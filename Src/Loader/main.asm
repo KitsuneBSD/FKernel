@@ -1,5 +1,4 @@
 ; Booting the kernel as legacy BIOS
-
 ; NOTE: This kernel is not a real kernel, it's just a simple boot loader from legacy BIOS
 
 ; Disable interrupts 
@@ -18,7 +17,6 @@ chr_loop:lodsb
   mov bh, 0 
   int 0x10
   jmp chr_loop
-
 
 ; Lock the kernel
 hang:
