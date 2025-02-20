@@ -6,7 +6,7 @@ PWD=$(pwd)
 NEW_PATH="${PWD%/Lib}/bin:$PATH"
 
 if [[ ":$PATH:" != *":$NEW_PATH:"* ]]; then
-	echo "export PATH=\"$NEW_PATH:\$PATH\"" >>.profile
+	echo "export PATH=\"$NEW_PATH:\$PATH\"" >>$HOME/.profile
 	echo "[INFO]: Caminho '$NEW_PATH' adicionado ao .profile"
 else
 	echo "[INFO]: Caminho '$NEW_PATH' já está presente no PATH"
