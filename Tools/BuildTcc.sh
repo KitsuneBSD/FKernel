@@ -1,10 +1,8 @@
 set -eo pipefail
 
-. "./Lib/set_path.sh"
-
-. "./Lib/check_command.sh"
-. "./Lib/extract_repo_name.sh"
-. "./Lib/clone_repository.sh"
+source "$(dirname "$0")/Lib/check_command.sh"
+source "$(dirname "$0")/Lib/extract_repo_name.sh"
+source "$(dirname "$0")/Lib/clone_repository.sh"
 
 ARCH=x86_64
 NPROCS=$(nproc)
