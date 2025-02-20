@@ -6,11 +6,11 @@ function clone_repository {
 	repo_name=$(extract_repo_name "$1")
 
 	if [ ! -d "$repo_name" ]; then
-		git clone "$url"
+		git clone "$url" "$(dirname "$0")/$repo_name"
 	else
-		rm -rf "$repo_name"
-		git clone "$url"
+		rm -rf "$(dirname "$0")/$repo_name"
+		git clone "$url" "$(dirname "$0")/$repo_name"
 	fi
 
-	cd "$repo_name" || exit 1
+	cd "$(dirname "$0")/$repo_name" || exit 1
 }
