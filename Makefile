@@ -1,8 +1,8 @@
-.PHONY: all tools_build test
+.PHONY: all build_tools test
 
-all: tools_build test
+all: build_tools test
 
-tools_build: 
+build_tools: 
 	bash Tools/*.sh
 
 test: 
