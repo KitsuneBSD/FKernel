@@ -1,6 +1,6 @@
 .PHONY: all clean run
 
-CC := tcc
+CC := ../../Tools/bin/x86_64-tcc
 CFLAGS := -I Include -Wall -Werror -Wpedantic -Wextras -O2
 
 SOURCES := $(wildcard *.c)
