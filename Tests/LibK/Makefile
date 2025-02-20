@@ -1,7 +1,7 @@
 .PHONY: all clean run
 
 CC := ../../Tools/bin/x86_64-tcc
-CFLAGS := -I Include -Wall -Werror -Wpedantic -Wextras -O2
+CFLAGS := -I Include -I ../../Include/LibK -Wall -Werror -Wpedantic -Wextras -O2
 
 SOURCES := $(wildcard *.c)
 EXES := $(SOURCES:.c=)
