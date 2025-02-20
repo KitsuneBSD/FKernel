@@ -14,10 +14,12 @@ TCC_NAME=$(extract_repo_name "$TCC_REPO")
 function compile {
 	output="$ARCH-tcc"
 
+	echo "$PWD"
+
 	printf "[INFO]: Starting compiling...\n"
 
-	if [ -f "./configure" ]; then
-		"./configure"
+	if [ -f "configure" ]; then
+		"./configure" "--prefix=/usr/local --enable-static"
 	fi
 
 	if [ -f "Makefile" ]; then
@@ -26,6 +28,7 @@ function compile {
 
 	if [ -f "$output" ]; then
 		mv "$output" "../bin"
+		sudo mv "x86_64-libtcc1.a" /usr/lib/
 		printf "[INFO]: Compilação concluída! Binário movido para 'bin/'.\n"
 	else
 		printf "[ERROR]: Output file '%s' not found after compilation.\n" "$output"
