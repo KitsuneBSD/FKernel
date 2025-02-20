@@ -10,9 +10,7 @@ TCC_REPO="https://github.com/TinyCC/TinyCC"
 TCC_NAME=$(extract_repo_name "$TCC_REPO")
 
 function compile {
-	output="$ARCH-tcc"
-
-	echo "$PWD"
+	output="$(dirname "$0")/bin/$ARCH-tcc"
 
 	printf "[INFO]: Starting compiling...\n"
 
@@ -25,16 +23,14 @@ function compile {
 	fi
 
 	if [ -f "$output" ]; then
-		mv "$output" "../bin"
-		sudo mv "x86_64-libtcc1.a" /usr/lib/
+		if [ ! -f "/usr/lib/x86_64-libtcc1.a" ]; then
+			sudo mv "x86_64-libtcc1.a" /usr/lib/
+		fi
 		printf "[INFO]: Compilação concluída! Binário movido para 'bin/'.\n"
-	else
-		printf "[ERROR]: Output file '%s' not found after compilation.\n" "$output"
-		exit 1
 	fi
 }
 
-mkdir -p "bin"
+mkdir -p "$(dirname "$0")/bin"
 
 check_command "git"
 check_command "gcc"
