@@ -1,4 +1,9 @@
-.PHONY: all test
+.PHONY: all tools_build test
 
-all:
-	$(MAKE) -C "Tests"
+all: tools_build test
+
+tools_build: 
+	bash Tools/*.sh
+
+test: 
+	$(MAKE) -C Tests
