@@ -1,4 +1,4 @@
-.PHONY: all compile build_os clean
+.PHONY: all compile build_os run_os clean
 
 # -- Project Directory
 BUILD_DIR=Build
@@ -22,6 +22,10 @@ build_os: $(TARGET)
 	@cp -r $(CONFIG_DIR)/grub.cfg $(FKERNELOS)/boot/grub/grub.cfg
 	@cp -r $(BUILD_DIR)/kernel.bin $(FKERNELOS)/boot/
 	@grub-mkrescue -o $(BUILD_DIR)/FKernelDistro.iso $(FKERNELOS)
+
+run_os: build_os
+	@echo "===> Running OS Mock"
+	@qemu-system-x86_64 -m 4G -smp 2 -cdrom $(BUILD_DIR)/FKernelDistro.iso
 
 compile:
 	@$(MAKE) -C Src/Kernel/Boot
