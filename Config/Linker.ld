@@ -5,45 +5,41 @@ KERNEL_VMA = 0x100000;
 SECTIONS {
     . = KERNEL_VMA;
 
-    .multiboot_header ALIGN(4K) : AT(ADDR(.multiboot_header) - KERNEL_VMA) {
-      *(.multiboot_header)
+    .multiboot_header : {
+        *(.multiboot_header)
     }
 
-    .text : AT(ADDR(.text) - KERNEL_VMA)
-    {
+    .text : {
         _code = .;
         *(.text)
         *(.rodata*)
         . = ALIGN(4096);
     }
 
-   .data : AT(ADDR(.data) - KERNEL_VMA)
-   {
+    .data : {
         _data = .;
         *(.data)
         . = ALIGN(4096);
-   }
+    }
 
-   .eh_frame : AT(ADDR(.eh_frame) - KERNEL_VMA)
-   {
-       _ehframe = .;
-       *(.eh_frame)
+    .eh_frame : {
+        _ehframe = .;
+        *(.eh_frame)
         . = ALIGN(4096);
-   }
+    }
 
-   .bss : AT(ADDR(.bss) - KERNEL_VMA)
-   {
-       _bss = .;
-       *(.bss)
-
+    .bss : {
+        _bss = .;
+        *(.bss)
         *(COMMON)
-       . = ALIGN(4096);
-   }
+        . = ALIGN(4096);
+    }
 
-   _end = .;
+    _end = .;
 
-   /DISCARD/ :
-   {
+    /DISCARD/ :
+    {
         *(.comment)
-   }
+    }
 }
+
