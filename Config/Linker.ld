@@ -3,7 +3,11 @@ ENTRY(_start)
 KERNEL_VMA = 0x100000;
 
 SECTIONS {
-  . = KERNEL_VMA;
+    . = KERNEL_VMA;
+
+    .multiboot_header ALIGN(4K) : AT(ADDR(.multiboot_header) - KERNEL_VMA) {
+      *(.multiboot_header)
+    }
 
     .text : AT(ADDR(.text) - KERNEL_VMA)
     {
