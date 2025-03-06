@@ -4,6 +4,7 @@
 BUILD_DIR=Build
 OBJECT_DIR=$(BUILD_DIR)/Obj
 FKERNELOS=$(BUILD_DIR)/FKernelOS
+FKERNELOS_ISO=$(BUILD_DIR)/FKernelDistro.iso
 CONFIG_DIR=Config
 
 TARGET=$(BUILD_DIR)/kernel.bin
@@ -13,7 +14,6 @@ OBJECTS=$(wildcard $(OBJECT_DIR)/*.o)
 LD=ld.lld
 LDFLAGS=-nostdlib -T $(CONFIG_DIR)/Linker.ld
 
-# NOTE: Maybe be a good idea in future change the default Makefile to KConfig
 all: compile $(TARGET) $(OBJECTS)
 
 build_os: $(TARGET)
@@ -22,10 +22,11 @@ build_os: $(TARGET)
 	@cp -r $(CONFIG_DIR)/grub.cfg $(FKERNELOS)/boot/grub/grub.cfg
 	@cp -r $(BUILD_DIR)/kernel.bin $(FKERNELOS)/boot/
 	@grub-mkrescue -o $(BUILD_DIR)/FKernelDistro.iso $(FKERNELOS)
+	@rm -rf $(FKERNELOS)
 
 run_os: build_os
 	@echo "===> Running OS Mock"
-	@qemu-system-x86_64 -m 4G -smp 2 -cdrom $(BUILD_DIR)/FKernelDistro.iso
+	@qemu-system-x86_64 -m 4G -smp 2 -cdrom $(FKERNELOS_ISO)
 
 compile:
 	@$(MAKE) -C Src/Kernel/Boot
