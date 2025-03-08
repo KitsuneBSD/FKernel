@@ -1,8 +1,8 @@
 .PHONY: all clean
 
 BUILD_DIR=../../../Build
-
 OBJ_DIR=$(BUILD_DIR)/Obj
+INCLUDE_DIR=../../../Include
 
 AS=nasm
 ASFLAGS=-felf64 -O2
@@ -11,7 +11,7 @@ ASM_FILES=$(wildcard *.asm)
 ASM_OBJS=$(patsubst %.asm, $(OBJ_DIR)/%.o, $(ASM_FILES))
 
 CC=clang 
-CFLAGS=-ffreestanding -nostdlib -nostdinc -O2 -c
+CFLAGS=-ffreestanding -nostdlib -nostdinc -O2 -c -I $(INCLUDE_DIR)/Kernel/Driver -I $(INCLUDE_DIR)/LibK
 
 C_FILES=$(wildcard *c)
 C_OBJS=$(patsubst %.c, $(OBJ_DIR)/%.o, $(C_FILES))
