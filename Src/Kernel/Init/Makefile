@@ -29,8 +29,8 @@ $(OBJ_DIR)/%.o: %.asm | $(OBJ_DIR)
 all: $(ASM_OBJS) $(C_OBJS)
 
 clean:
-	@echo "Cleaning Src/Kernel/Boot"
-	@rm -rf $(ASM_OBJS) $(C_OBJS) $(BUILD_DIR) $(OBJ_DIR)
+	@echo "Cleaning Src/Kernel/Init Objects"
+	@rm -rf $(ASM_OBJS) $(C_OBJS)
 
 $(BUILD_DIR):
 	@echo "Create Build Directory"
