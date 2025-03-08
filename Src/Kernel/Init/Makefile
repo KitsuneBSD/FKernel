@@ -28,8 +28,9 @@ $(OBJ_DIR)/%.o: %.asm | $(OBJ_DIR)
 
 all: $(ASM_OBJS) $(C_OBJS)
 
-clean:
+clean: $(ASM_OBJS) $(C_OBJS)
 	@echo "Cleaning Src/Kernel/Init Objects"
+	@echo "RM: $<"
 	@rm -rf $(ASM_OBJS) $(C_OBJS)
 
 $(BUILD_DIR):
