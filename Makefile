@@ -1,4 +1,4 @@
-.PHONY: all compile build_os run_os clean
+.PHONY: all compile run build_os run_os clean
 
 # -- Project Directory
 BUILD_DIR=Build
@@ -14,7 +14,7 @@ OBJECTS=$(wildcard $(OBJECT_DIR)/*.o)
 LD=ld.lld
 LDFLAGS=-nostdlib -T $(CONFIG_DIR)/Linker.ld
 
-all: compile $(TARGET) $(OBJECTS)
+all: compile $(TARGET) $(OBJECTS) run_os
 
 build_os: $(TARGET)
 	@echo "===> Create OS Mock"
