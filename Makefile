@@ -1,41 +1,43 @@
-.PHONY: all compile run build_os run_os clean
+.PHONY: all build run clean compile iso
 
-# -- Project Directory
 BUILD_DIR=Build
-OBJECT_DIR=$(BUILD_DIR)/Obj
-FKERNELOS=$(BUILD_DIR)/FKernelOS
-FKERNELOS_ISO=$(BUILD_DIR)/FKernelDistro.iso
+OBJ_DIR=$(BUILD_DIR)/Obj
 CONFIG_DIR=Config
 
-TARGET=$(BUILD_DIR)/kernel.bin
-OBJECTS=$(wildcard $(OBJECT_DIR)/*.o)
+FKernelOS=$(BUILD_DIR)/FKernelOS
+ISO_PATH=$(BUILD_DIR)/FKernel_MockOS.iso
 
-# -- Linker toolchain
+KERNEL_BIN=$(BUILD_DIR)/kernel.bin
+OBJS=$(shell find $(OBJ_DIR) -type f -name "*.o")
+
 LD=ld.lld
-LDFLAGS=-nostdlib -T $(CONFIG_DIR)/Linker.ld
+LD_FLAGS=-nostdlib -T $(CONFIG_DIR)/Linker.ld
 
-all: compile $(TARGET) $(OBJECTS) run_os
+all: build run
 
-build_os: $(TARGET)
-	@echo "===> Create OS Mock"
-	@mkdir -p $(FKERNELOS)/boot/grub/
-	@cp -r $(CONFIG_DIR)/grub.cfg $(FKERNELOS)/boot/grub/grub.cfg
-	@cp -r $(BUILD_DIR)/kernel.bin $(FKERNELOS)/boot/
-	@grub-mkrescue -o $(BUILD_DIR)/FKernelDistro.iso $(FKERNELOS)
-	@rm -rf $(FKERNELOS)
+build: $(KERNEL_BIN)
 
-run_os: build_os
-	@echo "===> Running OS Mock"
-	@qemu-system-x86_64 -m 4G -smp 2 -cdrom $(FKERNELOS_ISO)
+$(KERNEL_BIN): compile
+	@echo "Linking kernel..."
+	@$(LD) $(LD_FLAGS) $(OBJS) -o $@
 
 compile:
-	@$(MAKE) -C Src/Kernel/Boot
+	@find Src/Kernel -type f -name Makefile -execdir $(MAKE) -C $(dir {}) \;
+
+iso: build
+	@echo "Creating MockOS ISO"
+	@mkdir -p $(FKernelOS)/boot/grub
+	@cp $(CONFIG_DIR)/grub.cfg $(FKernelOS)/boot/grub
+	@cp $(KERNEL_BIN) $(FKernelOS)/boot/
+	@grub-mkrescue -o $(ISO_PATH) $(FKernelOS)
+	@rm -rf $(FKernelOS)
+
+run: iso 
+	@echo "Running MockOS in QEMU"
+	@qemu-system-x86_64 -cdrom $(ISO_PATH)
 
 clean:
-	@$(MAKE) -C Src/Kernel/Boot clean
-
-$(TARGET): $(OBJECTS)
-	@echo "Linking objects"
-	@$(LD) $(LDFLAGS) $(OBJECTS) -o $@
-
+	@echo "Clean build..."
+	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) clean \;
+	@rm -rf $(BUILD_DIR)
 
