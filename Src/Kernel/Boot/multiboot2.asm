@@ -1,13 +1,29 @@
-MULTIBOOT2_MAGIC equ 0xe85250d6
-MULTIBOOT2_ARCH equ 0 ; protected mode i386
+%define MULTIBOOT2_MAGIC 0xe85250d6
+%define MULTIBOOT2_ARCH 0
+%define MUTLIBOOT2_HEADER_LEN (header_end - header_start)
+
+%define MULTIBOOT2_TAG_TYPE_INFORMATION_REQUEST 1
+%define MUTLIBOOT2_TAG_TYPE_END 0
+
+%define MULTIBOOT2_INFO_MEMORY_MAP 1
+%define MULTIBOOT2_INFO_MODULES 5
 
 section .multiboot_header
+align 8
 header_start:
 	dd MULTIBOOT2_MAGIC
 	dd MULTIBOOT2_ARCH
-	dd header_end - header_start
-	dd 0x100000000 - (MULTIBOOT2_MAGIC + MULTIBOOT2_ARCH + (header_end - header_start))
+	dd MUTLIBOOT2_HEADER_LEN
+	dd 0x100000000 - (MULTIBOOT2_MAGIC + MULTIBOOT2_ARCH + MUTLIBOOT2_HEADER_LEN)
+  
+  ; tag information request
+  dw MULTIBOOT2_TAG_TYPE_INFORMATION_REQUEST
+  dw 0
+  dd 8 + 8
 
+  dd MULTIBOOT2_INFO_MEMORY_MAP
+  dd MULTIBOOT2_INFO_MODULES
+    
 	; end tag
 	dw 0
 	dw 0
