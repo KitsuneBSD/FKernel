@@ -22,14 +22,14 @@ $(KERNEL_BIN): compile
 	@$(LD) $(LD_FLAGS) $(OBJS) -o $@
 
 compile:
-	@find Src/Kernel -type f -name Makefile -execdir $(MAKE) -C $(dir {}) \;
+	@find Src/Kernel -type f -name Makefile -execdir $(MAKE) -s -C $(dir {}) \;
 
 iso: build
 	@echo "Creating MockOS ISO"
 	@mkdir -p $(FKernelOS)/boot/grub
 	@cp $(CONFIG_DIR)/grub.cfg $(FKernelOS)/boot/grub
 	@cp $(KERNEL_BIN) $(FKernelOS)/boot/
-	@grub-mkrescue -o $(ISO_PATH) $(FKernelOS)
+	@grub-mkrescue -o $(ISO_PATH) $(FKernelOS) > /dev/null 2>&1
 	@rm -rf $(FKernelOS)
 
 run: iso 
@@ -38,6 +38,6 @@ run: iso
 
 clean:
 	@echo "Clean build..."
-	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) clean \;
+	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) -s clean \;
 	@rm -rf $(BUILD_DIR)
 
