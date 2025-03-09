@@ -1,17 +1,13 @@
+include ../../../../config.mk
+
 .PHONY: all clean
 
 BUILD_DIR=../../../../Build
 OBJ_DIR=$(BUILD_DIR)/Obj
 INCLUDE_DIR=../../../../Include
 
-AS=nasm
-ASFLAGS=-felf64 -O2
-
 ASM_FILES=$(wildcard *.asm)
 ASM_OBJS=$(patsubst %.asm, $(OBJ_DIR)/%.o, $(ASM_FILES))
-
-CC=clang 
-CFLAGS=-ffreestanding -nostdlib -nostdinc -O2 -c -I $(INCLUDE_DIR)/Kernel/Driver -I $(INCLUDE_DIR)/LibK
 
 C_FILES=$(wildcard *c)
 C_OBJS=$(patsubst %.c, $(OBJ_DIR)/%.o, $(C_FILES))
@@ -28,9 +24,7 @@ $(OBJ_DIR)/%.o: %.asm | $(OBJ_DIR)
 
 all: $(ASM_OBJS) $(C_OBJS)
 
-clean: $(ASM_OBJS) $(C_OBJS)
-	@echo "Cleaning Src/Kernel/Driver/VgaBuffer Objects"
-	@echo "RM: $<"
+clean:
 	@rm -rf $(ASM_OBJS) $(C_OBJS)
 
 $(BUILD_DIR):

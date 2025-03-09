@@ -1,5 +1,7 @@
 .PHONY: all build run clean compile iso
 
+include ./config.mk
+
 BUILD_DIR=Build
 OBJ_DIR=$(BUILD_DIR)/Obj
 CONFIG_DIR=Config
@@ -10,9 +12,6 @@ ISO_PATH=$(BUILD_DIR)/FKernel_MockOS.iso
 KERNEL_BIN=$(BUILD_DIR)/kernel.bin
 OBJS=$(shell find $(OBJ_DIR) -type f -name "*.o")
 
-LD=ld.lld
-LD_FLAGS=-nostdlib -T $(CONFIG_DIR)/Linker.ld
-
 all: build run
 
 build: $(KERNEL_BIN)
@@ -22,6 +21,8 @@ $(KERNEL_BIN): compile
 	@$(LD) $(LD_FLAGS) $(OBJS) -o $@
 
 compile:
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(OBJ_DIR)
 	@find Src/Kernel -type f -name Makefile -execdir $(MAKE) -s -C $(dir {}) \;
 
 iso: build
@@ -41,3 +42,5 @@ clean:
 	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) -s clean \;
 	@rm -rf $(BUILD_DIR)
 
+
+	
