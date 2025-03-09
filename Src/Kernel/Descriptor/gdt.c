@@ -1,14 +1,14 @@
 #include "../../../Include/Kernel/Descriptor/gdt.h"
 #include "../../../Include/Kernel/Driver/vga_buffer.h"
 
-#define GDT_MAX_ENTRIES 9
+#define GDT_MAX_ENTRIES 8
+
+extern void load_gdt(uint64_t gdt_ptr_address);
 
 gdt_entry_t gdt_entry[GDT_MAX_ENTRIES];
 gdt_ptr_t gdt_ptr;
 
-int gdt_index = 1;
-
-extern void flush_segments();
+int gdt_index = 0;
 
 void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
   if (gdt_index > GDT_MAX_ENTRIES) {
@@ -25,30 +25,25 @@ void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
   ++gdt_index;
 }
 
-void load_gdt(gdt_ptr_t *gdt_ptr) {
-  asm volatile("lgdt (%0)" : : "r"(gdt_ptr));
-}
-
 void init_gdt() {
-  print_str("Load Null Descriptor\n");
+  print_str("Loading a new GDT\n");
+  print_str("Loading a NULL Descriptor\n");
   create_descriptor(0, 0, 0);
-  print_str("Load the Kernel Segments\n");
+  print_str("Loading a Kernel Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_0);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_0);
-  print_str("Load the Driver Segments\n");
+  print_str("Loading a Driver Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_1);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_1);
-  print_str("Load the Virtualization Segments\n");
+  print_str("Loading a Virtualization Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_2);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_2);
-  print_str("Load the User Segments\n");
+  print_str("Loading a User Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_3);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_3);
 
   gdt_ptr.limit = (sizeof(gdt_entry) - 1);
   gdt_ptr.base = (uint64_t)&gdt_entry;
 
-  load_gdt(&gdt_ptr);
-
-  flush_segments();
+  load_gdt((uint64_t)&gdt_ptr);
 }
