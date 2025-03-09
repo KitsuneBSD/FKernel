@@ -1,18 +1,32 @@
 #include "../../../Include/Kernel/Descriptor/gdt.h"
 #include "../../../Include/Kernel/Driver/vga_buffer.h"
 
-gdt_entry_t gdt_entry[5];
+#define GDT_MAX_ENTRIES 9
+
+gdt_entry_t gdt_entry[GDT_MAX_ENTRIES];
 gdt_ptr_t gdt_ptr;
 
-void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
-  int index = (flag >> 5) & 0x03;
+int gdt_index = 1;
 
-  gdt_entry[index].limit_low = (limit & 0xFFFF);
-  gdt_entry[index].base_low = (base & 0xFFFF);
-  gdt_entry[index].base_middle = (base >> 16) & 0xFF;
-  gdt_entry[index].access = (flag & 0xFF);
-  gdt_entry[index].granularity = ((limit >> 16) & 0x0F) | (flag >> 8);
-  gdt_entry[index].base_high = (base >> 24) & 0xFF;
+extern void flush_segments();
+
+void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
+  if (gdt_index > GDT_MAX_ENTRIES) {
+    print_str("GDT Index reach the max entries");
+    return;
+  }
+
+  gdt_entry[gdt_index].limit_low = (limit & 0xFFFF);
+  gdt_entry[gdt_index].base_low = (base & 0xFFFF);
+  gdt_entry[gdt_index].base_middle = (base >> 16) & 0xFF;
+  gdt_entry[gdt_index].access = (flag & 0xFF);
+  gdt_entry[gdt_index].granularity = ((limit >> 16) & 0x0F) | (flag >> 8);
+  gdt_entry[gdt_index].base_high = (base >> 24) & 0xFF;
+  ++gdt_index;
+}
+
+void load_gdt(gdt_ptr_t *gdt_ptr) {
+  asm volatile("lgdt (%0)" : : "r"(gdt_ptr));
 }
 
 void init_gdt() {
@@ -33,4 +47,8 @@ void init_gdt() {
 
   gdt_ptr.limit = (sizeof(gdt_entry) - 1);
   gdt_ptr.base = (uint64_t)&gdt_entry;
+
+  load_gdt(&gdt_ptr);
+
+  flush_segments();
 }
