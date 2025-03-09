@@ -26,7 +26,7 @@ void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
 }
 
 void init_gdt() {
-  print_str("Loading a new GDT\n");
+  print_str("Load a new GDT\n");
   print_str("Loading a NULL Descriptor\n");
   create_descriptor(0, 0, 0);
   print_str("Loading a Kernel Segment\n");
@@ -46,4 +46,5 @@ void init_gdt() {
   gdt_ptr.base = (uint64_t)&gdt_entry;
 
   load_gdt((uint64_t)&gdt_ptr);
+  print_str("New GDT Loaded\n");
 }
