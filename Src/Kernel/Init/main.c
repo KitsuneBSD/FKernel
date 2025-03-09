@@ -1,6 +1,8 @@
+#include "../../../Include/Kernel/Descriptor/gdt.h"
 #include "../../../Include/Kernel/Driver/vga_buffer.h"
 
 void kmain() {
   clear_screen();
-  print_str("Hello World!");
+  init_gdt();
+  print_str("[OK]: There is the latest point in the kernel");
 }
