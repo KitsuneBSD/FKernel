@@ -35,3 +35,6 @@ typedef unsigned long uint_fast64_t;
 
 typedef signed long int_least64_t;
 typedef unsigned long uint_least64_t;
+
+typedef signed long intptr_t;
+typedef unsigned long uintptr_t;
