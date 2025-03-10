@@ -26,19 +26,19 @@ void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
 }
 
 void init_gdt() {
-  print_str("Load a new GDT\n");
-  print_str("Loading a NULL Descriptor\n");
+  print_str("Init GDT\n");
+  print_str("Load NULL Descriptor\n");
   create_descriptor(0, 0, 0);
-  print_str("Loading a Kernel Segment\n");
+  print_str("Load Kernel Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_0);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_0);
-  print_str("Loading a Driver Segment\n");
+  print_str("Load Driver Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_1);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_1);
-  print_str("Loading a Virtualization Segment\n");
+  print_str("Load Virtualization Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_2);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_2);
-  print_str("Loading a User Segment\n");
+  print_str("Load User Segment\n");
   create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_3);
   create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_3);
 
@@ -46,5 +46,5 @@ void init_gdt() {
   gdt_ptr.base = (uint64_t)&gdt_entry;
 
   load_gdt((uint64_t)&gdt_ptr);
-  print_str("New GDT Loaded\n");
+  print_str("GDT Initialized\n");
 }
