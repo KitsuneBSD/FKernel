@@ -39,7 +39,7 @@ run: iso
 
 clean:
 	@echo "Clean build..."
-	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) -s clean \;
+	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) -s -C $(dir {}) clean \;
 	@rm -rf $(BUILD_DIR)
 
 
