@@ -25,6 +25,7 @@ $(OBJ_DIR)/%.o: %.asm | $(OBJ_DIR)
 all: $(ASM_OBJS) $(C_OBJS)
 
 clean:
+	@echo "Cleaning Src/Kernel/Driver/VgaBuffer Objects"
 	@rm -rf $(ASM_OBJS) $(C_OBJS)
 
 $(BUILD_DIR):

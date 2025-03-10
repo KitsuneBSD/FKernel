@@ -25,5 +25,6 @@ $(OBJ_DIR)/%.o: %.asm | $(OBJ_DIR)
 all: $(ASM_OBJS) $(C_OBJS)
 
 clean:
+	@echo "Cleaning Src/Kernel/Init Objects"
 	@rm -rf $(ASM_OBJS) $(C_OBJS)
 
