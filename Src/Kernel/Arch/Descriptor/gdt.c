@@ -1,5 +1,5 @@
-#include "../../../Include/Kernel/Arch/Descriptor/gdt.h"
-#include "../../../Include/Kernel/Driver/vga_buffer.h"
+#include "../../../../Include/Kernel/Arch/Descriptor/gdt.h"
+#include "../../../../Include/Kernel/Driver/vga_buffer.h"
 
 #define GDT_MAX_ENTRIES 8
 

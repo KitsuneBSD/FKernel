@@ -1,5 +1,4 @@
 #include "../../../Include/Kernel/Arch/Descriptor/gdt.h"
-#include "../../../Include/Kernel/Arch/Descriptor/idt.h"
 #include "../../../Include/Kernel/Driver/vga_buffer.h"
 
 void kmain() {

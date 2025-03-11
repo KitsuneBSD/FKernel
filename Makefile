@@ -23,7 +23,7 @@ $(KERNEL_BIN): compile
 compile:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(OBJ_DIR)
-	@find Src/Kernel -type f -name Makefile -execdir $(MAKE) -s -C $(dir {}) \;
+	@find Src/Kernel/* -type f -name Makefile -execdir $(MAKE) -s -C $(dir {}) \;
 
 iso: build
 	@echo "Creating MockOS ISO"

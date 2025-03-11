@@ -1,8 +1,8 @@
-include ../../../config.mk
+include ../../../../config.mk
 
 .PHONY: all clean
 
-BUILD_DIR=../../../Build
+BUILD_DIR=../../../../Build
 OBJ_DIR=$(BUILD_DIR)/Obj
 INCLUDE_DIR=../../../../Include
 
@@ -25,7 +25,7 @@ $(OBJ_DIR)/%.o: %.asm | $(OBJ_DIR)
 all: $(ASM_OBJS) $(C_OBJS)
 
 clean:
-	@echo "Cleaning Src/Kernel/Arch Objects"
+	@echo "Cleaning Src/Kernel/Arch/Descriptor Objects"
 	@rm -rf $(ASM_OBJS) $(C_OBJS)
 
 $(BUILD_DIR):
