@@ -1,7 +1,7 @@
 #pragma once
 
-#include "stdbool.h"
-#include "stdint.h"
+#include "../../../Include/Kernel/LibK/stdbool.h"
+#include "../../../Include/Kernel/LibK/stdint.h"
 
 #define fence() __asm__ volatile("" ::: "memory")
 

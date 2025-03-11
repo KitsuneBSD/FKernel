@@ -1,11 +1,9 @@
 #pragma once
 
-#include "../../../Include/LibK/stdint.h"
+#include "../../../../Include/Kernel/LibK/stdint.h"
 
 #define IDT_MAX_ENTRIES 256
 #define GDT_OFFSET_KERNEL_CODE 0x08
-
-extern void *isr_stub_table[];
 
 typedef struct {
   uint16_t isr_low;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../Include/LibK/stdint.h"
+#include "../../../../Include/Kernel/LibK/stdint.h"
 
 #define SEGMENT_DESCRIPTOR_TYPE(x) ((x) << 0x04)
 #define SEGMENT_PRESENCE(x) ((x) << 0x07)

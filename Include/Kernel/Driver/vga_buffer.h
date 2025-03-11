@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../../Include/LibK/stddef.h"
-#include "../../../Include/LibK/stdint.h"
+#include "../../../Include/Kernel/LibK/stddef.h"
+#include "../../../Include/Kernel/LibK/stdint.h"
 
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
