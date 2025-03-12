@@ -2,26 +2,25 @@
 
 #include "../../../../Include/Kernel/LibK/stdint.h"
 
-#define IDT_MAX_ENTRIES 256
-#define GDT_OFFSET_KERNEL_CODE 0x08
-
-typedef struct {
-  uint16_t isr_low;
-  uint16_t kernel_cs;
+struct idt_entry {
+  uint16_t offset_low;
+  uint16_t selector;
   uint8_t ist;
-  uint8_t attributes;
-  uint16_t isr_mid;
-  uint32_t isr_high;
+  uint8_t type_attr;
+  uint16_t offset_mid;
+  uint32_t offset_high;
   uint32_t reserved;
-} __attribute__((packed)) idt_entry_t;
+} __attribute__((packed));
 
-typedef struct {
+struct idt_ptr {
   uint16_t limit;
   uint64_t base;
-} __attribute__((packed)) idtr_t;
+} __attribute__((packed));
 
-static idt_entry_t idt[IDT_MAX_ENTRIES];
-static idtr_t idtr;
+#define IDT_ENTRIES 256
 
-void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags);
+extern struct idt_entry idt[IDT_ENTRIES];
+extern struct idt_ptr idtp;
+
 void init_idt();
+extern void idt_flush(uint64_t idtp_address);
