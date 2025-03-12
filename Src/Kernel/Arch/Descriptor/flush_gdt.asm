@@ -1,20 +1,19 @@
-global load_gdt
-
+global gdt_flush
 section .text
-bits 64
 
-load_gdt:
+gdt_flush:
   lgdt [rdi]
+
   mov ax, 0x10
   mov ds, ax
   mov es, ax
   mov fs, ax
   mov gs, ax
   mov ss, ax
-  push qword 0x08
-  lea rax, [rel reload_cs]
-  push rax
-  lretq
 
-reload_cs:
+  push qword 0x08
+  lea rax, [rel flush_cs]
+  push rax 
+  lretq
+flush_cs:
   ret

@@ -1,50 +1,39 @@
 #include "../../../../Include/Kernel/Arch/Descriptor/gdt.h"
 #include "../../../../Include/Kernel/Driver/vga_buffer.h"
 
-#define GDT_MAX_ENTRIES 8
+struct gdt_entry gdt[MAX_GDT_ENTRIES];
+struct gdt_ptr gdtr;
 
-extern void load_gdt(uint64_t gdt_ptr_address);
+static void gdt_set_gate(int num, uint32_t base, uint32_t limit, uint8_t access,
+                         uint8_t granularity) {
+  gdt[num].base_low = (base & 0xFFFF);
+  gdt[num].base_middle = (base >> 16) & 0xFF;
+  gdt[num].base_high = (base >> 24) & 0xFF;
 
-gdt_entry_t gdt_entry[GDT_MAX_ENTRIES];
-gdt_ptr_t gdt_ptr;
+  gdt[num].limit_low = (limit & 0xFFFF);
+  gdt[num].granularity = ((limit >> 16) & 0x0F);
 
-int gdt_index = 0;
-
-void create_descriptor(uint32_t base, uint32_t limit, uint16_t flag) {
-  if (gdt_index > GDT_MAX_ENTRIES) {
-    print_str("GDT Index reach the max entries");
-    return;
-  }
-
-  gdt_entry[gdt_index].limit_low = (limit & 0xFFFF);
-  gdt_entry[gdt_index].base_low = (base & 0xFFFF);
-  gdt_entry[gdt_index].base_middle = (base >> 16) & 0xFF;
-  gdt_entry[gdt_index].access = (flag & 0xFF);
-  gdt_entry[gdt_index].granularity = ((limit >> 16) & 0x0F) | (flag >> 8);
-  gdt_entry[gdt_index].base_high = (base >> 24) & 0xFF;
-  ++gdt_index;
+  gdt[num].granularity |= (granularity & 0xF0);
+  gdt[num].access = access;
 }
 
 void init_gdt() {
   print_str("Init GDT\n");
-  print_str("Load NULL Descriptor\n");
-  create_descriptor(0, 0, 0);
-  print_str("Load Kernel Segment\n");
-  create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_0);
-  create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_0);
-  print_str("Load Driver Segment\n");
-  create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_1);
-  create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_1);
-  print_str("Load Virtualization Segment\n");
-  create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_2);
-  create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_2);
-  print_str("Load User Segment\n");
-  create_descriptor(0, 0xFFFFFFFF, GDT_CODE_RING_3);
-  create_descriptor(0, 0xFFFFFFFF, GDT_DATA_RING_3);
+  gdtr.limit = (sizeof(struct gdt_entry) * MAX_GDT_ENTRIES) - 1;
+  gdtr.base = (uint64_t)&gdt;
 
-  gdt_ptr.limit = (sizeof(gdt_entry) - 1);
-  gdt_ptr.base = (uint64_t)&gdt_entry;
+  print_str("Set NULL Descriptor\n");
+  gdt_set_gate(0, 0, 0, 0, 0);
 
-  load_gdt((uint64_t)&gdt_ptr);
-  print_str("GDT Initialized\n");
+  print_str("Set Ring 0: Kernel\n");
+  gdt_set_gate(1, 0, 0xFFFFF, 0x9A, 0x20);
+  gdt_set_gate(2, 0, 0xFFFFF, 0x92, 0x00);
+
+  print_str("Set Ring 3: User\n");
+  gdt_set_gate(3, 0, 0xFFFFF, 0xFA, 0x20);
+  gdt_set_gate(4, 0, 0xFFFFF, 0xF2, 0x00);
+
+  gdt_flush((uint64_t)&gdtr);
+
+  print_str("GDT Loaded\n");
 }
