@@ -22,7 +22,7 @@ void init_gdt() {
   gdtr.limit = (sizeof(struct gdt_entry) * MAX_GDT_ENTRIES) - 1;
   gdtr.base = (uint64_t)&gdt;
 
-  print_str("Set NULL Descriptor\n");
+  print_str("Set Null Descriptor\n");
   gdt_set_gate(0, 0, 0, 0, 0);
 
   print_str("Set Ring 0: Kernel\n");
