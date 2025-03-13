@@ -82,6 +82,41 @@ void putc(char c) {
   update_cursor();
 }
 
+void print_int(int num) {
+  char buffer[10];
+  int i = 0;
+  bool is_negative = false;
+
+  if (num == 0) {
+    print_str("0");
+    return;
+  }
+
+  if (num < 0) {
+    is_negative = true;
+    num = -num;
+  }
+
+  while (num > 0) {
+    buffer[i++] = (num % 10) + '0';
+    num /= 10;
+  }
+
+  if (is_negative) {
+    buffer[i++] = '-';
+  }
+
+  buffer[i] = '\0';
+
+  for (int j = 0, k = i - 1; j < k; j++, k--) {
+    char temp = buffer[j];
+    buffer[j] = buffer[k];
+    buffer[k] = temp;
+  }
+
+  print_str(buffer);
+}
+
 void print_str(const char *str) {
   for (size_t i = 0; str[i] != '\0'; ++i) {
     putc(str[i]);

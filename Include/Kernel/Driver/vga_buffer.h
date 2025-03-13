@@ -32,5 +32,6 @@ struct Char {
 
 void clear_screen();
 void putc(char c);
+void print_int(int num);
 void print_str(const char *str);
 void print_set_color(enum Color bg, enum Color fg);
