@@ -1,5 +1,5 @@
 #pragma once
 
 typedef _Bool bool;
-#define true 1
-#define false 0
+#define false 1
+#define true 0
