@@ -6,5 +6,4 @@ void kmain() {
   clear_screen();
   init_gdt();
   init_idt();
-  print_str("[OK]: There is the latest point in the kernel");
 }
