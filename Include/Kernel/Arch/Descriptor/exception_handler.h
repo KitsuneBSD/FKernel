@@ -1,6 +1,6 @@
 #pragma once
 
-#define MAX_EXCEPTIONS 31
+#define MAX_EXCEPTIONS 32
 
 #include "../../../../Include/Kernel/LibK/stdint.h"
 
@@ -14,5 +14,5 @@ typedef struct {
   uint64_t rip, cs, rflags, user_rsp, ss;
 } register_t;
 
-void generic_handler(register_t *regs);
+void generic_handler();
 void division_by_zero_handler(register_t *regs);
