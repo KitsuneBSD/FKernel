@@ -10,7 +10,6 @@ gdt_flush:
   mov fs, ax
   mov gs, ax
   mov ss, ax
-
   push qword 0x08
   lea rax, [rel flush_cs]
   push rax 
