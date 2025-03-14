@@ -15,7 +15,7 @@ uint8_t default_color = WHITE | BLACK << 4;
 struct Char *vga_adress = (struct Char *)0xb8000;
 
 void update_cursor() {
-  uint16_t position = cursor_y * MAX_VGA_COLS + cursor_x;
+  uint16_t position = (cursor_y * MAX_VGA_COLS) + cursor_x;
 
   outb(VGA_PORT, 0x0E);
   outb(VGA_DATA, (position >> 8) & 0xFF);
@@ -82,7 +82,19 @@ void putc(char c) {
   update_cursor();
 }
 
-void print_int(int num) {
+void print_hex(uint64_t value) {
+  char hex_str[17];
+  const char *hex_digits = "0123456789ABCDEF";
+  hex_str[16] = '\0';
+  for (int i = 15; i >= 0; --i) {
+    hex_str[i] = hex_digits[value & 0xF];
+    value >>= 4;
+  }
+  print_str("0x");
+  print_str(hex_str);
+}
+
+void print_int(int64_t num) {
   char buffer[10];
   int i = 0;
   bool is_negative = false;
