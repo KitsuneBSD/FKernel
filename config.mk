@@ -5,7 +5,7 @@ LD_FLAGS=-nostdlib -T $(CONFIG_DIR)/Linker.ld
 
 CC=clang 
 
-CFLAGS=-ffreestanding -nostdlib -nostdinc -O2 -c 
+CFLAGS=-ffreestanding -nostdlib -nostdinc -O0 -c 
 CFLAGS += $(INCLUDE_FLAGS) -fno-stack-protector -fno-strict-aliasing
 CFLAGS += -fno-omit-frame-pointer -fno-optimize-sibling-calls
 
