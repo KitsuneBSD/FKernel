@@ -16,3 +16,4 @@ typedef struct {
 
 void generic_handler();
 void division_by_zero_handler(register_t *regs);
+void invalid_opcode_handler(register_t *regs);
