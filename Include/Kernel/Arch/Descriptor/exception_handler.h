@@ -14,6 +14,7 @@ typedef struct {
   uint64_t rip, cs, rflags, user_rsp, ss;
 } register_t;
 
-void generic_handler();
+void panic(const char *segpoint, register_t *regs);
+void generic_handler(register_t *regs);
 void division_by_zero_handler(register_t *regs);
 void invalid_opcode_handler(register_t *regs);
