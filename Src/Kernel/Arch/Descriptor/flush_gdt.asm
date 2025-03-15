@@ -13,6 +13,6 @@ gdt_flush:
   push qword 0x08
   lea rax, [rel flush_cs]
   push rax 
-  lretq
+  ret
 flush_cs:
   ret
