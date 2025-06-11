@@ -1,6 +1,8 @@
 add_rules("mode.debug", "mode.release")
 set_policy("check.auto_ignore_flags", false)
 
+set_languages("cxx20")
+
 set_targetdir("build")
 
 toolchain("FKernel_Compiling")
@@ -51,6 +53,8 @@ end
 add_cxxflags(cxxflags_osdev)
 add_asflags(nasm_flags)
 add_ldflags(linker_flags)
+
+add_includedirs("Include")
 
 add_files("Src/Kernel/Boot/**.cpp")
 add_files("Src/Kernel/Boot/**.asm")
