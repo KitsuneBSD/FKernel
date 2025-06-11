@@ -113,6 +113,29 @@ struct alignas(TAG_ALIGN) Info {
   }
 };
 
+struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
+  struct Entry {
+    u64 base_addr;
+    u64 length;
+    u32 type;
+    u32 reserved;
+  };
+
+  u32 entry_size;
+  u32 entry_version;
+  Entry entries[0];
+
+  const Entry *begin() const noexcept { return entries; }
+
+  const Entry *end() const noexcept {
+    std::size_t entries_size = size - sizeof(TagMemoryMap);
+
+    std::size_t count = entries_size / entry_size;
+
+    return entries + count;
+  }
+};
+
 static_assert(sizeof(Tag) == 8);
 static_assert(alignof(Tag) == 8);
 static_assert(alignof(Info) == 8);
