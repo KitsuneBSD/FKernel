@@ -137,6 +137,25 @@ public:
     write(&buffer[pos + 1]);
     new_line();
   }
+
+  void write_dec(uint64_t value) {
+    char buffer[20];
+    int i = 19;
+    buffer[i--] = '\0';
+
+    if (value == 0) {
+      write("0");
+      return;
+    }
+
+    while (value > 0 && i >= 0) {
+      buffer[i--] = '0' + (value % 10);
+      value /= 10;
+    }
+
+    write(&buffer[i + 1]);
+  }
+
   void write(const char *str) {
     while (*str)
       putchar(*str++);
