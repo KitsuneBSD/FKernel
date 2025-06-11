@@ -23,3 +23,5 @@ cp "$grub_config" "$grub_directory"
 cp "$kernel_binary" "build/mockos/boot"
 
 grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso "build/mockos"
+rm -rf "build/mockos"
+rm -rf "build/FKernel.bin"
