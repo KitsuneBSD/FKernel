@@ -54,7 +54,7 @@ add_cxxflags(cxxflags_osdev)
 add_asflags(nasm_flags)
 add_ldflags(linker_flags)
 
-add_includedirs("Include")
+add_includedirs("Include", "Include/Kernel")
 
 add_files("Src/Kernel/Boot/**.cpp")
 add_files("Src/Kernel/Boot/**.asm")
