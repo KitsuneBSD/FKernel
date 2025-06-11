@@ -71,4 +71,8 @@ on_run(function(target)
 	os.exec("bash Meta/run_mockos.sh")
 end)
 
+on_clean(function(target)
+	os.exec("rm -rf build")
+end)
+
 target_end()
