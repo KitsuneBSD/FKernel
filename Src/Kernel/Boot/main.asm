@@ -8,13 +8,16 @@ start:
 	mov esp, stack_top
 
 	call check_multiboot
+
+  mov [multiboot_magic], eax
+  mov [multiboot_info_ptr], ebx
+
 	call check_cpuid
 	call check_long_mode
 
 	call setup_page_tables
 	call enable_paging
-
-	lgdt [gdt64.pointer]
+  	lgdt [gdt64.pointer]
 	jmp gdt64.code_segment:long_mode_start
 
 	hlt
@@ -115,6 +118,11 @@ error:
 	hlt
 
 section .bss
+align 8 
+multiboot_magic: resd 1 
+multiboot_info_ptr: resq 1
+
+section .bss
 align 4096
 page_table_l4:
 	resb 4096
@@ -144,6 +152,10 @@ long_mode_start:
   mov es, ax
   mov fs, ax
   mov gs, ax
-
+  
+  mov eax, [multiboot_magic]
+  mov edi, eax
+  mov rsi, [multiboot_info_ptr]
+  
 	call kmain
   hlt

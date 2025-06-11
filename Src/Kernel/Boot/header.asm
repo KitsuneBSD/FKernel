@@ -1,15 +1,13 @@
-section .multiboot_header
+section .multiboot_header align=8
 
-%define MULTIBOOT2_MAGIC 0xe85250d6
-%define MULTIBOOT2_i386_ARCHICTECTURE 0
+header_start:
+  dd 0xE85250D6                ; magic
+  dd 0                         ; architecture
+  dd header_end - header_start ; header length (em bytes)
+  dd -(0xE85250D6 + 0 + (header_end - header_start)) ; checksum
+
+  dw 0                        ; tag type = end (0)
+  dw 0                        ; flags
+  dd 8                        ; size do tag end (8 bytes)
 
 header_end:
-  dd MULTIBOOT2_MAGIC
-  dd MULTIBOOT2_i386_ARCHICTECTURE
-  dd header_end - header_start
-  dd 0x100000000 - ( MULTIBOOT2_MAGIC + MULTIBOOT2_i386_ARCHICTECTURE + (header_end - header_start))
-
-  dw 0
-  dw 0
-  dd 8
-header_start:
