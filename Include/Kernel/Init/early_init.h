@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/gdt.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
 
