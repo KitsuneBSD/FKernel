@@ -1,41 +1,39 @@
 #include "Boot/kmain.h"
-#include <Boot/multiboot2.h>
-#include <Driver/Vga_Buffer.hpp>
+#include "LibFK/Log.h"
 
 void kmain(uint32_t multiboot_magic, void *mb_info) {
-  using namespace multiboot2;
   using namespace vga;
+  using namespace multiboot2;
 
-  // TODO: Create a function kernel::log to make
   console.clear();
   console.set_color(Color::LightGreen, Color::Black);
+
+  console.write("Multiboot Magic: ");
   console.write_hex(multiboot_magic);
+  console.write("\n");
+
   if (multiboot_magic != BOOTLOADER_MAGIC) {
-    console.set_color(Color::LightRed, Color::White);
-    console.write("Error: Invalid multiboot magic number!\n");
+    Log(LogLevel::ERROR, "Invalid multiboot magic number!");
     while (true) {
       __asm__("hlt");
     }
   }
 
-  const Info *info = reinterpret_cast<const Info *>(mb_info);
-
-  if (auto *cmdline = reinterpret_cast<const TagString *>(
-          info->find_tag(TagType::Cmdline))) {
-    console.set_color(Color::White, Color::Black);
-    console.write("Boot cmdline: ");
+  const auto *info = reinterpret_cast<const Info *>(mb_info);
+  MultibootParser mb_parser(info);
+  // Cmdline
+  if (auto *cmdline = mb_parser.find_tag<TagString>(TagType::Cmdline)) {
+    Log(LogLevel::INFO, "Boot cmdline detected:");
     console.write(cmdline->get_string());
     console.write("\n");
   } else {
-    console.set_color(Color::Yellow, Color::Black);
-    console.write("No boot cmdline found.\n");
+    Log(LogLevel::WARN, "No boot cmdline found.");
   }
 
-  auto *mem_map_tag =
-      reinterpret_cast<const TagMemoryMap *>(info->find_tag(TagType::MMap));
+  // Memory Map
+  const auto *mem_map_tag = mb_parser.find_tag<TagMemoryMap>(TagType::MMap);
   if (!mem_map_tag) {
-    console.set_color(Color::LightRed, Color::Black);
-    console.write("Error: Memory map tag not found!\n");
+    Log(LogLevel::ERROR, "Memory map tag not found!");
     while (true) {
       __asm__("hlt");
     }
@@ -44,21 +42,18 @@ void kmain(uint32_t multiboot_magic, void *mb_info) {
   uint64_t total_mem = 0;
   for (const auto *entry = mem_map_tag->begin(); entry != mem_map_tag->end();
        ++entry) {
-    if (entry->type == 1) { // 1 = memória disponível conforme spec Multiboot2
+    if (entry->type == 1) { // Memory available
       total_mem += entry->length;
     }
   }
 
-  console.write_hex(total_mem);
-
   uint64_t total_mem_mb = total_mem / (1024 * 1024);
-  console.write("Total available memory: ");
+
+  Log(LogLevel::INFO, "Total usable memory:");
   console.write_dec(total_mem_mb);
   console.write(" MB\n");
 
-  console.set_color(Color::LightGreen, Color::Black);
-  console.write("Kernel initialized successfully.\n");
-
+  Log(LogLevel::INFO, "Kernel initialized successfully.");
   while (true) {
     __asm__("hlt");
   }
