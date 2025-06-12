@@ -16,6 +16,8 @@ toolchain_end()
 -- NOTE: This flags isn't used in default xmake so, we need enforcing them
 local cxxflags_osdev = {
 	"-ffreestanding",
+	"-nostdinc",
+	"-nostdlib",
 	"-fno-threadsafe-statics",
 	"-fno-exceptions",
 	"-fno-rtti",
@@ -30,6 +32,7 @@ local nasm_flags = {
 -- NOTE: Enforcing the use of Config/Linker.ld file
 local linker_flags = {
 	"-T Config/linker.ld",
+	"-nostdlib",
 }
 
 target("FKernel")
@@ -54,7 +57,7 @@ add_cxxflags(cxxflags_osdev)
 add_asflags(nasm_flags)
 add_ldflags(linker_flags)
 
-add_includedirs("Include", "Include/Kernel", "Include/LibFK")
+add_includedirs("Include", "Include/Kernel", "Include/LibFK", "Include/LibC")
 
 add_files("Src/Kernel/Boot/**.cpp")
 add_files("Src/Kernel/Boot/**.asm")
