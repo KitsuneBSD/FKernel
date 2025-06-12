@@ -61,6 +61,7 @@ add_includedirs("Include", "Include/Kernel", "Include/LibFK", "Include/LibC")
 
 add_files("Src/Kernel/Boot/**.cpp")
 add_files("Src/Kernel/Driver/**.cpp")
+add_files("Src/Kernel/Init/**.cpp")
 add_files("Src/LibFK/**.cpp")
 
 if is_arch("x86_64") then
