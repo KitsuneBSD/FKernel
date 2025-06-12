@@ -66,6 +66,10 @@ add_files("Src/LibFK/**.cpp")
 
 if is_arch("x86_64") then
 	add_files("Src/Kernel/Boot/Arch/x86_64/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
+	add_files("Src/Kernel/Arch/x86_64/**.asm")
+
+	add_includedirs("Src/Kernel/Arch/x86_64")
 end
 
 before_build(function(target)
