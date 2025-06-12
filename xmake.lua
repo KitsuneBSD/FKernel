@@ -54,10 +54,14 @@ add_cxxflags(cxxflags_osdev)
 add_asflags(nasm_flags)
 add_ldflags(linker_flags)
 
-add_includedirs("Include", "Include/Kernel")
+add_includedirs("Include", "Include/Kernel", "Include/LibFK")
 
 add_files("Src/Kernel/Boot/**.cpp")
 add_files("Src/Kernel/Boot/**.asm")
+
+add_files("Src/Kernel/Driver/**.cpp")
+
+add_files("Src/LibFK/**.cpp")
 
 before_build(function(target)
 	os.exec("bash Meta/run_cppcheck.sh")
