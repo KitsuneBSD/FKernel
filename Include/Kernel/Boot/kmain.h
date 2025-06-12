@@ -3,6 +3,7 @@
 #include <Boot/multiboot2.h>
 #include <Boot/multiboot_interpreter.h>
 #include <Driver/Vga_Buffer.hpp>
+#include <Init/early_init.h>
 #include <stdint.h>
 
 #ifdef __cplusplus

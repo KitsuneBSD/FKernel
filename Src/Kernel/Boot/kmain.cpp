@@ -1,4 +1,5 @@
 #include "Boot/kmain.h"
+#include "Init/early_init.h"
 #include "LibFK/Log.h"
 
 void kmain(uint32_t multiboot_magic, void *mb_info) {
@@ -52,6 +53,8 @@ void kmain(uint32_t multiboot_magic, void *mb_info) {
   Log(LogLevel::INFO, "Total usable memory:");
   console.write_dec(total_mem_mb);
   console.write(" MB\n");
+
+  early_init(total_mem);
 
   Log(LogLevel::INFO, "Kernel initialized successfully.");
   while (true) {
