@@ -1,14 +1,14 @@
 #pragma once
 
-// TODO: Use a freestanding implement of stdint.hpp
-#include <cstdint>
+#include <stddef.h>
+#include <stdint.h>
 
 namespace multiboot2 {
 
-using u8 = std::uint8_t;
-using u16 = std::uint16_t;
-using u32 = std::uint32_t;
-using u64 = std::uint64_t;
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
 
 constexpr u32 HEADER_ALIGN = 8;
 constexpr u32 HEADER_MAGIC = 0xe85250d6;
@@ -121,9 +121,9 @@ struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
   const Entry *begin() const noexcept { return entries; }
 
   const Entry *end() const noexcept {
-    std::size_t entries_size = size - sizeof(TagMemoryMap);
+    size_t entries_size = size - sizeof(TagMemoryMap);
 
-    std::size_t count = entries_size / entry_size;
+    size_t count = entries_size / entry_size;
 
     return entries + count;
   }

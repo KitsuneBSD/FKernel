@@ -1,18 +1,15 @@
 #pragma once
 
-// TODO: Need remake to use freestanding stddef
-// TODO: Need remake to use freestanding stdint
-// TODO: Need separe .hpp and .cpp
+#include <stddef.h>
+#include <stdint.h>
 
-#include <cstddef>
-#include <cstdint>
 namespace vga {
 
-constexpr std::uintptr_t VGA_MEMORY = 0xB8000;
-constexpr std::size_t VGA_WIDTH = 80;
-constexpr std::size_t VGA_HEIGHT = 25;
+constexpr uintptr_t VGA_MEMORY = 0xB8000;
+constexpr size_t VGA_WIDTH = 80;
+constexpr size_t VGA_HEIGHT = 25;
 
-enum class Color : std::uint8_t {
+enum class Color : uint8_t {
   Black = 0,
   Blue = 1,
   Green = 2,
@@ -42,8 +39,8 @@ public:
 
 private:
   uint16_t *buffer = reinterpret_cast<uint16_t *>(VGA_MEMORY);
-  std::size_t row = 0;
-  std::size_t column = 0;
+  size_t row = 0;
+  size_t column = 0;
   uint8_t color = encode_color(Color::LightGray, Color::Black);
 
   static constexpr uint8_t encode_color(Color fg, Color bg) {
@@ -51,7 +48,7 @@ private:
   }
 
   uint16_t make_entry(char c) const;
-  void putchar_raw(char c, std::size_t col, std::size_t row);
+  void putchar_raw(char c, size_t col, size_t row);
   void new_line();
   void scroll();
   void update_cursor();

@@ -4,8 +4,8 @@ uint16_t vga::Console::make_entry(char c) const {
   return (static_cast<uint16_t>(color) << 8) | c;
 }
 
-void vga::Console::putchar_raw(char c, std::size_t col, std::size_t row) {
-  const std::size_t index = row * VGA_WIDTH + col;
+void vga::Console::putchar_raw(char c, size_t col, size_t row) {
+  const size_t index = row * VGA_WIDTH + col;
   buffer[index] = make_entry(c);
 }
 
@@ -18,12 +18,12 @@ void vga::Console::new_line() {
 }
 
 void vga::Console::scroll() {
-  for (std::size_t y = 1; y < VGA_HEIGHT; ++y) {
-    for (std::size_t x = 0; x < VGA_WIDTH; ++x) {
+  for (size_t y = 1; y < VGA_HEIGHT; ++y) {
+    for (size_t x = 0; x < VGA_WIDTH; ++x) {
       buffer[(y - 1) * VGA_WIDTH + x] = buffer[y * VGA_WIDTH + x];
     }
   }
-  for (std::size_t x = 0; x < VGA_WIDTH; ++x) {
+  for (size_t x = 0; x < VGA_WIDTH; ++x) {
     buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = make_entry(' ');
   }
 }
@@ -37,8 +37,8 @@ void vga::Console::update_cursor() {
 }
 
 void vga::Console::clear() {
-  for (std::size_t y = 0; y < VGA_HEIGHT; ++y) {
-    for (std::size_t x = 0; x < VGA_WIDTH; ++x) {
+  for (size_t y = 0; y < VGA_HEIGHT; ++y) {
+    for (size_t x = 0; x < VGA_WIDTH; ++x) {
       putchar_raw(' ', x, y);
     }
   }
