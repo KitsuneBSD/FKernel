@@ -66,6 +66,11 @@ enum class LoadPreference : u32 { None = 0, Low = 1, High = 2 };
 struct alignas(TAG_ALIGN) Tag {
   TagType type;
   u32 size;
+
+  const Tag *next() const noexcept {
+    return reinterpret_cast<const Tag *>(
+        reinterpret_cast<const uint8_t *>(this) + ((size + 7) & ~7u));
+  }
 };
 
 struct alignas(TAG_ALIGN) TagString {
@@ -99,18 +104,6 @@ struct alignas(TAG_ALIGN) Info {
   const Tag *first_tag() const noexcept {
     return tags;
   }
-
-  [[nodiscard]]
-  const Tag *find_tag(TagType wanted) const noexcept {
-    const Tag *tag = tags;
-    while (tag && tag->type != TagType::End) {
-      if (tag->type == wanted)
-        return tag;
-      tag = reinterpret_cast<const Tag *>(reinterpret_cast<const u8 *>(tag) +
-                                          ((tag->size + 7) & ~7u));
-    }
-    return nullptr;
-  }
 };
 
 struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
@@ -139,5 +132,4 @@ struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
 static_assert(sizeof(Tag) == 8);
 static_assert(alignof(Tag) == 8);
 static_assert(alignof(Info) == 8);
-
 }; // namespace multiboot2
