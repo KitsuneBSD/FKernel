@@ -47,6 +47,7 @@ void init_gdt() {
     reinterpret_cast<uint8_t *>(&tss)[i] = 0;
   }
 
+  // FIXME:Update rsp0 and ist1 to real values in stack
   tss.rsp0 = 0xCAFEBABE000; // Stack Ring 0
   tss.ist1 = 0xDEADBEEF000; // Exceções críticas
 
@@ -54,6 +55,7 @@ void init_gdt() {
   Log(LogLevel::INFO, "TSS.rsp0 set to 0xCAFEBABE000 (kernel stack).");
   Log(LogLevel::INFO, "TSS.ist1 set to 0xDEADBEEF000 (critical IST).");
 
+  // TODO: Make a right start of all stacks rsp1, rsp2 and IST 2-7
   set_tss_descriptor(reinterpret_cast<uint64_t>(&tss), sizeof(TSS) - 1);
 
   *(reinterpret_cast<GDT_TSS_Entry *>(&gdt[5])) = tss_descriptor;

@@ -3,6 +3,9 @@
 
 using namespace vga;
 
+// TODO: Adding timestamps
+// TODO: Adding a formatters to log
+// TODO: Adding a lock-free algorithm
 LogLevel Logger::currentLevel = LogLevel::INFO;
 
 Logger &Logger::Instance() {

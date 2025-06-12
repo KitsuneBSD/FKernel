@@ -7,5 +7,6 @@ void early_init(uint64_t memory_available) {
   init_gdt();
   Log(LogLevel::INFO, "Starting IDT");
   init_idt();
-  // Log(LogLevel::INFO, "Start MemoryManagement");
+  // TODO: Start MemoryManagement
+  //  Log(LogLevel::INFO, "Start MemoryManagement");
 }

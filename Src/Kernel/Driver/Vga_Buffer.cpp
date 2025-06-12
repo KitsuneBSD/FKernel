@@ -17,6 +17,7 @@ void vga::Console::new_line() {
   }
 }
 
+// TODO: Improve Scroll using memcpy (with SIMD/SSE) to optimize line copy
 void vga::Console::scroll() {
   for (size_t y = 1; y < VGA_HEIGHT; ++y) {
     for (size_t x = 0; x < VGA_WIDTH; ++x) {
@@ -65,6 +66,7 @@ void vga::Console::putchar(char c) {
   update_cursor();
 }
 
+// FIXME: The method writ_hex break the line automatically
 void vga::Console::write_hex(uint64_t value, bool prefix, bool uppercase) {
   if (prefix) {
     write("0x");
@@ -109,6 +111,7 @@ void vga::Console::write_dec(uint64_t value) {
   write(&buffer[i + 1]);
 }
 
+// TODO: Implement suport to backspace, tab and control caracteres.
 void vga::Console::write(const char *str) {
   while (*str)
     putchar(*str++);

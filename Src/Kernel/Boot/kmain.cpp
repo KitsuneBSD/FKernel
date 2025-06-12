@@ -13,6 +13,7 @@ void kmain(uint32_t multiboot_magic, void *mb_info) {
   console.write_hex(multiboot_magic);
   console.write("\n");
 
+  // TODO: Start module threatment and kernel args in multiboot
   if (multiboot_magic != BOOTLOADER_MAGIC) {
     Log(LogLevel::ERROR, "Invalid multiboot magic number!");
     while (true) {
@@ -57,6 +58,9 @@ void kmain(uint32_t multiboot_magic, void *mb_info) {
   early_init(total_mem);
 
   Log(LogLevel::INFO, "Kernel initialized successfully.");
+
+  // FIXME: Infinite loop with hlt block the system, adding another alternatives
+  // first
   while (true) {
     __asm__("hlt");
   }

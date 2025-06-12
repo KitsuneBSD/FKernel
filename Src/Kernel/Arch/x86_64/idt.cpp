@@ -22,6 +22,9 @@ extern "C" void isr_stub_0();
 void init_idt() {
   Log(LogLevel::INFO, "Initializing Interrupt Descriptor Table (IDT)...");
 
+  // TODO: Create stubs ISR to all possible exceptions
+  // TODO: Create IRQ threament
+  // TODO: Update isr_stub_0 to logging and rescue
   for (int i = 0; i < IDT_ENTRIES; ++i) {
     set_idt_entry(i, isr_stub_0, 0, 0x8E);
   }
