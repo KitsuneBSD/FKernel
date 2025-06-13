@@ -1,12 +1,12 @@
-#include <Arch/x86_64/gdt.h>
-#include <LibFK/Log.h>
 
-constexpr size_t GDT_ENTRIES = 7;
+#include <Arch/x86_64/gdt.h>
+#include <Arch/x86_64/stack_size.h>
+#include <LibC/string.h>
+#include <LibFK/Log.h>
 
 alignas(0x1000) GDTEntry gdt[GDT_ENTRIES];
 GDT_TSS_Entry tss_descriptor;
 TSS tss;
-
 GDTPointer gdtp;
 
 void set_entry(int i, uint32_t base, uint32_t limit, uint8_t access,
@@ -41,23 +41,32 @@ void init_gdt() {
 
   Logf(LogLevel::INFO, "Standard segments (kernel/user) initialized.");
 
-  // TODO: Change this implementation to a proper memset implementation using
-  // SIMD/SSE2
-  for (size_t i = 0; i < sizeof(TSS); ++i) {
-    reinterpret_cast<uint8_t *>(&tss)[i] = 0;
-  }
+  memset(&tss, 0, sizeof(TSS));
 
-  // FIXME: Update rsp0 and ist1 to real values in stack
-  tss.rsp0 = 0xCAFEBABE000;
-  tss.ist1 = 0xDEADBEEF000;
+  tss.rsp0 = reinterpret_cast<uint64_t>(&kernel_stack[STACK_SIZE]);
+
+  tss.ist1 = reinterpret_cast<uint64_t>(&ist_stacks[0][STACK_SIZE]);
+  tss.ist2 = reinterpret_cast<uint64_t>(&ist_stacks[1][STACK_SIZE]);
+  tss.ist3 = reinterpret_cast<uint64_t>(&ist_stacks[2][STACK_SIZE]);
+  tss.ist4 = reinterpret_cast<uint64_t>(&ist_stacks[3][STACK_SIZE]);
+  tss.ist5 = reinterpret_cast<uint64_t>(&ist_stacks[4][STACK_SIZE]);
+  tss.ist6 = reinterpret_cast<uint64_t>(&ist_stacks[5][STACK_SIZE]);
+  tss.ist7 = reinterpret_cast<uint64_t>(&ist_stacks[6][STACK_SIZE]);
+
+  for (int i = 0; i < IST_COUNT; ++i) {
+    Logf(LogLevel::INFO, "TSS.ist%d set to 0x%lx", i + 1,
+         reinterpret_cast<uint64_t>(&ist_stacks[i][STACK_SIZE]));
+  }
 
   Logf(LogLevel::INFO, "TSS cleared and configured.");
   Logf(LogLevel::INFO, "TSS.rsp0 set to 0x%lx (kernel stack).", tss.rsp0);
-  Logf(LogLevel::INFO, "TSS.ist1 set to 0x%lx (critical IST).", tss.ist1);
 
-  // TODO: Make a right start of all stacks rsp1, rsp2 and IST 2–7
   set_tss_descriptor(reinterpret_cast<uint64_t>(&tss), sizeof(TSS) - 1);
-  *(reinterpret_cast<GDT_TSS_Entry *>(&gdt[5])) = tss_descriptor;
+
+  constexpr size_t TSS_ENTRY_INDEX = 5;
+  static_assert(TSS_ENTRY_INDEX + 1 < GDT_ENTRIES, "TSS overflows GDT");
+
+  memcpy(&gdt[TSS_ENTRY_INDEX], &tss_descriptor, sizeof(tss_descriptor));
 
   Logf(LogLevel::INFO, "TSS descriptor written to GDT (entries 5 and 6).");
 
