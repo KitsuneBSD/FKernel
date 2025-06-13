@@ -95,23 +95,26 @@ void *memset(void *dest, int ch, size_t n) {
   return dest;
 }
 
-size_t utoa(unsigned int value, char *buffer, int base) {
+size_t utoa(uint64_t value, char *buffer, int base) {
   const char *digits = "0123456789abcdef";
-  char temp[32];
+  char temp[65];
   size_t i = 0;
 
   if (value == 0) {
     buffer[0] = '0';
+    buffer[1] = '\0';
     return 1;
   }
 
-  while (value && i < sizeof(temp)) {
+  while (value && i < sizeof(temp) - 1) {
     temp[i++] = digits[value % base];
     value /= base;
   }
 
+  // Reverse into buffer
   for (size_t j = 0; j < i; ++j)
     buffer[j] = temp[i - j - 1];
 
+  buffer[i] = '\0'; // null-terminate
   return i;
 }
