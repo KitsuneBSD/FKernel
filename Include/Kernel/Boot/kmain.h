@@ -4,7 +4,7 @@
 #include <Boot/multiboot_interpreter.h>
 #include <Driver/Vga_Buffer.hpp>
 #include <Init/early_init.h>
-#include <stdint.h>
+#include <LibC/stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

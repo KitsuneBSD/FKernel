@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include <LibC/stddef.h>
+#include <LibC/stdint.h>
 
 namespace multiboot2 {
 
