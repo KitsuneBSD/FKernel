@@ -20,10 +20,10 @@ void set_idt_entry(int vector, void (*handler)(), uint8_t ist, uint8_t flags) {
 extern "C" void isr_stub_0();
 
 void init_idt() {
-  Log(LogLevel::INFO, "Initializing Interrupt Descriptor Table (IDT)...");
+  Logf(LogLevel::INFO, "Initializing Interrupt Descriptor Table (IDT)...");
 
   // TODO: Create stubs ISR to all possible exceptions
-  // TODO: Create IRQ threament
+  // TODO: Create IRQ treatment
   // TODO: Update isr_stub_0 to logging and rescue
   for (int i = 0; i < IDT_ENTRIES; ++i) {
     set_idt_entry(i, isr_stub_0, 0, 0x8E);
@@ -32,7 +32,9 @@ void init_idt() {
   idtp.limit = sizeof(IDTEntry) * IDT_ENTRIES - 1;
   idtp.base = reinterpret_cast<uint64_t>(&idt);
 
-  Log(LogLevel::INFO, "IDT pointer constructed. Executing lidt...");
+  Logf(LogLevel::INFO,
+       "IDT pointer constructed at base 0x%lx, limit %u. Executing lidt...",
+       idtp.base, idtp.limit);
   flush_idt(&idtp);
-  Log(LogLevel::INFO, "IDT successfully loaded.");
+  Logf(LogLevel::INFO, "IDT successfully loaded.");
 }

@@ -2,6 +2,6 @@ global tss_flush
 section .text 
 
 tss_flush:
-    mov ax, di                    ; TSS selector
+    mov ax, di                    
     ltr ax
     ret
