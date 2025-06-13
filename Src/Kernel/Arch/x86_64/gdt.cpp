@@ -31,7 +31,7 @@ void set_tss_descriptor(uint64_t base, uint32_t limit) {
 }
 
 void init_gdt() {
-  Log(LogLevel::INFO, "Initializing Global Descriptor Table (GDT)...");
+  Logf(LogLevel::INFO, "Initializing Global Descriptor Table (GDT)...");
 
   set_entry(0, 0, 0, 0, 0);       // Null
   set_entry(1, 0, 0, 0x9A, 0x20); // Kernel Code (64-bit)
@@ -39,7 +39,7 @@ void init_gdt() {
   set_entry(3, 0, 0, 0xFA, 0x20); // User Code (Ring 3)
   set_entry(4, 0, 0, 0xF2, 0x00); // User Data (Ring 3)
 
-  Log(LogLevel::INFO, "Standard segments (kernel/user) initialized.");
+  Logf(LogLevel::INFO, "Standard segments (kernel/user) initialized.");
 
   // TODO: Change this implementation to a proper memset implementation using
   // SIMD/SSE2
@@ -47,29 +47,31 @@ void init_gdt() {
     reinterpret_cast<uint8_t *>(&tss)[i] = 0;
   }
 
-  // FIXME:Update rsp0 and ist1 to real values in stack
-  tss.rsp0 = 0xCAFEBABE000; // Stack Ring 0
-  tss.ist1 = 0xDEADBEEF000; // Exceções críticas
+  // FIXME: Update rsp0 and ist1 to real values in stack
+  tss.rsp0 = 0xCAFEBABE000;
+  tss.ist1 = 0xDEADBEEF000;
 
-  Log(LogLevel::INFO, "TSS cleared and configured.");
-  Log(LogLevel::INFO, "TSS.rsp0 set to 0xCAFEBABE000 (kernel stack).");
-  Log(LogLevel::INFO, "TSS.ist1 set to 0xDEADBEEF000 (critical IST).");
+  Logf(LogLevel::INFO, "TSS cleared and configured.");
+  Logf(LogLevel::INFO, "TSS.rsp0 set to 0x%lx (kernel stack).", tss.rsp0);
+  Logf(LogLevel::INFO, "TSS.ist1 set to 0x%lx (critical IST).", tss.ist1);
 
-  // TODO: Make a right start of all stacks rsp1, rsp2 and IST 2-7
+  // TODO: Make a right start of all stacks rsp1, rsp2 and IST 2–7
   set_tss_descriptor(reinterpret_cast<uint64_t>(&tss), sizeof(TSS) - 1);
-
   *(reinterpret_cast<GDT_TSS_Entry *>(&gdt[5])) = tss_descriptor;
 
-  Log(LogLevel::INFO, "TSS descriptor written to GDT (entries 5 and 6).");
+  Logf(LogLevel::INFO, "TSS descriptor written to GDT (entries 5 and 6).");
 
   gdtp.limit = sizeof(GDTEntry) * 5 + sizeof(GDT_TSS_Entry) - 1;
   gdtp.base = reinterpret_cast<uint64_t>(&gdt);
 
-  Log(LogLevel::INFO, "GDT pointer constructed. Executing lgdt...");
-  gdt_flush(&gdtp);
-  Log(LogLevel::INFO, "GDT successfully loaded.");
+  Logf(LogLevel::INFO, "GDT pointer constructed at 0x%lx with limit 0x%x.",
+       gdtp.base, gdtp.limit);
 
-  Log(LogLevel::INFO, "Loading TSS with selector 0x28...");
+  Logf(LogLevel::INFO, "Executing lgdt...");
+  gdt_flush(&gdtp);
+  Logf(LogLevel::INFO, "GDT successfully loaded.");
+
+  Logf(LogLevel::INFO, "Loading TSS with selector 0x28...");
   tss_flush(0x28);
-  Log(LogLevel::INFO, "TSS successfully loaded with ltr.");
+  Logf(LogLevel::INFO, "TSS successfully loaded with ltr.");
 }
