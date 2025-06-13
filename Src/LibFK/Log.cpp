@@ -1,11 +1,11 @@
 #include "Driver/Vga_Buffer.hpp"
 #include <LibFK/Log.h>
 
+#include <LibC/stdarg.h>
+#include <LibC/stdio.h>
+
 using namespace vga;
 
-// TODO: Adding timestamps
-// TODO: Adding a formatters to log
-// TODO: Adding a lock-free algorithm
 LogLevel Logger::currentLevel = LogLevel::INFO;
 
 Logger &Logger::Instance() {
@@ -49,5 +49,18 @@ void Logger::Log(LogLevel level, const char *message) const {
   console.write(LevelToString(level));
   console.write(": ");
   console.write(message);
+
   console.write("\n");
+}
+void Logger::Logf(LogLevel level, const char *fmt, ...) const {
+  if (level < currentLevel)
+    return;
+
+  char buffer[512];
+  va_list args;
+  va_start(args, fmt);
+  vsprintf(buffer, fmt, args);
+  va_end(args);
+
+  Log(level, buffer);
 }
