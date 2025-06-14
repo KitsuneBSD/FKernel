@@ -12,6 +12,8 @@ struct __attribute__((packed)) GDTEntry {
   uint8_t base_high;
 };
 
+static_assert(sizeof(GDTEntry) == 8, "GDT_ENTRY must be 8 bytes");
+
 struct __attribute__((packed)) GDT_TSS_Entry {
   uint16_t limit_low;
   uint16_t base_low;
@@ -23,12 +25,16 @@ struct __attribute__((packed)) GDT_TSS_Entry {
   uint32_t reserved;
 };
 
+static_assert(sizeof(GDT_TSS_Entry) == 16, "GDT_TSS_Entry must be 16 bytes");
+
 struct __attribute__((packed)) GDTPointer {
   uint16_t limit;
   uint64_t base;
 };
 
-struct TSS {
+static_assert(sizeof(GDTPointer) == 10, "GDTPointer must be 10 bytes");
+
+struct __attribute__((packed)) TSS {
   uint32_t reserved0;
   uint64_t rsp0;
   uint64_t rsp1;
@@ -45,6 +51,8 @@ struct TSS {
   uint16_t reserved3;
   uint16_t io_map_base;
 };
+
+static_assert(sizeof(TSS) == 104, "TSS must be 104 bytes (64-bit TSS)");
 
 extern "C" void gdt_flush(struct GDTPointer *gdtr);
 extern "C" void tss_flush(uint16_t selector);
