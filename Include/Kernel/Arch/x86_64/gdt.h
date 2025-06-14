@@ -28,7 +28,7 @@ struct __attribute__((packed)) GDTPointer {
   uint64_t base;
 };
 
-struct __attribute__((packed)) TSS {
+struct TSS {
   uint32_t reserved0;
   uint64_t rsp0;
   uint64_t rsp1;
