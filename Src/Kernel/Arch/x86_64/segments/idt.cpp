@@ -1,8 +1,6 @@
 #include <Kernel/Arch/x86_64/idt.h>
 #include <LibFK/Log.h>
 
-constexpr size_t IDT_ENTRIES = 256;
-
 alignas(0x10) IDTEntry idt[IDT_ENTRIES];
 IDTPointer idtp;
 

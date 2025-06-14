@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arch/x86_64/stack_size.h>
 #include <LibC/stdint.h>
 
 struct __attribute__((packed)) GDTEntry {

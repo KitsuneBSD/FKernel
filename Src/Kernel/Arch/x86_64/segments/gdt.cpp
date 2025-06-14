@@ -1,6 +1,5 @@
 
 #include <Arch/x86_64/gdt.h>
-#include <Arch/x86_64/stack_size.h>
 #include <LibC/string.h>
 #include <LibFK/Log.h>
 
