@@ -22,6 +22,7 @@ local cxxflags_osdev = {
 	"-fno-exceptions",
 	"-fno-rtti",
 	"-fno-stack-protector",
+	"-Wno-gnu-line-marker",
 }
 
 -- NOTE: We need enforcing the elf binary first
