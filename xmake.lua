@@ -22,6 +22,7 @@ local cxxflags_osdev = {
 	"-fno-exceptions",
 	"-fno-rtti",
 	"-fno-stack-protector",
+	"-fno-omit-frame-pointer ",
 	"-Wno-gnu-line-marker",
 }
 

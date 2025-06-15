@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arch/x86_64/isr.h>
 #include <Arch/x86_64/stack_size.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
