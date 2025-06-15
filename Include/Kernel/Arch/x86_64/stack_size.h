@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Arch/x86_64/idt.h"
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 

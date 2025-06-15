@@ -10,4 +10,6 @@ struct CPUStateFrame {
   uint64_t rip, cs, rflags, rsp, ss;
 } __attribute__((packed));
 
-void dump_cpu_state(const CPUStateFrame *frame);
+void named_interrupt(uint64_t int_no);
+
+extern "C" void dump_cpu_state(const CPUStateFrame *frame);

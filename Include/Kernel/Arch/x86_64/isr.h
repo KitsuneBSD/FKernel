@@ -4,38 +4,39 @@
 
 // Auto-generated ISR stubs
 
-// extern "C" void isr_divide_by_zero();      // 0
-// extern "C" void isr_debug();               // 1
-// extern "C" void isr_nmi();                 // 2
-// extern "C" void isr_breakpoint();          // 3
-// extern "C" void isr_overflow();            // 4
-// extern "C" void isr_bound_range();         // 5
-// extern "C" void isr_invalid_opcode();      // 6
-// extern "C" void isr_device_na();           // 7
-// extern "C" void isr_double_fault();        // 8
-// extern "C" void isr_coprocessor_seg();     // 9
-// extern "C" void isr_invalid_tss();         // 10
-// extern "C" void isr_seg_not_present();     // 11
-// extern "C" void isr_stack_fault();         // 12
-// extern "C" void isr_gp_fault();            // 13
-// extern "C" void isr_page_fault();          // 14
-// extern "C" void isr_reserved_15();         // 15
-// extern "C" void isr_fpu_error();           // 16
-// extern "C" void isr_alignment_check();     // 17
-// extern "C" void isr_machine_check();       // 18
-// extern "C" void isr_simd_fp();             // 19
-// extern "C" void isr_virtualization();      // 20
-// extern "C" void isr_reserved_21();         // 21
-// extern "C" void isr_reserved_22();         // 22
-// extern "C" void isr_reserved_23();         // 23
-// extern "C" void isr_reserved_24();         // 24
-// extern "C" void isr_reserved_25();         // 25
-// extern "C" void isr_reserved_26();         // 26
-// extern "C" void isr_reserved_27();         // 27
-// extern "C" void isr_reserved_28();         // 28
-// extern "C" void isr_reserved_29();         // 29
-// extern "C" void isr_reserved_30();         // 30
-// extern "C" void isr_reserved_31();         // 31
+extern "C" void isr_divide_by_zero();  // 0
+extern "C" void isr_debug();           // 1
+extern "C" void isr_nmi();             // 2
+extern "C" void isr_breakpoint();      // 3
+extern "C" void isr_overflow();        // 4
+extern "C" void isr_bound_range();     // 5
+extern "C" void isr_invalid_opcode();  // 6
+extern "C" void isr_device_na();       // 7
+extern "C" void isr_double_fault();    // 8
+extern "C" void isr_coprocessor_seg(); // 9
+extern "C" void isr_invalid_tss();     // 10
+extern "C" void isr_seg_not_present(); // 11
+extern "C" void isr_stack_fault();     // 12
+extern "C" void isr_gp_fault();        // 13
+extern "C" void isr_page_fault();      // 14
+extern "C" void isr_reserved_15();     // 15
+extern "C" void isr_fpu_error();       // 16
+extern "C" void isr_alignment_check(); // 17
+extern "C" void isr_machine_check();   // 18
+extern "C" void isr_simd_fp();         // 19
+extern "C" void isr_virtualization();  // 20
+extern "C" void isr_reserved_21();     // 21
+extern "C" void isr_reserved_22();     // 22
+extern "C" void isr_reserved_23();     // 23
+extern "C" void isr_reserved_24();     // 24
+extern "C" void isr_reserved_25();     // 25
+extern "C" void isr_reserved_26();     // 26
+extern "C" void isr_reserved_27();     // 27
+extern "C" void isr_reserved_28();     // 28
+extern "C" void isr_reserved_29();     // 29
+extern "C" void isr_reserved_30();     // 30
+extern "C" void isr_reserved_31();     // 31
+
 // extern "C" void isr_stub_32();
 // extern "C" void isr_stub_33();
 // extern "C" void isr_stub_34();
