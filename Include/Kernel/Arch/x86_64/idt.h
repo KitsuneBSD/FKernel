@@ -14,10 +14,14 @@ struct IDTEntry {
   uint32_t zero;
 } __attribute__((packed));
 
+static_assert(sizeof(IDTEntry) == 16, "IDTEntry must be 16 bytes");
+
 struct IDTPointer {
   uint16_t limit;
   uint64_t base;
 } __attribute__((packed));
+
+static_assert(sizeof(IDTPointer) == 10, "IDTPointer must be 10 bytes");
 
 extern "C" void flush_idt(IDTPointer *idtr);
 
