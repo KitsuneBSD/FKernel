@@ -23,9 +23,6 @@ void init_idt() {
   // TODO: Create stubs ISR to all possible exceptions
   // TODO: Create IRQ treatment
   // TODO: Update isr_stub_0 to logging and rescue
-  for (int i = 0; i < IDT_ENTRIES; ++i) {
-    set_idt_entry(i, isr_stub_0, 0, 0x8E);
-  }
 
   idtp.limit = sizeof(IDTEntry) * IDT_ENTRIES - 1;
   idtp.base = reinterpret_cast<uint64_t>(&idt);
