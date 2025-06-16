@@ -34,19 +34,17 @@ void handle_double_fault(const CPUStateFrame *frame) {
 }
 
 void default_exception_handler(const CPUStateFrame *frame) {
-  Logf(LogLevel::ERROR, "=== CPU EXCEPTION ===");
-
   if (frame->int_no < 32)
-    Logf(LogLevel::ERROR, "Interrupt %lu: %s", frame->int_no,
+    Logf(LogLevel::WARN, "Interrupt %lu: %s", frame->int_no,
          interrupt_messages[frame->int_no]);
   else
-    Logf(LogLevel::ERROR, "Interrupt %lu: Unknown or external IRQ",
+    Logf(LogLevel::WARN, "Interrupt %lu: Unknown or external IRQ",
          frame->int_no);
 
   dump_registers(frame);
   dump_stack(frame);
 
-  Logf(LogLevel::ERROR, "=====================");
+  Logf(LogLevel::WARN, "=====================");
 }
 
 void named_interrupt(uint64_t int_no) {
