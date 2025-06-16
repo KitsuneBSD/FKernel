@@ -4,11 +4,6 @@ print_error() {
 	echo -e "\e[41m\e[97mError: $1\e[0m"
 }
 
-if ! command -v grub-mkrescue &>/dev/null; then
-	print_error "grub-mkrescue not found. Please install grub-mkrescue before running this script."
-	exit 1
-fi
-
 grub_directory="build/mockos/boot/grub"
 grub_config="Config/grub.cfg"
 kernel_binary="build/FKernel.bin"
@@ -21,7 +16,16 @@ fi
 
 cp "$grub_config" "$grub_directory"
 cp "$kernel_binary" "build/mockos/boot"
+if ! command -v grub-mkrescue &>/dev/null; then
+	if ! command -v grub2-mkrescue &>/dev/null; then
+		print_error "grub-mkrescue not found. Please install grub-mkrescue before running this script."
+		exit 1
+	else
+		grub2-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso "build/mockos"
+	fi
+else
+	grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso "build/mockos"
+fi
 
-grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso "build/mockos"
 rm -rf "build/mockos"
 rm -rf "build/FKernel.bin"
