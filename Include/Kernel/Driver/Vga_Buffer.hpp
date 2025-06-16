@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arch/x86_64/io.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
@@ -52,10 +53,6 @@ private:
   void new_line();
   void scroll();
   void update_cursor();
-
-  static inline void outb(uint16_t port, uint8_t value) {
-    asm volatile("outb %0, %1" : : "a"(value), "Nd"(port));
-  }
 };
 } // namespace vga
 
