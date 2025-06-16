@@ -1,11 +1,12 @@
-#include <Kernel/Init/early_init.hpp>
-#include <Kernel/Driver/vga_buffer.hpp>
+#include "Arch/x86_64/gdt.h"
+#include "LibFK/Log.h"
+#include <Init/early_init.h>
 
-#include <Lib/LibC/stdio.h>
-
-void early_init(uint64_t memory_available){
-    clear();
-    printf("[OK]: Start early init\n");
-
-    return;
+void early_init(uint64_t memory_available) {
+  Log(LogLevel::INFO, "Starting GDT");
+  init_gdt();
+  Log(LogLevel::INFO, "Starting IDT");
+  init_idt();
+  // TODO: Start MemoryManagement
+  //  Log(LogLevel::INFO, "Start MemoryManagement");
 }

@@ -1,58 +1,94 @@
 add_rules("mode.debug", "mode.release")
 set_policy("check.auto_ignore_flags", false)
 
+set_languages("cxx20")
+
 set_targetdir("build")
-set_objectdir("build/objs")
 
-set_languages("c++23")
-
-local clang_flags = {
-  "-g",
-  "-fno-threadsafe-statics",
-  "-fno-exceptions",
-  "-fno-rtti"
-}
-local nasm_flags = {
-  "-f elf64",
-  "-g"
-}
-
-local lld_flags = {
-  "-T Config/linker.ld"
-}
 toolchain("FKernel_Compiling")
-  set_kind("standalone")
-  set_toolset("cc", "clang")
-  set_toolset("cxx", "clang++")
-  set_toolset("ld", "ld.lld")
-  set_toolset("as", "nasm")
+set_kind("standalone")
+set_toolset("cc", "clang")
+set_toolset("cxx", "clang++")
+set_toolset("ld", "ld.lld")
+set_toolset("as", "nasm")
 toolchain_end()
 
+-- NOTE: This flags isn't used in default xmake so, we need enforcing them
+local cxxflags_osdev = {
+	"-ffreestanding",
+	"-nostdinc",
+	"-nostdlib",
+	"-fno-threadsafe-statics",
+	"-fno-exceptions",
+	"-fno-rtti",
+	"-fno-stack-protector",
+	"-fno-omit-frame-pointer ",
+	"-Wno-gnu-line-marker",
+}
+
+-- NOTE: We need enforcing the elf binary first
+local nasm_flags = {
+	"-f elf64",
+}
+
+-- NOTE: Enforcing the use of Config/Linker.ld file
+local linker_flags = {
+	"-T Config/linker.ld",
+	"-nostdlib",
+}
+
 target("FKernel")
-  set_kind("binary")
-  set_default(true)
-  set_filename("FKernel.bin")
-  
-  set_warnings(all)
+set_kind("binary")
+set_default(true)
+set_filename("FKernel.bin")
 
-  add_cxflags(clang_flags)
-  add_asflags(nasm_flags)
-  add_ldflags(lld_flags)
+set_warnings("everything")
 
-  before_build(function (target)
-    os.execv("bash Meta/run_cppcheck.sh")
-  end)
+if is_mode("release") then
+	set_optimize("faster")
+	set_symbols("hidden")
+end
 
-  after_link(function (target)
-    os.execv("bash Meta/mounting_mockos.sh")
-  end)
+if is_mode("debug") then
+	set_optimize("none")
+	set_symbols("debug")
+	add_defines("FKERNEL_DEBUG")
+end
 
-  on_run(function (target)
-     os.execv("bash Meta/run_mockOS.sh")
-    --os.execv("bash Meta/run_kernel.sh")
-  end)
+add_cxxflags(cxxflags_osdev)
+add_asflags(nasm_flags)
+add_ldflags(linker_flags)
 
-  add_includedirs("Include","Include/Kernel", "Include/Lib")
-  add_files("Src/Kernel/**.asm")
-  add_files("Src/Kernel/**.cpp")
-  add_files("Src/Lib/**.cpp")
+add_includedirs("Include", "Include/Kernel", "Include/LibFK", "Include/LibC")
+
+add_files("Src/Kernel/Boot/**.cpp")
+add_files("Src/Kernel/Driver/**.cpp")
+add_files("Src/Kernel/Init/**.cpp")
+add_files("Src/LibFK/**.cpp")
+add_files("Src/LibC/**.cpp")
+
+if is_arch("x86_64") then
+	add_files("Src/Kernel/Boot/Arch/x86_64/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
+	add_files("Src/Kernel/Arch/x86_64/**.asm")
+
+	add_includedirs("Src/Kernel/Arch/x86_64")
+end
+
+before_build(function(target)
+	os.exec("bash Meta/run_cppcheck.sh")
+end)
+
+after_link(function(target)
+	os.exec("bash Meta/mounting_mockos.sh")
+end)
+
+on_run(function(target)
+	os.exec("bash Meta/run_mockos.sh")
+end)
+
+on_clean(function(target)
+	os.exec("rm -rf build")
+end)
+
+target_end()
