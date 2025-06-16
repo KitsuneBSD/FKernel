@@ -7,10 +7,10 @@ set_targetdir("build")
 
 toolchain("FKernel_Compiling")
 set_kind("standalone")
-set_toolset("cc", "clang")
-set_toolset("cxx", "clang++")
-set_toolset("ld", "ld.lld")
-set_toolset("as", "nasm")
+set_toolset("cc", "clang", "tcc", "gcc")
+set_toolset("cxx", "clang++", "g++")
+set_toolset("ld", "mold", "ld.lld", "clang++", "ld")
+set_toolset("as", "nasm", "fasm", "yasm")
 toolchain_end()
 
 -- NOTE: This flags isn't used in default xmake so, we need enforcing them
