@@ -16,6 +16,7 @@ extern "C" void irq_dispatch(uint8_t irq, void *context) {
 
 void register_irq_handler(uint8_t irq, IRQHandler handler) {
   if (irq < 16) {
+    Logf(LogLevel::INFO, "Install irq %d", irq);
     irq_handlers[irq] = handler;
   } else {
     Logf(LogLevel::ERROR, "Trying to register handler for invalid IRQ %u", irq);

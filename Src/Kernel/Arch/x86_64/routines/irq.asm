@@ -19,7 +19,6 @@ irq%1_handler:
     iretq
 %endmacro
 
-; Gera os 16 IRQ handlers
 %assign i 0
 %rep 16
     IRQ_HANDLER i

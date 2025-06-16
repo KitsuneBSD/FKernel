@@ -1,4 +1,5 @@
 #include "Arch/x86_64/irq.h"
+#include "Arch/x86_64/irq_handler.hpp"
 #include <Kernel/Arch/x86_64/global_exception_handler.h>
 #include <Kernel/Arch/x86_64/idt.h>
 #include <Kernel/Arch/x86_64/irq.h>
@@ -46,6 +47,8 @@ void init_idt() {
   init_idt_entries();
   init_exception_handlers();
   install_irq_handlers();
+
+  register_irq_handler(0, timer_handler);
 
   idtp.limit = sizeof(IDTEntry) * IDT_ENTRIES - 1;
   idtp.base = reinterpret_cast<uint64_t>(&idt);
