@@ -36,23 +36,22 @@ extern "C" void isr_reserved_28();     // 28
 extern "C" void isr_reserved_29();     // 29
 extern "C" void isr_reserved_30();     // 30
 extern "C" void isr_reserved_31();     // 31
-
-// extern "C" void isr_stub_32();
-// extern "C" void isr_stub_33();
-// extern "C" void isr_stub_34();
-// extern "C" void isr_stub_35();
-// extern "C" void isr_stub_36();
-// extern "C" void isr_stub_37();
-// extern "C" void isr_stub_38();
-// extern "C" void isr_stub_39();
-// extern "C" void isr_stub_40();
-// extern "C" void isr_stub_41();
-// extern "C" void isr_stub_42();
-// extern "C" void isr_stub_43();
-// extern "C" void isr_stub_44();
-// extern "C" void isr_stub_45();
-// extern "C" void isr_stub_46();
-// extern "C" void isr_stub_47();
+extern "C" void irq0_handler();        // 32
+extern "C" void irq1_handler();        // 33
+extern "C" void irq2_handler();        // 34
+extern "C" void irq3_handler();        // 35
+extern "C" void irq4_handler();        // 36
+extern "C" void irq5_handler();        // 37
+extern "C" void irq6_handler();        // 38
+extern "C" void irq7_handler();        // 39
+extern "C" void irq8_handler();        // 40
+extern "C" void irq9_handler();        // 41
+extern "C" void irq10_handler();       // 42
+extern "C" void irq11_handler();       // 43
+extern "C" void irq12_handler();       // 44
+extern "C" void irq13_handler();       // 45
+extern "C" void irq14_handler();       // 46
+extern "C" void irq15_handler();       // 47
 // extern "C" void isr_stub_48();
 // extern "C" void isr_stub_49();
 // extern "C" void isr_stub_50();
