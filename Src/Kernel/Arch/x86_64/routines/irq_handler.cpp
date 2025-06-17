@@ -46,3 +46,31 @@ extern "C" void legacy_peripheral_handler(void *context) {
 #endif
   send_eoi(5);
 }
+
+extern "C" void fdc_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "Floppy Disk Controller IRQ6 triggered.");
+#endif
+  send_eoi(6);
+}
+
+extern "C" void spurious_irq7_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::WARN, "IRQ7 triggered — possibly spurious.");
+#endif
+  send_eoi(7);
+}
+
+extern "C" void rtc_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "Real-Time Clock IRQ8 triggered.");
+#endif
+  send_eoi(8);
+}
+
+extern "C" void acpi_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "ACPI / IRQ2 redirected IRQ9 triggered.");
+#endif
+  send_eoi(9);
+}

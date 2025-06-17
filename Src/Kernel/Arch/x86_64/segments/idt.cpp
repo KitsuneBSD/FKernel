@@ -35,6 +35,11 @@ void install_irq_handlers() {
   register_irq_handler(4, com1_handler);
   register_irq_handler(5, legacy_peripheral_handler);
 
+  register_irq_handler(6, fdc_handler);
+  register_irq_handler(7, spurious_irq7_handler);
+  register_irq_handler(8, rtc_handler);
+  register_irq_handler(9, acpi_handler);
+
   Logf(LogLevel::INFO, "IRQ handlers installed into IDT.");
 }
 
