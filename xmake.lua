@@ -7,10 +7,10 @@ set_targetdir("build")
 
 toolchain("FKernel_Compiling")
 set_kind("standalone")
-set_toolset("cc", "clang")
-set_toolset("cxx", "clang++")
-set_toolset("ld", "ld.lld")
-set_toolset("as", "nasm")
+set_toolset("cc", "clang", "tcc", "gcc")
+set_toolset("cxx", "clang++", "g++")
+set_toolset("ld", "mold", "ld.lld", "clang++", "ld")
+set_toolset("as", "nasm", "fasm", "yasm")
 toolchain_end()
 
 -- NOTE: This flags isn't used in default xmake so, we need enforcing them
@@ -45,7 +45,7 @@ set_filename("FKernel.bin")
 set_warnings("everything")
 
 if is_mode("release") then
-	set_optimize("faster")
+	set_optimize("none")
 	set_symbols("hidden")
 end
 
@@ -64,6 +64,7 @@ add_includedirs("Include", "Include/Kernel", "Include/LibFK", "Include/LibC")
 add_files("Src/Kernel/Boot/**.cpp")
 add_files("Src/Kernel/Driver/**.cpp")
 add_files("Src/Kernel/Init/**.cpp")
+add_files("Src/Kernel/MemoryManagement/**.cpp")
 add_files("Src/LibFK/**.cpp")
 add_files("Src/LibC/**.cpp")
 
