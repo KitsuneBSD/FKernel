@@ -1,8 +1,7 @@
-#include "Arch/x86_64/irq.h"
-#include "Arch/x86_64/irq_handler.hpp"
 #include <Kernel/Arch/x86_64/global_exception_handler.h>
 #include <Kernel/Arch/x86_64/idt.h>
 #include <Kernel/Arch/x86_64/irq.h>
+#include <Kernel/Arch/x86_64/irq_handler.h>
 #include <Kernel/Arch/x86_64/stack_size.h>
 #include <LibFK/Log.h>
 
@@ -29,6 +28,13 @@ void install_irq_handlers() {
     set_idt_entry(0x20 + i, irq_stubs[i], 0, FLAGS);
   }
 
+  register_irq_handler(0, timer_handler);
+  register_irq_handler(1, keyboard_handler);
+  register_irq_handler(2, cascade_handler);
+  register_irq_handler(3, com2_handler);
+  register_irq_handler(4, com1_handler);
+  register_irq_handler(5, legacy_peripheral_handler);
+
   Logf(LogLevel::INFO, "IRQ handlers installed into IDT.");
 }
 
@@ -47,8 +53,6 @@ void init_idt() {
   init_idt_entries();
   init_exception_handlers();
   install_irq_handlers();
-
-  register_irq_handler(0, timer_handler);
 
   idtp.limit = sizeof(IDTEntry) * IDT_ENTRIES - 1;
   idtp.base = reinterpret_cast<uint64_t>(&idt);
