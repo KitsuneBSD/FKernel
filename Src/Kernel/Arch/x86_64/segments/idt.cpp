@@ -1,3 +1,5 @@
+#include "Driver/Apic.h"
+#include "Driver/Pic.h"
 #include <Kernel/Arch/x86_64/global_exception_handler.h>
 #include <Kernel/Arch/x86_64/idt.h>
 #include <Kernel/Arch/x86_64/irq.h>
@@ -73,6 +75,9 @@ void init_idt() {
 
   flush_idt(&idtp);
 
+  Logf(LogLevel::INFO, "Change PIC to APIC");
+  disable_pic();
+  init_apic();
   Logf(LogLevel::INFO, "IDT loaded successfully.");
   asm volatile("sti");
 }

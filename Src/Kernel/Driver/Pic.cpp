@@ -30,3 +30,8 @@ void send_eoi(uint8_t irq) {
 void set_mask(uint8_t mask) { outb(PIC1_DATA, mask); }
 
 uint8_t get_mask() { return inb(PIC1_DATA); }
+
+void disable_pic() {
+  outb(PIC1_DATA, 0xFF);
+  outb(PIC2_DATA, 0xFF);
+}

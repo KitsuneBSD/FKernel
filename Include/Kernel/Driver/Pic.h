@@ -17,3 +17,4 @@ void remap(int offset1, int offset2);
 void send_eoi(uint8_t irq);
 void set_mask(uint8_t mask);
 uint8_t get_mask();
+void disable_pic();
