@@ -45,7 +45,7 @@ set_filename("FKernel.bin")
 set_warnings("everything")
 
 if is_mode("release") then
-	set_optimize("faster")
+	set_optimize("none")
 	set_symbols("hidden")
 end
 
