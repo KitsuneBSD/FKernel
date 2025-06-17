@@ -41,6 +41,10 @@ void install_irq_handlers() {
   register_irq_handler(9, acpi_handler);
   register_irq_handler(10, irq10_pci_handler);
   register_irq_handler(11, irq11_pci_handler);
+  register_irq_handler(12, ps2_mouse_handler);
+  register_irq_handler(13, fpu_handler);
+  register_irq_handler(14, primary_ata_handler);
+  register_irq_handler(15, secondary_ata_handler);
   Logf(LogLevel::INFO, "IRQ handlers installed into IDT.");
 }
 

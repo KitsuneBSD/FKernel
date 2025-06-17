@@ -14,3 +14,7 @@ extern "C" void rtc_handler(void *context);
 extern "C" void acpi_handler(void *context);
 extern "C" void irq10_pci_handler(void *context);
 extern "C" void irq11_pci_handler(void *context);
+extern "C" void ps2_mouse_handler(void *context);
+extern "C" void fpu_handler(void *context);
+extern "C" void primary_ata_handler(void *context);
+extern "C" void secondary_ata_handler(void *context);

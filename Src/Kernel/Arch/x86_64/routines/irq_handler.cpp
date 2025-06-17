@@ -88,3 +88,31 @@ extern "C" void irq11_pci_handler(void *context) {
 #endif
   send_eoi(11);
 }
+
+extern "C" void ps2_mouse_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "PS/2 Mouse IRQ12 triggered.");
+#endif
+  send_eoi(12);
+}
+
+extern "C" void fpu_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "FPU / x87 Coprocessor IRQ13 triggered.");
+#endif
+  send_eoi(13);
+}
+
+extern "C" void primary_ata_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "Primary ATA IRQ14 triggered.");
+#endif
+  send_eoi(14);
+}
+
+extern "C" void secondary_ata_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "Secondary ATA IRQ15 triggered.");
+#endif
+  send_eoi(15);
+}
