@@ -14,10 +14,20 @@ uint32_t ioapic_read(uint8_t reg) {
 }
 
 void ioapic_redirect_irq(uint8_t irq, uint8_t vector, uint8_t apic_id) {
-  uint8_t index = 0x10 + irq * 2;
-  uint32_t low = vector;
-  uint32_t high = apic_id << 24;
+  if (irq >= 24)
+    return;
 
-  ioapic_write(index + 1, high);
-  ioapic_write(index, low);
+  uint32_t low = 0;
+  low |= vector;
+  low |= 0 << 8;
+  low |= 0 << 11;
+  low |= 0 << 13;
+  low |= 0 << 15;
+  low |= 0 << 16;
+
+  uint32_t high = ((uint32_t)apic_id) << 24;
+
+  uint8_t redir_index = 0x10 + irq * 2;
+  ioapic_write(redir_index + 1, high);
+  ioapic_write(redir_index, low);
 }
