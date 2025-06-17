@@ -74,10 +74,12 @@ void init_idt() {
        idtp.base, idtp.limit);
 
   flush_idt(&idtp);
+  /*TODO: Move this thing to after load MemoryManagement
+   Logf(LogLevel::INFO, "Change PIC to APIC");
 
-  Logf(LogLevel::INFO, "Change PIC to APIC");
-  disable_pic();
-  init_apic();
-  Logf(LogLevel::INFO, "IDT loaded successfully.");
+   disable_pic();
+   init_apic();
+   Logf(LogLevel::INFO, "IDT loaded successfully.");
+   */
   asm volatile("sti");
 }
