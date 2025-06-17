@@ -13,4 +13,8 @@ SECTIONS
 	{
 		*(.text)
 	}
+
+  .bss : {
+    _end = .;
+  }
 }
