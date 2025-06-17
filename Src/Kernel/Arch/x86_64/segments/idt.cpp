@@ -39,7 +39,8 @@ void install_irq_handlers() {
   register_irq_handler(7, spurious_irq7_handler);
   register_irq_handler(8, rtc_handler);
   register_irq_handler(9, acpi_handler);
-
+  register_irq_handler(10, irq10_pci_handler);
+  register_irq_handler(11, irq11_pci_handler);
   Logf(LogLevel::INFO, "IRQ handlers installed into IDT.");
 }
 

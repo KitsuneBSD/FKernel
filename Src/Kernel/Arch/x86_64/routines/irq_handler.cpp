@@ -74,3 +74,17 @@ extern "C" void acpi_handler(void *context) {
 #endif
   send_eoi(9);
 }
+
+extern "C" void irq10_pci_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "IRQ10 triggered (PCI / livre).");
+#endif
+  send_eoi(10);
+}
+
+extern "C" void irq11_pci_handler(void *context) {
+#ifdef FKERNEL_DEBUG
+  Logf(LogLevel::INFO, "IRQ11 triggered (PCI / livre).");
+#endif
+  send_eoi(11);
+}

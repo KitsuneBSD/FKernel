@@ -12,3 +12,5 @@ extern "C" void fdc_handler(void *context);
 extern "C" void spurious_irq7_handler(void *context);
 extern "C" void rtc_handler(void *context);
 extern "C" void acpi_handler(void *context);
+extern "C" void irq10_pci_handler(void *context);
+extern "C" void irq11_pci_handler(void *context);
