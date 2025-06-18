@@ -45,6 +45,9 @@ void default_exception_handler(const CPUStateFrame *frame) {
   dump_stack(frame);
 
   Logf(LogLevel::WARN, "=====================");
+
+  while (true)
+    asm volatile("cli; hlt");
 }
 
 void named_interrupt(uint64_t int_no) {
@@ -93,5 +96,7 @@ void init_exception_handlers() {
     exception_handlers[i] = default_exception_handler;
 
   register_exception_handler(13, general_protection_fault_handler);
-  register_exception_handler(8, handle_double_fault); // Double Fault
+  register_exception_handler(8, handle_double_fault);
+
+  Log(LogLevel::INFO, "Exception Handlers initialized with sucess");
 }
