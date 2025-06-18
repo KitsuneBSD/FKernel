@@ -15,6 +15,8 @@ Logger &Logger::Instance() {
 
 const char *Logger::LevelToString(LogLevel level) {
   switch (level) {
+  case LogLevel::TRACE:
+    return "TRACE";
   case LogLevel::INFO:
     return "INFO";
   case LogLevel::WARN:
@@ -28,6 +30,8 @@ const char *Logger::LevelToString(LogLevel level) {
 
 vga::Color Logger::LevelToColor(LogLevel level) {
   switch (level) {
+  case LogLevel::TRACE:
+    return Color::LightGray;
   case LogLevel::INFO:
     return Color::LightGreen;
   case LogLevel::WARN:
