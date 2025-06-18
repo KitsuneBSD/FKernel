@@ -21,7 +21,7 @@ public:
     for (const Tag *tag = first_tag(); tag && tag->type != TagType::End;
          tag = tag->next()) {
       if (tag->type == type) {
-        Log(LogLevel::INFO, "Found requested tag");
+        Log(LogLevel::TRACE, "Found requested tag");
         return reinterpret_cast<const T *>(tag);
       }
     }

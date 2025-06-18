@@ -6,7 +6,7 @@
 extern uintptr_t heap_end;
 
 void early_init(uint64_t memory_available) {
-  Log(LogLevel::INFO, "Starting GDT");
+  Log(LogLevel::INFO, "Starting GDT | TSS");
   init_gdt();
   Log(LogLevel::INFO, "Starting IDT");
   init_idt();

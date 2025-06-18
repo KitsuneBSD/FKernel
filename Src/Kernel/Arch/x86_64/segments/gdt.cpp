@@ -33,7 +33,7 @@ void set_tss_descriptor(uint64_t base, uint32_t limit) {
 }
 
 void init_gdt() {
-  Logf(LogLevel::INFO, "Initializing Global Descriptor Table (GDT)...");
+  Logf(LogLevel::TRACE, "Initializing Global Descriptor Table (GDT)...");
 
   set_entry(0, 0, 0, 0, 0);       // Null
   set_entry(1, 0, 0, 0x9A, 0x20); // Kernel Code (64-bit)
@@ -41,7 +41,7 @@ void init_gdt() {
   set_entry(3, 0, 0, 0xFA, 0x20); // User Code (Ring 3)
   set_entry(4, 0, 0, 0xF2, 0x00); // User Data (Ring 3)
 
-  Logf(LogLevel::INFO, "Standard segments (kernel/user) initialized.");
+  Logf(LogLevel::TRACE, "Standard segments (kernel/user) initialized.");
 
   memset(&tss, 0, sizeof(TSS));
 
@@ -54,12 +54,12 @@ void init_gdt() {
   tss.io_map_base = sizeof(TSS);
 
   for (int i = 0; i < IST_COUNT; ++i) {
-    Logf(LogLevel::INFO, "TSS.ist%d set to 0x%lx", i + 1,
+    Logf(LogLevel::TRACE, "TSS.ist%d set to 0x%lx", i + 1,
          reinterpret_cast<uint64_t>(&ist_stacks[i][STACK_SIZE]));
   }
 
-  Logf(LogLevel::INFO, "TSS cleared and configured.");
-  Logf(LogLevel::INFO, "TSS.rsp0 set to 0x%lx (kernel stack).", tss.rsp0);
+  Logf(LogLevel::TRACE, "TSS cleared and configured.");
+  Logf(LogLevel::TRACE, "TSS.rsp0 set to 0x%lx (kernel stack).", tss.rsp0);
 
   set_tss_descriptor(reinterpret_cast<uint64_t>(&tss), sizeof(TSS) - 1);
 
@@ -68,19 +68,19 @@ void init_gdt() {
 
   memcpy(&gdt[TSS_ENTRY_INDEX], &tss_descriptor, sizeof(tss_descriptor));
 
-  Logf(LogLevel::INFO, "TSS descriptor written to GDT (entries 5 and 6).");
+  Logf(LogLevel::TRACE, "TSS descriptor written to GDT (entries 5 and 6).");
 
   gdtp.limit = sizeof(GDTEntry) * 5 + sizeof(GDT_TSS_Entry) - 1;
   gdtp.base = reinterpret_cast<uint64_t>(&gdt);
 
-  Logf(LogLevel::INFO, "GDT pointer constructed at 0x%lx with limit 0x%x.",
+  Logf(LogLevel::TRACE, "GDT pointer constructed at 0x%lx with limit 0x%x.",
        gdtp.base, gdtp.limit);
 
-  Logf(LogLevel::INFO, "Executing lgdt...");
+  Logf(LogLevel::TRACE, "Executing lgdt...");
   gdt_flush(&gdtp);
   Logf(LogLevel::INFO, "GDT successfully loaded.");
 
-  Logf(LogLevel::INFO, "Loading TSS with selector 0x28...");
+  Logf(LogLevel::TRACE, "Loading TSS with selector 0x28...");
   tss_flush(0x28);
   Logf(LogLevel::INFO, "TSS successfully loaded with ltr.");
 }

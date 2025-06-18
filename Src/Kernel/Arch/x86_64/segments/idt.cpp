@@ -47,11 +47,11 @@ void install_irq_handlers() {
   register_irq_handler(13, fpu_handler);
   register_irq_handler(14, primary_ata_handler);
   register_irq_handler(15, secondary_ata_handler);
-  Logf(LogLevel::INFO, "IRQ handlers installed into IDT.");
+  Logf(LogLevel::TRACE, "IRQ handlers installed into IDT.");
 }
 
 void init_idt_entries() {
-  Logf(LogLevel::INFO, "Populating IDT with default ISR handlers...");
+  Logf(LogLevel::TRACE, "Populating IDT with default ISR handlers...");
 
   for (size_t i = 0; i < IDT_ENTRIES; ++i) {
     set_idt_entry(i, isr_handlers[i], isr_ist[i], IDT_INTERRUPT_GATE_FLAGS);
@@ -60,7 +60,7 @@ void init_idt_entries() {
 
 void init_idt() {
   asm volatile("cli");
-  Logf(LogLevel::INFO, "Starting IDT initialization...");
+  Logf(LogLevel::TRACE, "Starting IDT initialization...");
 
   init_idt_entries();
   init_exception_handlers();
@@ -69,17 +69,17 @@ void init_idt() {
   idtp.limit = sizeof(IDTEntry) * IDT_ENTRIES - 1;
   idtp.base = reinterpret_cast<uint64_t>(&idt);
 
-  Logf(LogLevel::INFO,
+  Logf(LogLevel::TRACE,
        "IDT pointer set at base 0x%lx, limit %u. Loading IDT with lidt...",
        idtp.base, idtp.limit);
 
   flush_idt(&idtp);
   /*TODO: Move this thing to after load MemoryManagement
-   Logf(LogLevel::INFO, "Change PIC to APIC");
+   Logf(LogLevel::TRACE, "Change PIC to APIC");
 
    disable_pic();
    init_apic();
-   Logf(LogLevel::INFO, "IDT loaded successfully.");
    */
   asm volatile("sti");
+  Log(LogLevel::INFO, "IDT loaded successfully.");
 }
