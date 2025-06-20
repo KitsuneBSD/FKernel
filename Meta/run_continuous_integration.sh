@@ -17,17 +17,19 @@ check_tool clang-format
 check_tool clang-tidy
 check_tool cppcheck
 
-src_files=$(find . \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \))
+src_files=$(find . \( -name "*.c" -o -name "*.cpp" \))
+header_files=$(find . \( -name "*.h" -o -name "*.hpp" \))
 
-if [ -z "$src_files" ]; then
-	print_error "Nenhum arquivo .c ou .cpp encontrado"
+if [ -z "$src_files" ] || [ -z "$header_files" ]; then
+	print_error "Nenhum arquivo .c, .h, .hpp ou .cpp encontrado"
 	exit 0
 fi
 
 echo "== Running clang-format =="
-echo "$src_files" | xargs clang-format -i
+echo "$src_files $header_files" | xargs clang-format -i
 
 echo "== Running clang-tidy =="
+
 echo "$src_files" | xargs clang-tidy -extra-arg=-IInclude
 
 echo "== Running cppcheck =="
