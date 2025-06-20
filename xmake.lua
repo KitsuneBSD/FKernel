@@ -77,7 +77,7 @@ if is_arch("x86_64") then
 end
 
 before_build(function(target)
-	os.exec("bash Meta/run_cppcheck.sh")
+	os.exec("bash Meta/run_continuous_integration.sh")
 end)
 
 after_link(function(target)
