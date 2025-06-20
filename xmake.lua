@@ -59,21 +59,9 @@ add_cxxflags(cxxflags_osdev)
 add_asflags(nasm_flags)
 add_ldflags(linker_flags)
 
-add_includedirs("Include", "Include/Kernel", "Include/LibFK", "Include/LibC")
-
-add_files("Src/Kernel/Boot/**.cpp")
-add_files("Src/Kernel/Driver/**.cpp")
-add_files("Src/Kernel/Init/**.cpp")
-add_files("Src/Kernel/MemoryManagement/**.cpp")
-add_files("Src/LibFK/**.cpp")
-add_files("Src/LibC/**.cpp")
+add_includedirs("Include")
 
 if is_arch("x86_64") then
-	add_files("Src/Kernel/Boot/Arch/x86_64/**.asm")
-	add_files("Src/Kernel/Arch/x86_64/**.cpp")
-	add_files("Src/Kernel/Arch/x86_64/**.asm")
-
-	add_includedirs("Src/Kernel/Arch/x86_64")
 end
 
 before_build(function(target)
