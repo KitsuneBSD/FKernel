@@ -29,6 +29,7 @@ local cxxflags_osdev = {
 -- NOTE: We need enforcing the elf binary first
 local nasm_flags = {
 	"-f elf64",
+	"-w-other",
 }
 
 -- NOTE: Enforcing the use of Config/Linker.ld file
@@ -65,6 +66,7 @@ add_includedirs("Include")
 add_files("Src/LibC/**.cpp")
 
 if is_arch("x86_64") then
+	add_files("Src/Kernel/Arch/x86_64/**.asm")
 end
 
 before_build(function(target)
