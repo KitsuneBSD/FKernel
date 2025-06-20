@@ -13,8 +13,6 @@ void Manager::set_entry(int index, LibC::uint32_t base, LibC::uint32_t limit, Li
     entry.access = access;
     entry.granularity = ((limit >> 16) & 0x0F) | (granularity & 0xF0);
     entry.base_high = (base >> 24) & 0xFF;
-
-    Logf(LogLevel::TRACE, "Gdt entry setted with %lu base, %d limit, %d access and %d granularity\n", base, limit, access, granularity);
 }
 
 void Manager::set_tss(LibC::uint64_t base, LibC::uint32_t limit) noexcept
@@ -27,8 +25,6 @@ void Manager::set_tss(LibC::uint64_t base, LibC::uint32_t limit) noexcept
     tss_entry_.base_high = (base >> 24) & 0xFF;
     tss_entry_.base_upper = (base >> 32) & 0xFFFFFFFF;
     tss_entry_.reserved = 0;
-
-    Logf(LogLevel::TRACE, "TSS Entry setted with %d base and %d limit\n", base, limit);
 }
 
 void Manager::initialize() noexcept
