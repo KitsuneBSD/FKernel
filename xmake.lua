@@ -30,6 +30,7 @@ local cxxflags_osdev = {
 local nasm_flags = {
 	"-f elf64",
 	"-w-other",
+	"-w-label-orphan",
 }
 
 -- NOTE: Enforcing the use of Config/Linker.ld file
