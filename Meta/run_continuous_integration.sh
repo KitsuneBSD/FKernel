@@ -13,7 +13,6 @@ check_tool() {
 	fi
 }
 
-check_tool xmake
 check_tool clang-format
 check_tool clang-tidy
 check_tool cppcheck
@@ -23,11 +22,6 @@ src_files=$(find . \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hp
 if [ -z "$src_files" ]; then
 	print_error "Nenhum arquivo .c ou .cpp encontrado"
 	exit 0
-fi
-
-if [ ! -f "compile_commands.json" ]; then
-	echo "== Generate compile_commands =="
-	xmake project -k compile_commands
 fi
 
 echo "== Running clang-format =="

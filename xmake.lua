@@ -71,6 +71,7 @@ if is_arch("x86_64") then
 end
 
 before_build(function(target)
+	os.exec("bash Meta/generate_compile_commands.sh")
 	os.exec("bash Meta/run_continuous_integration.sh")
 end)
 
@@ -84,6 +85,7 @@ end)
 
 on_clean(function(target)
 	os.exec("rm -rf build")
+	os.exec("rm -rf compile_commands.json")
 end)
 
 target_end()
