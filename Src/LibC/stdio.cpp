@@ -41,7 +41,7 @@ static inline char* format_integer(char* buf, LibC::int64_t val, int base, int w
 
     len = utoa(uval, temp, base);
 
-    int total_width = static_cast<int>(len) + (negative ? 1 : 0);
+    int const total_width = static_cast<int>(len) + (negative ? 1 : 0);
     if (total_width < width)
         buf = append_padding(buf, pad_char, width - total_width);
 
@@ -57,7 +57,7 @@ static inline char* format_integer(char* buf, LibC::int64_t val, int base, int w
 static inline char* format_unsigned(char* buf, LibC::uint64_t val, int base, int width, char pad_char)
 {
     char temp[65];
-    LibC::size_t len = utoa(val, temp, base);
+    LibC::size_t const len = utoa(val, temp, base);
 
     if (static_cast<int>(len) < width) {
         buf = append_padding(buf, pad_char, width - static_cast<int>(len));
@@ -128,26 +128,26 @@ int vsprintf(char* out, char const* fmt, va_list args)
 
         case 'd':
         case 'i': {
-            LibC::int64_t val = long_long_flag ? va_arg(args, long long)
-                : long_flag                    ? va_arg(args, long)
-                                               : va_arg(args, int);
+            LibC::int64_t const val = long_long_flag ? va_arg(args, long long)
+                                                     : (long_flag ? va_arg(args, long)
+                                                                  : va_arg(args, int));
             buf = format_integer(buf, val, 10, width, pad_char);
             break;
         }
 
         case 'u': {
-            LibC::uint64_t val = long_long_flag ? va_arg(args, unsigned long long)
-                : long_flag                     ? va_arg(args, unsigned long)
-                                                : va_arg(args, unsigned int);
+            LibC::uint64_t const val = long_long_flag ? va_arg(args, unsigned long long)
+                                                      : (long_flag ? va_arg(args, unsigned long)
+                                                                   : va_arg(args, unsigned int));
             buf = format_unsigned(buf, val, 10, width, pad_char);
             break;
         }
 
         case 'x':
         case 'X': {
-            LibC::uint64_t val = long_long_flag ? va_arg(args, unsigned long long)
-                : long_flag                     ? va_arg(args, unsigned long)
-                                                : va_arg(args, unsigned int);
+            LibC::uint64_t const val = long_long_flag ? va_arg(args, unsigned long long)
+                                                      : (long_flag ? va_arg(args, unsigned long)
+                                                                   : va_arg(args, unsigned int));
             buf = format_unsigned(buf, val, 16, width, pad_char);
             break;
         }
@@ -164,11 +164,13 @@ int vsprintf(char* out, char const* fmt, va_list args)
 
         default:
             *buf++ = '%';
-            *buf++ = *fmt;
+            if (*fmt)
+                *buf++ = *fmt;
             break;
         }
 
-        ++fmt;
+        if (*fmt)
+            ++fmt;
     }
 
     *buf = '\0';
@@ -179,7 +181,7 @@ int sprintf(char* out, char const* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    int written = vsprintf(out, fmt, args);
+    int const written = vsprintf(out, fmt, args);
     va_end(args);
     return written;
 }

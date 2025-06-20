@@ -61,6 +61,9 @@ add_ldflags(linker_flags)
 
 add_includedirs("Include")
 
+-- Compile: LibC
+add_files("Src/LibC/**.cpp")
+
 if is_arch("x86_64") then
 end
 
