@@ -1,4 +1,5 @@
 #include <Kernel/Boot/kmain.h>
+#include <Kernel/Driver/VgaBuffer.h>
 
 void kmain(LibC::uint32_t multiboot_magic, void* mb_info)
 {
@@ -27,6 +28,10 @@ void kmain(LibC::uint32_t multiboot_magic, void* mb_info)
             total_mem += entry->length;
         }
     }
+
+    console.set_color(vga::Color::LightGreen, vga::Color::Black);
+    console.clear();
+    console.write("Hello World!");
 
     // NOTE: This infinite loop is the end point of kernel, our goal is never reach here
     while (true) {
