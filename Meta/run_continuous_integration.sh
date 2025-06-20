@@ -18,7 +18,7 @@ check_tool clang-format
 check_tool clang-tidy
 check_tool cppcheck
 
-src_files=$(find . \( -name "*.c" -o -name "*.cpp" \))
+src_files=$(find . \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \))
 
 if [ -z "$src_files" ]; then
 	print_error "Nenhum arquivo .c ou .cpp encontrado"
