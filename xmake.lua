@@ -65,6 +65,9 @@ add_includedirs("Include")
 
 -- Compile: LibC
 add_files("Src/LibC/**.cpp")
+-- Compile: LibFK
+add_files("Src/LibFK/**.cpp")
+
 -- Compile: Kernel/Boot
 add_files("Src/Kernel/Boot/**.cpp")
 -- Compile: Kernel/Driver
@@ -74,6 +77,7 @@ add_files("Src/Kernel/Driver/**.cpp")
 if is_arch("x86_64") then
 	add_includedirs("Include/Kernel/Arch/x86_64")
 	add_files("Src/Kernel/Arch/x86_64/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
 
 before_build(function(target)
