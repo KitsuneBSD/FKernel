@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-#!/usr/bin/env bash
-
 print_error() {
 	echo -e "\e[41m\e[97mError: $1\e[0m"
 }

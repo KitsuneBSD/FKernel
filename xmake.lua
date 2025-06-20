@@ -65,7 +65,10 @@ add_includedirs("Include")
 
 -- Compile: LibC
 add_files("Src/LibC/**.cpp")
+-- Compile: Kernel/Boot
+add_files("Src/Kernel/Boot/**.cpp")
 
+-- Assembly: x86_64 nasm
 if is_arch("x86_64") then
 	add_files("Src/Kernel/Arch/x86_64/**.asm")
 end

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+#set -euo pipefail
 
 print_error() {
 	echo -e "\e[41m\e[97mError: $1\e[0m"
