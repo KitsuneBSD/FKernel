@@ -1,39 +1,41 @@
 #pragma once
 
-#include <Boot/multiboot2.h>
-#include <LibFK/Log.h>
+#include <Kernel/Boot/multiboot2.h>
 
 namespace multiboot2 {
 class MultibootParser {
 private:
-  const uint8_t *base;
+    LibC::uint8_t const* base;
 
 public:
-  explicit MultibootParser(const void *mb_addr)
-      : base(reinterpret_cast<const uint8_t *>(mb_addr)) {}
-
-  const Tag *first_tag() const {
-    return reinterpret_cast<const Tag *>(base +
-                                         8); // Skip total_size + reserved
-  }
-
-  template <typename T> const T *find_tag(TagType type) const {
-    for (const Tag *tag = first_tag(); tag && tag->type != TagType::End;
-         tag = tag->next()) {
-      if (tag->type == type) {
-        Log(LogLevel::INFO, "Found requested tag");
-        return reinterpret_cast<const T *>(tag);
-      }
+    explicit MultibootParser(void const* mb_addr)
+        : base(reinterpret_cast<LibC::uint8_t const*>(mb_addr))
+    {
     }
-    Log(LogLevel::WARN, "Requested tag not found");
-    return nullptr;
-  }
 
-  void foreach_tag(void (*callback)(const Tag *tag)) const {
-    for (const Tag *tag = first_tag(); tag && tag->type != TagType::End;
-         tag = tag->next()) {
-      callback(tag);
+    Tag const* first_tag() const
+    {
+        return reinterpret_cast<Tag const*>(base + 8); // Skip total_size + reserved
     }
-  }
+
+    template<typename T>
+    T const* find_tag(TagType type) const
+    {
+        for (Tag const* tag = first_tag(); tag && tag->type != TagType::End;
+             tag = tag->next()) {
+            if (tag->type == type) {
+                return reinterpret_cast<T const*>(tag);
+            }
+        }
+        return nullptr;
+    }
+
+    void foreach_tag(void (*callback)(Tag const* tag)) const
+    {
+        for (Tag const* tag = first_tag(); tag && tag->type != TagType::End;
+             tag = tag->next()) {
+            callback(tag);
+        }
+    }
 };
 }; // namespace multiboot2

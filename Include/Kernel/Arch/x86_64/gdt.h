@@ -1,60 +1,79 @@
 #pragma once
 
-#include <Arch/x86_64/stack_size.h>
+#include <Kernel/Arch/x86_64/stack_size.h>
 #include <LibC/stdint.h>
 
-struct __attribute__((packed)) GDTEntry {
-  uint16_t limit_low;
-  uint16_t base_low;
-  uint8_t base_middle;
-  uint8_t access;
-  uint8_t granularity;
-  uint8_t base_high;
+namespace gdt {
+
+struct [[gnu::packed]] Entry {
+    LibC::uint16_t limit_low;
+    LibC::uint16_t base_low;
+    LibC::uint8_t base_middle;
+    LibC::uint8_t access;
+    LibC::uint8_t granularity;
+    LibC::uint8_t base_high;
 };
 
-static_assert(sizeof(GDTEntry) == 8, "GDT_ENTRY must be 8 bytes");
+static_assert(sizeof(Entry) == 8, "GDT::Entry must be 8 bytes");
 
-struct __attribute__((packed)) GDT_TSS_Entry {
-  uint16_t limit_low;
-  uint16_t base_low;
-  uint8_t base_middle;
-  uint8_t access;
-  uint8_t granularity;
-  uint8_t base_high;
-  uint32_t base_upper;
-  uint32_t reserved;
+struct [[gnu::packed]] TSSEntry {
+    LibC::uint16_t limit_low;
+    LibC::uint16_t base_low;
+    LibC::uint8_t base_middle;
+    LibC::uint8_t access;
+    LibC::uint8_t granularity;
+    LibC::uint8_t base_high;
+    LibC::uint32_t base_upper;
+    LibC::uint32_t reserved;
 };
 
-static_assert(sizeof(GDT_TSS_Entry) == 16, "GDT_TSS_Entry must be 16 bytes");
+static_assert(sizeof(TSSEntry) == 16, "GDT::TSSEntry must be 16 bytes");
 
-struct __attribute__((packed)) GDTPointer {
-  uint16_t limit;
-  uint64_t base;
+struct [[gnu::packed]] Pointer {
+    LibC::uint16_t limit;
+    LibC::uint64_t base;
 };
 
-static_assert(sizeof(GDTPointer) == 10, "GDTPointer must be 10 bytes");
+static_assert(sizeof(Pointer) == 10, "GDT::Pointer must be 10 bytes");
 
-struct TSS {
-  uint32_t reserved0;
-  uint64_t rsp0;
-  uint64_t rsp1;
-  uint64_t rsp2;
-  uint64_t reserved1;
-  uint64_t ist[IST_COUNT];
-  uint64_t reserved2;
-  uint16_t reserved3;
-  uint16_t io_map_base;
-} __attribute__((packed));
+struct [[gnu::packed]] TSS {
+    LibC::uint32_t reserved0 = 0;
+    LibC::uint64_t rsp0 = 0;
+    LibC::uint64_t rsp1 = 0;
+    LibC::uint64_t rsp2 = 0;
+    LibC::uint64_t reserved1 = 0;
+    LibC::uint64_t ist[IST_COUNT] = {};
+    LibC::uint64_t reserved2 = 0;
+    LibC::uint16_t reserved3 = 0;
+    LibC::uint16_t io_map_base = 0;
+};
 
-static_assert(sizeof(TSS) == 104, "TSS must be 104 bytes (64-bit TSS)");
+static_assert(sizeof(TSS) == 104, "GDT::TSS must be 104 bytes (64-bit TSS)");
 
-extern TSS tss;
+class Manager final {
+public:
+    static Manager& instance() noexcept
+    {
+        static Manager gdt_instance;
+        return gdt_instance;
+    }
 
-extern "C" void gdt_flush(struct GDTPointer *gdtr);
-extern "C" void tss_flush(uint16_t selector);
+    void initialize() noexcept;
+    void set_entry(int index, LibC::uint32_t base, LibC::uint32_t limit, LibC::uint8_t access, LibC::uint8_t granularity) noexcept;
+    void set_tss(LibC::uint64_t base, LibC::uint32_t limit) noexcept;
 
-void set_entry(int i, uint32_t base, uint32_t limit, uint8_t access,
-               uint8_t gran);
-void set_tss_descriptor(uint64_t base, uint32_t limit);
+    Pointer const& gdtr() const noexcept { return gdtr_; }
+    const TSS& tss() const noexcept { return tss_; }
 
-void init_gdt();
+private:
+    Manager() noexcept = default;
+
+    Entry entries_[5] = {};
+    TSSEntry tss_entry_ = {};
+    Pointer gdtr_ = {};
+    TSS tss_ = {};
+};
+
+extern "C" void gdt_flush(Pointer const* gdtr);
+extern "C" void tss_flush(LibC::uint16_t selector);
+}

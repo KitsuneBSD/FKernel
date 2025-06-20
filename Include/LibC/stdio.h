@@ -3,5 +3,9 @@
 #include <LibC/stdarg.h>
 #include <LibC/string.h>
 
-int sprintf(char *out, const char *fmt, ...);
-int vsprintf(char *out, const char *fmt, va_list args);
+namespace LibC {
+
+int sprintf(char* out, char const* fmt, ...);
+int vsprintf(char* out, char const* fmt, va_list args);
+
+}

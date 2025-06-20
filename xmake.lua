@@ -29,6 +29,8 @@ local cxxflags_osdev = {
 -- NOTE: We need enforcing the elf binary first
 local nasm_flags = {
 	"-f elf64",
+	"-w-other",
+	"-w-label-orphan",
 }
 
 -- NOTE: Enforcing the use of Config/Linker.ld file
@@ -59,25 +61,28 @@ add_cxxflags(cxxflags_osdev)
 add_asflags(nasm_flags)
 add_ldflags(linker_flags)
 
-add_includedirs("Include", "Include/Kernel", "Include/LibFK", "Include/LibC")
+add_includedirs("Include")
 
-add_files("Src/Kernel/Boot/**.cpp")
-add_files("Src/Kernel/Driver/**.cpp")
-add_files("Src/Kernel/Init/**.cpp")
-add_files("Src/Kernel/MemoryManagement/**.cpp")
-add_files("Src/LibFK/**.cpp")
+-- Compile: LibC
 add_files("Src/LibC/**.cpp")
+-- Compile: LibFK
+add_files("Src/LibFK/**.cpp")
 
+-- Compile: Kernel/Boot
+add_files("Src/Kernel/Boot/**.cpp")
+-- Compile: Kernel/Driver
+add_files("Src/Kernel/Driver/**.cpp")
+
+-- Assembly: x86_64 nasm
 if is_arch("x86_64") then
-	add_files("Src/Kernel/Boot/Arch/x86_64/**.asm")
-	add_files("Src/Kernel/Arch/x86_64/**.cpp")
+	add_includedirs("Include/Kernel/Arch/x86_64")
 	add_files("Src/Kernel/Arch/x86_64/**.asm")
-
-	add_includedirs("Src/Kernel/Arch/x86_64")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
 
 before_build(function(target)
-	os.exec("bash Meta/run_cppcheck.sh")
+	os.exec("bash Meta/generate_compile_commands.sh")
+	os.exec("bash Meta/run_continuous_integration.sh")
 end)
 
 after_link(function(target)
@@ -90,6 +95,7 @@ end)
 
 on_clean(function(target)
 	os.exec("rm -rf build")
+	os.exec("rm -rf compile_commands.json")
 end)
 
 target_end()

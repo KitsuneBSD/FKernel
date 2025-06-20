@@ -1,120 +1,152 @@
 #include <LibC/string.h>
 
-void reverse(char *str, int length) {
-  int start = 0;
-  int end = length - 1;
-  while (start < end) {
-    char temp = str[start];
-    str[start] = str[end];
-    str[end] = temp;
-    end--;
-    start++;
-  }
+namespace LibC {
 
-  return;
+static void reverse(char* str, int length)
+{
+    int start = 0;
+    int end = length - 1;
+    while (start < end) {
+        char temp = str[start];
+        str[start] = str[end];
+        str[end] = temp;
+        ++start;
+        --end;
+    }
 }
 
-size_t strlen(const char *str) {
-  const char *s = str;
-  while (*s) {
-    ++s;
-  }
-
-  return s - str;
+LibC::size_t strlen(char const* str)
+{
+    char const* s = str;
+    while (*s)
+        ++s;
+    return static_cast<LibC::size_t>(s - str);
 }
 
-char *itoa(int num, char *str, int base) {
-  int i = 0;
-  bool is_negative = false;
+char* itoa(int num, char* str, int base)
+{
+    if (base < 2 || base > 16) {
+        str[0] = '\0';
+        return str;
+    }
 
-  if (num == 0) {
-    str[i++] = '0';
+    unsigned int value;
+    bool is_negative = false;
+
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return str;
+    }
+
+    if (num < 0 && base == 10) {
+        is_negative = true;
+        value = static_cast<unsigned int>(-(static_cast<long long>(num)));
+    } else {
+        value = static_cast<unsigned int>(num);
+    }
+
+    int i = 0;
+    static constexpr char digits[] = "0123456789abcdef";
+
+    while (value != 0) {
+        unsigned int rem = value % static_cast<unsigned int>(base);
+        str[i++] = digits[rem];
+        value /= static_cast<unsigned int>(base);
+    }
+
+    if (is_negative) {
+        str[i++] = '-';
+    }
+
     str[i] = '\0';
+    reverse(str, i);
+
     return str;
-  }
-
-  if (num < 0 && base == 10) {
-    is_negative = true;
-    num = -num;
-  }
-
-  while (num != 0) {
-    int rem = num % base;
-    str[i++] = (rem > 9) ? (rem - 10) + 'a' : rem + '0';
-    num = num / base;
-  }
-
-  if (is_negative) {
-    str[i++] = '-';
-  }
-
-  str[i] = '\0';
-
-  size_t str_size = strlen(str);
-
-  reverse(str, str_size);
-
-  return str;
 }
 
-int atoi(const char *str) {
-  int res = 0;
-  int sign = 1;
-  int i = 0;
+int atoi(char const* str)
+{
+    if (!str)
+        return 0;
 
-  if (str[0] == '-') {
-    sign = -1;
-    i++;
-  }
+    int result = 0;
+    int sign = 1;
+    int i = 0;
 
-  for (int i = 0; str[i] != '\0'; ++i) {
-    res = res * 10 + str[i] - '0';
-  }
+    while (str[i] == ' ' || str[i] == '\t')
+        ++i;
 
-  return sign * res;
+    if (str[i] == '-') {
+        sign = -1;
+        ++i;
+    } else if (str[i] == '+') {
+        ++i;
+    }
+
+    for (; str[i] >= '0' && str[i] <= '9'; ++i) {
+        result = result * 10 + (str[i] - '0');
+    }
+
+    return sign * result;
 }
 
-void *memcpy(void *dest, const void *src, size_t n) {
-  char *d = static_cast<char *>(dest);
-  const char *s = static_cast<const char *>(src);
+void* memcpy(void* dest, void const* src, LibC::size_t n)
+{
+    if (!dest || !src)
+        return dest;
 
-  while (n--) {
-    *d++ = *s++;
-  }
+    char* d = static_cast<char*>(dest);
+    char const* s = static_cast<char const*>(src);
 
-  return dest;
+    for (LibC::size_t i = 0; i < n; ++i) {
+        d[i] = s[i];
+    }
+
+    return dest;
 }
 
-void *memset(void *dest, int ch, size_t n) {
-  char *d = static_cast<char *>(dest);
+void* memset(void* dest, int ch, LibC::size_t n)
+{
+    if (!dest) {
+        return NULL;
+    }
 
-  while (n--) {
-    *d++ = ch;
-  }
+    char* d = static_cast<char*>(dest);
 
-  return dest;
+    for (LibC::size_t i = 0; i < n; ++i) {
+        d[i] = static_cast<char>(ch);
+    }
+
+    return dest;
 }
 
-size_t utoa(uint64_t value, char *buffer, int base) {
-  const char *digits = "0123456789abcdef";
-  char temp[65];
-  size_t i = 0;
+LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base)
+{
+    if (base < 2 || base > 16) {
+        buffer[0] = '\0';
+        return 0;
+    }
 
-  if (value == 0) {
-    buffer[0] = '0';
-    buffer[1] = '\0';
-    return 1;
-  }
+    static char const digits[] = "0123456789abcdef";
+    char temp[65];
+    LibC::size_t i = 0;
 
-  while (value && i < sizeof(temp) - 1) {
-    temp[i++] = digits[value % base];
-    value /= base;
-  }
+    if (value == 0) {
+        buffer[0] = '0';
+    }
 
-  // Reverse into buffer
-  for (size_t j = 0; j < i; ++j)
-    buffer[j] = temp[i - j - 1];
+    while (value != 0 && i < sizeof(temp) - 1) {
+        temp[i++] = digits[value % static_cast<LibC::uint64_t>(base)];
+        value /= static_cast<LibC::uint64_t>(base);
+    }
 
-  buffer[i] = '\0'; // null-terminate
-  return i;
+    for (LibC::size_t j = 0; j < i; ++j) {
+        buffer[j] = temp[i - j - 1];
+    }
+    buffer[i] = '\0';
+
+    return i;
+}
+
 }
