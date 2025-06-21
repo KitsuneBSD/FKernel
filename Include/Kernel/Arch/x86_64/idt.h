@@ -38,13 +38,19 @@ public:
 
     void initialize() noexcept;
     void set_entry(int vector, void (*handler)(), LibC::uint8_t ist, LibC::uint8_t type_attr) noexcept;
+    void set_entry(int vector, void (*handler)(void*), LibC::uint8_t ist, LibC::uint8_t type_attr) noexcept;
 
     void register_exception(int vector, void (*handler)()) noexcept;
     void register_irq(int irq_number, void (*handler)()) noexcept;
     void register_syscall(int vector, void (*handler)()) noexcept;
 
+    void associate_irq(int irq_number, void (*handler)(void*)) noexcept;
     Pointer const& idtr() const noexcept { return idtr_; }
+
+    auto irq_get_handler(int irq_number) -> void (*)(void*);
 };
 
 extern "C" void idt_flush(Pointer const* idtr);
 }
+
+extern "C" void irq_dispatch(LibC::uint8_t irq, void* context);

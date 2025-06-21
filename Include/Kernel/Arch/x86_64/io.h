@@ -52,4 +52,17 @@ inline LibC::uint64_t inq(LibC::uint16_t port)
     return ret;
 }
 
+inline void send_eoi(int irq_number) noexcept
+{
+    constexpr LibC::uint16_t PIC1_COMMAND = 0x20;
+    constexpr LibC::uint16_t PIC2_COMMAND = 0xA0;
+    constexpr LibC::uint8_t PIC_EOI = 0x20;
+
+    if (irq_number >= 8) {
+        outb(PIC2_COMMAND, PIC_EOI);
+    }
+
+    outb(PIC1_COMMAND, PIC_EOI);
+}
+
 }
