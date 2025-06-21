@@ -1,7 +1,7 @@
-global flush_idt
+global idt_flush
 extern idtp
 
 section .text
-flush_idt:
+idt_flush:
     lidt [rdi]
     ret
