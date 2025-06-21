@@ -10,6 +10,4 @@ void early_init(multiboot2::TagMemoryMap)
     Log(LogLevel::INFO, "Init the kernel");
     gdt::Manager::instance().initialize();
     idt::Manager::instance().initialize();
-
-    asm("ud2");
 }

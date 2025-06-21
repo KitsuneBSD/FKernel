@@ -87,10 +87,10 @@ void Manager::set_entry(int vector, void (*handler)(), LibC::uint8_t ist, LibC::
 void Manager::register_exception(int vector, void (*handler)()) noexcept
 {
     constexpr LibC::uint8_t TYPE_ATTR = 0x8E; // Interrupt Gate, Present, DPL=0
-    LibC::uint8_t ist = isr_ist[vector];      // Usa o IST correto conforme definido
+    LibC::uint8_t ist = isr_ist[vector];
     Logf(LogLevel::TRACE,
-        "IDT Exception Registered: Vector=%d, Vector Name=%s, Handler=%p, IST=%u",
-        vector, exception::vector_to_string(static_cast<exception::Vector>(vector)), handler, ist);
+        "IDT Exception Registered: Vector=%d, Vector Name=%s, Handler=%p",
+        vector, exception::vector_to_string(static_cast<exception::Vector>(vector)), handler);
     set_entry(vector, handler, ist, TYPE_ATTR);
 }
 
