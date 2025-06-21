@@ -1,11 +1,68 @@
+#include <Kernel/Arch/x86_64/exception.h>
 #include <Kernel/Arch/x86_64/idt.h>
+#include <Kernel/Arch/x86_64/isr.h>
 #include <LibFK/Log.hpp>
 
 namespace idt {
+
+constexpr LibC::uint8_t IST_NONE = 0;
+constexpr LibC::uint8_t IST_DOUBLE_FAULT = 1;
+
+static void (*isr_stubs[32])() = {
+    isr_divide_by_zero,
+    isr_debug,
+    isr_nmi,
+    isr_breakpoint,
+    isr_overflow,
+    isr_bound_range,
+    isr_invalid_opcode,
+    isr_device_na,
+    isr_double_fault,
+    isr_coprocessor_seg,
+    isr_invalid_tss,
+    isr_seg_not_present,
+    isr_stack_fault,
+    isr_gp_fault,
+    isr_page_fault,
+    isr_reserved_15,
+    isr_fpu_error,
+    isr_alignment_check,
+    isr_machine_check,
+    isr_simd_fp,
+    isr_virtualization,
+    isr_reserved_21,
+    isr_reserved_22,
+    isr_reserved_23,
+    isr_reserved_24,
+    isr_reserved_25,
+    isr_reserved_26,
+    isr_reserved_27,
+    isr_reserved_28,
+    isr_reserved_29,
+    isr_reserved_30,
+    isr_reserved_31
+};
+
+LibC::uint8_t const isr_ist[32] = {
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_DOUBLE_FAULT, // 8
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE
+};
+
 void Manager::initialize() noexcept
 {
     for (int i = 0; i < static_cast<int>(IDT_ENTRIES); i++) {
         entries_[i] = {};
+    }
+
+    for (int i = 0; i < 32; ++i) {
+        register_exception(i, isr_stubs[i]);
     }
 
     idtr_.limit = sizeof(entries_) - 1;
@@ -29,10 +86,12 @@ void Manager::set_entry(int vector, void (*handler)(), LibC::uint8_t ist, LibC::
 
 void Manager::register_exception(int vector, void (*handler)()) noexcept
 {
-    constexpr LibC::uint8_t IST = 1;
-    constexpr LibC::uint8_t TYPE_ATTR = 0x8E; // 1000 1110b
-
-    set_entry(vector, handler, IST, TYPE_ATTR);
+    constexpr LibC::uint8_t TYPE_ATTR = 0x8E; // Interrupt Gate, Present, DPL=0
+    LibC::uint8_t ist = isr_ist[vector];      // Usa o IST correto conforme definido
+    Logf(LogLevel::TRACE,
+        "IDT Exception Registered: Vector=%d, Vector Name=%s, Handler=%p, IST=%u",
+        vector, exception::vector_to_string(static_cast<exception::Vector>(vector)), handler, ist);
+    set_entry(vector, handler, ist, TYPE_ATTR);
 }
 
 void Manager::register_irq(int irq_number, void (*handler)()) noexcept
@@ -52,5 +111,4 @@ void Manager::register_syscall(int vector, void (*handler)()) noexcept
 
     set_entry(vector, handler, IST, TYPE_ATTR);
 }
-
 }
