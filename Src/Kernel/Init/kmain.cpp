@@ -18,11 +18,7 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
     }
 
     multiboot2::MultibootParser mb_parser(multiboot_ptr);
-#ifdef FKERNEL_DEBUG
     Logger::Instance().SetLevel(LogLevel::TRACE);
-#else
-    Logger::Instance().SetLevel(LogLevel::INFO);
-#endif
 
     auto mem_map_tag = mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
 
@@ -33,7 +29,7 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
             __asm__("hlt");
         }
     }
-    // early_init(*mem_map_tag);
+    early_init(*mem_map_tag);
 
     return;
 }
