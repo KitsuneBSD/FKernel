@@ -5,7 +5,7 @@
 
 namespace LibC {
 
-LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base, bool uppercase = false);
+LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base, bool uppercase = true);
 
 extern "C" void* memcpy(void* dest, void const* src, LibC::size_t n);
 extern "C" void* memset(void* dest, int ch, LibC::size_t n);
