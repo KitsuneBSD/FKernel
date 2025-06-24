@@ -1,9 +1,9 @@
 #pragma once
 
-extern "C" void flush_gdt(void* gdtr);
-
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
+
+#include <Kernel/Arch/x86_64/Cpu/Asm.h>
 
 namespace gdt {
 enum GdtIndex : LibC::uint8_t {
