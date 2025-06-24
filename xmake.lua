@@ -17,6 +17,7 @@ local clang_flags = {
 local nasm_flags = {
 	"-f elf64",
 	"-w-label-orphan",
+	"-w-other",
 }
 
 local lld_flags = {
