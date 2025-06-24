@@ -10,15 +10,20 @@ local clang_flags = {
 	"-fno-threadsafe-statics",
 	"-fno-exceptions",
 	"-fno-rtti",
+	"-nostdlib",
+	"-nostdinc",
 	"-Wno-gnu-line-marker",
 }
 local nasm_flags = {
 	"-f elf64",
+	"-w-label-orphan",
 }
 
 local lld_flags = {
 	"-T Config/linker.ld",
+	"-nostdlib",
 }
+
 toolchain("FKernel_Compiling")
 set_kind("standalone")
 set_toolset("cc", "clang")
@@ -68,10 +73,13 @@ add_ldflags(lld_flags)
 add_includedirs("Include")
 
 if is_arch("x86_64") then
-	add_files("Src/Kernel/Arch/x86_64/Boot/**.asm")
-	add_files("Src/Kernel/Arch/x86_64/Section/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/*/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/*/**.cpp")
 end
 
-add_files("Src/Kernel/Init/**.cpp")
+add_files("Src/LibC/**.cpp")
+add_files("Src/LibFK/**.cpp")
 
+add_files("Src/Kernel/Init/**.cpp")
+add_files("Src/Kernel/Driver/**.cpp")
 target_end()
