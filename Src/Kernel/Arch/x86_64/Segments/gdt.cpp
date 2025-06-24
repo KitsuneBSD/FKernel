@@ -35,7 +35,7 @@ void Manager::initialize() noexcept
 
     flush_gdt(&gdtr);
 
-    Logf(LogLevel::INFO, "GDT: Loaded with success");
+    Log(LogLevel::INFO, "GDT: Loaded with success");
 }
 
 }
