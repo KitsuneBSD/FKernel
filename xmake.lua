@@ -64,11 +64,15 @@ on_run(function(target)
 	os.execv("bash Meta/run_mockos.sh")
 end)
 
-set_warnings("everything")
+if is_mode("debug") then
+	set_warnings("everything")
+else
+	set_warnings("allextra", "error")
+end
 
-add_cxflags(clang_flags)
-add_asflags(nasm_flags)
-add_ldflags(lld_flags)
+add_cxflags(clang_flags, { force = true })
+add_asflags(nasm_flags, { force = true })
+add_ldflags(lld_flags, { force = true })
 
 add_includedirs("Include")
 
