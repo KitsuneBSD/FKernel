@@ -6,7 +6,7 @@ extern "C" void flush_gdt(void* gdtr);
 #include <LibC/stdint.h>
 
 namespace gdt {
-enum GdtIndex : int {
+enum GdtIndex : LibC::uint8_t {
     Null = 0,
     KernelCode,
     KernelData,
