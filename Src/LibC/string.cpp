@@ -91,7 +91,7 @@ int atoi(char const* str)
     return sign * result;
 }
 
-void* memcpy(void* dest, void const* src, LibC::size_t n)
+extern "C" void* memcpy(void* dest, void const* src, LibC::size_t n)
 {
     if (!dest || !src)
         return dest;
@@ -106,7 +106,7 @@ void* memcpy(void* dest, void const* src, LibC::size_t n)
     return dest;
 }
 
-void* memset(void* dest, int ch, LibC::size_t n)
+extern "C" void* memset(void* dest, int ch, LibC::size_t n)
 {
     if (!dest) {
         return NULL;
@@ -121,19 +121,20 @@ void* memset(void* dest, int ch, LibC::size_t n)
     return dest;
 }
 
-LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base)
+LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base, bool uppercase)
 {
     if (base < 2 || base > 16) {
         buffer[0] = '\0';
         return 0;
     }
-
-    static char const digits[] = "0123456789abcdef";
+    static char const* digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
     char temp[65];
     LibC::size_t i = 0;
 
     if (value == 0) {
         buffer[0] = '0';
+        buffer[1] = '\0';
+        return 1;
     }
 
     while (value != 0 && i < sizeof(temp) - 1) {

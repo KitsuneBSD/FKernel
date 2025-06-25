@@ -2,6 +2,9 @@
 .xmake/linux/x86_64/cache
 .xmake/linux/x86_64/tmp
 
+compile_commands.json
+
+.cache
 .ccls-cache
 
 build
