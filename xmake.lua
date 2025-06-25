@@ -7,6 +7,7 @@ set_objectdir("build/objs")
 set_languages("cxx20")
 
 local clang_flags = {
+	"-ffreestanding",
 	"-fno-threadsafe-statics",
 	"-fno-exceptions",
 	"-fno-rtti",
