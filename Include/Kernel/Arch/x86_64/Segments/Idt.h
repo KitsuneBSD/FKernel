@@ -6,6 +6,8 @@
 
 namespace idt {
 
+using IrqHandler = void (*)(LibC::uint8_t irq, void* context);
+
 struct idt_entry {
     LibC::uint16_t offset_low;
     LibC::uint16_t selector;
@@ -45,5 +47,10 @@ public:
     void initialize() noexcept;
     void set_entry(int index, void* isr, LibC::uint16_t selector, LibC::uint8_t type_attr, LibC::uint8_t ist) noexcept;
 };
+
+void register_irq_handler(LibC::uint8_t irq, IrqHandler handler) noexcept;
+void unregister_irq_handler(LibC::uint8_t irq) noexcept;
+
+extern "C" void irq_dispatch(LibC::uint8_t irq, void* context) noexcept;
 
 }
