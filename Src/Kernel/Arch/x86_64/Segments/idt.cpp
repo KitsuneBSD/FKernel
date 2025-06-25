@@ -1,4 +1,5 @@
-#include "Kernel/Arch/x86_64/Cpu/Asm.h"
+#include <Kernel/Arch/x86_64/Cpu/Constants.h>
+#include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibFK/Log.h>
 
@@ -9,22 +10,23 @@ void Manager::initialize() noexcept
     Log(LogLevel::INFO, "IDT: Initialize Interrupt Descriptor Table from x86_64 (64 Bits)");
     for (int i = 0; i < 256; ++i) {
         if (i <= 31) {
-            Logf(LogLevel::TRACE, "Implement a exception for index: %d", i);
+            Logf(LogLevel::TRACE, "IDT: Registered Exception %d (%s)", i, named_exception(i));
+            set_entry(i, reinterpret_cast<void*>(exception_stubs[i]), 0x08, IDT_TYPE_INTERRUPT_GATE, i);
         }
 
         else if (i > 31 && i <= 47) {
-            Logf(LogLevel::TRACE, "Implement a routine for index: %d", i);
+            //   Logf(LogLevel::TRACE, "Implement a routine for index: %d", i);
         }
 
         else {
-            Logf(LogLevel::TRACE, "Implement a custom handling for index %d", i);
+            //  Logf(LogLevel::TRACE, "Implement a custom handling for index %d", i);
         }
     }
 
-    // idtr.limit = sizeof(entries_) - 1;
-    // idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
+    idtr.limit = sizeof(entries_) - 1;
+    idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
 
-    // flush_idt(&idtr);
+    flush_idt(&idtr);
     Log(LogLevel::INFO, "IDT: Loaded with success");
 }
 
@@ -41,9 +43,9 @@ void Manager::set_entry(int index, void* isr, LibC::uint16_t selector, LibC::uin
     entry.offset_high = (addr >> 32) & 0xFFFFFFFF;
     entry.zero = 0;
 
-    Logf(LogLevel::TRACE,
-        "[IDT] Entry[%d]: isr=0x%016llx sel=0x%04x attr=0x%02x ist=%u",
-        index, addr, selector, type_attr, ist);
+    //   Logf(LogLevel::TRACE,
+    //       "[IDT] Entry[%d]: isr=0x%016llx sel=0x%04x attr=0x%02x ist=%u",
+    //      index, addr, selector, type_attr, ist);
 }
 
 }
