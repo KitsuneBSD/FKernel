@@ -57,6 +57,7 @@ void Manager::initialize() noexcept
     set_entry(GdtIndex::UserCode, 0, 0xFFFFF, 0xFA, 0xA0);   // Executável, ring 3
     set_entry(GdtIndex::UserData, 0, 0xFFFFF, 0xF2, 0xA0);   // Dados, ring 3
 
+    Logf(LogLevel::INFO, "TSS: Initialize Task State Segment from x86_64 (64 Bits)");
     LibC::uint64_t const tss_base = reinterpret_cast<LibC::uint64_t>(&tss_);
     LibC::uint32_t const tss_limit = sizeof(Tss::Tss) - 1;
 
