@@ -11,8 +11,11 @@ inline void halt()
 
 extern "C" void global_default_handler(CpuState* const frame)
 {
-    if (frame->error_code == 0) {
-        Log(LogLevel::WARN, "Division by Zero isn't allowed");
+    if (frame->error_code != 14 && frame->error_code != 8) {
+        Logf(LogLevel::WARN, "%s isn't allowed", named_exception(frame->error_code));
+        return;
+    } else {
+        Logf(LogLevel::ERROR, "%s isn't allowed", named_exception(frame->error_code));
+        halt();
     }
-    halt();
 }
