@@ -1,0 +1,18 @@
+#include "LibFK/Log.h"
+#include <Kernel/Arch/x86_64/Cpu/State.h>
+#include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
+
+inline void halt()
+{
+    while (true) {
+        asm("hlt");
+    }
+}
+
+extern "C" void global_default_handler(CpuState* const frame)
+{
+    if (frame->error_code == 0) {
+        Log(LogLevel::WARN, "Division by Zero isn't allowed");
+    }
+    halt();
+}
