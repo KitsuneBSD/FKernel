@@ -17,7 +17,7 @@ void VirtualMemoryManager::initialize() noexcept
         return;
     }
 
-    pml4 = reinterpret_cast<LibC::uint64_t*>(BumpAllocator::alloc(page_size));
+    pml4 = reinterpret_cast<LibC::uint64_t*>(BumpAllocator::alloc(page_size, page_size));
     if (!pml4) {
         Log(LogLevel::ERROR, "VMM: Failed to allocate PML4");
         return;
@@ -77,7 +77,7 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pd[pd_idx] & PAGE_PRESENT) {
         pt = reinterpret_cast<LibC::uint64_t*>(pd[pd_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pt = reinterpret_cast<LibC::uint64_t*>(BumpAllocator::alloc(page_size));
+        pt = reinterpret_cast<LibC::uint64_t*>(BumpAllocator::alloc(page_size, page_size));
         if (!pt) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PT");
             return nullptr;
@@ -93,19 +93,33 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
 
 bool VirtualMemoryManager::map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept
 {
-    auto* pte = get_or_create_pte(virt_addr);
-    if (!pte) {
-        Log(LogLevel::ERROR, "VMM: Failed to get or create PTE");
+    constexpr LibC::uintptr_t page_mask = ~0xFFFULL;
+
+    // Validar alinhamento dos endereços (4 KiB)
+    if ((virt_addr & 0xFFF) != 0 || (phys_addr & 0xFFF) != 0) {
+        Logf(LogLevel::ERROR, "VMM: map_page chamado com endereços desalinhados virt=0x%llX phys=0x%llX", virt_addr, phys_addr);
         return false;
     }
 
-    if (*pte & PAGE_PRESENT) {
-        Logf(LogLevel::WARN, "VMM: Attempt to map already mapped page at virt addr 0x%llX", virt_addr);
+    virt_addr &= page_mask;
+    phys_addr &= page_mask;
+
+    auto* pte = get_or_create_pte(virt_addr);
+    if (!pte) {
+        Log(LogLevel::ERROR, "VMM: Falha ao obter/criar PTE");
+        return false;
+    }
+
+    if ((*pte & PAGE_PRESENT) != 0) {
+        Logf(LogLevel::WARN, "VMM: Página já mapeada em virt addr 0x%llX", virt_addr);
         return false;
     }
 
     *pte = (phys_addr & 0x000FFFFFFFFFF000ULL) | (flags | PAGE_PRESENT);
-    Logf(LogLevel::INFO, "VMM: Mapped virt addr 0x%llX to phys addr 0x%llX with flags 0x%llX", virt_addr, phys_addr, flags);
+
+    Logf(LogLevel::INFO, "VMM: Mapeou virt addr 0x%llX para phys addr 0x%llX com flags 0x%llX (PTE=0x%llX)",
+        virt_addr, phys_addr, flags, *pte);
+
     return true;
 }
 

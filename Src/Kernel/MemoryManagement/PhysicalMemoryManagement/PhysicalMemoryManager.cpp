@@ -135,6 +135,32 @@ void PhysicalMemoryManager::mark_region_used(LibC::uint64_t base, LibC::uint64_t
     }
 }
 
+LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
+{
+    for (LibC::uint64_t page = 0; page < pmm_total_pages; ++page) {
+        if (!get_bit(page)) {
+            set_bit(page);
+            return pmm_base_addr + (page * total_page_size);
+        }
+    }
+
+    Log(LogLevel::ERROR, "PMM: Out of physical memory");
+    return 0;
+}
+
+void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
+{
+    if (phys_addr < pmm_base_addr)
+        return;
+
+    LibC::uint64_t page = (phys_addr - pmm_base_addr) / total_page_size;
+
+    if (page >= pmm_total_pages)
+        return;
+
+    clear_bit(page);
+}
+
 void PhysicalMemoryManager::set_bit(LibC::size_t index) noexcept
 {
     if (index >= pmm_total_pages)
