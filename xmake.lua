@@ -13,6 +13,7 @@ local clang_flags = {
 	"-fno-rtti",
 	"-nostdlib",
 	"-nostdinc",
+	"-mcmodel=kernel",
 	"-Wno-gnu-line-marker",
 }
 local nasm_flags = {
