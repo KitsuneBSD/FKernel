@@ -13,6 +13,7 @@ local clang_flags = {
 	"-fno-rtti",
 	"-nostdlib",
 	"-nostdinc",
+	"-mcmodel=kernel",
 	"-Wno-gnu-line-marker",
 }
 local nasm_flags = {
@@ -88,4 +89,6 @@ add_files("Src/LibFK/**.cpp")
 
 add_files("Src/Kernel/Init/**.cpp")
 add_files("Src/Kernel/Driver/**.cpp")
+
+add_files("Src/Kernel/MemoryManagement/*/**.cpp")
 target_end()

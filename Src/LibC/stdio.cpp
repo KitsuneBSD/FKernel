@@ -5,9 +5,8 @@ namespace LibC {
 
 static inline char* append_string(char* buf, char const* str)
 {
-    while (*str) {
+    while (*str)
         *buf++ = *str++;
-    }
     return buf;
 }
 
@@ -24,24 +23,24 @@ static inline char* append_padding(char* buf, char pad_char, int count)
     return buf;
 }
 
-static inline char* format_integer(char* buf, LibC::int64_t val, int base, int width, char pad_char)
+static inline char* format_integer(char* buf, int64_t val, int base, int width, char pad_char)
 {
     char temp[65];
-    LibC::size_t len = 0;
+    size_t len = 0;
 
     bool negative = false;
-    LibC::uint64_t uval;
+    uint64_t uval;
 
     if (val < 0) {
         negative = true;
-        uval = static_cast<LibC::uint64_t>(-val);
+        uval = static_cast<uint64_t>(-val);
     } else {
-        uval = static_cast<LibC::uint64_t>(val);
+        uval = static_cast<uint64_t>(val);
     }
 
-    len = utoa(uval, temp, base);
+    len = utoa(uval, temp, base, false);
 
-    int const total_width = static_cast<int>(len) + (negative ? 1 : 0);
+    int total_width = static_cast<int>(len) + (negative ? 1 : 0);
     if (total_width < width)
         buf = append_padding(buf, pad_char, width - total_width);
 
@@ -54,18 +53,16 @@ static inline char* format_integer(char* buf, LibC::int64_t val, int base, int w
     return buf;
 }
 
-static inline char* format_unsigned(char* buf, LibC::uint64_t val, int base, int width, char pad_char)
+static inline char* format_unsigned(char* buf, uint64_t val, int base, int width, char pad_char, bool uppercase = false)
 {
     char temp[65];
-    LibC::size_t const len = utoa(val, temp, base);
+    size_t len = utoa(val, temp, base, uppercase);
 
-    if (static_cast<int>(len) < width) {
+    if (static_cast<int>(len) < width)
         buf = append_padding(buf, pad_char, width - static_cast<int>(len));
-    }
 
-    for (LibC::size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; ++i)
         *buf++ = temp[i];
-    }
 
     return buf;
 }
@@ -73,7 +70,7 @@ static inline char* format_unsigned(char* buf, LibC::uint64_t val, int base, int
 static inline char* format_pointer(char* buf, void* ptr)
 {
     buf = append_string(buf, "0x");
-    return format_unsigned(buf, reinterpret_cast<uintptr_t>(ptr), 16, 0, '0');
+    return format_unsigned(buf, reinterpret_cast<uintptr_t>(ptr), 16, sizeof(uintptr_t) * 2, '0');
 }
 
 int vsprintf(char* out, char const* fmt, va_list args)
@@ -87,6 +84,7 @@ int vsprintf(char* out, char const* fmt, va_list args)
         }
 
         ++fmt;
+
         char pad_char = ' ';
         int width = 0;
 
@@ -102,14 +100,20 @@ int vsprintf(char* out, char const* fmt, va_list args)
 
         bool long_flag = false;
         bool long_long_flag = false;
+        bool size_t_flag = false;
 
-        if (*fmt == 'l') {
-            ++fmt;
+        while (*fmt == 'l' || *fmt == 'z') {
             if (*fmt == 'l') {
+                if (long_flag) {
+                    long_long_flag = true;
+                    long_flag = false;
+                } else {
+                    long_flag = true;
+                }
                 ++fmt;
-                long_long_flag = true;
-            } else {
-                long_flag = true;
+            } else if (*fmt == 'z') {
+                size_t_flag = true;
+                ++fmt;
             }
         }
 
@@ -128,27 +132,33 @@ int vsprintf(char* out, char const* fmt, va_list args)
 
         case 'd':
         case 'i': {
-            LibC::int64_t const val = long_long_flag ? va_arg(args, long long)
-                                                     : (long_flag ? va_arg(args, long)
-                                                                  : va_arg(args, int));
+            int64_t val;
+            if (long_long_flag)
+                val = va_arg(args, long long);
+            else if (long_flag)
+                val = va_arg(args, long);
+            else
+                val = va_arg(args, int);
             buf = format_integer(buf, val, 10, width, pad_char);
             break;
         }
 
-        case 'u': {
-            LibC::uint64_t const val = long_long_flag ? va_arg(args, unsigned long long)
-                                                      : (long_flag ? va_arg(args, unsigned long)
-                                                                   : va_arg(args, unsigned int));
-            buf = format_unsigned(buf, val, 10, width, pad_char);
-            break;
-        }
-
+        case 'u':
         case 'x':
         case 'X': {
-            LibC::uint64_t const val = long_long_flag ? va_arg(args, unsigned long long)
-                                                      : (long_flag ? va_arg(args, unsigned long)
-                                                                   : va_arg(args, unsigned int));
-            buf = format_unsigned(buf, val, 16, width, pad_char);
+            uint64_t val;
+            if (size_t_flag)
+                val = va_arg(args, size_t);
+            else if (long_long_flag)
+                val = va_arg(args, unsigned long long);
+            else if (long_flag)
+                val = va_arg(args, unsigned long);
+            else
+                val = va_arg(args, unsigned int);
+
+            int base = (*fmt == 'u') ? 10 : 16;
+            bool uppercase = (*fmt == 'X');
+            buf = format_unsigned(buf, val, base, width, pad_char, uppercase);
             break;
         }
 
@@ -181,7 +191,7 @@ int sprintf(char* out, char const* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    int const written = vsprintf(out, fmt, args);
+    int written = vsprintf(out, fmt, args);
     va_end(args);
     return written;
 }
