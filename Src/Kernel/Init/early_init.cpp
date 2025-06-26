@@ -2,6 +2,7 @@
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
+#include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 
 extern "C" LibC::uintptr_t current_pml4_ptr;
 
@@ -16,4 +17,5 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
     idt_manager.initialize();
 
     MemoryManagement::PhysicalMemoryManager::initialize(mmap);
+    MemoryManagement::VirtualMemoryManager::initialize();
 }
