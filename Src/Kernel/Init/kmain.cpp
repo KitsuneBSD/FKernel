@@ -1,4 +1,4 @@
-#include "LibC/stdint.h"
+#include <LibC/stdint.h>
 #include <LibFK/Log.h>
 
 #include <Kernel/Boot/multiboot2.h>
@@ -31,5 +31,8 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
     }
     early_init(*mem_map_tag);
 
-    return;
+    // Infinite Loop Hang
+    while (true) {
+        asm("hlt");
+    }
 }
