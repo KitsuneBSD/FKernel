@@ -7,29 +7,11 @@
 
 namespace idt {
 
-static IrqHandler irq_handlers[16] = { nullptr };
+extern "C" idt::IrqHandler irq_handlers[16];
 
 void Manager::initialize() noexcept
 {
     Log(LogLevel::INFO, "IDT: Initialize Interrupt Descriptor Table from x86_64 (64 Bits)");
-
-    idt::register_irq_handler(0, timer_handler);
-    idt::register_irq_handler(1, keyboard_handler);
-    idt::register_irq_handler(2, cascade_handler);
-    idt::register_irq_handler(3, com2_handler);
-    idt::register_irq_handler(4, com1_handler);
-    idt::register_irq_handler(5, legacy_peripheral_handler);
-
-    idt::register_irq_handler(6, fdc_handler);
-    idt::register_irq_handler(7, spurious_irq7_handler);
-    idt::register_irq_handler(8, rtc_handler);
-    idt::register_irq_handler(9, acpi_handler);
-    idt::register_irq_handler(10, irq10_pci_handler);
-    idt::register_irq_handler(11, irq11_pci_handler);
-    idt::register_irq_handler(12, ps2_mouse_handler);
-    idt::register_irq_handler(13, fpu_handler);
-    idt::register_irq_handler(14, primary_ata_handler);
-    idt::register_irq_handler(15, secondary_ata_handler);
 
     for (int i = 0; i < 256; ++i) {
         if (i <= 31) {
@@ -48,6 +30,23 @@ void Manager::initialize() noexcept
             //  Logf(LogLevel::TRACE, "Implement a custom handling for index %d", i);
         }
     }
+    register_irq_handler(0, timer_handler);
+    register_irq_handler(1, keyboard_handler);
+    register_irq_handler(2, cascade_handler);
+    register_irq_handler(3, com2_handler);
+    register_irq_handler(4, com1_handler);
+    register_irq_handler(5, legacy_peripheral_handler);
+
+    register_irq_handler(6, fdc_handler);
+    register_irq_handler(7, spurious_irq7_handler);
+    register_irq_handler(8, rtc_handler);
+    register_irq_handler(9, acpi_handler);
+    register_irq_handler(10, irq10_pci_handler);
+    register_irq_handler(11, irq11_pci_handler);
+    register_irq_handler(12, ps2_mouse_handler);
+    register_irq_handler(13, fpu_handler);
+    register_irq_handler(14, primary_ata_handler);
+    register_irq_handler(15, secondary_ata_handler);
 
     idtr.limit = sizeof(entries_) - 1;
     idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
@@ -73,45 +72,18 @@ void Manager::set_entry(int index, void* isr, LibC::uint16_t selector, LibC::uin
     //       "[IDT] Entry[%d]: isr=0x%016llx sel=0x%04x attr=0x%02x ist=%u",
     //      index, addr, selector, type_attr, ist);
 }
-
-void register_irq_handler(LibC::uint8_t irq, IrqHandler handler) noexcept
-{
-    if (irq >= 16) {
-        Logf(LogLevel::ERROR, "IDT: Attempt to register handler for invalid IRQ %u", irq);
-        return;
-    }
-
-    if (irq_handlers[irq] != nullptr) {
-        Logf(LogLevel::WARN, "IDT: Overwriting existing handler for IRQ %u (%s)", irq, named_irq(irq));
-    }
-
-    irq_handlers[irq] = handler;
-    Logf(LogLevel::INFO, "IDT: Handler registered for IRQ %u (%s)", irq, named_irq(irq));
-}
-
-void unregister_irq_handler(LibC::uint8_t irq) noexcept
-{
-    if (irq >= 16) {
-        Logf(LogLevel::ERROR, "IDT: Attempt to unregister handler for invalid IRQ %u", irq);
-        return;
-    }
-
-    irq_handlers[irq] = nullptr;
-    Logf(LogLevel::INFO, "IDT: Handler removed for IRQ %u (%s)", irq, named_irq(irq));
-}
-
 extern "C" void irq_dispatch(LibC::uint8_t irq, void* context) noexcept
 {
     if (irq >= 16) {
-        Logf(LogLevel::ERROR, "IRQ_DISPATCH: Invalid IRQ %u", irq);
+        Logf(LogLevel::ERROR, "Dispatch: Invalid IRQ %u", irq);
         Io::send_eoi(irq);
         return;
     }
 
-    if (idt::irq_handlers[irq]) {
-        idt::irq_handlers[irq](irq, context);
+    if (irq_handlers[irq]) {
+        irq_handlers[irq](irq, context);
     } else {
-        Logf(LogLevel::WARN, "IRQ_DISPATCH: Unhandled IRQ %u (%s)", irq, named_irq(irq));
+        Logf(LogLevel::WARN, "Dispatch: Unhandled IRQ %u (%s)", irq, named_irq(irq));
     }
 
     if (irq >= 8) {
