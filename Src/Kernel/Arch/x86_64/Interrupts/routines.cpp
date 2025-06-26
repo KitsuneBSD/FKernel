@@ -1,10 +1,13 @@
 
 #include <Kernel/Arch/x86_64/Hw/Io.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
+#include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
 
 static LibC::uint64_t tick_count = 0;
+
+idt::IrqHandler irq_handlers[16] = { nullptr };
 
 extern "C" void (*const routine_stubs[16])() = {
     irq0_handler, irq1_handler, irq2_handler, irq3_handler,
@@ -125,4 +128,30 @@ extern "C" void secondary_ata_handler(LibC::uint8_t irq, void* context)
 {
     Logf(LogLevel::TRACE, "Secondary ATA IRQ15 triggered.");
     Io::send_eoi(15);
+}
+
+void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept
+{
+    if (irq >= 16) {
+        Logf(LogLevel::ERROR, "Routine: Attempt to register handler for invalid IRQ %u", irq);
+        return;
+    }
+
+    if (irq_handlers[irq] != nullptr) {
+        Logf(LogLevel::WARN, "Routine: Overwriting existing handler for IRQ %u (%s)", irq, named_irq(irq));
+    }
+
+    irq_handlers[irq] = handler;
+    Logf(LogLevel::TRACE, "Routine: Handler registered for IRQ %u (%s)", irq, named_irq(irq));
+}
+
+void unregister_irq_handler(LibC::uint8_t irq) noexcept
+{
+    if (irq >= 16) {
+        Logf(LogLevel::ERROR, "Routine: Attempt to unregister handler for invalid IRQ %u", irq);
+        return;
+    }
+
+    irq_handlers[irq] = nullptr;
+    Logf(LogLevel::TRACE, "Routine: Handler removed for IRQ %u (%s)", irq, named_irq(irq));
 }

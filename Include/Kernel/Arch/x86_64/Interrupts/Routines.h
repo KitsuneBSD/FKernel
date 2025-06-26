@@ -1,6 +1,8 @@
 #pragma once
 
-#include "LibC/stdint.h"
+#include <Kernel/Arch/x86_64/Segments/Idt.h>
+#include <LibC/stdint.h>
+
 extern "C" void irq0_handler();  // 32
 extern "C" void irq1_handler();  // 33
 extern "C" void irq2_handler();  // 34
@@ -59,6 +61,9 @@ constexpr char const* named_irq(int irq) noexcept
         return "Unknown IRQ";
     }
 }
+
+void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept;
+void unregister_irq_handler(LibC::uint8_t irq) noexcept;
 
 extern "C" void timer_handler(LibC::uint8_t irq, void* context);
 extern "C" void keyboard_handler(LibC::uint8_t irq, void* context);
