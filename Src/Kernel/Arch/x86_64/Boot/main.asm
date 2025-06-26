@@ -1,4 +1,5 @@
 global start
+global current_pml4_ptr
 extern kmain
 
 section .text
@@ -69,7 +70,7 @@ setup_page_tables:
 	or eax, 0b11 ; present, writable
 	mov [page_table_l4], eax
 	
-	mov eax, page_table_l2
+  mov eax, page_table_l2
 	or eax, 0b11 ; present, writable
 	mov [page_table_l3], eax
 
@@ -123,6 +124,8 @@ multiboot_magic: resd 1
 multiboot_info_ptr: resq 1
 
 section .bss
+align 8
+current_pml4_ptr: resq 1
 align 4096
 page_table_l4:
 	resb 4096
@@ -146,6 +149,14 @@ gdt64:
 section .text
 bits 64
 long_mode_start:
+  lea rax, [page_table_l4]
+  mov [current_pml4_ptr], rax
+
+  mov eax, [multiboot_magic]
+  mov edi, eax
+  mov rsi, [multiboot_info_ptr]
+  
+
   mov ax, 0
   mov ss, ax
   mov ds, ax
@@ -153,9 +164,5 @@ long_mode_start:
   mov fs, ax
   mov gs, ax
   
-  mov eax, [multiboot_magic]
-  mov edi, eax
-  mov rsi, [multiboot_info_ptr]
-  
-	call kmain
+  call kmain
   hlt
