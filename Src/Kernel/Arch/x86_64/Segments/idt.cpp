@@ -3,6 +3,7 @@
 #include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
+#include <Kernel/Driver/8259Pic.h>
 #include <LibFK/Log.h>
 
 namespace idt {
@@ -12,6 +13,10 @@ extern "C" idt::IrqHandler irq_handlers[16];
 void Manager::initialize() noexcept
 {
     Log(LogLevel::INFO, "IDT: Initialize Interrupt Descriptor Table from x86_64 (64 Bits)");
+
+    Pic8259::remap(0x20, 0x28);
+
+    Log(LogLevel::TRACE, "IDT: PIC remapped successfully");
 
     for (int i = 0; i < 256; ++i) {
         if (i <= 31) {
@@ -24,6 +29,8 @@ void Manager::initialize() noexcept
             int irq = i - 32;
             Logf(LogLevel::TRACE, "IDT: Registered Routine %d (%s)", i, named_irq(irq));
             set_entry(i, reinterpret_cast<void*>(routine_stubs[irq]), 0x08, IDT_TYPE_INTERRUPT_GATE, 0);
+            Logf(LogLevel::TRACE, "IDT: Mask Irq %d (%s) ", irq, named_irq(irq));
+            Pic8259::mask_irq(irq);
         }
 
         else {
@@ -52,6 +59,9 @@ void Manager::initialize() noexcept
     idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
 
     flush_idt(&idtr);
+
+    Pic8259::unmask_irq(0);
+    Pic8259::unmask_irq(1);
     Log(LogLevel::INFO, "IDT: Loaded with success");
 }
 
