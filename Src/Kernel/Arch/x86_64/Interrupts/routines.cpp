@@ -9,6 +9,25 @@ static LibC::uint64_t tick_count = 0;
 
 idt::IrqHandler irq_handlers[16] = { nullptr };
 
+irq_entry_t irq_table[16] = {
+    { 0, timer_handler },
+    { 1, keyboard_handler },
+    { 2, cascade_handler },
+    { 3, com2_handler },
+    { 4, com1_handler },
+    { 5, legacy_peripheral_handler },
+    { 6, fdc_handler },
+    { 7, spurious_irq7_handler },
+    { 8, rtc_handler },
+    { 9, acpi_handler },
+    { 10, irq10_pci_handler },
+    { 11, irq11_pci_handler },
+    { 12, ps2_mouse_handler },
+    { 13, fpu_handler },
+    { 14, primary_ata_handler },
+    { 15, secondary_ata_handler }
+};
+
 extern "C" void (*const routine_stubs[16])() = {
     irq0_handler, irq1_handler, irq2_handler, irq3_handler,
     irq4_handler, irq5_handler, irq6_handler, irq7_handler,

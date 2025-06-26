@@ -2,6 +2,12 @@
 
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
+typedef void (*irq_handler_t)(LibC::uint8_t, void*);
+
+typedef struct {
+    int irq;
+    irq_handler_t handler;
+} irq_entry_t;
 
 extern "C" void irq0_handler();  // 32
 extern "C" void irq1_handler();  // 33
@@ -64,6 +70,8 @@ constexpr char const* named_irq(int irq) noexcept
 
 void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept;
 void unregister_irq_handler(LibC::uint8_t irq) noexcept;
+
+extern "C" irq_entry_t irq_table[16];
 
 extern "C" void timer_handler(LibC::uint8_t irq, void* context);
 extern "C" void keyboard_handler(LibC::uint8_t irq, void* context);

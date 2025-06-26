@@ -9,6 +9,7 @@
 namespace idt {
 
 extern "C" idt::IrqHandler irq_handlers[16];
+extern "C" irq_entry_t irq_table[];
 
 void Manager::initialize() noexcept
 {
@@ -29,7 +30,7 @@ void Manager::initialize() noexcept
             int irq = i - 32;
             Logf(LogLevel::TRACE, "IDT: Registered Routine %d (%s)", i, named_irq(irq));
             set_entry(i, reinterpret_cast<void*>(routine_stubs[irq]), 0x08, IDT_TYPE_INTERRUPT_GATE, 0);
-            Logf(LogLevel::TRACE, "IDT: Mask Irq %d (%s) ", irq, named_irq(irq));
+            register_irq_handler(irq_table[irq].irq, irq_table[irq].handler);
             Pic8259::mask_irq(irq);
         }
 
@@ -37,24 +38,6 @@ void Manager::initialize() noexcept
             //  Logf(LogLevel::TRACE, "Implement a custom handling for index %d", i);
         }
     }
-    register_irq_handler(0, timer_handler);
-    register_irq_handler(1, keyboard_handler);
-    register_irq_handler(2, cascade_handler);
-    register_irq_handler(3, com2_handler);
-    register_irq_handler(4, com1_handler);
-    register_irq_handler(5, legacy_peripheral_handler);
-
-    register_irq_handler(6, fdc_handler);
-    register_irq_handler(7, spurious_irq7_handler);
-    register_irq_handler(8, rtc_handler);
-    register_irq_handler(9, acpi_handler);
-    register_irq_handler(10, irq10_pci_handler);
-    register_irq_handler(11, irq11_pci_handler);
-    register_irq_handler(12, ps2_mouse_handler);
-    register_irq_handler(13, fpu_handler);
-    register_irq_handler(14, primary_ata_handler);
-    register_irq_handler(15, secondary_ata_handler);
-
     idtr.limit = sizeof(entries_) - 1;
     idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
 
