@@ -20,10 +20,15 @@ void Pit::initialize(LibC::uint32_t frequency) noexcept
         return;
     }
 
-    LibC::uint32_t divisor = static_cast<LibC::uint32_t>(PIT_FREQUENCY / frequency);
+    LibC::uint32_t divisor = (PIT_FREQUENCY + frequency / 2) / frequency;
 
     if (divisor == 0) {
+        Log(LogLevel::TRACE, "PIT: Divisor can' be zero. Forcing to be 1");
         divisor = 1;
+    }
+
+    if (frequency < 19 || frequency > PIT_FREQUENCY) {
+        Logf(LogLevel::WARN, "PIT: Frequency %u Hz may be out of reliable range", frequency);
     }
 
     if (divisor > 0xFFFF) {

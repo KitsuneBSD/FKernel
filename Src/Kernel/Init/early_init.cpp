@@ -18,7 +18,7 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
     auto& idt_manager = idt::Manager::Instance();
     idt_manager.initialize();
 
-    Pit::initialize(100);
+    Pit::initialize(1000);
 
     MemoryManagement::PhysicalMemoryManager::initialize(mmap);
     MemoryManagement::VirtualMemoryManager::initialize();
