@@ -4,6 +4,8 @@
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 
+#include <Kernel/Driver/Pit.h>
+
 extern "C" LibC::uintptr_t current_pml4_ptr;
 
 void early_init(multiboot2::TagMemoryMap const& mmap)
@@ -15,6 +17,8 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
 
     auto& idt_manager = idt::Manager::Instance();
     idt_manager.initialize();
+
+    Pit::initialize(100);
 
     MemoryManagement::PhysicalMemoryManager::initialize(mmap);
     MemoryManagement::VirtualMemoryManager::initialize();
