@@ -1,5 +1,5 @@
+#include <Kernel/MemoryManagement/BumpAllocator/bump_alloc.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
-#include <Kernel/MemoryManagement/PhysicalMemoryManagement/bump_alloc.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>

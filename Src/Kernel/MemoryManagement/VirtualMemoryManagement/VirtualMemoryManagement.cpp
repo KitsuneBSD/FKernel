@@ -1,4 +1,4 @@
-#include <Kernel/MemoryManagement/PhysicalMemoryManagement/bump_alloc.h>
+#include <Kernel/MemoryManagement/BumpAllocator/bump_alloc.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
