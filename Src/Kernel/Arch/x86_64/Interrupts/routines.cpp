@@ -5,7 +5,7 @@
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
 
-static LibC::uint64_t tick_count = 0;
+static LibC::uint64_t volatile tick_count = 0;
 
 idt::IrqHandler irq_handlers[16] = { nullptr };
 
@@ -27,6 +27,11 @@ irq_entry_t irq_table[16] = {
     { 14, primary_ata_handler },
     { 15, secondary_ata_handler }
 };
+
+LibC::uint64_t uptime()
+{
+    return tick_count;
+}
 
 extern "C" void (*const routine_stubs[16])() = {
     irq0_handler, irq1_handler, irq2_handler, irq3_handler,
