@@ -42,6 +42,7 @@ void Manager::initialize() noexcept
     idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
 
     flush_idt(&idtr);
+    asm volatile("sti");
 
     Pic8259::unmask_irq(0);
     Pic8259::unmask_irq(1);
