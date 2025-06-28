@@ -4,12 +4,17 @@
 #include <LibC/stdint.h>
 
 namespace MemoryManagement {
+
 class BumpAllocator {
 private:
     LibC::uintptr_t bump_ptr;
     LibC::uintptr_t bump_end;
 
+    bool initialized = false;
+
     BumpAllocator() = default;
+
+    bool can_alloc(LibC::size_t size, LibC::size_t alignment = 8) const noexcept;
 
 public:
     static BumpAllocator& instance() noexcept

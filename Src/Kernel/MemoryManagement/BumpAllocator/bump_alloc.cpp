@@ -6,10 +6,37 @@ namespace MemoryManagement {
 
 void BumpAllocator::initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexcept
 {
+    if (initialized) {
+        return;
+    }
+
+    if (end <= start) {
+        Log(LogLevel::ERROR, "BumpAllocator: Invalid heap range (end <= start)");
+        return;
+    }
 
     bump_ptr = start;
     bump_end = end;
+
+    Logf(LogLevel::INFO, "BumpAllocator initialized: start=0x%p end=0x%p",
+        reinterpret_cast<void*>(start), reinterpret_cast<void*>(end));
+
+    initialized = true;
 }
+
+bool BumpAllocator::can_alloc(LibC::size_t size, LibC::size_t alignment) const noexcept
+{
+    if (!initialized) {
+        return false;
+    }
+
+    if ((alignment & (alignment - 1)) != 0)
+        return false;
+
+    LibC::uintptr_t aligned = (bump_ptr + alignment - 1) & ~(alignment - 1);
+    return aligned + size <= bump_end;
+}
+
 void* BumpAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexcept
 {
     if ((alignment & (alignment - 1)) != 0) {
@@ -17,20 +44,21 @@ void* BumpAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexcept
         return nullptr;
     }
 
-    LibC::uintptr_t aligned = (bump_ptr + alignment - 1) & ~(alignment - 1);
-
-    Logf(LogLevel::TRACE, "BumpAllocator: Alloc requested size=%zu alignment=%zu, bump_ptr=0x%p, aligned=0x%p",
-        size, alignment, reinterpret_cast<void*>(bump_ptr), reinterpret_cast<void*>(aligned));
-
-    if (aligned + size > bump_end) {
-        Log(LogLevel::WARN, "BumpAllocator: Out of memory");
+    if (!can_alloc(size, alignment)) {
+        Logf(LogLevel::ERROR,
+            "BumpAllocator: Not enough space for allocation (size=%zu, alignment=%zu, remaining=%zu)",
+            size, alignment, remaining());
         return nullptr;
     }
+
+    LibC::uintptr_t aligned = (bump_ptr + alignment - 1) & ~(alignment - 1);
 
     void* ptr = reinterpret_cast<void*>(aligned);
     bump_ptr = aligned + size;
 
-    Logf(LogLevel::TRACE, "BumpAllocator: Allocated ptr=0x%p new bump_ptr=0x%p", ptr, reinterpret_cast<void*>(bump_ptr));
+    Logf(LogLevel::TRACE,
+        "BumpAllocator: Allocated %zu bytes at 0x%p (alignment=%zu), new bump_ptr=0x%p",
+        size, ptr, alignment, reinterpret_cast<void*>(bump_ptr));
 
     return ptr;
 }
