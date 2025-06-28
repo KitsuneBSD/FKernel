@@ -6,15 +6,29 @@
 namespace MemoryManagement {
 class BumpAllocator {
 private:
-    static LibC::uintptr_t bump_ptr;
-    static LibC::uintptr_t bump_end;
+    LibC::uintptr_t bump_ptr;
+    LibC::uintptr_t bump_end;
+
+    BumpAllocator() = default;
 
 public:
-    static void initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexcept;
+    static BumpAllocator& instance() noexcept
+    {
 
-    static void* alloc(LibC::size_t size, LibC::size_t alignment = 8) noexcept;
+        static BumpAllocator s_instance;
+        return s_instance;
+    }
 
-    static LibC::size_t remaining() noexcept;
+    void initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexcept;
+
+    void* alloc(LibC::size_t size, LibC::size_t alignment = 8) noexcept;
+
+    LibC::size_t remaining() const noexcept;
 };
 
+}
+
+inline void* Balloc(LibC::size_t size, LibC::size_t alignment = 8)
+{
+    return MemoryManagement::BumpAllocator::instance().alloc(size, alignment);
 }

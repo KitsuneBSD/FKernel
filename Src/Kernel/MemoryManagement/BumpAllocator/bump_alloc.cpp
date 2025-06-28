@@ -3,8 +3,6 @@
 #include <LibFK/Log.h>
 
 namespace MemoryManagement {
-LibC::uintptr_t BumpAllocator::bump_ptr = 0;
-LibC::uintptr_t BumpAllocator::bump_end = 0;
 
 void BumpAllocator::initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexcept
 {
@@ -37,8 +35,9 @@ void* BumpAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexcept
     return ptr;
 }
 
-LibC::size_t BumpAllocator::remaining() noexcept
+LibC::size_t BumpAllocator::remaining() const noexcept
 {
     return (bump_end > bump_ptr) ? (bump_end - bump_ptr) : 0;
 }
+
 }
