@@ -5,26 +5,6 @@
 
 namespace MemoryManagement {
 
-enum class MemRegionType : LibC::uint8_t {
-    Available,
-    Reserved,
-    ACPIReclaimable,
-    ACPINVS,
-    BadMemory,
-    Unknown
-};
-
-struct MemRegion {
-    LibC::uint64_t base; // endereço físico inicial
-    LibC::uint64_t size; // tamanho em bytes
-    MemRegionType type;
-
-    bool is_available() const noexcept
-    {
-        return type == MemRegionType::Available;
-    }
-};
-
 class PhysicalMemoryManager {
 private:
     static LibC::uint8_t* pmm_bitmap;

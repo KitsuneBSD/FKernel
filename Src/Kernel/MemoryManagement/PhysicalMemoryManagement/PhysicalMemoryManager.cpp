@@ -18,7 +18,7 @@ LibC::uint64_t PhysicalMemoryManager::total_page_size = 4096;
 
 void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noexcept
 {
-    BumpAllocator::initialize(reinterpret_cast<LibC::uintptr_t>(&__heap_start), reinterpret_cast<LibC::uintptr_t>(&__heap_end));
+    BumpAllocator::instance().initialize(reinterpret_cast<LibC::uintptr_t>(&__heap_start), reinterpret_cast<LibC::uintptr_t>(&__heap_end));
     Log(LogLevel::INFO, "PMM: Initializing Physical Memory Manager");
 
     LibC::uint64_t lowest_addr = ~0ULL;
@@ -50,7 +50,7 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
     Logf(LogLevel::TRACE, "PMM: Total pages = %llu", pmm_total_pages);
     Logf(LogLevel::TRACE, "PMM: Bitmap size = %zu bytes", pmm_bitmap_size);
 
-    pmm_bitmap = static_cast<LibC::uint8_t*>(BumpAllocator::alloc(pmm_bitmap_size, 8));
+    pmm_bitmap = static_cast<LibC::uint8_t*>(Balloc(pmm_bitmap_size, 8));
     if (!pmm_bitmap) {
         Log(LogLevel::ERROR, "PMM: Failed to allocate bitmap memory");
         return;
