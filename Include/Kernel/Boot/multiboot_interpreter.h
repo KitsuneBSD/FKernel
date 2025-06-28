@@ -22,7 +22,7 @@ public:
     T const* find_tag(TagType type) const
     {
         for (Tag const* tag = first_tag(); tag && tag->type != TagType::End;
-             tag = tag->next()) {
+            tag = tag->next()) {
             if (tag->type == type) {
                 return reinterpret_cast<T const*>(tag);
             }
@@ -33,9 +33,14 @@ public:
     void foreach_tag(void (*callback)(Tag const* tag)) const
     {
         for (Tag const* tag = first_tag(); tag && tag->type != TagType::End;
-             tag = tag->next()) {
+            tag = tag->next()) {
             callback(tag);
         }
     }
 };
+
+inline bool is_available(FK::dword type)
+{
+    return static_cast<MemoryType>(type) == MemoryType::Available;
+}
 }; // namespace multiboot2

@@ -1,3 +1,4 @@
+#include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/MemoryManagement/BumpAllocator/bump_alloc.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <LibC/stddef.h>
@@ -28,7 +29,7 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
         Logf(LogLevel::TRACE, "PMM: Memory region: base=0x%016llX size=0x%016llX type=%u",
             entry.base_addr, entry.length, static_cast<LibC::uint64_t>(entry.type));
 
-        if (entry.type == 1 /* Available */) {
+        if (multiboot2::is_available(entry.type)) {
             if (entry.base_addr < lowest_addr)
                 lowest_addr = entry.base_addr;
             if (entry.base_addr + entry.length > highest_addr)

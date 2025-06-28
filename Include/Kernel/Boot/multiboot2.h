@@ -12,6 +12,17 @@ constexpr FK::dword MOD_ALIGN = 0x00001000;
 constexpr FK::dword INFO_ALIGN = 0x00000008;
 constexpr FK::dword TAG_ALIGN = 8;
 
+enum class MemoryType : FK::dword {
+    Available = 1,             // Usável pelo sistema
+    Reserved = 2,              // Reservado; não deve ser usado
+    ACPIReclaimable = 3,       // Memória ACPI reutilizável após parsing
+    ACPINVS = 4,               // ACPI NVS – não volátil, deve ser preservada
+    BadMemory = 5,             // Áreas defeituosas; não devem ser usadas
+    BootloaderReclaimable = 6, // Pode ser reutilizada após o boot
+    KernelAndModules = 7,      // Ocupada pelo kernel e módulos (não padrão, mas alguns bootloaders usam)
+    Unknown = 0xFFFFFFFF       // Para tipos não reconhecidos
+};
+
 enum class TagType : FK::dword {
     End = 0,
     Cmdline = 1,
