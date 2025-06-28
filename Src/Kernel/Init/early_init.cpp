@@ -20,6 +20,8 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
 
     Pit::initialize(1000);
 
-    MemoryManagement::PhysicalMemoryManager::initialize(mmap);
-    MemoryManagement::VirtualMemoryManager::initialize();
+    auto& pmm = MemoryManagement::PhysicalMemoryManager::instance();
+    pmm.initialize(mmap);
+    auto& vmm = MemoryManagement::VirtualMemoryManager::instance();
+    vmm.initialize();
 }
