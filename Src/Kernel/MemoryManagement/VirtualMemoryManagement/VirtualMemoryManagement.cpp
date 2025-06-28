@@ -8,8 +8,6 @@ static constexpr LibC::size_t page_size = 4096;
 
 namespace MemoryManagement {
 
-LibC::uint64_t* VirtualMemoryManager::pml4 = nullptr;
-
 void VirtualMemoryManager::initialize() noexcept
 {
     if (pml4 != nullptr) {

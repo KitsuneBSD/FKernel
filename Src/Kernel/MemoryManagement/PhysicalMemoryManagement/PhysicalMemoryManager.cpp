@@ -10,14 +10,10 @@ extern LibC::uintptr_t __heap_end;
 
 namespace MemoryManagement {
 
-LibC::uint8_t* PhysicalMemoryManager::pmm_bitmap = nullptr;
-LibC::size_t PhysicalMemoryManager::pmm_bitmap_size = 0;
-LibC::uint64_t PhysicalMemoryManager::pmm_total_pages = 0;
-LibC::uint64_t PhysicalMemoryManager::pmm_base_addr = 0;
-LibC::uint64_t PhysicalMemoryManager::total_page_size = 4096;
-
 void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noexcept
 {
+    this->total_page_size = 4096;
+
     BumpAllocator::instance().initialize(reinterpret_cast<LibC::uintptr_t>(&__heap_start), reinterpret_cast<LibC::uintptr_t>(&__heap_end));
     Log(LogLevel::INFO, "PMM: Initializing Physical Memory Manager");
 
