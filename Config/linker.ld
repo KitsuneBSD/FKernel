@@ -17,7 +17,7 @@ SECTIONS
   .bump_heap (NOLOAD) :
     {
         __heap_start = .;
-        . += 32M;               /* Reserva 32 MiB para heap */
+        . += 16M;               /* Reserva 16 MiB para heap */
         __heap_end = .;
     }
 }
