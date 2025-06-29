@@ -15,6 +15,10 @@ void BumpAllocator::initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexc
         return;
     }
 
+    Logf(LogLevel::INFO, "Heap start = %zu, end = %zu, size = %zu",
+        start, end,
+        (end - start));
+
     bump_ptr = start;
     bump_end = end;
 
