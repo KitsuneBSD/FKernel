@@ -1,3 +1,4 @@
+#include "LibFK/types.hpp"
 #include <Kernel/MemoryManagement/BumpAllocator/bump_alloc.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
@@ -15,9 +16,9 @@ void BumpAllocator::initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexc
         return;
     }
 
-    Logf(LogLevel::INFO, "Heap start = %zu, end = %zu, size = %zu",
+    Logf(LogLevel::INFO, "Heap start = %zu, end = %zu, size = %zu KiB",
         start, end,
-        (end - start));
+        (end - start) / FK::KiB);
 
     bump_ptr = start;
     bump_end = end;
@@ -76,8 +77,8 @@ void* BumpAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexcept
     bump_ptr = aligned + size;
 
     Logf(LogLevel::TRACE,
-        "BumpAllocator: Allocated %zu bytes at 0x%p (alignment=%zu), new bump_ptr=0x%p",
-        size, ptr, alignment, reinterpret_cast<void*>(bump_ptr));
+        "BumpAllocator: Allocated %zu kb at 0x%p (alignment=%zu), new bump_ptr=0x%p",
+        size / FK::KiB, ptr, alignment, reinterpret_cast<void*>(bump_ptr));
 
     return ptr;
 }
