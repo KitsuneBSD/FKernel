@@ -2,6 +2,7 @@
 
 constexpr LibC::uint8_t IST_NONE = 0;
 constexpr LibC::uint8_t IST_DOUBLE_FAULT = 1;
+constexpr LibC::uint8_t IST_NMI = 2;
 
 extern "C" void isr_divide_by_zero();
 extern "C" void isr_debug();

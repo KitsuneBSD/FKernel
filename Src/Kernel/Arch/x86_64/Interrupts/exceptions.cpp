@@ -37,15 +37,10 @@ void (*exception_stubs[32])() = {
 };
 
 LibC::uint8_t const isr_ist[32] = {
-    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
-    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
-    IST_DOUBLE_FAULT, // 8
-    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
-    IST_NONE, IST_NONE, IST_NONE,
-    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
-    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
-    IST_NONE, IST_NONE, IST_NONE, IST_NONE,
-    IST_NONE, IST_NONE, IST_NONE
+    IST_NONE, IST_NONE, IST_NMI, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_DOUBLE_FAULT, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE,
+    IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE
 };
 
 char const* named_exception(int index) noexcept
@@ -60,8 +55,7 @@ char const* named_exception(int index) noexcept
         "Invalid Opcode",
         "Device Not Available",
         "Double Fault",
-        "Coprocessor Segment Overrun", // reservado no manual
-        "Invalid TSS",
+        "Coprocessor Segment Overrun", "Invalid TSS",
         "Segment Not Present",
         "Stack-Segment Fault",
         "General Protection Fault",
@@ -72,8 +66,7 @@ char const* named_exception(int index) noexcept
         "Machine Check",
         "SIMD Floating-Point Exception",
         "Virtualization Exception",
-        "Control Protection Exception", // se x86_64 mais novo
-        "Reserved 22",
+        "Control Protection Exception", "Reserved 22",
         "Reserved 23",
         "Reserved 24",
         "Reserved 25",

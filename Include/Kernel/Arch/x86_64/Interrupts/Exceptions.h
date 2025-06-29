@@ -5,5 +5,6 @@
 
 extern void (*exception_stubs[32])();
 extern LibC::uint8_t const isr_ist[32];
+
 void global_default_handler(struct CpuState const* frame);
 char const* named_exception(int index) noexcept;
