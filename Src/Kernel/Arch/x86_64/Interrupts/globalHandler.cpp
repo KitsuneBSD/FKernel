@@ -12,11 +12,7 @@ inline void halt()
 
 extern "C" void global_default_handler(CpuState* const frame)
 {
-    if (frame->error_code != 14 && frame->error_code != 8) {
-        Logf(LogLevel::WARN, "%u: Exception: %s isn't allowed", uptime(), named_exception(frame->error_code));
-        return;
-    } else {
-        Logf(LogLevel::ERROR, "%u: Exception: %s isn't allowed", uptime(), named_exception(frame->error_code));
-        halt();
-    }
+
+    Logf(LogLevel::ERROR, "%u: Exception: %s isn't allowed", uptime(), named_exception(frame->error_code));
+    halt();
 }
