@@ -17,6 +17,7 @@ private:
     static constexpr LibC::size_t max_free_blocks = 1024;
     FreeBlock free_blocks[max_free_blocks];
     LibC::size_t free_block_count = 0;
+    bool bitmap_dirty = false;
 
 private:
     PhysicalMemoryManager() = default;
@@ -30,6 +31,8 @@ private:
 
     void add_free_block(LibC::uint64_t start_page, LibC::uint64_t page_count) noexcept;
     void consolidate_blocks() noexcept;
+    void sync_free_blocks_with_bitmap() noexcept;
+    void sync_free_blocks_if_needed() noexcept;
 
 public:
     static PhysicalMemoryManager& instance() noexcept
