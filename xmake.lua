@@ -15,6 +15,8 @@ local clang_flags = {
 	"-nostdinc",
 	"-mcmodel=kernel",
 	"-Wno-gnu-line-marker",
+	"-mno-sse",
+	" -mno-avx",
 }
 local nasm_flags = {
 	"-f elf64",
