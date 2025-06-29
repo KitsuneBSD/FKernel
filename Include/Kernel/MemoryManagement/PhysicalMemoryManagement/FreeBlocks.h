@@ -16,14 +16,14 @@ struct FreeBlock {
     bool operator<(FreeBlock const& other) const noexcept;
 };
 
-static void swap_blocks(FreeBlock& a, FreeBlock& b) noexcept
+static inline void swap_blocks(FreeBlock& a, FreeBlock& b) noexcept
 {
     FreeBlock tmp = a;
     a = b;
     b = tmp;
 }
 
-static void quicksort_blocks(FreeBlock* arr, LibC::size_t left, LibC::size_t right) noexcept
+static inline void quicksort_blocks(FreeBlock* arr, LibC::size_t left, LibC::size_t right) noexcept
 {
     if (left >= right)
         return;
