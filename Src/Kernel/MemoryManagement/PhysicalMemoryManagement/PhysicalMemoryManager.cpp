@@ -142,6 +142,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
                 break;
 
             set_bit(page);
+            sync_free_blocks_if_needed();
             return pmm_base_addr + page * total_page_size;
         }
     }
@@ -163,6 +164,7 @@ void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
     clear_bit(page);
     add_free_block(page, 1);
     consolidate_blocks();
+    sync_free_blocks_if_needed();
 }
 
 LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t count) noexcept
@@ -195,6 +197,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t cou
         free_blocks[best_index].page_count -= count;
     }
 
+    sync_free_blocks_if_needed();
     return pmm_base_addr + start_page * total_page_size;
 }
 
@@ -213,32 +216,53 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
     for (LibC::uint64_t i = 0; i < count; ++i)
         clear_bit(start_page + i);
 
+    sync_free_blocks_if_needed();
     add_free_block(start_page, count);
     consolidate_blocks();
 }
 
 void PhysicalMemoryManager::set_bit(LibC::size_t index) noexcept
 {
-    if (index >= pmm_total_pages)
+
+    if (index >= pmm_total_pages) {
+        Logf(LogLevel::WARN, "PMM: set_bit index %zu out of range (max %llu)", index, pmm_total_pages);
         return;
+    }
+
     LibC::size_t word = index / 64;
     LibC::size_t bit = index % 64;
-    pmm_bitmap[word] |= (1ULL << bit);
+    LibC::uint64_t mask = (1ULL << bit);
+
+    if ((pmm_bitmap[word] & mask) == 0) { // Só atualiza se o bit estava limpo
+        pmm_bitmap[word] |= mask;
+        bitmap_dirty = true;
+    }
 }
 
 void PhysicalMemoryManager::clear_bit(LibC::size_t index) noexcept
 {
-    if (index >= pmm_total_pages)
+    if (index >= pmm_total_pages) {
+        Logf(LogLevel::WARN, "PMM: clear_bit index %zu out of range (max %llu)", index, pmm_total_pages);
         return;
+    }
+
     LibC::size_t word = index / 64;
     LibC::size_t bit = index % 64;
-    pmm_bitmap[word] &= ~(1ULL << bit);
+    LibC::uint64_t mask = (1ULL << bit);
+
+    if ((pmm_bitmap[word] & mask) != 0) {
+        pmm_bitmap[word] &= ~mask;
+        bitmap_dirty = true;
+    }
 }
 
 bool PhysicalMemoryManager::get_bit(LibC::size_t index) noexcept
 {
-    if (index >= pmm_total_pages)
+    if (index >= pmm_total_pages) {
+        Logf(LogLevel::WARN, "PMM: get_bit index %zu out of range (max %llu), returning true", index, pmm_total_pages);
         return true;
+    }
+
     LibC::size_t word = index / 64;
     LibC::size_t bit = index % 64;
     return (pmm_bitmap[word] & (1ULL << bit)) != 0;
@@ -276,6 +300,50 @@ void PhysicalMemoryManager::mark_region_free(LibC::uint64_t base, LibC::uint64_t
 
     for (LibC::uint64_t page = start_page; page < end_page; ++page)
         clear_bit(page);
+}
+
+void PhysicalMemoryManager::sync_free_blocks_if_needed() noexcept
+{
+    if (!bitmap_dirty)
+        return;
+
+    sync_free_blocks_with_bitmap();
+}
+
+void PhysicalMemoryManager::sync_free_blocks_with_bitmap() noexcept
+{
+    Log(LogLevel::INFO, "PMM: Synchronizing free blocks with bitmap...");
+
+    free_block_count = 0;
+
+    LibC::uint64_t current_start = 0;
+    LibC::uint64_t current_len = 0;
+
+    for (LibC::uint64_t i = 0; i < pmm_total_pages; ++i) {
+        if (!get_bit(i)) { // bit 0 = free
+            if (current_len == 0)
+                current_start = i;
+            ++current_len;
+        } else if (current_len > 0) {
+            add_free_block(current_start, current_len);
+            current_len = 0;
+        }
+    }
+
+    if (current_len > 0)
+        add_free_block(current_start, current_len);
+
+    consolidate_blocks();
+
+    LibC::uint64_t free_pages = 0;
+    for (LibC::size_t i = 0; i < free_block_count; ++i)
+        free_pages += free_blocks[i].page_count;
+
+    Logf(LogLevel::INFO,
+        "PMM: Sync complete: free blocks %llu, total free pages %llu",
+        free_block_count, free_pages);
+
+    bitmap_dirty = false;
 }
 
 } // namespace MemoryManagement
