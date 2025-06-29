@@ -22,7 +22,7 @@ void Manager::initialize() noexcept
     for (int i = 0; i < 256; ++i) {
         if (i <= 31) {
             Logf(LogLevel::TRACE, "IDT: Registered Exception %d (%s)", i, named_exception(i));
-            set_entry(i, reinterpret_cast<void*>(exception_stubs[i]), 0x08, IDT_TYPE_INTERRUPT_GATE, 0);
+            set_entry(i, reinterpret_cast<void*>(exception_stubs[i]), 0x08, IDT_TYPE_INTERRUPT_GATE, isr_ist[i]);
         }
 
         else if (i > 31 && i <= 47) {
