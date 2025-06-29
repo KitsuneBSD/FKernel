@@ -41,6 +41,8 @@ public:
 
 inline bool is_available(FK::dword type)
 {
-    return static_cast<MemoryType>(type) == MemoryType::Available;
+    auto t = static_cast<MemoryType>(type);
+    return t == MemoryType::Available || t == MemoryType::BootloaderReclaimable || t == MemoryType::ACPIReclaimable;
 }
+
 }; // namespace multiboot2
