@@ -16,7 +16,7 @@ local clang_flags = {
 	"-mcmodel=kernel",
 	"-Wno-gnu-line-marker",
 	"-mno-sse",
-	" -mno-avx",
+	"-mno-avx",
 }
 local nasm_flags = {
 	"-f elf64",
@@ -69,11 +69,7 @@ on_run(function(target)
 	os.execv("bash Meta/run_mockos.sh")
 end)
 
-if is_mode("debug") then
-	set_warnings("everything")
-else
-	set_warnings("allextra", "error")
-end
+set_warnings("allextra", "error")
 
 add_cxflags(clang_flags, { force = true })
 add_asflags(nasm_flags, { force = true })
