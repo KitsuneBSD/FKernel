@@ -96,28 +96,41 @@ extern "C" void* memcpy(void* dest, void const* src, LibC::size_t n)
     if (!dest || !src)
         return dest;
 
-    char* d = static_cast<char*>(dest);
-    char const* s = static_cast<char const*>(src);
+    auto* d = reinterpret_cast<uint8_t*>(dest);
+    auto* s = reinterpret_cast<uint8_t const*>(src);
 
-    for (LibC::size_t i = 0; i < n; ++i) {
-        d[i] = s[i];
+    while (n >= 8) {
+        *reinterpret_cast<uint64_t*>(d) = *reinterpret_cast<uint64_t const*>(s);
+        d += 8;
+        s += 8;
+        n -= 8;
     }
-
+    while (n--) {
+        *d++ = *s++;
+    }
     return dest;
 }
 
-extern "C" void* memset(void* dest, int ch, LibC::size_t n)
+void* memset(void* dest, int ch, size_t n)
 {
-    if (!dest) {
-        return NULL;
+    if (!dest)
+        return nullptr;
+
+    uint8_t* d = (uint8_t*)dest;
+    uint64_t pattern = 0;
+    uint8_t c = static_cast<uint8_t>(ch);
+    // Preenche pattern com c replicado em todos bytes
+    for (int i = 0; i < 8; i++)
+        pattern = (pattern << 8) | c;
+
+    while (n >= 8) {
+        *(uint64_t*)d = pattern;
+        d += 8;
+        n -= 8;
     }
-
-    char* d = static_cast<char*>(dest);
-
-    for (LibC::size_t i = 0; i < n; ++i) {
-        d[i] = static_cast<char>(ch);
+    while (n--) {
+        *d++ = c;
     }
-
     return dest;
 }
 
