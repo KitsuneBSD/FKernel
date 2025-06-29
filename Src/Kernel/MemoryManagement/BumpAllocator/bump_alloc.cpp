@@ -37,6 +37,21 @@ bool BumpAllocator::can_alloc(LibC::size_t size, LibC::size_t alignment) const n
     return aligned + size <= bump_end;
 }
 
+void* BumpAllocator::alloc_zeroed(LibC::size_t size, LibC::size_t alignment) noexcept
+{
+    if (!can_alloc(size, alignment)) {
+        Logf(LogLevel::ERROR,
+            "BumpAllocator: Not enough space for allocation (size=%zu, alignment=%zu, remaining=%zu)",
+            size, alignment, remaining());
+        return nullptr;
+    }
+
+    void* ptr = this->alloc(size, alignment);
+    if (ptr)
+        LibC::memset(ptr, 0, size);
+    return ptr;
+}
+
 void* BumpAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexcept
 {
     if ((alignment & (alignment - 1)) != 0) {

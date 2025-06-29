@@ -27,13 +27,19 @@ public:
     void initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexcept;
 
     void* alloc(LibC::size_t size, LibC::size_t alignment = 8) noexcept;
+    void* alloc_zeroed(LibC::size_t size, LibC::size_t alignment = 8) noexcept;
 
     LibC::size_t remaining() const noexcept;
 };
 
 }
 
+inline void* Balloc_zeroed(LibC::size_t size, LibC::size_t alignment = 8)
+{
+    return MemoryManagement::BumpAllocator::instance().alloc_zeroed(size, alignment);
+}
+
 inline void* Balloc(LibC::size_t size, LibC::size_t alignment = 8)
 {
-    return MemoryManagement::BumpAllocator::instance().alloc(size, alignment);
+    return MemoryManagement::BumpAllocator::instance().alloc_zeroed(size, alignment);
 }
