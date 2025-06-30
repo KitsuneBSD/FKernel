@@ -116,6 +116,10 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
         }
     }
 
+    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
+        ensure_bitmap_allocated(region);
+    }
+
     log_memory_status();
     Log(LogLevel::INFO, "PMM: Initialized with success");
 }
@@ -135,7 +139,7 @@ void PhysicalMemoryManager::ensure_bitmap_allocated(PhysicalMemoryRegion* region
     }
 
     region->bitmap = reinterpret_cast<LibC::uint64_t*>(mem);
-    Logf(LogLevel::TRACE, "PMM: Bitmap allocated for region base=0x%lx with %lu pages", region->base_addr, region->page_count);
+    // Logf(LogLevel::TRACE, "PMM: Bitmap allocated for region base=0x%lx with %lu pages", region->base_addr, region->page_count);
 }
 
 bool PhysicalMemoryManager::find_free_pages_in_region(PhysicalMemoryRegion* region, LibC::uint64_t count, LibC::uint64_t& start_page) noexcept
@@ -232,6 +236,7 @@ LibC::uint64_t PhysicalMemoryManager::free_bytes() const noexcept
 
 void PhysicalMemoryManager::log_memory_status() const noexcept
 {
+
     LibC::uint64_t total_kb = total_bytes() / FK::KiB;
     LibC::uint64_t free_kb = free_bytes() / FK::KiB;
 
