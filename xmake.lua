@@ -7,26 +7,25 @@ set_objectdir("build/objs")
 set_languages("cxx20")
 
 local clang_flags = {
-	"-ffreestanding",
-	"-fno-threadsafe-statics",
-	"-fno-exceptions",
-	"-fno-rtti",
-	"-nostdlib",
-	"-nostdinc",
-	"-mcmodel=kernel",
-	"-Wno-gnu-line-marker",
-	"-mno-sse",
-	"-mno-avx",
+  "-ffreestanding",
+  "-fno-threadsafe-statics",
+  "-fno-exceptions",
+  "-fno-rtti",
+  "-nostdlib",
+  "-nostdinc",
+  "-mcmodel=kernel",
+  "-mno-sse",
+  "-mno-avx",
 }
 local nasm_flags = {
-	"-f elf64",
-	"-w-label-orphan",
-	"-w-other",
+  "-f elf64",
+  "-w-label-orphan",
+  "-w-other",
 }
 
 local lld_flags = {
-	"-T Config/linker.ld",
-	"-nostdlib",
+  "-T Config/linker.ld",
+  "-nostdlib",
 }
 
 toolchain("FKernel_Compiling")
@@ -43,30 +42,30 @@ set_default(true)
 set_filename("FKernel.bin")
 
 if is_mode("debug") then
-	set_symbols("debug")
-	set_optimize("fast")
-	add_defines("FKERNEL_DEBUG")
+  set_symbols("debug")
+  set_optimize("fast")
+  add_defines("FKERNEL_DEBUG")
 end
 
 if is_mode("release") then
-	set_symbols("hidden")
-	set_optimize("faster")
+  set_symbols("hidden")
+  set_optimize("faster")
 
-	before_build(function(target)
-		os.execv("bash Meta/run_continuous_integration.sh")
-	end)
+  before_build(function(target)
+    os.execv("bash Meta/run_continuous_integration.sh")
+  end)
 end
 
 after_link(function(target)
-	os.execv("bash Meta/mounting_mockos.sh")
+  os.execv("bash Meta/mounting_mockos.sh")
 end)
 
 on_clean(function(target)
-	os.execv("rm -rf build")
+  os.execv("rm -rf build")
 end)
 
 on_run(function(target)
-	os.execv("bash Meta/run_mockos.sh")
+  os.execv("bash Meta/run_mockos.sh")
 end)
 
 set_warnings("allextra", "error")
@@ -78,8 +77,8 @@ add_ldflags(lld_flags, { force = true })
 add_includedirs("Include")
 
 if is_arch("x86_64") then
-	add_files("Src/Kernel/Arch/x86_64/*/**.asm")
-	add_files("Src/Kernel/Arch/x86_64/*/**.cpp")
+  add_files("Src/Kernel/Arch/x86_64/*/**.asm")
+  add_files("Src/Kernel/Arch/x86_64/*/**.cpp")
 end
 
 add_files("Src/LibC/**.cpp")
