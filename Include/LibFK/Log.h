@@ -5,7 +5,6 @@
 #include <LibC/stdio.h>
 
 enum class LogLevel : LibC::uint8_t {
-    DEBUG = 0,
     TRACE = 1,
     INFO = 2,
     WARN = 3,
