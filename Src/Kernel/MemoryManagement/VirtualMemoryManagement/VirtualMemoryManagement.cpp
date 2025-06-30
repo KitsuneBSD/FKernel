@@ -1,4 +1,4 @@
-#include <Kernel/MemoryManagement/BumpAllocator/bump_alloc.h>
+#include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
@@ -15,7 +15,7 @@ void VirtualMemoryManager::initialize() noexcept
         return;
     }
 
-    pml4 = reinterpret_cast<LibC::uint64_t*>(Balloc(page_size, page_size));
+    pml4 = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
     if (!pml4) {
         Log(LogLevel::ERROR, "VMM: Failed to allocate PML4");
         return;
@@ -45,7 +45,7 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pml4[pml4_idx] & PAGE_PRESENT) {
         pdpt = reinterpret_cast<LibC::uint64_t*>(pml4[pml4_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pdpt = reinterpret_cast<LibC::uint64_t*>(Balloc(page_size, page_size));
+        pdpt = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
         if (!pdpt) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PDPT");
             return nullptr;
@@ -60,7 +60,7 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pdpt[pdpt_idx] & PAGE_PRESENT) {
         pd = reinterpret_cast<LibC::uint64_t*>(pdpt[pdpt_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pd = reinterpret_cast<LibC::uint64_t*>(Balloc(page_size, page_size));
+        pd = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
         if (!pd) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PD");
             return nullptr;
@@ -75,7 +75,7 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pd[pd_idx] & PAGE_PRESENT) {
         pt = reinterpret_cast<LibC::uint64_t*>(pd[pd_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pt = reinterpret_cast<LibC::uint64_t*>(Balloc(page_size, page_size));
+        pt = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
         if (!pt) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PT");
             return nullptr;

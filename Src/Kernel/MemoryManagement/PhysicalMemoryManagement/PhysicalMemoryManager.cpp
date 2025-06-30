@@ -1,5 +1,5 @@
 #include <Kernel/Boot/multiboot_interpreter.h>
-#include <Kernel/MemoryManagement/BumpAllocator/bump_alloc.h>
+#include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <LibC/stddef.h>
@@ -39,7 +39,7 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
     pmm_bitmap_size = (pmm_total_pages + 63) / 64; // 64 bits por palavra
 
     pmm_bitmap = static_cast<LibC::uint64_t*>(
-        Balloc_zeroed(pmm_bitmap_size * sizeof(LibC::uint64_t), alignof(LibC::uint64_t)));
+        Falloc_zeroed(pmm_bitmap_size * sizeof(LibC::uint64_t), alignof(LibC::uint64_t)));
     if (!pmm_bitmap) {
         Log(LogLevel::ERROR, "PMM: Failed to allocate bitmap");
         return;

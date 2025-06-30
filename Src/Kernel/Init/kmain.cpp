@@ -1,4 +1,4 @@
-#include "Kernel/MemoryManagement/BumpAllocator/bump_alloc.h"
+#include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
 
@@ -23,9 +23,9 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
 
     multiboot2::MultibootParser mb_parser(multiboot_ptr);
 #ifdef FKERNEL_DEBUG
-    Logger::Instance().SetLevel(LogLevel::DEBUG);
-#else
     Logger::Instance().SetLevel(LogLevel::TRACE);
+#else
+    Logger::Instance().SetLevel(LogLevel::INFO);
 #endif // DEBUG
     auto mem_map_tag = mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
 
@@ -37,7 +37,7 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
         }
     }
 
-    MemoryManagement::BumpAllocator::instance().initialize(
+    MemoryManagement::FreeListAllocator::instance().initialize(
         reinterpret_cast<LibC::uintptr_t>(__heap_start),
         reinterpret_cast<LibC::uintptr_t>(__heap_end));
     early_init(*mem_map_tag);
