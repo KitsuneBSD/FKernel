@@ -5,11 +5,17 @@
 
 namespace MemoryManagement {
 
-struct BlockHeader {
+struct alignas(16) BlockHeader {
     LibC::size_t size;
     LibC::size_t padding;
-    static constexpr LibC::size_t magic = 0xDEADBEEFDEADBEEFull;
     LibC::uintptr_t magic_check;
+
+    static constexpr LibC::uintptr_t magic = 0xDEADBEEFDEADBEEFull;
+
+    bool is_valid() const noexcept
+    {
+        return magic_check == magic;
+    }
 };
 
 struct FreeMemoryBlock {

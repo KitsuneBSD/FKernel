@@ -26,6 +26,14 @@ void FreeListAllocator::initialize(LibC::uintptr_t start, LibC::uintptr_t end) n
         start, end, end - start);
 }
 
+void* FreeListAllocator::alloc_zeroed(LibC::size_t size, LibC::size_t alignment) noexcept
+{
+    void* ptr = alloc(size, alignment);
+    LibC::memset(ptr, 0, size);
+
+    return ptr;
+}
+
 void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexcept
 {
     if (!initialized || size == 0) {
@@ -38,25 +46,18 @@ void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexce
         return nullptr;
     }
 
-    Logf(LogLevel::TRACE, "[FreeListAllocator] Allocation request: size=%lu, alignment=%lu", size, alignment);
-
     FreeMemoryBlock* current = free_list_head;
 
     while (current) {
         LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(current);
 
-        // Calcular ponteiro usuário alinhado, considerando header
         LibC::uintptr_t header_addr = block_addr;
         LibC::uintptr_t user_data_addr = (header_addr + sizeof(BlockHeader) + alignment - 1) & ~(alignment - 1);
         LibC::size_t padding = user_data_addr - (header_addr + sizeof(BlockHeader));
         LibC::size_t total_needed = sizeof(BlockHeader) + padding + size;
 
-        Logf(LogLevel::TRACE, "  [Scan] Block @ 0x%lx, size=%lu, padding=%lu, total_needed=%lu",
-            block_addr, current->size, padding, total_needed);
-
         if (current->size >= total_needed) {
             if (current->size > total_needed + sizeof(FreeMemoryBlock)) {
-                // Split block
                 LibC::uintptr_t next_block_addr = block_addr + total_needed;
                 FreeMemoryBlock* next_block = reinterpret_cast<FreeMemoryBlock*>(next_block_addr);
                 next_block->size = current->size - total_needed;
@@ -71,19 +72,16 @@ void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexce
                 else
                     free_list_head = next_block;
             } else {
-                // Usa bloco completo
                 remove_block(current);
                 total_needed = current->size;
             }
 
-            // Preencher header
             BlockHeader* header = reinterpret_cast<BlockHeader*>(header_addr);
             header->size = total_needed;
             header->padding = padding;
             header->magic_check = BlockHeader::magic;
 
             void* user_ptr = reinterpret_cast<void*>(user_data_addr);
-            Logf(LogLevel::TRACE, "[FreeListAllocator] Allocated %lu bytes at 0x%lx (aligned)", size, user_data_addr);
 
             return user_ptr;
         }
@@ -95,14 +93,6 @@ void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment) noexce
     return nullptr;
 }
 
-void* FreeListAllocator::alloc_zeroed(LibC::size_t size, LibC::size_t alignment) noexcept
-{
-    void* ptr = alloc(size, alignment);
-    if (ptr)
-        LibC::memset(ptr, 0, size);
-    return ptr;
-}
-
 void FreeListAllocator::free(void* ptr) noexcept
 {
     if (!ptr) {
@@ -110,16 +100,14 @@ void FreeListAllocator::free(void* ptr) noexcept
         return;
     }
 
-    // Recuperar header: ponteiro do usuário está depois do header + padding
     LibC::uintptr_t user_addr = reinterpret_cast<LibC::uintptr_t>(ptr);
     BlockHeader* header = nullptr;
 
-    // header está antes do ponteiro do usuário - tem padding armazenado
     header = reinterpret_cast<BlockHeader*>(user_addr - sizeof(BlockHeader));
     header = reinterpret_cast<BlockHeader*>(user_addr - sizeof(BlockHeader) - header->padding);
 
-    if (header->magic_check != BlockHeader::magic) {
-        Log(LogLevel::ERROR, "[FreeListAllocator] Invalid free: magic mismatch. Possible corruption or double free.");
+    if (header->is_valid()) {
+        Log(LogLevel::ERROR, "[FreeListAllocator] Invalid free:  mismatch. Possible corruption or double free.");
         return;
     }
 
@@ -129,8 +117,6 @@ void FreeListAllocator::free(void* ptr) noexcept
     block->size = header->size;
     block->next = nullptr;
     block->prev = nullptr;
-
-    Logf(LogLevel::TRACE, "[FreeListAllocator] Free block at 0x%lx, size=%lu", block_addr, block->size);
 
     insert_block(block);
     try_coalesce(block);
