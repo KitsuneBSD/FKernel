@@ -5,8 +5,8 @@
 
 namespace MemoryManagement {
 struct FreeBlock {
-    LibC::uint64_t start_page; // Índice da primeira página
-    LibC::uint64_t page_count; // Número de páginas contíguas
+    LibC::uint64_t start_page;
+    LibC::uint64_t page_count;
 
     LibC::uint64_t end_page() const noexcept;
     bool overlaps(FreeBlock const& other) const noexcept;
