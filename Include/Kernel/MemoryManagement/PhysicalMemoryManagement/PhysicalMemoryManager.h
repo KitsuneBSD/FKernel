@@ -9,7 +9,6 @@ class PhysicalMemoryManager {
 private:
     PhysicalMemoryRegion* region_list_head = nullptr;
     PhysicalMemoryRegion* region_list_tail = nullptr;
-    static constexpr LibC::uint64_t total_page_size = 4096;
 
     void add_region(PhysicalMemoryRegion* region) noexcept;
     PhysicalMemoryRegion* find_region(LibC::uintptr_t phys_addr) noexcept;

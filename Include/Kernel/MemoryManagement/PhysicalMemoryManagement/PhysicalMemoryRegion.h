@@ -7,9 +7,10 @@
 #include <LibFK/Log.h>
 
 namespace MemoryManagement {
+
 struct PhysicalMemoryRegion {
-    LibC::uintptr_t base_addr;
-    LibC::uint64_t page_count;
+    LibC::uintptr_t base_addr = 0;
+    LibC::uint64_t page_count = 0;
     LibC::uint64_t* bitmap = nullptr;
     LibC::size_t bitmap_size = 0;
 
@@ -18,20 +19,28 @@ struct PhysicalMemoryRegion {
     PhysicalMemoryRegion* next = nullptr;
     PhysicalMemoryRegion* prev = nullptr;
 
-    PhysicalMemoryRegion() = default;
+    PhysicalMemoryRegion() noexcept = default;
 
-    PhysicalMemoryRegion(LibC::uintptr_t base, LibC::uint64_t pages)
+    PhysicalMemoryRegion(LibC::uintptr_t base, LibC::uint64_t pages) noexcept
         : base_addr(base)
         , page_count(pages)
         , free_block { 0, pages }
     {
-        bitmap_size = (pages + 63) / 64;
-        bitmap = static_cast<LibC::uint64_t*>(
-            Falloc_zeroed(bitmap_size * sizeof(LibC::uint64_t)));
+    }
+
+    ~PhysicalMemoryRegion() noexcept
+    {
+        destroy();
     }
 
     void init(LibC::uintptr_t base, LibC::uint64_t pages) noexcept
     {
+        if (bitmap) {
+            Ffree(bitmap);
+            bitmap = nullptr;
+            bitmap_size = 0;
+        }
+
         base_addr = base;
         page_count = pages;
         free_block.start_page = 0;
@@ -58,4 +67,5 @@ struct PhysicalMemoryRegion {
         }
     }
 };
+
 }
