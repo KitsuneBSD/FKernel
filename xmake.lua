@@ -11,12 +11,14 @@ local clang_flags = {
   "-fno-threadsafe-statics",
   "-fno-exceptions",
   "-fno-rtti",
+  "-fno-stack-protector",
   "-nostdlib",
   "-nostdinc",
   "-mcmodel=kernel",
   "-mno-sse",
   "-mno-avx",
 }
+
 local nasm_flags = {
   "-f elf64",
   "-w-label-orphan",
