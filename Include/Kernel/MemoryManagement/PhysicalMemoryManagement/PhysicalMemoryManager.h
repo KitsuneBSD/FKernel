@@ -13,7 +13,7 @@ private:
     void add_region(PhysicalMemoryRegion* region) noexcept;
     PhysicalMemoryRegion* find_region(LibC::uintptr_t phys_addr) noexcept;
     void remove_region(LibC::uintptr_t phys_addr) noexcept;
-
+    LibC::size_t count_used_pages() const noexcept;
     LibC::uint64_t total_pages() const noexcept;
     LibC::uint64_t free_pages() const noexcept;
     LibC::uint64_t total_bytes() const noexcept;

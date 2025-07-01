@@ -236,18 +236,25 @@ LibC::uint64_t PhysicalMemoryManager::free_bytes() const noexcept
 
 void PhysicalMemoryManager::log_memory_status() const noexcept
 {
-
     LibC::uint64_t total_kb = total_bytes() / FK::KiB;
     LibC::uint64_t free_kb = free_bytes() / FK::KiB;
 
     LibC::size_t total_regions = region_count();
     LibC::size_t allocated_regions = allocated_region_count();
 
+    LibC::size_t total_pages_count = total_pages();
+    LibC::size_t free_pages_count = free_pages();
+    LibC::size_t used_pages_count = total_pages_count - free_pages_count;
+
     Logf(LogLevel::INFO,
         "PMM: Memory status: total %llu KiB (%llu MiB), free %llu KiB (%llu MiB), regions total %lu, regions allocated %lu",
         total_kb, total_kb / FK::KiB,
         free_kb, free_kb / FK::KiB,
         total_regions, allocated_regions);
+
+    Logf(LogLevel::INFO,
+        "PMM: Pages used: %lu, free: %lu, total: %lu",
+        used_pages_count, free_pages_count, total_pages_count);
 }
 
 LibC::size_t PhysicalMemoryManager::region_count() const noexcept
@@ -333,6 +340,18 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t cou
 
     Logf(LogLevel::WARN, "PMM: alloc_contiguous_pages out of memory for %lu pages", count);
     return 0;
+}
+
+LibC::size_t PhysicalMemoryManager::count_used_pages() const noexcept
+{
+    LibC::size_t used_pages = 0;
+    for (auto* region = region_list_head; region != nullptr; region = region->next) {
+        if (!region->bitmap) {
+            continue;
+        }
+        used_pages += region->bitmap_size;
+    }
+    return used_pages;
 }
 
 void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t count) noexcept
