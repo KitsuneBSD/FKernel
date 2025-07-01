@@ -243,9 +243,11 @@ void PhysicalMemoryManager::log_memory_status() const noexcept
     LibC::size_t free_pages_count = total_pages_count - used_pages_count;
 
     Logf(LogLevel::INFO,
-        "PMM: Memory status: total %llu KiB (%llu MiB), free %llu KiB (%llu MiB), regions total %lu, regions allocated %lu",
+        "PMM: Memory status: total %llu KiB (%llu MiB), free %llu KiB (%llu MiB) ",
         total_kb, total_kb / FK::KiB,
-        free_kb, free_kb / FK::KiB,
+        free_kb, free_kb / FK::KiB);
+
+    Logf(LogLevel::INFO, "PMM: Region status: regions total %lu, regions allocated %lu",
         total_regions, allocated_regions);
 
     Logf(LogLevel::INFO,
