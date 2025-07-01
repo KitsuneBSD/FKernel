@@ -13,7 +13,7 @@ MockOS="build/FKernel-MockOS.iso"
 
 qemu-system-x86_64 \
 	-cdrom "$MockOS" \
-	-m 32M \
+	-m 2G \
 	-nographic \
 	-serial mon:stdio \
 	-boot d

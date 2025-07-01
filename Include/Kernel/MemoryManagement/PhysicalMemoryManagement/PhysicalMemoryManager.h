@@ -1,53 +1,43 @@
 #pragma once
 
 #include <Kernel/Boot/multiboot2.h>
+#include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <LibC/stdint.h>
 
 namespace MemoryManagement {
-
-enum class MemRegionType : LibC::uint8_t {
-    Available,
-    Reserved,
-    ACPIReclaimable,
-    ACPINVS,
-    BadMemory,
-    Unknown
-};
-
-struct MemRegion {
-    LibC::uint64_t base; // endereço físico inicial
-    LibC::uint64_t size; // tamanho em bytes
-    MemRegionType type;
-
-    bool is_available() const noexcept
-    {
-        return type == MemRegionType::Available;
-    }
-};
-
 class PhysicalMemoryManager {
 private:
-    static LibC::uint8_t* pmm_bitmap;
-    static LibC::size_t pmm_bitmap_size;
-    static LibC::uint64_t pmm_total_pages;
-    static LibC::uint64_t pmm_base_addr;
-    static LibC::uint64_t total_page_size;
+    PhysicalMemoryRegion* region_list_head = nullptr;
+    PhysicalMemoryRegion* region_list_tail = nullptr;
 
-private:
-    static void set_bit(LibC::size_t index) noexcept;
-    static void clear_bit(LibC::size_t index) noexcept;
-    static bool get_bit(LibC::size_t index) noexcept;
+    void add_region(PhysicalMemoryRegion* region) noexcept;
+    PhysicalMemoryRegion* find_region(LibC::uintptr_t phys_addr) noexcept;
+    void remove_region(LibC::uintptr_t phys_addr) noexcept;
+
+    LibC::uint64_t total_pages() const noexcept;
+    LibC::uint64_t free_pages() const noexcept;
+    LibC::uint64_t total_bytes() const noexcept;
+    LibC::uint64_t free_bytes() const noexcept;
+
+    LibC::size_t region_count() const noexcept;
+    LibC::size_t allocated_region_count() const noexcept;
+
+    void ensure_bitmap_allocated(PhysicalMemoryRegion* region) noexcept;
+    bool find_free_pages_in_region(PhysicalMemoryRegion* region, LibC::uint64_t count, LibC::uint64_t& out_start_page) noexcept;
+    void mark_pages(PhysicalMemoryRegion* region, LibC::uint64_t start_page, LibC::uint64_t count, bool allocate) noexcept;
 
 public:
-    static void initialize(multiboot2::TagMemoryMap const& mmap) noexcept;
+    static PhysicalMemoryManager& instance() noexcept
+    {
+        static PhysicalMemoryManager s_instance;
+        return s_instance;
+    }
 
-    static LibC::uint64_t alloc_page() noexcept;
-
-    static void free_page(LibC::uint64_t phys_addr) noexcept;
-
-    static void mark_region_used(LibC::uint64_t base, LibC::uint64_t size) noexcept;
-
-    static void mark_region_free(LibC::uint64_t base, LibC::uint64_t size) noexcept;
+    void initialize(multiboot2::TagMemoryMap const& mmap) noexcept;
+    LibC::uintptr_t alloc_page() noexcept;
+    void free_page(LibC::uintptr_t phys_addr) noexcept;
+    LibC::uintptr_t alloc_contiguous_pages(LibC::uint64_t page_count) noexcept;
+    void free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t page_count) noexcept;
+    void log_memory_status() const noexcept;
 };
-
 }

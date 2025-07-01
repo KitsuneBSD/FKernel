@@ -4,6 +4,10 @@
 #include <LibFK/Log.h>
 
 namespace gdt {
+alignas(16) static LibC::uint8_t ist1_stack[4096]; // NMI
+alignas(16) static LibC::uint8_t ist2_stack[4096]; // Double Fault
+alignas(16) static LibC::uint8_t ist3_stack[4096]; // Extra (ex: Machine Check)
+alignas(16) static LibC::uint64_t kernel_stack[16384];
 
 void Manager::set_entry(int index, LibC::uint32_t base, LibC::uint32_t limit, LibC::uint8_t access, LibC::uint8_t granularity) noexcept
 {
@@ -58,6 +62,13 @@ void Manager::initialize() noexcept
     set_entry(GdtIndex::UserData, 0, 0xFFFFF, 0xF2, 0xA0);   // Dados, ring 3
 
     Logf(LogLevel::INFO, "TSS: Initialize Task State Segment from x86_64 (64 Bits)");
+
+    tss_.rsp0 = reinterpret_cast<LibC::uint64_t>(kernel_stack + sizeof(kernel_stack));
+    tss_.ist[0] = reinterpret_cast<LibC::uint64_t>(ist1_stack + sizeof(ist1_stack)); // IST1
+    tss_.ist[1] = reinterpret_cast<LibC::uint64_t>(ist2_stack + sizeof(ist2_stack)); // IST2
+    tss_.ist[2] = reinterpret_cast<LibC::uint64_t>(ist3_stack + sizeof(ist3_stack)); // IST3
+    tss_.io_map_base = sizeof(Tss::Tss);
+
     LibC::uint64_t const tss_base = reinterpret_cast<LibC::uint64_t>(&tss_);
     LibC::uint32_t const tss_limit = sizeof(Tss::Tss) - 1;
 

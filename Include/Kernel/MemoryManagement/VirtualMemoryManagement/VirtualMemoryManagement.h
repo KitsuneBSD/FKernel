@@ -16,19 +16,27 @@ constexpr LibC::uint64_t PAGE_GLOBAL = 1ULL << 8;
 constexpr LibC::uint64_t PAGE_NX = 1ULL << 63;
 
 class VirtualMemoryManager {
-public:
-    static void initialize() noexcept;
-
-    static bool map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept;
-    static bool unmap_page(LibC::uintptr_t virt_addr) noexcept;
-    static LibC::uintptr_t translate(LibC::uintptr_t virt_addr) noexcept;
-
-    static void flush_tlb_single(LibC::uintptr_t virt_addr) noexcept;
-
 private:
-    static LibC::uint64_t* pml4;
-    static void create_tables_if_needed(LibC::uintptr_t virt_addr) noexcept;
-    static LibC::uint64_t* get_or_create_pte(LibC::uintptr_t virt_addr) noexcept;
+    LibC::uint64_t* pml4;
+    void create_tables_if_needed(LibC::uintptr_t virt_addr) noexcept;
+    LibC::uint64_t* get_or_create_pte(LibC::uintptr_t virt_addr) noexcept;
+    VirtualMemoryManager() = default;
+
+public:
+    static VirtualMemoryManager& instance() noexcept
+    {
+
+        static VirtualMemoryManager v_instance;
+        return v_instance;
+    }
+
+    void initialize() noexcept;
+
+    bool map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept;
+    bool unmap_page(LibC::uintptr_t virt_addr) noexcept;
+    LibC::uintptr_t translate(LibC::uintptr_t virt_addr) noexcept;
+
+    void flush_tlb_single(LibC::uintptr_t virt_addr) noexcept;
 };
 
 }

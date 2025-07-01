@@ -1,3 +1,4 @@
+#include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
 
@@ -7,6 +8,9 @@
 #include <Kernel/Boot/early_init.h>
 
 #include <Kernel/Driver/SerialPort.h>
+
+extern char __heap_start[];
+extern char __heap_end[];
 
 extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
 {
@@ -18,8 +22,11 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
     }
 
     multiboot2::MultibootParser mb_parser(multiboot_ptr);
+#ifdef FKERNEL_DEBUG
     Logger::Instance().SetLevel(LogLevel::TRACE);
-
+#else
+    Logger::Instance().SetLevel(LogLevel::INFO);
+#endif // DEBUG
     auto mem_map_tag = mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
 
     if (!mem_map_tag) {
@@ -29,6 +36,10 @@ extern "C" void kmain(LibC::uint32_t multiboot2_magic, void* multiboot_ptr)
             __asm__("hlt");
         }
     }
+
+    MemoryManagement::FreeListAllocator::instance().initialize(
+        reinterpret_cast<LibC::uintptr_t>(__heap_start),
+        reinterpret_cast<LibC::uintptr_t>(__heap_end));
     early_init(*mem_map_tag);
 
     // Infinite Loop Hang

@@ -70,6 +70,7 @@ constexpr char const* named_irq(int irq) noexcept
 
 void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept;
 void unregister_irq_handler(LibC::uint8_t irq) noexcept;
+LibC::uint64_t uptime();
 
 extern "C" irq_entry_t irq_table[16];
 
