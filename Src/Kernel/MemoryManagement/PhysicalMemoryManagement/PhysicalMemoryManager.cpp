@@ -8,7 +8,7 @@
 
 namespace MemoryManagement {
 constexpr LibC::uint64_t total_page_size = 4096;
-constexpr LibC::uint64_t max_region_bytes = 64 * FK::MiB;
+constexpr LibC::uint64_t max_region_bytes = 64 * static_cast<LibC::uint64_t>(FK::MiB);
 constexpr LibC::uint64_t max_region_pages = max_region_bytes / total_page_size;
 
 static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::uint64_t page_count) noexcept
@@ -87,7 +87,7 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
 
 void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noexcept
 {
-    constexpr LibC::uint64_t max_region_bytes = 64 * FK::MiB;
+    constexpr LibC::uint64_t max_region_bytes = 64 * static_cast<LibC::uint64_t>(FK::MiB);
     constexpr LibC::uint64_t max_region_pages = max_region_bytes / total_page_size;
 
     for (auto it = mmap.begin(); it != mmap.end(); ++it) {
@@ -243,8 +243,8 @@ void PhysicalMemoryManager::log_memory_status() const noexcept
     LibC::size_t allocated_regions = allocated_region_count();
 
     LibC::size_t total_pages_count = total_pages();
-    LibC::size_t free_pages_count = free_pages();
-    LibC::size_t used_pages_count = total_pages_count - free_pages_count;
+    LibC::size_t used_pages_count = count_used_pages();
+    LibC::size_t free_pages_count = total_pages_count - used_pages_count;
 
     Logf(LogLevel::INFO,
         "PMM: Memory status: total %llu KiB (%llu MiB), free %llu KiB (%llu MiB), regions total %lu, regions allocated %lu",
