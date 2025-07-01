@@ -87,13 +87,8 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
 
 void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noexcept
 {
-    constexpr LibC::uint64_t max_region_bytes = 64 * static_cast<LibC::uint64_t>(FK::MiB);
-    constexpr LibC::uint64_t max_region_pages = max_region_bytes / total_page_size;
-
     for (auto it = mmap.begin(); it != mmap.end(); ++it) {
         auto const& entry = *it;
-        if (!multiboot2::is_available(entry.type))
-            continue;
 
         LibC::uintptr_t base = entry.base_addr;
         LibC::uint64_t total_pages = entry.length / total_page_size;
@@ -110,14 +105,15 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
             }
 
             add_region(region);
+            ensure_bitmap_allocated(region);
+
+            if (!multiboot2::is_available(entry.type)) {
+                mark_pages(region, 0, region_pages, true);
+            }
 
             base += region_pages * total_page_size;
             total_pages -= region_pages;
         }
-    }
-
-    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
-        ensure_bitmap_allocated(region);
     }
 
     log_memory_status();
@@ -285,8 +281,14 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
         if (!find_free_pages_in_region(region, 1, start_page))
             continue;
 
-        mark_pages(region, start_page, 1, true);
         LibC::uintptr_t phys_addr = region->base_addr + start_page * total_page_size;
+        if (phys_addr == 0) {
+            Log(LogLevel::WARN, "PMM: alloc_page skipping zero physical address");
+            continue;
+        }
+
+        mark_pages(region, start_page, 1, true);
+
         Logf(LogLevel::TRACE, "PMM: alloc_page allocated 0x%lx in region base=0x%lx", phys_addr, region->base_addr);
         return phys_addr;
     }
@@ -346,10 +348,10 @@ LibC::size_t PhysicalMemoryManager::count_used_pages() const noexcept
 {
     LibC::size_t used_pages = 0;
     for (auto* region = region_list_head; region != nullptr; region = region->next) {
-        if (!region->bitmap) {
+        if (!region->bitmap)
             continue;
-        }
-        used_pages += region->bitmap_size;
+        for (LibC::size_t i = 0; i < region->bitmap_size; ++i)
+            used_pages += __builtin_popcountll(region->bitmap[i]);
     }
     return used_pages;
 }
