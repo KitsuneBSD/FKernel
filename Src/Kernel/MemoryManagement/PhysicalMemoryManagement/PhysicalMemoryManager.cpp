@@ -4,7 +4,7 @@
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 namespace MemoryManagement {
 constexpr LibC::uint64_t total_page_size = 4096;

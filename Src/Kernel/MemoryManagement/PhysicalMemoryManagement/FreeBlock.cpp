@@ -1,5 +1,5 @@
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 namespace MemoryManagement {
 LibC::uint64_t FreeBlock::end_page() const noexcept

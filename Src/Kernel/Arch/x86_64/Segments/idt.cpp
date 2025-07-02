@@ -4,7 +4,7 @@
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <Kernel/Driver/8259Pic.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 namespace idt {
 

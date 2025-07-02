@@ -4,7 +4,7 @@
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 namespace MemoryManagement {
 

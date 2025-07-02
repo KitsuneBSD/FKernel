@@ -1,5 +1,5 @@
 #include "Kernel/Arch/x86_64/Interrupts/Routines.h"
-#include "LibFK/Log.h"
+#include "LibFK/log.h"
 #include <Kernel/Arch/x86_64/Cpu/State.h>
 #include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
 

@@ -3,7 +3,7 @@
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 #include <LibFK/types.h>
 
 static LibC::uint64_t tick_count = 0;

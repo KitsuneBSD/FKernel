@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Hw/Io.h>
 #include <Kernel/Driver/Pit.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 constexpr LibC::uint32_t PIT_FREQUENCY = 1193182; // Frequência do clock do PIT (Hz)
 constexpr LibC::uint32_t PIT_CHANNEL0_PORT = 0x40;

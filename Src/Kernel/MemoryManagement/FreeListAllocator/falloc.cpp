@@ -1,7 +1,7 @@
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <LibC/stdint.h>
 #include <LibC/string.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 #include <LibFK/types.h>
 
 namespace MemoryManagement {

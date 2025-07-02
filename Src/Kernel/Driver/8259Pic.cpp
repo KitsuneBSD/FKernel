@@ -1,7 +1,7 @@
 #include "Kernel/Arch/x86_64/Interrupts/Routines.h"
 #include <Kernel/Arch/x86_64/Interrupts/Isr.h>
 #include <Kernel/Driver/8259Pic.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 void Pic8259::remap(int offset1, int offset2) noexcept
 {

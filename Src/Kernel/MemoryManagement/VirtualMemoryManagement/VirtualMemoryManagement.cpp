@@ -1,7 +1,7 @@
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stdint.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 static constexpr LibC::size_t entries_per_table = 512;
 static constexpr LibC::size_t page_size = 4096;
