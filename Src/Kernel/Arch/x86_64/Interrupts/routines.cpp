@@ -4,7 +4,7 @@
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
 #include <LibFK/Log.h>
-#include <LibFK/types.hpp>
+#include <LibFK/types.h>
 
 static LibC::uint64_t tick_count = 0;
 

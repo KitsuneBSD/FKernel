@@ -2,7 +2,7 @@
 #include <LibC/stdint.h>
 #include <LibC/string.h>
 #include <LibFK/Log.h>
-#include <LibFK/types.hpp>
+#include <LibFK/types.h>
 
 namespace MemoryManagement {
 

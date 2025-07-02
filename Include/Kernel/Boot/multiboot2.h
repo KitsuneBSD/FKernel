@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibFK/types.hpp>
+#include <LibFK/types.h>
 
 namespace multiboot2 {
 constexpr FK::dword HEADER_ALIGN = 8;
