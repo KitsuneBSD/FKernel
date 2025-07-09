@@ -28,4 +28,3 @@ else
 fi
 
 rm -rf "build/mockos"
-rm -rf "build/FKernel.bin"

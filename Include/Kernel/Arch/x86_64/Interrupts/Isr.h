@@ -1,5 +1,7 @@
 #pragma once
 
+#include <LibC/stdint.h>
+
 constexpr LibC::uint8_t IST_NONE = 0;
 constexpr LibC::uint8_t IST_DOUBLE_FAULT = 1;
 constexpr LibC::uint8_t IST_NMI = 2;

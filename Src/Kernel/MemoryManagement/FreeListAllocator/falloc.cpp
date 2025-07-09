@@ -1,7 +1,8 @@
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <LibC/stdint.h>
 #include <LibC/string.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
+#include <LibFK/types.h>
 
 namespace MemoryManagement {
 
@@ -22,8 +23,10 @@ void FreeListAllocator::initialize(LibC::uintptr_t start, LibC::uintptr_t end) n
 
     initialized = true;
 
-    Logf(LogLevel::INFO, "[FreeListAllocator] Initialized: start=0x%lx, end=0x%lx, size=%lu bytes",
-        start, end, end - start);
+    LibC::size_t size_in_bytes = end - start;
+
+    Logf(LogLevel::INFO, "[FreeListAllocator] Initialized: start=0x%lx, end=0x%lx, size=%lu bytes (%lu MiB)",
+        start, end, size_in_bytes, size_in_bytes / FK::MiB);
 }
 
 void* FreeListAllocator::alloc_zeroed(LibC::size_t size, LibC::size_t alignment) noexcept

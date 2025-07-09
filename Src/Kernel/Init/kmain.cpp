@@ -1,6 +1,6 @@
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <LibC/stdint.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>

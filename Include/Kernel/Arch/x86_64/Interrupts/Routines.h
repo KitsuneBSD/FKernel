@@ -2,6 +2,7 @@
 
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
+
 typedef void (*irq_handler_t)(LibC::uint8_t, void*);
 
 typedef struct {

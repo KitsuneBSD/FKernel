@@ -1,5 +1,5 @@
 #include <Kernel/Driver/SerialPort.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 #include <LibC/stdarg.h>
 #include <LibC/stdio.h>

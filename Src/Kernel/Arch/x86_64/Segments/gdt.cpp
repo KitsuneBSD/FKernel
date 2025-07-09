@@ -1,7 +1,7 @@
 #include "Kernel/Arch/x86_64/Cpu/Constants.h"
 #include <Kernel/Arch/x86_64/Cpu/Asm.h>
 #include <Kernel/Arch/x86_64/Segments/Gdt.h>
-#include <LibFK/Log.h>
+#include <LibFK/log.h>
 
 namespace gdt {
 alignas(16) static LibC::uint8_t ist1_stack[4096]; // NMI
