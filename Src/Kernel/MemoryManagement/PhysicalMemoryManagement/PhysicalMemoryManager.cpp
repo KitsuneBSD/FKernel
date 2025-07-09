@@ -26,6 +26,7 @@ static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::ui
     auto* region = reinterpret_cast<PhysicalMemoryRegion*>(mem);
     region->init(base_addr, page_count);
 
+    Logf(LogLevel::TRACE, "PMM: Region allocated at %p", region);
     return region;
 }
 
