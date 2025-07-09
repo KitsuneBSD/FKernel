@@ -1,3 +1,5 @@
+#include "Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h"
+#include "LibFK/types.h"
 #include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
@@ -13,6 +15,8 @@ constexpr LibC::uint64_t max_region_pages = max_region_bytes / total_page_size;
 
 static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::uint64_t page_count) noexcept
 {
+    Logf(LogLevel::TRACE, "PMM: Allocating region base=0x%lx, pages=%lu", base_addr, page_count);
+
     void* mem = Falloc(sizeof(PhysicalMemoryRegion), alignof(PhysicalMemoryRegion));
     if (!mem) {
         Log(LogLevel::ERROR, "PMM: allocate_region failed: out of memory");
@@ -20,14 +24,9 @@ static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::ui
     }
 
     auto* region = reinterpret_cast<PhysicalMemoryRegion*>(mem);
-    region->base_addr = base_addr;
-    region->page_count = page_count;
-    region->bitmap = nullptr; // bitmap não alocado ainda (lazy)
-    region->bitmap_size = 0;
-    region->free_block = { 0, page_count };
-    region->next = nullptr;
-    region->prev = nullptr;
+    region->init(base_addr, page_count);
 
+    Logf(LogLevel::TRACE, "PMM: Region allocated at %p", region);
     return region;
 }
 
@@ -36,12 +35,15 @@ static void deallocate_region(PhysicalMemoryRegion* region) noexcept
     if (!region)
         return;
 
-    if (region->bitmap) {
-        Ffree(region->bitmap);
-        region->bitmap = nullptr;
-        region->bitmap_size = 0;
+    Logf(LogLevel::TRACE, "PMM: Deallocating region base=0x%lx", region->base_addr);
+
+    if (region->bitmap.is_valid()) {
+        Logf(LogLevel::TRACE, "PMM: Freeing bitmap for region base=0x%lx", region->base_addr);
+        Ffree(region->bitmap_buffer);
+        region->destroy();
     }
 
+    region->~PhysicalMemoryRegion();
     Ffree(region);
 }
 
@@ -52,14 +54,17 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
         return;
     }
 
+    Logf(LogLevel::TRACE, "PMM: add_region base=0x%lx pages=%lu", region->base_addr, region->page_count);
+
     if (region->page_count > max_region_pages) {
+        Logf(LogLevel::TRACE, "PMM: Splitting region base=0x%lx pages=%lu", region->base_addr, region->page_count);
         LibC::uint64_t remaining_pages = region->page_count;
         LibC::uintptr_t current_base = region->base_addr;
 
         deallocate_region(region);
+
         while (remaining_pages > 0) {
             LibC::uint64_t split_count = (remaining_pages > max_region_pages) ? max_region_pages : remaining_pages;
-
             PhysicalMemoryRegion* subregion = allocate_region(current_base, split_count);
             if (!subregion) {
                 Log(LogLevel::ERROR, "PMM: Failed to allocate subregion in add_region");
@@ -74,21 +79,18 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
         return;
     }
 
-    region->prev = region_list_tail;
-    region->next = nullptr;
-
-    if (region_list_tail)
-        region_list_tail->next = region;
-    else
-        region_list_head = region;
-
-    region_list_tail = region;
+    regions_.append(region);
+    Logf(LogLevel::TRACE, "PMM: Region appended base=0x%lx", region->base_addr);
 }
 
 void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noexcept
 {
     for (auto it = mmap.begin(); it != mmap.end(); ++it) {
         auto const& entry = *it;
+
+        if (entry.base_addr < static_cast<FK::qword>(1 * FK::MiB)) {
+            continue;
+        }
 
         LibC::uintptr_t base = entry.base_addr;
         LibC::uint64_t total_pages = entry.length / total_page_size;
@@ -105,10 +107,10 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
             }
 
             add_region(region);
-            ensure_bitmap_allocated(region);
+            ensure_bitmap_allocated(*region);
 
             if (!multiboot2::is_available(entry.type)) {
-                mark_pages(region, 0, region_pages, true);
+                mark_pages(*region, 0, region_pages, true);
             }
 
             base += region_pages * total_page_size;
@@ -120,36 +122,57 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
     Log(LogLevel::INFO, "PMM: Initialized with success");
 }
 
-void PhysicalMemoryManager::ensure_bitmap_allocated(PhysicalMemoryRegion* region) noexcept
+void PhysicalMemoryManager::ensure_bitmap_allocated(PhysicalMemoryRegion& region) noexcept
 {
-    if (!region || region->bitmap)
+    if (region.bitmap.is_valid())
         return;
 
-    region->bitmap_size = (region->page_count + 63) / 64;
+    region.bitmap_word_count = (region.page_count + 63) / 64;
+    Logf(LogLevel::TRACE, "PMM: Allocating bitmap: base=0x%lx, words=%lu", region.base_addr, region.bitmap_word_count);
 
-    void* mem = Falloc_zeroed(region->bitmap_size * sizeof(LibC::uint64_t), alignof(LibC::uint64_t));
+    void* mem = Falloc_zeroed(region.bitmap_word_count * sizeof(LibC::uint64_t), alignof(LibC::uint64_t));
     if (!mem) {
-        Logf(LogLevel::ERROR, "PMM: Failed to allocate bitmap for region base=0x%lx", region->base_addr);
-        region->bitmap_size = 0;
+        Logf(LogLevel::ERROR, "PMM: Failed to allocate bitmap for region base=0x%lx", region.base_addr);
+        region.bitmap_word_count = 0;
         return;
     }
 
-    region->bitmap = reinterpret_cast<LibC::uint64_t*>(mem);
-    // Logf(LogLevel::TRACE, "PMM: Bitmap allocated for region base=0x%lx with %lu pages", region->base_addr, region->page_count);
+    region.bitmap_buffer = reinterpret_cast<LibC::uint64_t*>(mem);
+
+    region.bitmap.reset(region.bitmap_buffer, region.page_count);
 }
 
-bool PhysicalMemoryManager::find_free_pages_in_region(PhysicalMemoryRegion* region, LibC::uint64_t count, LibC::uint64_t& start_page) noexcept
+void PhysicalMemoryManager::mark_pages(PhysicalMemoryRegion& region, LibC::uint64_t start_page, LibC::uint64_t count, bool allocate) noexcept
 {
-    if (!region || !region->bitmap || count == 0 || count > region->page_count)
+    if (!region.bitmap.is_valid())
+        return;
+
+    if (start_page + count > region.page_count) {
+        Logf(LogLevel::WARN, "PMM: mark_pages out of range: base=0x%lx, start_page=%lu, count=%lu",
+            region.base_addr, start_page, count);
+        return;
+    }
+
+    for (LibC::uint64_t i = 0; i < count; ++i) {
+        Logf(LogLevel::TRACE, "PMM: mark_pages %s page=%lu in region base=0x%lx",
+            allocate ? "alloc" : "free", start_page + i, region.base_addr);
+        if (allocate)
+            region.bitmap.set(start_page + i);
+        else
+            region.bitmap.clear(start_page + i);
+    }
+}
+
+bool PhysicalMemoryManager::find_free_pages_in_region(PhysicalMemoryRegion& region, LibC::uint64_t count, LibC::uint64_t& start_page) noexcept
+{
+    if (!region.bitmap.is_valid() || count == 0 || count > region.page_count)
         return false;
 
     LibC::uint64_t run_length = 0;
     LibC::uint64_t run_start = 0;
 
-    for (LibC::uint64_t page_idx = 0; page_idx < region->page_count; ++page_idx) {
-        LibC::size_t word_idx = page_idx / 64;
-        LibC::size_t bit_pos = page_idx % 64;
-        bool is_free = ((region->bitmap[word_idx] & (1ULL << bit_pos)) == 0);
+    for (LibC::uint64_t page_idx = 0; page_idx < region.page_count; ++page_idx) {
+        bool is_free = !region.bitmap.test(page_idx);
 
         if (!is_free) {
             run_length = 0;
@@ -167,57 +190,13 @@ bool PhysicalMemoryManager::find_free_pages_in_region(PhysicalMemoryRegion* regi
     return false;
 }
 
-void PhysicalMemoryManager::mark_pages(PhysicalMemoryRegion* region, LibC::uint64_t start_page, LibC::uint64_t count, bool allocate) noexcept
-{
-    if (!region || !region->bitmap)
-        return;
-
-    if (start_page + count > region->page_count) {
-        Logf(LogLevel::WARN, "PMM: mark_pages out of range: base=0x%lx, start_page=%lu, count=%lu",
-            region->base_addr, start_page, count);
-        return;
-    }
-
-    for (LibC::uint64_t i = 0; i < count; ++i) {
-        LibC::size_t word_idx = (start_page + i) / 64;
-        LibC::size_t bit_pos = (start_page + i) % 64;
-        if (allocate)
-            region->bitmap[word_idx] |= (1ULL << bit_pos);
-        else
-            region->bitmap[word_idx] &= ~(1ULL << bit_pos);
-    }
-}
-
 LibC::uint64_t PhysicalMemoryManager::total_pages() const noexcept
 {
     LibC::uint64_t total = 0;
-    for (PhysicalMemoryRegion* cur = region_list_head; cur != nullptr; cur = cur->next)
-        total += cur->page_count;
-    return total;
-}
-
-LibC::uint64_t PhysicalMemoryManager::free_pages() const noexcept
-{
-    LibC::uint64_t free_count = 0;
-    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
-        if (!region->bitmap)
-            continue;
-
-        LibC::size_t full_words = region->page_count / 64;
-        LibC::size_t remaining_bits = region->page_count % 64;
-
-        for (LibC::size_t i = 0; i < full_words; ++i) {
-            LibC::uint64_t word = region->bitmap[i];
-            free_count += 64 - __builtin_popcountll(word);
-        }
-        if (remaining_bits > 0) {
-            LibC::uint64_t last_word = region->bitmap[full_words];
-            LibC::uint64_t mask = (1ULL << remaining_bits) - 1;
-            last_word &= mask;
-            free_count += remaining_bits - __builtin_popcountll(last_word);
-        }
+    for (auto& region : regions_) {
+        total += region.page_count;
     }
-    return free_count;
+    return total;
 }
 
 LibC::uint64_t PhysicalMemoryManager::total_bytes() const noexcept
@@ -228,6 +207,59 @@ LibC::uint64_t PhysicalMemoryManager::total_bytes() const noexcept
 LibC::uint64_t PhysicalMemoryManager::free_bytes() const noexcept
 {
     return free_pages() * total_page_size;
+}
+
+LibC::size_t PhysicalMemoryManager::allocated_region_count() const noexcept
+{
+    LibC::size_t count = 0;
+    for (auto& region : regions_) {
+        if (region.is_allocated()) {
+            ++count;
+        } else {
+            Logf(LogLevel::WARN, "PMM: allocated_region_count found region base=0x%lx without bitmap", region.base_addr);
+        }
+    }
+    return count;
+}
+
+LibC::uint64_t PhysicalMemoryManager::free_pages() const noexcept
+{
+    LibC::uint64_t free_count = 0;
+    for (auto& region : regions_) {
+        if (!region.bitmap.is_valid()) {
+            free_count += region.page_count;
+            continue;
+        }
+
+        LibC::size_t full_words = region.page_count / 64;
+        LibC::size_t remaining_bits = region.page_count % 64;
+
+        for (LibC::size_t i = 0; i < full_words; ++i) {
+            LibC::uint64_t word = region.bitmap_buffer[i];
+            free_count += 64 - __builtin_popcountll(word);
+        }
+        if (remaining_bits > 0) {
+            LibC::uint64_t last_word = region.bitmap_buffer[full_words];
+            LibC::uint64_t mask = (1ULL << remaining_bits) - 1;
+            last_word &= mask;
+            free_count += remaining_bits - __builtin_popcountll(last_word);
+        }
+    }
+    return free_count;
+}
+
+LibC::size_t PhysicalMemoryManager::count_used_pages() const noexcept
+{
+    LibC::size_t used_pages = 0;
+    for (auto& region : regions_) {
+        if (!region.bitmap.is_valid())
+            continue; // sem controle de bitmap, não podemos contar páginas usadas
+
+        for (LibC::size_t i = 0; i < region.bitmap_word_count; ++i) {
+            used_pages += __builtin_popcountll(region.bitmap_buffer[i]);
+        }
+    }
+    return used_pages;
 }
 
 void PhysicalMemoryManager::log_memory_status() const noexcept
@@ -243,7 +275,7 @@ void PhysicalMemoryManager::log_memory_status() const noexcept
     LibC::size_t free_pages_count = total_pages_count - used_pages_count;
 
     Logf(LogLevel::INFO,
-        "PMM: Memory status: total %llu KiB (%llu MiB), free %llu KiB (%llu MiB) ",
+        "PMM: Memory status: total %llu KiB (%llu MiB), free %llu KiB (%llu MiB)",
         total_kb, total_kb / FK::KiB,
         free_kb, free_kb / FK::KiB);
 
@@ -258,32 +290,22 @@ void PhysicalMemoryManager::log_memory_status() const noexcept
 LibC::size_t PhysicalMemoryManager::region_count() const noexcept
 {
     LibC::size_t count = 0;
-    for (PhysicalMemoryRegion* cur = region_list_head; cur != nullptr; cur = cur->next) {
-        count++;
-    }
-    return count;
-}
-
-LibC::size_t PhysicalMemoryManager::allocated_region_count() const noexcept
-{
-    LibC::size_t count = 0;
-    for (PhysicalMemoryRegion* cur = region_list_head; cur != nullptr; cur = cur->next) {
-        if (cur->bitmap) // se bitmap está alocado, a região está "alocada"
-            count++;
+    for ([[maybe_unused]] auto& region : regions_) {
+        ++count;
     }
     return count;
 }
 
 LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
 {
-    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
-        ensure_bitmap_allocated(region); // Garante bitmap alocado
+    for (auto& region : regions_) {
+        ensure_bitmap_allocated(region);
 
         LibC::uint64_t start_page = 0;
         if (!find_free_pages_in_region(region, 1, start_page))
             continue;
 
-        LibC::uintptr_t phys_addr = region->base_addr + start_page * total_page_size;
+        LibC::uintptr_t phys_addr = region.base_addr + start_page * total_page_size;
         if (phys_addr == 0) {
             Log(LogLevel::WARN, "PMM: alloc_page skipping zero physical address");
             continue;
@@ -291,7 +313,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
 
         mark_pages(region, start_page, 1, true);
 
-        Logf(LogLevel::TRACE, "PMM: alloc_page allocated 0x%lx in region base=0x%lx", phys_addr, region->base_addr);
+        Logf(LogLevel::TRACE, "PMM: alloc_page allocated 0x%lx in region base=0x%lx", phys_addr, region.base_addr);
         return phys_addr;
     }
 
@@ -301,24 +323,25 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
 
 void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
 {
-    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
-        if (phys_addr < region->base_addr || phys_addr >= region->base_addr + region->page_count * total_page_size)
+    for (auto& region : regions_) {
+        if (phys_addr < region.base_addr || phys_addr >= region.base_addr + region.page_count * total_page_size)
             continue;
 
-        LibC::uintptr_t offset = phys_addr - region->base_addr;
+        LibC::uintptr_t offset = phys_addr - region.base_addr;
         if (offset % total_page_size != 0) {
             Logf(LogLevel::WARN, "PMM: free_page unaligned address 0x%lx", phys_addr);
             return;
         }
 
         LibC::size_t page_idx = offset / total_page_size;
-        ensure_bitmap_allocated(region); // Garante bitmap alocado antes de mexer
+        ensure_bitmap_allocated(region);
 
         mark_pages(region, page_idx, 1, false);
 
-        Logf(LogLevel::TRACE, "PMM: free_page freed 0x%lx in region base=0x%lx", phys_addr, region->base_addr);
+        Logf(LogLevel::TRACE, "PMM: free_page freed 0x%lx in region base=0x%lx", phys_addr, region.base_addr);
         return;
     }
+
     Logf(LogLevel::WARN, "PMM: free_page address 0x%lx not found in any region", phys_addr);
 }
 
@@ -329,7 +352,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t cou
         return 0;
     }
 
-    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
+    for (auto& region : regions_) {
         ensure_bitmap_allocated(region);
 
         LibC::uint64_t start_page = 0;
@@ -337,25 +360,13 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t cou
             continue;
 
         mark_pages(region, start_page, count, true);
-        LibC::uintptr_t phys_addr = region->base_addr + start_page * total_page_size;
+        LibC::uintptr_t phys_addr = region.base_addr + start_page * total_page_size;
         Logf(LogLevel::TRACE, "PMM: alloc_contiguous_pages allocated %lu pages at 0x%lx", count, phys_addr);
         return phys_addr;
     }
 
     Logf(LogLevel::WARN, "PMM: alloc_contiguous_pages out of memory for %lu pages", count);
     return 0;
-}
-
-LibC::size_t PhysicalMemoryManager::count_used_pages() const noexcept
-{
-    LibC::size_t used_pages = 0;
-    for (auto* region = region_list_head; region != nullptr; region = region->next) {
-        if (!region->bitmap)
-            continue;
-        for (LibC::size_t i = 0; i < region->bitmap_size; ++i)
-            used_pages += __builtin_popcountll(region->bitmap[i]);
-    }
-    return used_pages;
 }
 
 void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t count) noexcept
@@ -365,18 +376,18 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
         return;
     }
 
-    for (PhysicalMemoryRegion* region = region_list_head; region != nullptr; region = region->next) {
-        if (phys_addr < region->base_addr || phys_addr >= region->base_addr + region->page_count * total_page_size)
+    for (auto& region : regions_) {
+        if (phys_addr < region.base_addr || phys_addr >= region.base_addr + region.page_count * total_page_size)
             continue;
 
-        LibC::uintptr_t offset = phys_addr - region->base_addr;
+        LibC::uintptr_t offset = phys_addr - region.base_addr;
         if (offset % total_page_size != 0) {
             Logf(LogLevel::WARN, "PMM: free_contiguous_pages unaligned address 0x%lx", phys_addr);
             return;
         }
 
         LibC::size_t page_idx = offset / total_page_size;
-        if (page_idx + count > region->page_count) {
+        if (page_idx + count > region.page_count) {
             Logf(LogLevel::WARN, "PMM: free_contiguous_pages range exceeds region for 0x%lx count %lu", phys_addr, count);
             return;
         }
@@ -392,4 +403,45 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
     Logf(LogLevel::WARN, "PMM: free_contiguous_pages address 0x%lx not found in any region", phys_addr);
 }
 
+PhysicalMemoryRegion* PhysicalMemoryManager::find_region(LibC::uintptr_t phys_addr) noexcept
+{
+    for (auto& region : regions_) {
+        if (phys_addr >= region.base_addr && phys_addr < region.base_addr + region.page_count * total_page_size) {
+            return &region;
+        }
+    }
+    return nullptr;
+}
+
+void PhysicalMemoryManager::remove_region(LibC::uintptr_t phys_addr) noexcept
+{
+    auto* region = find_region(phys_addr);
+    if (!region) {
+        Logf(LogLevel::WARN, "PMM: remove_region: region not found for address 0x%lx", phys_addr);
+        return;
+    }
+
+    regions_.remove(region);
+    deallocate_region(region);
+}
+
+void PhysicalMemoryRegion::init(LibC::uintptr_t base, LibC::uint64_t pages) noexcept
+{
+    base_addr = base;
+    page_count = pages;
+    free_block = { 0, pages };
+    bitmap.reset(nullptr, 0);
+    bitmap_word_count = 0;
+    allocated = true;
+}
+
+void PhysicalMemoryRegion::destroy() noexcept
+{
+    if (bitmap.is_valid()) {
+        Ffree(bitmap_buffer);
+    }
+    bitmap.reset(nullptr, 0);
+    bitmap_word_count = 0;
+    allocated = false;
+}
 }
