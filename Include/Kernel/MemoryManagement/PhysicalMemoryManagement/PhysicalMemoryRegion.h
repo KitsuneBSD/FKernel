@@ -1,5 +1,8 @@
 #pragma once
 
+#include "LibFK/bitmap.h"
+#include "LibFK/intrusiveList.h"
+#include "LibFK/types.h"
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
 #include <LibC/stddef.h>
@@ -9,15 +12,19 @@
 namespace MemoryManagement {
 
 struct PhysicalMemoryRegion {
-    LibC::uintptr_t base_addr = 0;
+    LibC::uintptr_t base_addr = static_cast<LibC::uintptr_t>(1 * FK::MiB);
     LibC::uint64_t page_count = 0;
-    LibC::uint64_t* bitmap = nullptr;
-    LibC::size_t bitmap_size = 0;
+
+    LibC::uint64_t* bitmap_buffer = nullptr;
+    FK::Bitmap bitmap;
+
+    LibC::size_t bitmap_word_count = 0;
 
     FreeBlock free_block { 0, 0 };
+    FK::IntrusiveNode<PhysicalMemoryRegion> list_node;
+    FK::IntrusiveList<PhysicalMemoryRegion, &PhysicalMemoryRegion::list_node> region_list;
 
-    PhysicalMemoryRegion* next = nullptr;
-    PhysicalMemoryRegion* prev = nullptr;
+    bool allocated = false;
 
     PhysicalMemoryRegion() noexcept = default;
 
@@ -28,44 +35,13 @@ struct PhysicalMemoryRegion {
     {
     }
 
-    ~PhysicalMemoryRegion() noexcept
-    {
-        destroy();
-    }
-
-    void init(LibC::uintptr_t base, LibC::uint64_t pages) noexcept
-    {
-        if (bitmap) {
-            Ffree(bitmap);
-            bitmap = nullptr;
-            bitmap_size = 0;
-        }
-
-        base_addr = base;
-        page_count = pages;
-        free_block.start_page = 0;
-        free_block.page_count = pages;
-
-        bitmap_size = (pages + 63) / 64;
-        bitmap = static_cast<LibC::uint64_t*>(
-            Falloc_zeroed(bitmap_size * sizeof(LibC::uint64_t)));
-        if (!bitmap) {
-            bitmap_size = 0;
-            Logf(LogLevel::ERROR, "PMM: Failed to allocate bitmap for region base=0x%lx pages=%lu", base_addr, page_count);
-        }
-
-        next = nullptr;
-        prev = nullptr;
-    }
-
-    void destroy() noexcept
-    {
-        if (bitmap) {
-            Ffree(bitmap);
-            bitmap = nullptr;
-            bitmap_size = 0;
-        }
-    }
+    void init(LibC::uintptr_t base, LibC::uint64_t pages) noexcept;
+    void destroy() noexcept;
+    bool is_page_used(LibC::uint64_t page_index) noexcept;
+    void mark_page(LibC::uint64_t page_index) noexcept;
+    void unmark_page(LibC::uint64_t page_index) noexcept;
+    bool find_free_page(LibC::uint64_t& out_page_index, LibC::uint64_t start = 0) const noexcept;
+    bool is_allocated() const noexcept;
 };
 
 }
