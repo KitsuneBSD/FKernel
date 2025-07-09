@@ -53,8 +53,6 @@ public:
             head_ = node;
 
         tail_ = node;
-
-        Logf(LogLevel::TRACE, "IntrusiveList: append node=%p prev=%p next=%p", node, n.prev, n.next);
     }
 
     void remove(T* node) noexcept

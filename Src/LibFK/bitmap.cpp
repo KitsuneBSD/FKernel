@@ -12,7 +12,6 @@ bool Bitmap::test(LibC::size_t bit) noexcept
         return false;
     }
     bool result = (data_[idx] & (1ULL << offset)) != 0;
-    Logf(LogLevel::TRACE, "Bitmap: test bit=%lu -> %d", bit, result);
     return result;
 }
 
@@ -25,7 +24,6 @@ bool Bitmap::set(LibC::size_t bit) noexcept
         return false;
     }
     data_[idx] |= (1ULL << offset);
-    Logf(LogLevel::TRACE, "Bitmap: set bit=%lu", bit);
     return true;
 }
 
@@ -38,13 +36,11 @@ bool Bitmap::clear(LibC::size_t bit) noexcept
         return false;
     }
     data_[idx] &= ~(1ULL << offset);
-    Logf(LogLevel::TRACE, "Bitmap: clear bit=%lu", bit);
     return true;
 }
 
 bool Bitmap::find_first_clear(LibC::size_t& out_bit, LibC::size_t start) const noexcept
 {
-    Logf(LogLevel::TRACE, "Bitmap: find_first_clear starting at %lu", start);
     for (LibC::size_t i = start / 64; i < size_ / 64; ++i) {
         if (data_[i] != LibC::UINT64_MAX) {
             LibC::uint64_t inverted = ~data_[i];
@@ -62,7 +58,6 @@ bool Bitmap::find_first_clear(LibC::size_t& out_bit, LibC::size_t start) const n
 
 void Bitmap::reset(LibC::uint64_t* buffer, LibC::size_t bits) noexcept
 {
-    Logf(LogLevel::TRACE, "Bitmap: reset buffer=%p bits=%lu", buffer, bits);
     if (!buffer || bits == 0) {
         data_ = nullptr;
         size_ = 0;
