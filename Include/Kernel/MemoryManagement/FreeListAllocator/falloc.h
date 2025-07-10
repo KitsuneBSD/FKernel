@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LibFK/intrusiveList.h"
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
@@ -20,15 +21,16 @@ struct alignas(16) BlockHeader {
 
 struct FreeMemoryBlock {
     LibC::size_t size;
-    FreeMemoryBlock* next;
-    FreeMemoryBlock* prev;
+    FK::IntrusiveNode<FreeMemoryBlock> ListNode;
 };
 
 class FreeListAllocator {
 private:
     LibC::uintptr_t heap_start = 0;
     LibC::uintptr_t heap_end = 0;
-    FreeMemoryBlock* free_list_head = nullptr;
+
+    FK::IntrusiveList<FreeMemoryBlock, &FreeMemoryBlock::ListNode> free_list;
+
     bool initialized = false;
 
     FreeListAllocator() = default;

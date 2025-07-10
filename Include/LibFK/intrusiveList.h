@@ -7,18 +7,6 @@ struct IntrusiveNode {
     Type* next = nullptr;
     Type* prev = nullptr;
 
-    void detach()
-    {
-        Logf(LogLevel::TRACE, "IntrusiveNode: detach this=%p next=%p prev=%p", this, next, prev);
-
-        if (prev)
-            prev->next = next;
-        if (next)
-            next->prev = prev;
-        next = nullptr;
-        prev = nullptr;
-    }
-
     bool is_linked() const { return next || prev; }
 };
 
@@ -73,6 +61,11 @@ public:
 
         n.next = nullptr;
         n.prev = nullptr;
+    }
+
+    void set_head(T* node) noexcept
+    {
+        head_ = node;
     }
 
     template<typename Callback>
