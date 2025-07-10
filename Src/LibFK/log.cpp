@@ -6,6 +6,24 @@
 
 LogLevel Logger::currentLevel = LogLevel::INFO;
 
+static bool enableColors = true;
+
+static char const* LevelToColor(LogLevel level)
+{
+    switch (level) {
+    case LogLevel::TRACE:
+        return "\x1b[34m"; // Azul
+    case LogLevel::INFO:
+        return "\x1b[32m"; // Verde
+    case LogLevel::WARN:
+        return "\x1b[33m"; // Amarelo
+    case LogLevel::ERROR:
+        return "\x1b[31m"; // Vermelho
+    default:
+        return "\x1b[0m"; // Reset
+    }
+}
+
 Logger& Logger::Instance()
 {
     static Logger instance;
@@ -37,12 +55,25 @@ void Logger::Log(LogLevel level, char const* message) const
 
     auto& serial = Serial::SerialPort::Instance();
 
-    serial.write("[");
-    serial.write(LevelToString(level));
-    serial.write("] ");
+    char const* levelStr = LevelToString(level);
+
+    if (enableColors) {
+        char const* color = LevelToColor(level);
+        serial.write(color);
+        serial.write("[");
+        serial.write(levelStr);
+        serial.write("]");
+        serial.write("\x1b[0m "); // Reset color
+    } else {
+        serial.write("[");
+        serial.write(levelStr);
+        serial.write("] ");
+    }
+
     serial.write(message);
     serial.write("\n");
 }
+
 void Logger::Logf(LogLevel level, char const* fmt, ...) const
 {
     if (level < currentLevel)
