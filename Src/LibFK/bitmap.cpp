@@ -8,7 +8,7 @@ bool Bitmap::test(LibC::size_t bit) noexcept
     LibC::size_t idx = bit / 64;
     LibC::size_t offset = bit % 64;
     if (idx >= size_ / 64) {
-        Logf(LogLevel::TRACE, "Bitmap: test out of range: bit=%lu (size=%lu)", bit, size_);
+        Logf(LogLevel::WARN, "Bitmap: test out of range: bit=%lu (size=%lu)", bit, size_);
         return false;
     }
     bool result = (data_[idx] & (1ULL << offset)) != 0;
@@ -20,7 +20,7 @@ bool Bitmap::set(LibC::size_t bit) noexcept
     LibC::size_t idx = bit / 64;
     LibC::size_t offset = bit % 64;
     if (idx >= size_ / 64) {
-        Logf(LogLevel::TRACE, "Bitmap: set out of range: bit=%lu (size=%lu)", bit, size_);
+        Logf(LogLevel::WARN, "Bitmap: set out of range: bit=%lu (size=%lu)", bit, size_);
         return false;
     }
     data_[idx] |= (1ULL << offset);
@@ -32,7 +32,7 @@ bool Bitmap::clear(LibC::size_t bit) noexcept
     LibC::size_t idx = bit / 64;
     LibC::size_t offset = bit % 64;
     if (idx >= size_ / 64) {
-        Logf(LogLevel::TRACE, "Bitmap: clear out of range: bit=%lu (size=%lu)", bit, size_);
+        Logf(LogLevel::WARN, "Bitmap: clear out of range: bit=%lu (size=%lu)", bit, size_);
         return false;
     }
     data_[idx] &= ~(1ULL << offset);
@@ -52,7 +52,7 @@ bool Bitmap::find_first_clear(LibC::size_t& out_bit, LibC::size_t start) const n
             }
         }
     }
-    Log(LogLevel::TRACE, "Bitmap: find_first_clear no free bit found");
+    Log(LogLevel::WARN, "Bitmap: find_first_clear no free bit found");
     return false;
 }
 
@@ -61,7 +61,7 @@ void Bitmap::reset(LibC::uint64_t* buffer, LibC::size_t bits) noexcept
     if (!buffer || bits == 0) {
         data_ = nullptr;
         size_ = 0;
-        Log(LogLevel::TRACE, "Bitmap: reset: invalid buffer or size, clearing state");
+        Log(LogLevel::WARN, "Bitmap: reset: invalid buffer or size, clearing state");
         return;
     }
 
