@@ -15,7 +15,6 @@ qemu-system-x86_64 \
 	-cdrom "$MockOS" \
 	-m 2G \
 	-nographic \
-	-serial stdio \
-  -monitor telnet:localhost:4444,server,nowait \
+	-serial mon:stdio \
   -smp 2 \
-	-boot d
+	-boot d 
