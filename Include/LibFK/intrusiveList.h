@@ -75,6 +75,33 @@ public:
             callback_function(it);
     }
 
+    template<typename Comparator>
+    void insert_ordered(T* node, Comparator comp) noexcept
+    {
+        if (is_empty()) {
+            append(node);
+            return;
+        }
+        for (T* it = head_; it; it = (it->*member).next) {
+            if (comp(node, it)) {
+                auto& n = node->*member;
+                auto& it_node = it->*member;
+
+                n.prev = it_node.prev;
+                n.next = it;
+
+                if (it_node.prev)
+                    (it_node.prev->*member).next = node;
+                else
+                    head_ = node;
+
+                it_node.prev = node;
+                return;
+            }
+        }
+        append(node);
+    }
+
     class Iterator {
         T* m_node;
 

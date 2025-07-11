@@ -15,11 +15,11 @@ constexpr LibC::uint64_t max_region_pages = max_region_bytes / total_page_size;
 
 static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::uint64_t page_count) noexcept
 {
-    Logf(LogLevel::TRACE, "PMM: Allocating region base=0x%lx, pages=%lu", base_addr, page_count);
+    Logf(LogLevel::TRACE, "PMM: Allocate region base=0x%lx, pages=%lu", base_addr, page_count);
 
     void* mem = Falloc(sizeof(PhysicalMemoryRegion), alignof(PhysicalMemoryRegion));
     if (!mem) {
-        Log(LogLevel::ERROR, "PMM: allocate_region failed: out of memory");
+        Log(LogLevel::ERROR, "PMM: Allocate region failed: out of memory");
         return nullptr;
     }
 
@@ -35,10 +35,10 @@ static void deallocate_region(PhysicalMemoryRegion* region) noexcept
     if (!region)
         return;
 
-    Logf(LogLevel::TRACE, "PMM: Deallocating region base=0x%lx", region->base_addr);
+    Logf(LogLevel::TRACE, "PMM: Deallocate region base=0x%lx", region->base_addr);
 
     if (region->bitmap.is_valid()) {
-        Logf(LogLevel::TRACE, "PMM: Freeing bitmap for region base=0x%lx", region->base_addr);
+        Logf(LogLevel::TRACE, "PMM: Free bitmap for region base=0x%lx", region->base_addr);
         Ffree(region->bitmap_buffer);
         region->destroy();
     }
@@ -50,14 +50,14 @@ static void deallocate_region(PhysicalMemoryRegion* region) noexcept
 void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
 {
     if (!region) {
-        Log(LogLevel::ERROR, "PMM: add_region called with nullptr");
+        Log(LogLevel::ERROR, "PMM: Add Region called with nullptr");
         return;
     }
 
-    Logf(LogLevel::TRACE, "PMM: add_region base=0x%lx pages=%lu", region->base_addr, region->page_count);
+    Logf(LogLevel::TRACE, "PMM: Add Region base=0x%lx pages=%lu", region->base_addr, region->page_count);
 
     if (region->page_count > max_region_pages) {
-        Logf(LogLevel::TRACE, "PMM: Splitting region base=0x%lx pages=%lu", region->base_addr, region->page_count);
+        Logf(LogLevel::TRACE, "PMM: Split region base=0x%lx pages=%lu", region->base_addr, region->page_count);
         LibC::uint64_t remaining_pages = region->page_count;
         LibC::uintptr_t current_base = region->base_addr;
 
@@ -127,7 +127,7 @@ void PhysicalMemoryManager::ensure_bitmap_allocated(PhysicalMemoryRegion& region
         return;
 
     region.bitmap_word_count = (region.page_count + 63) / 64;
-    Logf(LogLevel::TRACE, "PMM: Allocating bitmap: base=0x%lx, words=%lu", region.base_addr, region.bitmap_word_count);
+    Logf(LogLevel::TRACE, "PMM: Allocate bitmap: base=0x%lx, words=%lu", region.base_addr, region.bitmap_word_count);
 
     void* mem = Falloc_zeroed(region.bitmap_word_count * sizeof(LibC::uint64_t), alignof(LibC::uint64_t));
     if (!mem) {
@@ -147,7 +147,7 @@ void PhysicalMemoryManager::mark_pages(PhysicalMemoryRegion& region, LibC::uint6
         return;
 
     if (start_page + count > region.page_count) {
-        Logf(LogLevel::WARN, "PMM: mark_pages out of range: base=0x%lx, start_page=%lu, count=%lu",
+        Logf(LogLevel::WARN, "PMM: Mark pages out of range: base=0x%lx, start_page=%lu, count=%lu",
             region.base_addr, start_page, count);
         return;
     }
@@ -213,7 +213,7 @@ LibC::size_t PhysicalMemoryManager::allocated_region_count() const noexcept
         if (region.is_allocated()) {
             ++count;
         } else {
-            Logf(LogLevel::WARN, "PMM: allocated_region_count found region base=0x%lx without bitmap", region.base_addr);
+            Logf(LogLevel::WARN, "PMM: Allocated region count found region base=0x%lx without bitmap", region.base_addr);
         }
     }
     return count;
@@ -304,17 +304,17 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
 
         LibC::uintptr_t phys_addr = region.base_addr + start_page * total_page_size;
         if (phys_addr == 0) {
-            Log(LogLevel::WARN, "PMM: alloc_page skipping zero physical address");
+            Log(LogLevel::WARN, "PMM: Alloc page skipping zero physical address");
             continue;
         }
 
         mark_pages(region, start_page, 1, true);
 
-        Logf(LogLevel::TRACE, "PMM: alloc_page allocated 0x%lx in region base=0x%lx", phys_addr, region.base_addr);
+        Logf(LogLevel::TRACE, "PMM: Alloc page allocated 0x%lx in region base=0x%lx", phys_addr, region.base_addr);
         return phys_addr;
     }
 
-    Log(LogLevel::WARN, "PMM: alloc_page out of memory");
+    Log(LogLevel::WARN, "PMM: Alloc page out of memory");
     return 0;
 }
 
@@ -326,7 +326,7 @@ void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
 
         LibC::uintptr_t offset = phys_addr - region.base_addr;
         if (offset % total_page_size != 0) {
-            Logf(LogLevel::WARN, "PMM: free_page unaligned address 0x%lx", phys_addr);
+            Logf(LogLevel::WARN, "PMM: Free page unaligned address 0x%lx", phys_addr);
             return;
         }
 
@@ -335,17 +335,17 @@ void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
 
         mark_pages(region, page_idx, 1, false);
 
-        Logf(LogLevel::TRACE, "PMM: free_page freed 0x%lx in region base=0x%lx", phys_addr, region.base_addr);
+        Logf(LogLevel::TRACE, "PMM: Free page freed 0x%lx in region base=0x%lx", phys_addr, region.base_addr);
         return;
     }
 
-    Logf(LogLevel::WARN, "PMM: free_page address 0x%lx not found in any region", phys_addr);
+    Logf(LogLevel::WARN, "PMM: Free page address 0x%lx not found in any region", phys_addr);
 }
 
 LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t count) noexcept
 {
     if (count == 0) {
-        Log(LogLevel::WARN, "PMM: alloc_contiguous_pages called with count=0");
+        Log(LogLevel::WARN, "PMM: Alloc contiguous pages called with count=0");
         return 0;
     }
 
@@ -358,18 +358,18 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t cou
 
         mark_pages(region, start_page, count, true);
         LibC::uintptr_t phys_addr = region.base_addr + start_page * total_page_size;
-        Logf(LogLevel::TRACE, "PMM: alloc_contiguous_pages allocated %lu pages at 0x%lx", count, phys_addr);
+        Logf(LogLevel::TRACE, "PMM: Alloc contiguous pages allocated %lu pages at 0x%lx", count, phys_addr);
         return phys_addr;
     }
 
-    Logf(LogLevel::WARN, "PMM: alloc_contiguous_pages out of memory for %lu pages", count);
+    Logf(LogLevel::WARN, "PMM: Alloc contiguous pages out of memory for %lu pages", count);
     return 0;
 }
 
 void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t count) noexcept
 {
     if (count == 0) {
-        Log(LogLevel::WARN, "PMM: free_contiguous_pages called with count=0");
+        Log(LogLevel::WARN, "PMM: Free contiguous pages called with count=0");
         return;
     }
 
@@ -379,13 +379,13 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
 
         LibC::uintptr_t offset = phys_addr - region.base_addr;
         if (offset % total_page_size != 0) {
-            Logf(LogLevel::WARN, "PMM: free_contiguous_pages unaligned address 0x%lx", phys_addr);
+            Logf(LogLevel::WARN, "PMM: Free contiguous pages unaligned address 0x%lx", phys_addr);
             return;
         }
 
         LibC::size_t page_idx = offset / total_page_size;
         if (page_idx + count > region.page_count) {
-            Logf(LogLevel::WARN, "PMM: free_contiguous_pages range exceeds region for 0x%lx count %lu", phys_addr, count);
+            Logf(LogLevel::WARN, "PMM: Free contiguous pages range exceeds region for 0x%lx count %lu", phys_addr, count);
             return;
         }
 
@@ -393,11 +393,11 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
 
         mark_pages(region, page_idx, count, false);
 
-        Logf(LogLevel::TRACE, "PMM: free_contiguous_pages freed %lu pages at 0x%lx", count, phys_addr);
+        Logf(LogLevel::TRACE, "PMM: Free contiguous pages freed %lu pages at 0x%lx", count, phys_addr);
         return;
     }
 
-    Logf(LogLevel::WARN, "PMM: free_contiguous_pages address 0x%lx not found in any region", phys_addr);
+    Logf(LogLevel::WARN, "PMM: Free contiguous pages address 0x%lx not found in any region", phys_addr);
 }
 
 PhysicalMemoryRegion* PhysicalMemoryManager::find_region(LibC::uintptr_t phys_addr) noexcept
@@ -414,7 +414,7 @@ void PhysicalMemoryManager::remove_region(LibC::uintptr_t phys_addr) noexcept
 {
     auto* region = find_region(phys_addr);
     if (!region) {
-        Logf(LogLevel::WARN, "PMM: remove_region: region not found for address 0x%lx", phys_addr);
+        Logf(LogLevel::WARN, "PMM: Remove region: region not found for address 0x%lx", phys_addr);
         return;
     }
 

@@ -122,30 +122,11 @@ void FreeListAllocator::insert_block(FreeMemoryBlock* block)
         return;
     }
 
-    for (auto it = free_list.begin(); it != free_list.end(); ++it) {
-        FreeMemoryBlock* current = &(*it);
+    free_list.insert_ordered(block, [](auto* a, auto* b) {
+        return reinterpret_cast<LibC::uintptr_t>(a) < reinterpret_cast<LibC::uintptr_t>(b);
+    });
 
-        if (block < current) {
-
-            auto& block_node = block->ListNode;
-            auto& current_node = current->ListNode;
-
-            block_node.next = current;
-            block_node.prev = current_node.prev;
-
-            if (current_node.prev) {
-                (current_node.prev)->ListNode.next = block;
-            } else {
-                free_list.set_head(block);
-            }
-
-            current_node.prev = block;
-
-            return;
-        }
-    }
-
-    free_list.append(block);
+    try_coalesce(block);
 }
 
 void FreeListAllocator::remove_block(FreeMemoryBlock* block)
@@ -155,16 +136,27 @@ void FreeListAllocator::remove_block(FreeMemoryBlock* block)
 
 void FreeListAllocator::try_coalesce(FreeMemoryBlock* block)
 {
-    auto* next = (block->ListNode.next);
-    if (next && (reinterpret_cast<LibC::uintptr_t>(block) + block->size == reinterpret_cast<LibC::uintptr_t>(next))) {
-        block->size += next->size;
-        free_list.remove(next);
+    auto block_addr = reinterpret_cast<LibC::uintptr_t>(block);
+
+    if (block->ListNode.next) {
+        auto* next = block->ListNode.next;
+        auto next_addr = reinterpret_cast<LibC::uintptr_t>(next);
+
+        if (block_addr + block->size == next_addr) {
+            block->size += next->size;
+            remove_block(next);
+        }
     }
 
-    auto* prev = (block->ListNode.prev);
-    if (prev && (reinterpret_cast<LibC::uintptr_t>(prev) + prev->size == reinterpret_cast<LibC::uintptr_t>(block))) {
-        prev->size += block->size;
-        free_list.remove(block);
+    if (block->ListNode.prev) {
+        auto* prev = block->ListNode.prev;
+        auto prev_addr = reinterpret_cast<LibC::uintptr_t>(prev);
+
+        if (prev_addr + prev->size == block_addr) {
+            prev->size += block->size;
+            remove_block(block);
+            block = prev;
+        }
     }
 }
 
