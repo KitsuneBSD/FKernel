@@ -21,7 +21,6 @@ private:
     LibC::size_t allocated_region_count() const noexcept;
     void ensure_bitmap_allocated(PhysicalMemoryRegion& region) noexcept;
     void remove_region(LibC::uintptr_t phys_addr) noexcept;
-    bool find_free_pages_in_region(PhysicalMemoryRegion& region, LibC::uint64_t count, LibC::uint64_t& start_page) noexcept;
 
 public:
     static PhysicalMemoryManager& instance() noexcept
