@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Arch/x86_64/Hw/Io.h>
+#include <Kernel/Arch/x86_64/Hardware/Io.h>
 #include <LibC/stdint.h>
 
 static constexpr LibC::uint8_t PIC1_CMD = 0x20;
