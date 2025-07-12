@@ -32,10 +32,12 @@ local lld_flags = {
 
 toolchain("FKernel_Compiling")
 set_kind("standalone")
-set_toolset("cc", "clang")
-set_toolset("cxx", "clang++")
-set_toolset("ld", "ld.lld")
-set_toolset("as", "nasm")
+
+set_toolset("cc", "clang", "tcc", "cl", "gcc")
+set_toolset("cxx", "clang++", "cl", "g++")
+set_toolset("ld", "ld.lld", "gold", "link", "ld")
+set_toolset("as", "nasm", "yasm", "ml")
+
 toolchain_end()
 
 target("FKernel")
