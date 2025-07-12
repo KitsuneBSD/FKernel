@@ -3,8 +3,9 @@
 #include <LibC/stdint.h>
 #include <LibFK/log.h>
 
-static constexpr LibC::size_t entries_per_table = 512;
-static constexpr LibC::size_t page_size = 4096;
+#ifdef __x86_64__
+#    include <Kernel/Arch/x86_64/Cpu/Constants.h>
+#endif // DEBUG
 
 namespace MemoryManagement {
 
@@ -15,13 +16,13 @@ void VirtualMemoryManager::initialize() noexcept
         return;
     }
 
-    pml4 = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
+    pml4 = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
     if (!pml4) {
         Log(LogLevel::ERROR, "VMM: Failed to allocate PML4");
         return;
     }
 
-    for (LibC::size_t i = 0; i < entries_per_table; ++i)
+    for (LibC::size_t i = 0; i < ENTRIES_PER_PAGE; ++i)
         pml4[i] = 0;
 
     Log(LogLevel::INFO, "VMM: PML4 initialized");
@@ -45,12 +46,12 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pml4[pml4_idx] & PAGE_PRESENT) {
         pdpt = reinterpret_cast<LibC::uint64_t*>(pml4[pml4_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pdpt = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
+        pdpt = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE));
         if (!pdpt) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PDPT");
             return nullptr;
         }
-        for (LibC::size_t i = 0; i < entries_per_table; ++i)
+        for (LibC::size_t i = 0; i < ENTRIES_PER_PAGE; ++i)
             pdpt[i] = 0;
         pml4[pml4_idx] = reinterpret_cast<LibC::uintptr_t>(pdpt) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PDPT at index %zu for virt addr 0x%llX", pml4_idx, virt_addr);
@@ -60,12 +61,12 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pdpt[pdpt_idx] & PAGE_PRESENT) {
         pd = reinterpret_cast<LibC::uint64_t*>(pdpt[pdpt_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pd = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
+        pd = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
         if (!pd) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PD");
             return nullptr;
         }
-        for (LibC::size_t i = 0; i < entries_per_table; ++i)
+        for (LibC::size_t i = 0; i < ENTRIES_PER_PAGE; ++i)
             pd[i] = 0;
         pdpt[pdpt_idx] = reinterpret_cast<LibC::uintptr_t>(pd) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PD at index %zu for virt addr 0x%llX", pdpt_idx, virt_addr);
@@ -75,12 +76,12 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
     if (pd[pd_idx] & PAGE_PRESENT) {
         pt = reinterpret_cast<LibC::uint64_t*>(pd[pd_idx] & 0x000FFFFFFFFFF000ULL);
     } else {
-        pt = reinterpret_cast<LibC::uint64_t*>(Falloc(page_size, page_size));
+        pt = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
         if (!pt) {
             Log(LogLevel::ERROR, "VMM: Failed to allocate PT");
             return nullptr;
         }
-        for (LibC::size_t i = 0; i < entries_per_table; ++i)
+        for (LibC::size_t i = 0; i < ENTRIES_PER_PAGE; ++i)
             pt[i] = 0;
         pd[pd_idx] = reinterpret_cast<LibC::uintptr_t>(pt) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PT at index %zu for virt addr 0x%llX", pd_idx, virt_addr);

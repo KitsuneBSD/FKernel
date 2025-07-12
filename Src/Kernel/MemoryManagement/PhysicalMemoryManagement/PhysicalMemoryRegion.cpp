@@ -11,7 +11,6 @@ void PhysicalMemoryRegion::init(LibC::uintptr_t base, LibC::uint64_t pages) noex
 
     base_addr = base;
     page_count = pages;
-    free_block = { 0, pages };
 
     bitmap_buffer = nullptr;
     bitmap_word_count = 0;
@@ -35,7 +34,6 @@ void PhysicalMemoryRegion::destroy() noexcept
     bitmap_word_count = 0;
     base_addr = 0;
     page_count = 0;
-    free_block = { 0, 0 };
     allocated = false;
     bitmap_allocated = false;
     region_list = {}; // limpa lista interna, caso tenha sido usada

@@ -3,7 +3,7 @@
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <LibFK/log.h>
 
-inline void halt()
+void halt()
 {
     while (true) {
         asm("hlt");

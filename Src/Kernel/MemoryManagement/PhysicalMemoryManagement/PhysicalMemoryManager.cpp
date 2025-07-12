@@ -1,18 +1,16 @@
 #include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
-#include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 #include <LibFK/log.h>
-#include <LibFK/types.h>
+
+#ifdef __x86_64__
+#    include <Kernel/Arch/x86_64/Cpu/Constants.h>
+#endif
 
 namespace MemoryManagement {
-constexpr LibC::uint64_t total_page_size = 4096;
-constexpr LibC::uint64_t max_region_bytes = 64 * static_cast<LibC::uint64_t>(FK::MiB);
-constexpr LibC::uint64_t max_region_pages = max_region_bytes / total_page_size;
-
 static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::uint64_t page_count) noexcept
 {
     Logf(LogLevel::TRACE, "PMM: Allocate region base=0x%lx, pages=%lu", base_addr, page_count);
@@ -68,7 +66,7 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
 
     Logf(LogLevel::TRACE, "PMM: Add Region base=0x%lx pages=%lu", region->base_addr, region->page_count);
 
-    if (region->page_count > max_region_pages) {
+    if (region->page_count > max_region_in_pages) {
         Logf(LogLevel::TRACE, "PMM: Split region base=0x%lx pages=%lu", region->base_addr, region->page_count);
         LibC::uint64_t remaining_pages = region->page_count;
         LibC::uintptr_t current_base = region->base_addr;
@@ -76,7 +74,7 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
         deallocate_region(region);
 
         while (remaining_pages > 0) {
-            LibC::uint64_t split_count = (remaining_pages > max_region_pages) ? max_region_pages : remaining_pages;
+            LibC::uint64_t split_count = (remaining_pages > max_region_in_pages) ? max_region_in_pages : remaining_pages;
             PhysicalMemoryRegion* subregion = allocate_region(current_base, split_count);
             if (!subregion) {
                 Log(LogLevel::ERROR, "PMM: Failed to allocate subregion in add_region");
@@ -85,7 +83,7 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
 
             add_region(subregion);
 
-            current_base += split_count * total_page_size;
+            current_base += split_count * TOTAL_MEMORY_PAGE_SIZE;
             remaining_pages -= split_count;
         }
         return;
@@ -99,15 +97,15 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
     for (auto it = mmap.begin(); it != mmap.end(); ++it) {
         auto const& entry = *it;
 
-        if (entry.length < total_page_size || entry.base_addr < static_cast<FK::qword>(1 * FK::MiB)) {
+        if (entry.length < TOTAL_MEMORY_PAGE_SIZE || entry.base_addr < static_cast<FK::qword>(1 * FK::MiB)) {
             continue;
         }
 
         LibC::uintptr_t base = entry.base_addr;
-        LibC::uint64_t total_pages = entry.length / total_page_size;
+        LibC::uint64_t total_pages = entry.length / TOTAL_MEMORY_PAGE_SIZE;
 
         while (total_pages > 0) {
-            LibC::uint64_t region_pages = (total_pages > max_region_pages) ? max_region_pages : total_pages;
+            LibC::uint64_t region_pages = (total_pages > max_region_in_pages) ? max_region_in_pages : total_pages;
 
             PhysicalMemoryRegion* region = allocate_region(base, region_pages);
             if (!region) {
@@ -117,13 +115,12 @@ void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noe
 
             add_region(region);
 
-            // Marcar as páginas usadas se região não disponível
             if (!multiboot2::is_available(entry.type)) {
                 ensure_bitmap_allocated(*region);
                 mark_pages(*region, 0, region_pages, true);
             }
 
-            base += region_pages * total_page_size;
+            base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
             total_pages -= region_pages;
         }
     }
@@ -188,12 +185,12 @@ LibC::uint64_t PhysicalMemoryManager::total_pages() const noexcept
 
 LibC::uint64_t PhysicalMemoryManager::total_bytes() const noexcept
 {
-    return total_pages() * total_page_size;
+    return total_pages() * TOTAL_MEMORY_PAGE_SIZE;
 }
 
 LibC::uint64_t PhysicalMemoryManager::free_bytes() const noexcept
 {
-    return free_pages() * total_page_size;
+    return free_pages() * TOTAL_MEMORY_PAGE_SIZE;
 }
 
 LibC::size_t PhysicalMemoryManager::allocated_region_count() const noexcept
@@ -291,7 +288,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
         if (!region.find_free_page(page_index))
             continue;
 
-        LibC::uintptr_t phys_addr = region.base_addr + page_index * total_page_size;
+        LibC::uintptr_t phys_addr = region.base_addr + page_index * TOTAL_MEMORY_PAGE_SIZE;
         if (phys_addr == 0) {
             Log(LogLevel::WARN, "PMM: Alloc page skipping zero physical address");
             continue;
@@ -310,16 +307,16 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
 void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
 {
     for (auto& region : regions_) {
-        if (phys_addr < region.base_addr || phys_addr >= region.base_addr + region.page_count * total_page_size)
+        if (phys_addr < region.base_addr || phys_addr >= region.base_addr + region.page_count * TOTAL_MEMORY_PAGE_SIZE)
             continue;
 
         LibC::uintptr_t offset = phys_addr - region.base_addr;
-        if (offset % total_page_size != 0) {
+        if (offset % TOTAL_MEMORY_PAGE_SIZE != 0) {
             Logf(LogLevel::WARN, "PMM: Free page unaligned address 0x%lx", phys_addr);
             return;
         }
 
-        LibC::size_t page_idx = offset / total_page_size;
+        LibC::size_t page_idx = offset / TOTAL_MEMORY_PAGE_SIZE;
         ensure_bitmap_allocated(region);
 
         mark_pages(region, page_idx, 1, false);
@@ -358,7 +355,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_contiguous_pages(LibC::uint64_t cou
             }
 
             if (block_free) {
-                LibC::uintptr_t phys_addr = region.base_addr + candidate * total_page_size;
+                LibC::uintptr_t phys_addr = region.base_addr + candidate * TOTAL_MEMORY_PAGE_SIZE;
                 if (phys_addr == 0) {
                     Log(LogLevel::WARN, "PMM: alloc_contiguous_pages skipping zero physical address");
                     continue;
@@ -385,16 +382,16 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
     bool found_region = false;
 
     for (auto& region : regions_) {
-        if (phys_addr >= region.base_addr && phys_addr < region.base_addr + region.page_count * total_page_size) {
+        if (phys_addr >= region.base_addr && phys_addr < region.base_addr + region.page_count * TOTAL_MEMORY_PAGE_SIZE) {
             found_region = true;
 
             LibC::uintptr_t offset = phys_addr - region.base_addr;
-            if (offset % total_page_size != 0) {
+            if (offset % TOTAL_MEMORY_PAGE_SIZE != 0) {
                 Logf(LogLevel::WARN, "PMM: free_contiguous_pages unaligned address 0x%lx", phys_addr);
                 return;
             }
 
-            LibC::size_t page_idx = offset / total_page_size;
+            LibC::size_t page_idx = offset / TOTAL_MEMORY_PAGE_SIZE;
             if (page_idx + count > region.page_count) {
                 Logf(LogLevel::WARN, "PMM: free_contiguous_pages range exceeds region for 0x%lx count %lu", phys_addr, count);
                 return;
@@ -417,7 +414,7 @@ void PhysicalMemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, Lib
 PhysicalMemoryRegion* PhysicalMemoryManager::find_region(LibC::uintptr_t phys_addr) noexcept
 {
     for (auto& region : regions_) {
-        if (phys_addr >= region.base_addr && phys_addr < region.base_addr + region.page_count * total_page_size) {
+        if (phys_addr >= region.base_addr && phys_addr < region.base_addr + region.page_count * TOTAL_MEMORY_PAGE_SIZE) {
             return &region;
         }
     }
@@ -442,7 +439,7 @@ PhysicalMemoryRegion* PhysicalMemoryManager::find_region_containing(LibC::uintpt
         PhysicalMemoryRegion& region = *it;
 
         LibC::uintptr_t region_start = region.base_addr;
-        LibC::uintptr_t region_end = region_start + region.page_count * total_page_size;
+        LibC::uintptr_t region_end = region_start + region.page_count * TOTAL_MEMORY_PAGE_SIZE;
 
         if (addr >= region_start && addr < region_end) {
             return &region;

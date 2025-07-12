@@ -1,13 +1,12 @@
 #pragma once
 
-#include "LibFK/bitmap.h"
-#include "LibFK/intrusiveList.h"
-#include "LibFK/types.h"
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
-#include <Kernel/MemoryManagement/PhysicalMemoryManagement/FreeBlocks.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
+#include <LibFK/bitmap.h>
+#include <LibFK/intrusiveList.h>
 #include <LibFK/log.h>
+#include <LibFK/types.h>
 
 namespace MemoryManagement {
 
@@ -20,7 +19,6 @@ struct PhysicalMemoryRegion {
 
     LibC::size_t bitmap_word_count = 0;
 
-    FreeBlock free_block { 0, 0 };
     FK::IntrusiveNode<PhysicalMemoryRegion> list_node;
     FK::IntrusiveList<PhysicalMemoryRegion, &PhysicalMemoryRegion::list_node> region_list;
 
@@ -32,7 +30,6 @@ struct PhysicalMemoryRegion {
     PhysicalMemoryRegion(LibC::uintptr_t base, LibC::uint64_t pages) noexcept
         : base_addr(base)
         , page_count(pages)
-        , free_block { 0, pages }
     {
     }
 
