@@ -1,5 +1,5 @@
 
-#include <Kernel/Arch/x86_64/Hw/Io.h>
+#include <Kernel/Arch/x86_64/Hardware/Io.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
