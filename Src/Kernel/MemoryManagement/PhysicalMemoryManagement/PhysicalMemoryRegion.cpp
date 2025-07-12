@@ -16,6 +16,7 @@ void PhysicalMemoryRegion::init(LibC::uintptr_t base, LibC::uint64_t pages) noex
     bitmap_buffer = nullptr;
     bitmap_word_count = 0;
     allocated = true;
+    bitmap_allocated = false;
 }
 
 void PhysicalMemoryRegion::destroy() noexcept
@@ -36,43 +37,104 @@ void PhysicalMemoryRegion::destroy() noexcept
     page_count = 0;
     free_block = { 0, 0 };
     allocated = false;
-
+    bitmap_allocated = false;
     region_list = {}; // limpa lista interna, caso tenha sido usada
 }
 
 bool PhysicalMemoryRegion::is_page_used(LibC::uint64_t page_index) noexcept
 {
-    if (!allocated || !bitmap.is_valid() || page_index >= page_count) {
-        Logf(LogLevel::WARN, "PMR: is_page_used: Invalid access on region base=0x%lx", base_addr);
-        return true; // safer fallback
+    if (!allocated) {
+        Logf(LogLevel::WARN, "PMR: is_page_used called on unallocated region base=0x%lx", base_addr);
+        return true;
     }
+    if (!bitmap.is_valid()) {
+        Logf(LogLevel::WARN, "PMR: is_page_used called on region with invalid bitmap base=0x%lx", base_addr);
+        return true;
+    }
+
+    if (!bitmap_allocated) {
+        Logf(LogLevel::WARN, "PMR: is_page_used called on region with unallocated bitmap base=0x%lx", base_addr);
+        return true;
+    }
+
+    if (page_index >= page_count) {
+        Logf(LogLevel::WARN, "PMR: is_page_used out-of-range page_index=%lu base=0x%lx", page_index, base_addr);
+        return true;
+    }
+
     return bitmap.test(page_index);
 }
 
 void PhysicalMemoryRegion::mark_page(LibC::uint64_t page_index) noexcept
 {
-    if (!allocated || !bitmap.is_valid() || page_index >= page_count) {
-        Logf(LogLevel::WARN, "PMR: mark_page: Invalid access on region base=0x%lx", base_addr);
+    if (!allocated) {
+        Logf(LogLevel::WARN, "PMR: mark_page called on unallocated region base=0x%lx", base_addr);
         return;
     }
+
+    if (!bitmap.is_valid()) {
+        Logf(LogLevel::WARN, "PMR: mark_page called on region with invalid bitmap base=0x%lx", base_addr);
+        return;
+    }
+
+    if (!bitmap_allocated) {
+        Logf(LogLevel::WARN, "PMR: mark_page called on region with unallocated bitmap base=0x%lx", base_addr);
+        return;
+    }
+
+    if (page_index >= page_count) {
+        Logf(LogLevel::WARN, "PMR: mark_page called with out-of-range page_index=%lu on base=0x%lx", page_index, base_addr);
+        return;
+    }
+
     bitmap.set(page_index);
 }
 
 void PhysicalMemoryRegion::unmark_page(LibC::uint64_t page_index) noexcept
 {
-    if (!allocated || !bitmap.is_valid() || page_index >= page_count) {
-        Logf(LogLevel::WARN, "PMR: unmark_page: Invalid access on region base=0x%lx", base_addr);
+    if (!allocated) {
+        Logf(LogLevel::WARN, "PMR: unmark_page called on unallocated region base=0x%lx", base_addr);
         return;
     }
+    if (!bitmap.is_valid()) {
+        Logf(LogLevel::WARN, "PMR: unmark_page called on region with invalid bitmap base=0x%lx", base_addr);
+        return;
+    }
+
+    if (!bitmap_allocated) {
+        Logf(LogLevel::WARN, "PMR: unmark_page called on region with unallocated bitmap base=0x%lx", base_addr);
+        return;
+    }
+
+    if (page_index >= page_count) {
+        Logf(LogLevel::WARN, "PMR: unmark_page out-of-range page_index=%lu base=0x%lx", page_index, base_addr);
+        return;
+    }
+
     bitmap.clear(page_index);
 }
 
 bool PhysicalMemoryRegion::find_free_page(LibC::uint64_t& out_page_index, LibC::uint64_t start) const noexcept
 {
-    if (!allocated || !bitmap.is_valid() || start >= page_count) {
-        Logf(LogLevel::WARN, "PMR: find_free_page: Invalid access on region base=0x%lx", base_addr);
+    if (!allocated) {
+        Logf(LogLevel::WARN, "PMR: find_free_page called on unallocated region base=0x%lx", base_addr);
         return false;
     }
+    if (!bitmap.is_valid()) {
+        Logf(LogLevel::WARN, "PMR: find_free_page called on region with invalid bitmap base=0x%lx", base_addr);
+        return false;
+    }
+
+    if (!bitmap_allocated) {
+        Logf(LogLevel::WARN, "PMR: find_free_page called on region with unallocated bitmap base=0x%lx", base_addr);
+        return false;
+    }
+
+    if (start >= page_count) {
+        Logf(LogLevel::WARN, "PMR: find_free_page out-of-range start=%lu base=0x%lx", start, base_addr);
+        return false;
+    }
+
     return bitmap.find_first_clear(out_page_index, start);
 }
 

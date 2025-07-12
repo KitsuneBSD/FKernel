@@ -6,8 +6,15 @@ template<typename Type>
 struct IntrusiveNode {
     Type* next = nullptr;
     Type* prev = nullptr;
+    bool linked = false;
 
-    bool is_linked() const { return next || prev; }
+    bool is_linked() const noexcept
+    {
+        return linked;
+    }
+
+    void link() { linked = true; }
+    void unlink() { linked = false; }
 };
 
 template<typename T, IntrusiveNode<T> T::* member>
@@ -41,11 +48,17 @@ public:
             head_ = node;
 
         tail_ = node;
+        n.linked = true;
     }
 
     void remove(T* node) noexcept
     {
         auto& n = node->*member;
+
+        if (!n.is_linked()) {
+            Logf(LogLevel::WARN, "IntrusiveList: remove called on unlinked node %p, skipping", node);
+            return;
+        }
 
         Logf(LogLevel::TRACE, "IntrusiveList: remove node=%p", node);
 
@@ -61,6 +74,7 @@ public:
 
         n.next = nullptr;
         n.prev = nullptr;
+        n.linked = false;
     }
 
     void set_head(T* node) noexcept

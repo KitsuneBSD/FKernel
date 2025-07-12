@@ -24,6 +24,7 @@ struct PhysicalMemoryRegion {
     FK::IntrusiveNode<PhysicalMemoryRegion> list_node;
     FK::IntrusiveList<PhysicalMemoryRegion, &PhysicalMemoryRegion::list_node> region_list;
 
+    bool bitmap_allocated = false;
     bool allocated = false;
 
     PhysicalMemoryRegion() noexcept = default;

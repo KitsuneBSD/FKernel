@@ -16,7 +16,7 @@ private:
     void remove_region(PhysicalMemoryRegion* region) noexcept;
 
     void mark_pages(PhysicalMemoryRegion& region, LibC::uint64_t start_page, LibC::uint64_t count, bool allocate) noexcept;
-
+    PhysicalMemoryRegion* find_region_containing(LibC::uintptr_t addr) noexcept;
     LibC::size_t count_used_pages() const noexcept;
     LibC::size_t allocated_region_count() const noexcept;
     void ensure_bitmap_allocated(PhysicalMemoryRegion& region) noexcept;
