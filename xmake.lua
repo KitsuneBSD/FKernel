@@ -52,10 +52,6 @@ end
 if is_mode("release") then
   set_symbols("hidden")
   set_optimize("faster")
-
-  before_build(function(target)
-    os.execv("bash Meta/run_continuous_integration.sh")
-  end)
 end
 
 after_link(function(target)
