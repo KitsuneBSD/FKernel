@@ -158,7 +158,6 @@ bool VirtualMemoryManager::unmap_page(LibC::uintptr_t virt_addr) noexcept
     }
 
     pt[pt_idx] = 0;
-    flush_tlb_single(virt_addr);
     Logf(LogLevel::INFO, "VMM: Unmapped virt addr 0x%llX", virt_addr);
     return true;
 }
@@ -202,11 +201,6 @@ LibC::uintptr_t VirtualMemoryManager::translate(LibC::uintptr_t virt_addr) noexc
 
     LibC::uintptr_t phys_page = pt[pt_idx] & 0x000FFFFFFFFFF000ULL;
     return phys_page + offset;
-}
-
-void VirtualMemoryManager::flush_tlb_single(LibC::uintptr_t virt_addr) noexcept
-{
-    asm volatile("invlpg (%0)" ::"r"(virt_addr) : "memory");
 }
 
 }
