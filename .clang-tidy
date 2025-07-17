@@ -1,0 +1,13 @@
+---
+Checks: >
+    -*,
+    clang-analyzer-*,
+    bugprone-*,
+    misc-dead-variables,
+    misc-unused-alias-decls,
+    misc-unused-using-decls,
+    misc-unused-parameters,
+    portability-*,
+    -bugprone-easily-swappable-parameters,
+    -bugprone-reserved-identifier,
+    -bugprone-macro-parentheses
