@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
 
@@ -27,7 +28,7 @@ extern "C" void irq13_handler(); // 45
 extern "C" void irq14_handler(); // 46
 extern "C" void irq15_handler(); // 47
 
-extern "C" void (*const routine_stubs[16])();
+extern "C" void (*const routine_stubs[MAX_IRQ_NUMBER])();
 
 constexpr char const* named_irq(int irq) noexcept
 {
@@ -73,7 +74,7 @@ void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept;
 void unregister_irq_handler(LibC::uint8_t irq) noexcept;
 LibC::uint64_t uptime();
 
-extern "C" irq_entry_t irq_table[16];
+extern "C" irq_entry_t irq_table[MAX_IRQ_NUMBER];
 
 extern "C" void timer_handler(LibC::uint8_t irq, void* context);
 extern "C" void keyboard_handler(LibC::uint8_t irq, void* context);

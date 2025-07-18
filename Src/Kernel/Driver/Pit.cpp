@@ -1,29 +1,27 @@
 #include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
+#include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
 #include <Kernel/Driver/Pit.h>
+#include <Kernel/Driver/Pit_constants.h>
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
 
+Pit& Pit::Instance() noexcept
+{
+    static Pit instance;
+    return instance;
+}
+
 void Pit::initialize(LibC::uint32_t frequency) noexcept
 {
-    FK::enforcef(frequency > 0, "PIT: Frequency must be greater than 0");
+    FK::enforcef(frequency > 0, "PIT: Frequency must be greater than zero");
 
-    LibC::uint32_t divisor = (PIT_FREQUENCY + frequency / 2) / frequency;
+    LibC::uint16_t divisor = compute_divisor(frequency);
 
-    FK::alert_if_f(divisor == 0, "PIT: Computed divisor was zero, forcing to 1");
-    if (divisor == 0)
-        divisor = 1;
+    Logf(LogLevel::INFO, "PIT: Initializing — frequency=%llu Hz, divisor=%llu", frequency, divisor);
 
-    FK::alert_if_f(frequency < 19 || frequency > PIT_FREQUENCY,
-        "PIT: Frequency %u Hz is outside typical operating range (19Hz - %uHz)",
-        frequency, PIT_FREQUENCY);
-
-    FK::enforcef(divisor <= 0xFFFF, "PIT: Computed divisor (%u) exceeds 16-bit limit", divisor);
-
-    send_command(PIT_COMMAND);
-    set_divisor(static_cast<LibC::uint16_t>(divisor));
-
-    Logf(LogLevel::INFO, "PIT: Initialized — frequency=%u Hz, divisor=%u", frequency, divisor);
+    send_command(0b00110100); // Channel 0, lobyte/hibyte, mode 2
+    set_divisor(divisor);
 }
 
 void Pit::send_command(LibC::uint8_t command) noexcept
@@ -33,6 +31,14 @@ void Pit::send_command(LibC::uint8_t command) noexcept
 
 void Pit::set_divisor(LibC::uint16_t divisor) noexcept
 {
-    Io::outb(PIT_CHANNEL0_PORT, static_cast<LibC::uint8_t>(divisor & 0xFF));        // LSB
-    Io::outb(PIT_CHANNEL0_PORT, static_cast<LibC::uint8_t>((divisor >> 8) & 0xFF)); // MSB
+    FK::enforcef(divisor >= MIN_DIVISOR && divisor <= MAX_DIVISOR,
+        "PIT: Divisor out of range: {}", divisor);
+
+    Io::outb(PIT_CHANNEL0_PORT, divisor & 0xFF);
+    Io::outb(PIT_CHANNEL0_PORT, (divisor >> 8) & 0xFF);
+}
+
+LibC::uint16_t Pit::compute_divisor(LibC::uint32_t frequency) const noexcept
+{
+    return static_cast<LibC::uint16_t>(PIT_BASE_FREQUENCY / frequency);
 }

@@ -13,7 +13,7 @@ struct alignas(16) BlockHeader {
 
     static constexpr LibC::uintptr_t magic = 0xDEADBEEFDEADBEEFull;
 
-    bool is_valid() const noexcept
+    bool is_valid() const
     {
         return magic_check == magic;
     }
@@ -30,7 +30,6 @@ private:
     LibC::uintptr_t heap_end = 0;
 
     FK::IntrusiveList<FreeMemoryBlock, &FreeMemoryBlock::ListNode> free_list;
-
     bool initialized = false;
 
     FreeListAllocator() = default;
@@ -38,24 +37,31 @@ private:
     void insert_block(FreeMemoryBlock* block);
     void remove_block(FreeMemoryBlock* block);
     void try_coalesce(FreeMemoryBlock* block);
+    void* try_allocate(LibC::size_t size, LibC::size_t alignment);
+    void handle_split_or_take_block(FreeMemoryBlock* current, LibC::size_t total_needed);
+    void* place_block(FreeMemoryBlock* block, LibC::size_t padding, LibC::size_t total_needed, LibC::uintptr_t user_data_addr);
+    void* place_block_for(FreeMemoryBlock* block, LibC::size_t size, LibC::size_t alignment);
+    bool can_fit_block(FreeMemoryBlock* block, LibC::size_t size, LibC::size_t alignment) const;
+
+    void coalesce_with_next(FreeMemoryBlock* block);
+    void coalesce_with_prev(FreeMemoryBlock* block);
 
 public:
-    static FreeListAllocator& instance() noexcept
+    static FreeListAllocator& instance()
     {
         static FreeListAllocator s_instance;
         return s_instance;
     }
 
-    void initialize(LibC::uintptr_t start, LibC::uintptr_t end) noexcept;
-
-    void* alloc(LibC::size_t size, LibC::size_t alignment = 8) noexcept;
-    void* alloc_zeroed(LibC::size_t size, LibC::size_t alignment = 8) noexcept;
-    void free(void* ptr) noexcept;
-
-    LibC::size_t remaining() const noexcept;
+    void initialize(LibC::uintptr_t start, LibC::uintptr_t end);
+    void* alloc(LibC::size_t size, LibC::size_t alignment = 8);
+    void* alloc_zeroed(LibC::size_t size, LibC::size_t alignment = 8);
+    void free(void* ptr);
+    LibC::size_t remaining() const;
 };
 
 }
+
 inline void* Falloc(LibC::size_t size, LibC::size_t alignment = 8)
 {
     return MemoryManagement::FreeListAllocator::instance().alloc(size, alignment);

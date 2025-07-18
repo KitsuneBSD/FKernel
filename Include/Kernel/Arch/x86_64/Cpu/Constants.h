@@ -4,6 +4,9 @@
 #include <LibC/stdint.h>
 #include <LibFK/types.h>
 
+#include <Kernel/Arch/x86_64/Cpu/Gdt_Constants.h>
+#include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
+
 constexpr LibC::uint8_t IST_COUNT = 7;
 constexpr LibC::uint16_t TSS_SELECTOR = 5 << 3;
 
@@ -15,16 +18,10 @@ constexpr LibC::uint64_t TOTAL_MEMORY_PAGE_SIZE = 4096;
 constexpr LibC::uint64_t PAGE_ADDRESS_MASK = 0x000FFFFFFFFFF000ULL;
 constexpr LibC::size_t ENTRIES_PER_PAGE = 512;
 
-constexpr LibC::uint8_t MAX_IRQ_NUMBER = 15;
-
 constexpr LibC::uint8_t PIC1_CMD = 0x20;
 constexpr LibC::uint8_t PIC1_DATA = 0x21;
 constexpr LibC::uint8_t PIC2_CMD = 0xA0;
 constexpr LibC::uint8_t PIC2_DATA = 0xA1;
-
-constexpr LibC::uint8_t ICW1_INIT = 0x10;
-constexpr LibC::uint8_t ICW1_ICW4 = 0x01;
-constexpr LibC::uint8_t ICW4_8086 = 0x01;
 
 constexpr LibC::uintptr_t KERNEL_IDENTITY_LIMIT = 0x40000000; // 1 GiB
 constexpr LibC::uintptr_t KERNEL_PHYS_BASE = 0xFFFF800000000000;

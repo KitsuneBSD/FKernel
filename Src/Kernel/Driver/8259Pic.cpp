@@ -1,24 +1,52 @@
-#include "Kernel/Arch/x86_64/Interrupts/Routines.h"
-#include "LibFK/enforce.h"
-#include <Kernel/Arch/x86_64/Interrupts/Isr.h>
+#ifdef __x86_64__
+#    include <Kernel/Arch/x86_64/Hardware/Io.h>
+#    include <Kernel/Arch/x86_64/Interrupts/Isr.h>
+#    include <Kernel/Arch/x86_64/Interrupts/Routines.h>
+#endif
+
 #include <Kernel/Driver/8259Pic.h>
+#include <Kernel/Driver/8259Pic_Constants.h>
+#include <LibFK/enforce.h>
 #include <LibFK/log.h>
 
-void Pic8259::remap(int offset1, int offset2) noexcept
+void Pic8259::validate_irq_line(LibC::uint8_t irq_line) const noexcept
 {
-    FK::enforcef(offset1 >= 0x20 && offset1 <= 0xF8, "PIC8259: Invalid master offset: 0x%X", offset1);
-    FK::enforcef(offset2 >= 0x20 && offset2 <= 0xF8, "PIC8259: Invalid slave offset: 0x%X", offset2);
+    FK::enforcef(irq_line < 16, "PIC8259: IRQ line %u out of valid range [0..15]", irq_line);
+}
 
-    Logf(LogLevel::INFO, "PIC8259: Remapping PIC — Master=0x%X, Slave=0x%X", offset1, offset2);
+void Pic8259::send_eoi_master() noexcept
+{
+    Io::outb(PIC1_CMD, PIC_EOI);
+}
 
-    LibC::uint8_t const mask1 = Io::inb(PIC1_DATA);
-    LibC::uint8_t const mask2 = Io::inb(PIC2_DATA);
+void Pic8259::send_eoi_slave() noexcept
+{
+    Io::outb(PIC2_CMD, PIC_EOI);
+}
+
+LibC::uint16_t Pic8259::get_port_for_irq(LibC::uint8_t irq_line) const noexcept
+{
+    return (irq_line < 8) ? PIC1_DATA : PIC2_DATA;
+}
+
+LibC::uint8_t Pic8259::get_irq_mask_bit(LibC::uint8_t irq_line) const noexcept
+{
+    return (irq_line < 8) ? irq_line : (irq_line - 8);
+}
+
+void Pic8259::remap(int master_offset, int slave_offset) noexcept
+{
+    FK::enforcef(master_offset >= 0x20 && master_offset <= 0xF8, "PIC8259: Invalid master offset: 0x%X", master_offset);
+    FK::enforcef(slave_offset >= 0x20 && slave_offset <= 0xF8, "PIC8259: Invalid slave offset: 0x%X", slave_offset);
+
+    LibC::uint8_t mask1 = Io::inb(PIC1_DATA);
+    LibC::uint8_t mask2 = Io::inb(PIC2_DATA);
 
     Io::outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);
     Io::outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4);
 
-    Io::outb(PIC1_DATA, static_cast<LibC::uint8_t>(offset1));
-    Io::outb(PIC2_DATA, static_cast<LibC::uint8_t>(offset2));
+    Io::outb(PIC1_DATA, static_cast<LibC::uint8_t>(master_offset));
+    Io::outb(PIC2_DATA, static_cast<LibC::uint8_t>(slave_offset));
 
     Io::outb(PIC1_DATA, 0x04); // Tell Master PIC that there is a slave PIC at IRQ2
     Io::outb(PIC2_DATA, 0x02); // Tell Slave PIC its cascade identity
@@ -26,54 +54,42 @@ void Pic8259::remap(int offset1, int offset2) noexcept
     Io::outb(PIC1_DATA, ICW4_8086);
     Io::outb(PIC2_DATA, ICW4_8086);
 
-    Io::outb(PIC1_DATA, mask1); // Restore saved masks
+    Io::outb(PIC1_DATA, mask1);
     Io::outb(PIC2_DATA, mask2);
-
-    Log(LogLevel::INFO, "PIC8259: Remap completed successfully");
 }
 
 void Pic8259::send_eoi(LibC::uint8_t irq) noexcept
 {
     FK::alert_if_f(irq > 15, "PIC8259: send_eoi called with invalid IRQ %u", irq);
 
-    if (irq >= 8)
-        Io::outb(PIC2_CMD, 0x20); // EOI to slave
-
-    Io::outb(PIC1_CMD, 0x20); // EOI to master
+    if (irq >= 8) {
+        send_eoi_slave();
+    }
+    send_eoi_master();
 }
 
 void Pic8259::mask_irq(LibC::uint8_t irq_line) noexcept
 {
-    FK::enforcef(irq_line < 16, "PIC8259: Cannot mask invalid IRQ line %u", irq_line);
+    validate_irq_line(irq_line);
 
-    if (irq_line < 8) {
-        auto const old_mask = Io::inb(PIC1_DATA);
-        auto const new_mask = old_mask | (1 << irq_line);
-        Io::outb(PIC1_DATA, new_mask);
-        Logf(LogLevel::TRACE, "PIC8259: Masked IRQ %u (%s) [0x21] — old=0x%02X new=0x%02X",
-            irq_line, named_irq(irq_line), old_mask, new_mask);
-    } else {
-        LibC::uint8_t irq = irq_line - 8;
-        auto const old_mask = Io::inb(PIC2_DATA);
-        auto const new_mask = old_mask | (1 << irq);
-        Io::outb(PIC2_DATA, new_mask);
-        Logf(LogLevel::TRACE, "PIC8259: Masked IRQ %u (%s) [0xA1] — old=0x%02X new=0x%02X",
-            irq_line, named_irq(irq_line), old_mask, new_mask);
-    }
+    LibC::uint16_t port = get_port_for_irq(irq_line);
+    LibC::uint8_t bit = get_irq_mask_bit(irq_line);
+
+    LibC::uint8_t old_mask = Io::inb(port);
+    LibC::uint8_t new_mask = old_mask | (1 << bit);
+
+    Io::outb(port, new_mask);
 }
 
 void Pic8259::unmask_irq(LibC::uint8_t irq_line) noexcept
 {
-    FK::enforcef(irq_line < 16, "PIC8259: Cannot unmask invalid IRQ line %u", irq_line);
+    validate_irq_line(irq_line);
 
-    LibC::uint16_t const port = (irq_line < 8) ? PIC1_DATA : PIC2_DATA;
-    LibC::uint8_t const irq = (irq_line < 8) ? irq_line : irq_line - 8;
+    LibC::uint16_t port = get_port_for_irq(irq_line);
+    LibC::uint8_t bit = get_irq_mask_bit(irq_line);
 
-    LibC::uint8_t const old_mask = Io::inb(port);
-    LibC::uint8_t const new_mask = old_mask & ~(1 << irq);
+    LibC::uint8_t old_mask = Io::inb(port);
+    LibC::uint8_t new_mask = old_mask & ~(1 << bit);
 
     Io::outb(port, new_mask);
-
-    Logf(LogLevel::TRACE, "PIC8259: Unmasked IRQ %u (%s) [0x%X] — old=0x%02X new=0x%02X",
-        irq_line, named_irq(irq_line), port, old_mask, new_mask);
 }
