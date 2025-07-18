@@ -4,7 +4,7 @@ This document outlines the current and future tasks required to bring FKernel to
 
 ### Reaching a 1.0.0 Version
 
-- [ ] Improve consistency of log messages  
+- [x] Improve consistency of log messages  
   - Unify formatting  
   - Use structured levels (e.g., `TRACE`, `ERROR`, `INFO`)  
   - Tag logs by subsystem/module (e.g., `[PMM]`, `[VMM]`, `[INIT]`)
@@ -23,9 +23,12 @@ This document outlines the current and future tasks required to bring FKernel to
   - Ensure compliance with freestanding constraints  
   - Replace unnecessary libc usage in kernel components with LibFK equivalents  
 
-- [ ] Remove the internal if validators.
+- [x] Remove the internal if validators.
     - The validators need be checked in operation input and operation output only
     - Reduce the complex function to most simple
+
+- [ ] Create a function to inlining external assembly 
+
 ---
 
 ### Pro Tips for Contributors
