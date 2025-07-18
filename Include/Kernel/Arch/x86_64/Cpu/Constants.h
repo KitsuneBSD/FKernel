@@ -4,6 +4,9 @@
 #include <LibC/stdint.h>
 #include <LibFK/types.h>
 
+#include <Kernel/Arch/x86_64/Cpu/Gdt_Constants.h>
+#include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
+
 constexpr LibC::uint8_t IST_COUNT = 7;
 constexpr LibC::uint16_t TSS_SELECTOR = 5 << 3;
 

@@ -12,13 +12,14 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
 {
 
     auto& gdt_manager
-        = gdt::Manager::Instance();
+        = gdt::Manager::instance();
     gdt_manager.initialize();
 
     auto& idt_manager = idt::Manager::Instance();
     idt_manager.initialize();
 
-    Pit::initialize(1000);
+    Pit::Instance().initialize(1000);
+
     auto& pmm = MemoryManagement::PhysicalMemoryManager::instance();
     pmm.initialize(mmap);
     auto& vmm = MemoryManagement::VirtualMemoryManager::instance();

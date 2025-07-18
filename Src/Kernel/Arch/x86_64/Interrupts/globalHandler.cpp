@@ -1,5 +1,6 @@
 #include <Kernel/Arch/x86_64/Cpu/State.h>
 #include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
+#include <Kernel/Arch/x86_64/Interrupts/Interrupt_Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <LibFK/log.h>
 
@@ -12,6 +13,15 @@ void halt()
 
 extern "C" void global_default_handler(CpuState* const frame)
 {
+    FK::enforcef(frame != nullptr, "Global default Handler: CpuState frame is nullptr");
+
+    FK::alert_if_f(frame->interrupt_id >= MAX_EXCEPTION_ID,
+        "Global Default Handler: Unknown exception interrupt_id %u", frame->interrupt_id);
+
+    FK::alert_if_f(frame->rip == 0, "Global default handler: RIP is NULL");
+    FK::alert_if_f(frame->rsp == 0, "Global default handler: RSP is NULL");
+    FK::alert_if_f(frame->rbp == 0, "Global default handler: RBP is NULL");
+
     Logf(LogLevel::ERROR, "[%u] Exception %u (%s) at RIP=%p, ErrorCode=0x%x",
         uptime(),
         frame->interrupt_id,

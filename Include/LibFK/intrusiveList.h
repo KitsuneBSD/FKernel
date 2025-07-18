@@ -56,8 +56,6 @@ public:
         auto& n = node->*member;
         FK::enforcef(n.is_linked(), "IntrusiveList: remove called on unlinked node %p", node);
 
-        Logf(LogLevel::TRACE, "IntrusiveList: remove node=%p", node);
-
         if (n.prev)
             (n.prev->*member).next = n.next;
         else

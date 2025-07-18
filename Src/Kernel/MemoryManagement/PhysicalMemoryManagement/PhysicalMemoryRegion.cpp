@@ -6,6 +6,9 @@ namespace MemoryManagement {
 void PhysicalMemoryRegion::init(LibC::uintptr_t base, LibC::uint64_t pages) noexcept
 {
     FK::enforcef(!initialized, "PMR: Double init on region: base=0x%lx", base_addr);
+    FK::enforcef(base != 0, "PMR: init base address cannot be zero");
+    FK::enforcef(pages > 0, "PMR: init page count must be positive");
+
     base_addr = base;
     page_count = pages;
 
@@ -20,7 +23,8 @@ void PhysicalMemoryRegion::destroy() noexcept
 {
     FK::enforcef(allocated, "PMR: Destroy called on unallocated region");
 
-    if (bitmap.is_valid() && bitmap_buffer) {
+    if (bitmap.is_valid()) {
+        FK::enforcef(bitmap_buffer != nullptr, "PMR: Destroy called but bitmap_buffer is nullptr");
         Ffree(bitmap_buffer);
     }
 
@@ -80,4 +84,5 @@ bool PhysicalMemoryRegion::is_allocated() const noexcept
 {
     return allocated;
 }
-}
+
+} // namespace MemoryManagement

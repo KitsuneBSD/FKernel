@@ -4,11 +4,14 @@
 
 class Pit {
 public:
-    Pit() = delete;
+    static Pit& Instance() noexcept;
 
-    static void initialize(LibC::uint32_t frequency) noexcept;
+    void initialize(LibC::uint32_t frequency) noexcept;
+    void send_command(LibC::uint8_t command) noexcept;
+    void set_divisor(LibC::uint16_t divisor) noexcept;
 
-    static void send_command(LibC::uint8_t command) noexcept;
+private:
+    Pit() = default;
 
-    static void set_divisor(LibC::uint16_t divisor) noexcept;
+    LibC::uint16_t compute_divisor(LibC::uint32_t frequency) const noexcept;
 };

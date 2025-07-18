@@ -1,17 +1,17 @@
-
-#include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
+#include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <LibC/stdint.h>
+#include <LibFK/enforce.h>
 #include <LibFK/log.h>
 #include <LibFK/types.h>
 
 static LibC::uint64_t tick_count = 0;
 
-idt::IrqHandler irq_handlers[16] = { nullptr };
+idt::IrqHandler irq_handlers[MAX_IRQ_NUMBER] = { nullptr };
 
-irq_entry_t irq_table[16] = {
+irq_entry_t irq_table[MAX_IRQ_NUMBER] = {
     { 0, timer_handler },
     { 1, keyboard_handler },
     { 2, cascade_handler },

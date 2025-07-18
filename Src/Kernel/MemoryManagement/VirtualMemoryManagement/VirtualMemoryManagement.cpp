@@ -10,20 +10,11 @@
 
 namespace MemoryManagement {
 
-inline LibC::size_t extract_index(LibC::uintptr_t virt_addr, unsigned shift) noexcept
-{
-    return (virt_addr >> shift) & MASK_BITS;
-}
-
-inline LibC::uint64_t* get_table_entry(LibC::uint64_t entry) noexcept
-{
-    return reinterpret_cast<LibC::uint64_t*>(entry & ADDR_MASK);
-}
-
-inline void zero_table(LibC::uint64_t* table) noexcept
-{
-    LibC::memset(table, 0, ENTRIES_PER_PAGE * sizeof(LibC::uint64_t));
-}
+static constexpr LibC::size_t ENTRIES_PER_PAGE = 512;
+static constexpr LibC::uintptr_t PAGE_MASK = 0x000FFFFFFFFFF000ULL;
+static constexpr LibC::uintptr_t ADDR_MASK = 0x000FFFFFFFFFF000ULL;
+static constexpr LibC::uintptr_t MASK_BITS = 0x1FF;
+static constexpr LibC::uintptr_t TOTAL_MEMORY_PAGE_SIZE = 4096ULL;
 
 void VirtualMemoryManager::initialize() noexcept
 {
@@ -32,7 +23,7 @@ void VirtualMemoryManager::initialize() noexcept
     pml4 = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
     FK::enforcef(pml4 != nullptr, "VMM: Failed to allocate PML4");
 
-    zero_table(pml4);
+    LibC::memset(pml4, 0, ENTRIES_PER_PAGE * sizeof(LibC::uint64_t));
 
     Log(LogLevel::INFO, "VMM: PML4 initialized");
 }
@@ -40,77 +31,59 @@ void VirtualMemoryManager::initialize() noexcept
 LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_addr) noexcept
 {
     FK::enforcef(pml4 != nullptr, "VMM: get_or_create_pte called but PML4 is nullptr");
+    FK::enforcef(virt_addr < (1ULL << 48), "VMM: get_or_create_pte called with virt_addr beyond 48 bits: 0x%llX", virt_addr);
+    FK::enforcef((virt_addr & (TOTAL_MEMORY_PAGE_SIZE - 1)) == 0, "VMM: get_or_create_pte called with unaligned virt_addr 0x%llX", virt_addr);
 
-    LibC::size_t const pml4_idx = extract_index(virt_addr, 39);
-    LibC::size_t const pdpt_idx = extract_index(virt_addr, 30);
-    LibC::size_t const pd_idx = extract_index(virt_addr, 21);
-    LibC::size_t const pt_idx = extract_index(virt_addr, 12);
+    LibC::size_t const pml4_idx = (virt_addr >> 39) & MASK_BITS;
+    LibC::size_t const pdpt_idx = (virt_addr >> 30) & MASK_BITS;
+    LibC::size_t const pd_idx = (virt_addr >> 21) & MASK_BITS;
+    LibC::size_t const pt_idx = (virt_addr >> 12) & MASK_BITS;
 
-    LibC::uint64_t* pdpt;
-    if (pml4[pml4_idx] & PAGE_PRESENT) {
-        pdpt = get_table_entry(pml4[pml4_idx]);
-    } else {
-        pdpt = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
-        if (!pdpt) {
-            Log(LogLevel::ERROR, "VMM: Failed to allocate PDPT");
-            return nullptr;
-        }
-        zero_table(pdpt);
+    // PML4 level
+    if (!(pml4[pml4_idx] & PAGE_PRESENT)) {
+        auto* pdpt = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
+        FK::enforcef(pdpt != nullptr, "VMM: Failed to allocate PDPT");
+        LibC::memset(pdpt, 0, ENTRIES_PER_PAGE * sizeof(LibC::uint64_t));
         pml4[pml4_idx] = reinterpret_cast<LibC::uintptr_t>(pdpt) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PDPT at index %zu for virt addr 0x%llX", pml4_idx, virt_addr);
     }
+    auto* pdpt = reinterpret_cast<LibC::uint64_t*>(pml4[pml4_idx] & ADDR_MASK);
 
-    LibC::uint64_t* pd;
-    if (pdpt[pdpt_idx] & PAGE_PRESENT) {
-        pd = get_table_entry(pdpt[pdpt_idx]);
-    } else {
-        pd = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
-        if (!pd) {
-            Log(LogLevel::ERROR, "VMM: Failed to allocate PD");
-            return nullptr;
-        }
-        zero_table(pd);
+    // PDPT level
+    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) {
+        auto* pd = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
+        FK::enforcef(pd != nullptr, "VMM: Failed to allocate PD");
+        LibC::memset(pd, 0, ENTRIES_PER_PAGE * sizeof(LibC::uint64_t));
         pdpt[pdpt_idx] = reinterpret_cast<LibC::uintptr_t>(pd) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PD at index %zu for virt addr 0x%llX", pdpt_idx, virt_addr);
     }
+    auto* pd = reinterpret_cast<LibC::uint64_t*>(pdpt[pdpt_idx] & ADDR_MASK);
 
-    LibC::uint64_t* pt;
-    if (pd[pd_idx] & PAGE_PRESENT) {
-        pt = get_table_entry(pd[pd_idx]);
-    } else {
-        pt = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
-        if (!pt) {
-            Log(LogLevel::ERROR, "VMM: Failed to allocate PT");
-            return nullptr;
-        }
-        zero_table(pt);
+    // PD level
+    if (!(pd[pd_idx] & PAGE_PRESENT)) {
+        auto* pt = reinterpret_cast<LibC::uint64_t*>(Falloc(TOTAL_MEMORY_PAGE_SIZE, TOTAL_MEMORY_PAGE_SIZE));
+        FK::enforcef(pt != nullptr, "VMM: Failed to allocate PT");
+        LibC::memset(pt, 0, ENTRIES_PER_PAGE * sizeof(LibC::uint64_t));
         pd[pd_idx] = reinterpret_cast<LibC::uintptr_t>(pt) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PT at index %zu for virt addr 0x%llX", pd_idx, virt_addr);
     }
+    auto* pt = reinterpret_cast<LibC::uint64_t*>(pd[pd_idx] & ADDR_MASK);
 
     return &pt[pt_idx];
 }
 
 bool VirtualMemoryManager::map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept
 {
-    if ((virt_addr & 0xFFF) != 0 || (phys_addr & 0xFFF) != 0) {
-        Logf(LogLevel::ERROR, "VMM: map_page called with unaligned addresses virt=0x%llX phys=0x%llX", virt_addr, phys_addr);
-        return false;
-    }
+    FK::enforcef((virt_addr & 0xFFF) == 0, "VMM: map_page called with unaligned virt_addr 0x%llX", virt_addr);
+    FK::enforcef((phys_addr & 0xFFF) == 0, "VMM: map_page called with unaligned phys_addr 0x%llX", phys_addr);
 
     virt_addr &= PAGE_MASK;
     phys_addr &= PAGE_MASK;
 
     auto* pte = get_or_create_pte(virt_addr);
-    if (!pte) {
-        Log(LogLevel::ERROR, "VMM: Failed to get or create PTE");
-        return false;
-    }
+    FK::enforcef(pte != nullptr, "VMM: Failed to get or create PTE");
 
-    if ((*pte & PAGE_PRESENT) != 0) {
-        Logf(LogLevel::WARN, "VMM: Page already mapped at virt addr 0x%llX", virt_addr);
-        return false;
-    }
+    FK::enforcef((*pte & PAGE_PRESENT) == 0, "VMM: Page already mapped at virt addr 0x%llX", virt_addr);
 
     *pte = (phys_addr & ADDR_MASK) | (flags | PAGE_PRESENT);
 
@@ -123,36 +96,26 @@ bool VirtualMemoryManager::map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t p
 bool VirtualMemoryManager::unmap_page(LibC::uintptr_t virt_addr) noexcept
 {
     FK::enforcef(pml4 != nullptr, "VMM: unmap_page called but PML4 not initialized");
+    FK::enforcef((virt_addr & 0xFFF) == 0, "VMM: unmap_page called with unaligned virt_addr 0x%llX", virt_addr);
 
-    LibC::size_t const pml4_idx = extract_index(virt_addr, 39);
-    LibC::size_t const pdpt_idx = extract_index(virt_addr, 30);
-    LibC::size_t const pd_idx = extract_index(virt_addr, 21);
-    LibC::size_t const pt_idx = extract_index(virt_addr, 12);
+    LibC::size_t const pml4_idx = (virt_addr >> 39) & MASK_BITS;
+    LibC::size_t const pdpt_idx = (virt_addr >> 30) & MASK_BITS;
+    LibC::size_t const pd_idx = (virt_addr >> 21) & MASK_BITS;
+    LibC::size_t const pt_idx = (virt_addr >> 12) & MASK_BITS;
 
-    if (!(pml4[pml4_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: PML4 entry not present for virt addr 0x%llX", virt_addr);
-        return false;
-    }
-    auto* pdpt = get_table_entry(pml4[pml4_idx]);
+    FK::enforcef(pml4[pml4_idx] & PAGE_PRESENT, "VMM: PML4 entry not present for virt addr 0x%llX", virt_addr);
+    auto* pdpt = reinterpret_cast<LibC::uint64_t*>(pml4[pml4_idx] & ADDR_MASK);
 
-    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: PDPT entry not present for virt addr 0x%llX", virt_addr);
-        return false;
-    }
-    auto* pd = get_table_entry(pdpt[pdpt_idx]);
+    FK::enforcef(pdpt[pdpt_idx] & PAGE_PRESENT, "VMM: PDPT entry not present for virt addr 0x%llX", virt_addr);
+    auto* pd = reinterpret_cast<LibC::uint64_t*>(pdpt[pdpt_idx] & ADDR_MASK);
 
-    if (!(pd[pd_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: PD entry not present for virt addr 0x%llX", virt_addr);
-        return false;
-    }
-    auto* pt = get_table_entry(pd[pd_idx]);
+    FK::enforcef(pd[pd_idx] & PAGE_PRESENT, "VMM: PD entry not present for virt addr 0x%llX", virt_addr);
+    auto* pt = reinterpret_cast<LibC::uint64_t*>(pd[pd_idx] & ADDR_MASK);
 
-    if (!(pt[pt_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: PT entry not present for virt addr 0x%llX", virt_addr);
-        return false;
-    }
+    FK::enforcef(pt[pt_idx] & PAGE_PRESENT, "VMM: PT entry not present for virt addr 0x%llX", virt_addr);
 
     pt[pt_idx] = 0;
+
     Logf(LogLevel::INFO, "VMM: Unmapped virt addr 0x%llX", virt_addr);
     return true;
 }
@@ -160,38 +123,27 @@ bool VirtualMemoryManager::unmap_page(LibC::uintptr_t virt_addr) noexcept
 LibC::uintptr_t VirtualMemoryManager::translate(LibC::uintptr_t virt_addr) noexcept
 {
     FK::enforcef(pml4 != nullptr, "VMM: translate called but PML4 not initialized");
+    FK::enforcef(virt_addr < (1ULL << 48), "VMM: translate called with virt_addr beyond 48 bits: 0x%llX", virt_addr);
 
-    LibC::size_t const pml4_idx = extract_index(virt_addr, 39);
-    LibC::size_t const pdpt_idx = extract_index(virt_addr, 30);
-    LibC::size_t const pd_idx = extract_index(virt_addr, 21);
-    LibC::size_t const pt_idx = extract_index(virt_addr, 12);
+    LibC::size_t const pml4_idx = (virt_addr >> 39) & MASK_BITS;
+    LibC::size_t const pdpt_idx = (virt_addr >> 30) & MASK_BITS;
+    LibC::size_t const pd_idx = (virt_addr >> 21) & MASK_BITS;
+    LibC::size_t const pt_idx = (virt_addr >> 12) & MASK_BITS;
     LibC::size_t const offset = virt_addr & 0xFFF;
 
-    if (!(pml4[pml4_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: Translate failed at PML4 for virt addr 0x%llX", virt_addr);
-        return 0;
-    }
-    auto* pdpt = get_table_entry(pml4[pml4_idx]);
+    FK::enforcef(pml4[pml4_idx] & PAGE_PRESENT, "VMM: Translate failed at PML4 for virt addr 0x%llX", virt_addr);
+    auto* pdpt = reinterpret_cast<LibC::uint64_t*>(pml4[pml4_idx] & ADDR_MASK);
 
-    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: Translate failed at PDPT for virt addr 0x%llX", virt_addr);
-        return 0;
-    }
-    auto* pd = get_table_entry(pdpt[pdpt_idx]);
+    FK::enforcef(pdpt[pdpt_idx] & PAGE_PRESENT, "VMM: Translate failed at PDPT for virt addr 0x%llX", virt_addr);
+    auto* pd = reinterpret_cast<LibC::uint64_t*>(pdpt[pdpt_idx] & ADDR_MASK);
 
-    if (!(pd[pd_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: Translate failed at PD for virt addr 0x%llX", virt_addr);
-        return 0;
-    }
-    auto* pt = get_table_entry(pd[pd_idx]);
+    FK::enforcef(pd[pd_idx] & PAGE_PRESENT, "VMM: Translate failed at PD for virt addr 0x%llX", virt_addr);
+    auto* pt = reinterpret_cast<LibC::uint64_t*>(pd[pd_idx] & ADDR_MASK);
 
-    if (!(pt[pt_idx] & PAGE_PRESENT)) {
-        Logf(LogLevel::WARN, "VMM: Translate failed at PT for virt addr 0x%llX", virt_addr);
-        return 0;
-    }
+    FK::enforcef(pt[pt_idx] & PAGE_PRESENT, "VMM: Translate failed at PT for virt addr 0x%llX", virt_addr);
 
     LibC::uintptr_t phys_page = pt[pt_idx] & ADDR_MASK;
     return phys_page + offset;
 }
 
-}
+} // namespace MemoryManagement

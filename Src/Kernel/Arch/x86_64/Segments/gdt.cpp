@@ -1,4 +1,5 @@
 #include "Kernel/Arch/x86_64/Cpu/Constants.h"
+#include "Kernel/Arch/x86_64/Cpu/Gdt_Constants.h"
 #include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Cpu/Asm.h>
 #include <Kernel/Arch/x86_64/Segments/Gdt.h>
@@ -6,92 +7,98 @@
 
 namespace gdt {
 
-alignas(16) static LibC::uint8_t ist1_stack[4096]; // NMI
-alignas(16) static LibC::uint8_t ist2_stack[4096]; // Double Fault
-alignas(16) static LibC::uint8_t ist3_stack[4096]; // Extra (ex: Machine Check)
-alignas(16) static LibC::uint64_t kernel_stack[16384];
-
-void Manager::set_entry(int index, LibC::uint32_t base, LibC::uint32_t limit,
-    LibC::uint8_t access, LibC::uint8_t granularity) noexcept
+Manager& Manager::instance()
 {
-    constexpr int max_entries = sizeof(entries_) / sizeof(entries_[0]);
-    FK::enforcef(index >= 0 && index < max_entries,
-        "GDT::set_entry: index %d out of bounds [0..%d]", index, max_entries - 1);
-
-    auto& entry = entries_[index];
-
-    entry.limit_low = limit & 0xFFFF;
-    entry.base_low = base & 0xFFFF;
-    entry.base_middle = (base >> 16) & 0xFF;
-    entry.access = access;
-    entry.granularity = ((limit >> 16) & 0x0F) | (granularity & 0xF0);
-    entry.base_high = (base >> 24) & 0xFF;
-
-    Logf(LogLevel::TRACE,
-        "GDT[%d] = base: 0x%08X, limit: 0x%08X, access: 0x%02X, gran: 0x%02X",
-        index, base, limit, access, granularity);
-}
-
-void Manager::set_tss_entry(int index, LibC::uint64_t base, LibC::uint32_t limit) noexcept
-{
-    constexpr int max_entries = sizeof(entries_) / sizeof(entries_[0]);
-    FK::enforcef(index >= 0 && (index + 1) < max_entries,
-        "GDT::set_tss_entry: index %d out of bounds or no space for TSS descriptor", index);
-
-    auto& low = entries_[index];
-    auto& next = entries_[index + 1];
-
-    low.limit_low = limit & 0xFFFF;
-    low.base_low = base & 0xFFFF;
-    low.base_middle = (base >> 16) & 0xFF;
-    low.access = 0x89;                      // P=1, DPL=0, S=0, Type=1001 (TSS available 64-bit)
-    low.granularity = (limit >> 16) & 0x0F; // Byte granularity, no G flag
-    low.base_high = (base >> 24) & 0xFF;
-
-    next.limit_low = (base >> 32) & 0xFFFF;
-    next.base_low = (base >> 48) & 0xFFFF;
-    next.base_middle = 0;
-    next.access = 0;
-    next.granularity = 0;
-    next.base_high = 0;
-
-    Logf(LogLevel::TRACE, "GDT: TSS set at index %d (base=0x%016llX, limit=0x%08X)",
-        index, static_cast<unsigned long long>(base), limit);
+    static Manager instance;
+    return instance;
 }
 
 void Manager::initialize() noexcept
 {
-    Logf(LogLevel::INFO, "GDT: Initializing Global Descriptor Table for x86_64 (64-bit)");
+    setup_tss();
+    load_gdt();
+    load_tss();
+}
 
-    set_entry(GdtIndex::Null, 0, 0xFFFFF, 0, 0);
-    set_entry(GdtIndex::KernelCode, 0, 0xFFFFF, 0x9A, 0xA0); // Executable, ring 0
-    set_entry(GdtIndex::KernelData, 0, 0xFFFFF, 0x92, 0xA0); // Data, ring 0
-    set_entry(GdtIndex::UserCode, 0, 0xFFFFF, 0xFA, 0xA0);   // Executable, ring 3
-    set_entry(GdtIndex::UserData, 0, 0xFFFFF, 0xF2, 0xA0);   // Data, ring 3
+void Manager::set_descriptor(int index, LibC::uint32_t base, LibC::uint32_t limit,
+    LibC::uint8_t access, LibC::uint8_t flags) noexcept
+{
+    constexpr int max_index = static_cast<int>(DescriptorCount);
+    FK::enforcef(index >= 0 && index < max_index,
+        "Gdt: set descriptor index %d out of bounds [0..%d]", index, max_index - 1);
 
-    Logf(LogLevel::INFO, "TSS: Initializing Task State Segment for x86_64 (64-bit)");
+    Descriptor& desc = descriptors_[index];
 
-    // Correct pointer arithmetic: add byte size to pointer cast to integer
+    desc.limit_low = limit & 0xFFFF;
+    desc.base_low = base & 0xFFFF;
+    desc.base_middle = (base >> 16) & 0xFF;
+    desc.access = access;
+    desc.granularity = ((limit >> 16) & 0x0F) | (flags & 0xF0);
+    desc.base_high = (base >> 24) & 0xFF;
+}
+
+void Manager::set_tss_descriptor(int index, LibC::uint64_t base, LibC::uint32_t limit) noexcept
+{
+    constexpr int max_index = static_cast<int>(DescriptorCount) - 1;
+    FK::enforcef(index >= 0 && index < max_index,
+        "Gdt: set tss descriptor: index %d out of bounds or no space for TSS", index);
+
+    Descriptor& low = descriptors_[index];
+    Descriptor& high = descriptors_[index + 1];
+
+    low.limit_low = limit & 0xFFFF;
+    low.base_low = static_cast<LibC::uint32_t>(base & 0xFFFF);
+    low.base_middle = static_cast<LibC::uint8_t>((base >> 16) & 0xFF);
+    low.access = 0x89; // Presente, tipo 9 (TSS disponível)
+    low.granularity = (limit >> 16) & 0x0F;
+    low.base_high = static_cast<LibC::uint8_t>((base >> 24) & 0xFF);
+
+    high.limit_low = static_cast<LibC::uint16_t>((base >> 32) & 0xFFFF);
+    high.base_low = static_cast<LibC::uint16_t>((base >> 48) & 0xFFFF);
+    high.base_middle = 0;
+    high.access = 0;
+    high.granularity = 0;
+    high.base_high = 0;
+}
+
+void Manager::setup_tss() noexcept
+{
+    LibC::memset(&tss_, 0, sizeof(tss_));
+
     tss_.rsp0 = reinterpret_cast<LibC::uint64_t>(kernel_stack) + sizeof(kernel_stack);
-    tss_.ist[0] = reinterpret_cast<LibC::uint64_t>(ist1_stack) + sizeof(ist1_stack);
-    tss_.ist[1] = reinterpret_cast<LibC::uint64_t>(ist2_stack) + sizeof(ist2_stack);
-    tss_.ist[2] = reinterpret_cast<LibC::uint64_t>(ist3_stack) + sizeof(ist3_stack);
+    tss_.ist[0] = reinterpret_cast<LibC::uint64_t>(ist_stack_nmi) + sizeof(ist_stack_nmi);
+    tss_.ist[1] = reinterpret_cast<LibC::uint64_t>(ist_stack_double_fault) + sizeof(ist_stack_double_fault);
+    tss_.ist[2] = reinterpret_cast<LibC::uint64_t>(ist_stack_machine_check) + sizeof(ist_stack_machine_check);
 
     tss_.io_map_base = sizeof(Tss::Tss);
 
-    LibC::uint64_t const tss_base = reinterpret_cast<LibC::uint64_t>(&tss_);
-    LibC::uint32_t const tss_limit = sizeof(Tss::Tss) - 1;
+    LibC::uint64_t base = reinterpret_cast<LibC::uint64_t>(&tss_);
+    LibC::uint32_t limit = sizeof(Tss::Tss) - 1;
 
-    set_tss_entry(5, tss_base, tss_limit);
+    set_tss_descriptor(static_cast<int>(DescriptorIndex::FirstAvailableTSS), base, limit);
+}
 
-    gdtr.limit = sizeof(entries_) - 1;
-    gdtr.base = reinterpret_cast<LibC::uint64_t>(&entries_);
+void Manager::load_gdt() noexcept
+{
+    gdtr_.limit = static_cast<LibC::uint16_t>(sizeof(descriptors_) - 1);
+    gdtr_.base = reinterpret_cast<LibC::uint64_t>(&descriptors_);
 
-    flush_gdt(&gdtr);
-    Logf(LogLevel::INFO, "GDT: Loaded successfully");
+    set_descriptor(static_cast<int>(DescriptorIndex::Null), 0, 0, 0, 0);
+    set_descriptor(static_cast<int>(DescriptorIndex::KernelCode), 0, 0xFFFFF, SEGMENT_CODE_RING0, GRANULARITY_FLAGS);
+    set_descriptor(static_cast<int>(DescriptorIndex::KernelData), 0, 0xFFFFF, SEGMENT_DATA_RING0, GRANULARITY_FLAGS);
+    set_descriptor(static_cast<int>(DescriptorIndex::UserCode), 0, 0xFFFFF, SEGMENT_CODE_RING3, GRANULARITY_FLAGS);
+    set_descriptor(static_cast<int>(DescriptorIndex::UserData), 0, 0xFFFFF, SEGMENT_DATA_RING3, GRANULARITY_FLAGS);
 
+    flush_gdt(&gdtr_);
+
+    Logf(LogLevel::INFO, "GDT: Loaded GDTR (limit=0x%04X, base=0x%016llX)",
+        gdtr_.limit, static_cast<unsigned long long>(gdtr_.base));
+}
+
+void Manager::load_tss() noexcept
+{
     flush_tss(TSS_SELECTOR);
-    Logf(LogLevel::INFO, "TSS: Loaded successfully");
+    Logf(LogLevel::INFO, "TSS: Loaded selector %p", TSS_SELECTOR);
 }
 
 }

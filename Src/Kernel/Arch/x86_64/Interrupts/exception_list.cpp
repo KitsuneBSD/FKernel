@@ -1,8 +1,9 @@
-#include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
+#include <Kernel/Arch/x86_64/Interrupts/Interrupt_Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Isr.h>
+#include <LibFK/enforce.h>
 
-void (*exception_stubs[32])() = {
+void (*exception_stubs[MAX_EXCEPTION_ID])() = {
     isr_divide_by_zero,
     isr_debug,
     isr_nmi,
@@ -37,7 +38,7 @@ void (*exception_stubs[32])() = {
     isr_reserved_31
 };
 
-LibC::uint8_t const isr_ist[32] = {
+LibC::uint8_t const isr_ist[MAX_EXCEPTION_ID] = {
     IST_NONE, IST_NONE, IST_NMI, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_DOUBLE_FAULT, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE,
     IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE,
     IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE, IST_NONE,
@@ -81,12 +82,7 @@ constexpr char const* const names[] = {
 
 char const* named_exception(int index) noexcept
 {
-    bool invalid = (index < 0 || index >= static_cast<int>(sizeof(names) / sizeof(names[0])));
-
-    FK::alert_if_f(invalid, "named_exception: invalid exception index %d", index);
-
-    if (invalid)
-        return "Unknown";
+    FK::enforcef(index >= 0 || index < static_cast<int>(sizeof(names) / sizeof(names[0])), "named_exception: invalid exception index %d", index);
 
     return names[index];
 }
