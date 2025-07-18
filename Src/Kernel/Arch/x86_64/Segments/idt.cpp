@@ -82,6 +82,8 @@ void Manager::initialize() noexcept
     FK::enforcef(expected_entries == static_cast<int>(sizeof(entries_) / sizeof(entries_[0])),
         "IDT: entries_ array size mismatch");
 
+    asm volatile("cli");
+
     for (int vector = 0; vector <= 31; ++vector) {
         register_exception(vector);
     }
