@@ -1,4 +1,3 @@
-#include "Kernel/Arch/x86_64/Hardware/Io.h"
 #include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
