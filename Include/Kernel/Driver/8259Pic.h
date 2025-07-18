@@ -2,15 +2,12 @@
 
 #include <LibC/stdint.h>
 
-<<<<<<< HEAD
 #ifdef __x86_64__
 #    include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #    include <Kernel/Arch/x86_64/Hardware/Io.h>
 #    include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
 #endif // DEBUG
 
-=======
->>>>>>> 10cc49a (refactor: follow a new code styleguide focused in clarity and legibility)
 class Pic8259 {
 public:
     Pic8259(Pic8259 const&) = delete;
