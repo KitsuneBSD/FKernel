@@ -6,7 +6,7 @@
 #    include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #    include <Kernel/Arch/x86_64/Hardware/Io.h>
 #    include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
-#endif // DEBUG
+#endif
 
 class Pic8259 {
 public:
