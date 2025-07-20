@@ -34,9 +34,13 @@ public:
 
     void append(T* node) noexcept
     {
-        FK::enforce(node != nullptr, "IntrusiveList: append called with nullptr");
+
+        if (FK::alert_if_f(node == nullptr, "IntrusiveList: append called with nullptr"))
+            return;
         auto& n = node->*member;
-        FK::enforcef(!n.is_linked(), "IntrusiveList: append called on already linked node %p", node);
+
+        if (FK::alert_if_f(n.is_linked(), "IntrusiveList: append called on already linked node %p", node))
+            return;
 
         n.prev = tail_;
         n.next = nullptr;
@@ -52,9 +56,14 @@ public:
 
     void remove(T* node) noexcept
     {
-        FK::enforce(node != nullptr, "IntrusiveList: remove called with nullptr");
+
+        if (FK::alert_if_f(node == nullptr, "IntrusiveList: remove called with nullptr"))
+            return;
+
         auto& n = node->*member;
-        FK::enforcef(n.is_linked(), "IntrusiveList: remove called on unlinked node %p", node);
+
+        if (FK::alert_if_f(!n.is_linked(), "IntrusiveList: remove called on unlinked node %p", node))
+            return;
 
         if (n.prev)
             (n.prev->*member).next = n.next;
@@ -88,9 +97,13 @@ public:
     template<typename Comparator>
     void insert_ordered(T* node, Comparator comp) noexcept
     {
-        FK::enforce(node != nullptr, "IntrusiveList: insert_ordered called with nullptr");
+        if (FK::alert_if_f(node == nullptr, "IntrusiveList: insert_ordered called with nullptr"))
+            return;
+
         auto& n = node->*member;
-        FK::enforcef(!n.is_linked(), "IntrusiveList: insert_ordered called on already linked node %p", node);
+
+        if (FK::alert_if_f(n.is_linked(), "IntrusiveList: insert_ordered called on already linked node %p", node))
+            return;
 
         if (is_empty()) {
             append(node);
@@ -117,6 +130,7 @@ public:
         append(node);
     }
 
+    // TODO: Move out the class Iterator from external iterator
     class Iterator {
         T* m_node;
 
