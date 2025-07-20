@@ -1,8 +1,8 @@
-#include "Kernel/Arch/x86_64/Cpu/Constants.h"
-#include "Kernel/Arch/x86_64/Cpu/Gdt_Constants.h"
-#include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Cpu/Asm.h>
+#include <Kernel/Arch/x86_64/Cpu/Constants.h>
+#include <Kernel/Arch/x86_64/Cpu/Gdt_Constants.h>
 #include <Kernel/Arch/x86_64/Segments/Gdt.h>
+#include <LibFK/enforce.h>
 #include <LibFK/log.h>
 
 namespace gdt {
@@ -24,11 +24,13 @@ void Manager::set_descriptor(int index, LibC::uint32_t base, LibC::uint32_t limi
     LibC::uint8_t access, LibC::uint8_t flags) noexcept
 {
     constexpr int max_index = static_cast<int>(DescriptorCount);
-    FK::enforcef(index >= 0 && index < max_index,
-        "Gdt: set descriptor index %d out of bounds [0..%d]", index, max_index - 1);
+
+    if (FK::alert_if_f(index < 0 || index >= max_index,
+            "Gdt: set descriptor index %d out of bounds [0..%d]", index, max_index - 1)) {
+        return;
+    }
 
     Descriptor& desc = descriptors_[index];
-
     desc.limit_low = limit & 0xFFFF;
     desc.base_low = base & 0xFFFF;
     desc.base_middle = (base >> 16) & 0xFF;
@@ -40,6 +42,7 @@ void Manager::set_descriptor(int index, LibC::uint32_t base, LibC::uint32_t limi
 void Manager::set_tss_descriptor(int index, LibC::uint64_t base, LibC::uint32_t limit) noexcept
 {
     constexpr int max_index = static_cast<int>(DescriptorCount) - 1;
+
     FK::enforcef(index >= 0 && index < max_index,
         "Gdt: set tss descriptor: index %d out of bounds or no space for TSS", index);
 

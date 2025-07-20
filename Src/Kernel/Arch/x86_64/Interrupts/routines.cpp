@@ -42,11 +42,8 @@ extern "C" void (*const routine_stubs[16])() = {
     irq12_handler, irq13_handler, irq14_handler, irq15_handler
 };
 
-extern "C" void timer_handler(LibC::uint8_t irq, void* context)
+extern "C" void timer_handler(LibC::uint8_t, void*)
 {
-    UNUSED(irq)
-    UNUSED(context)
-
     ++tick_count;
 
     Io::send_eoi(0);
@@ -205,7 +202,7 @@ extern "C" void secondary_ata_handler(LibC::uint8_t irq, void* context)
 
 void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept
 {
-    FK::enforcef(irq < 16,
+    FK::enforcef(irq < MAX_IRQ_NUMBER,
         "Register Irq Handler: Invalid IRQ %u, valid range is [0..15]", irq);
 
     FK::alert_if_f(irq_handlers[irq] != nullptr,
@@ -218,7 +215,7 @@ void register_irq_handler(LibC::uint8_t irq, idt::IrqHandler handler) noexcept
 
 void unregister_irq_handler(LibC::uint8_t irq) noexcept
 {
-    FK::enforcef(irq < 16,
+    FK::enforcef(irq < MAX_IRQ_NUMBER,
         "Unregister Irq Handler: Invalid IRQ %u, valid range is [0..15]", irq);
 
     FK::alert_if_f(irq_handlers[irq] == nullptr,

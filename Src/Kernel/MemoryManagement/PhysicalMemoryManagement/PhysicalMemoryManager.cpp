@@ -101,44 +101,6 @@ void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
     mark_pages(*region, (phys_addr - region->base_addr) / TOTAL_MEMORY_PAGE_SIZE, 1, false);
 }
 
-void PhysicalMemoryManager::initialize(multiboot2::TagMemoryMap const& mmap) noexcept
-{
-    FK::enforcef(mmap.begin() != mmap.end(), "PMM: initialize received empty or invalid memory map");
-
-    for (auto it = mmap.begin(); it != mmap.end(); ++it) {
-        auto const& entry = *it;
-
-        if (entry.length < TOTAL_MEMORY_PAGE_SIZE || entry.base_addr < static_cast<FK::qword>(1 * FK::MiB)) {
-            continue;
-        }
-
-        LibC::uintptr_t base = entry.base_addr;
-        LibC::uint64_t total_pages = entry.length / TOTAL_MEMORY_PAGE_SIZE;
-
-        while (total_pages > 0) {
-            LibC::uint64_t region_pages = (total_pages > max_region_in_pages) ? max_region_in_pages : total_pages;
-
-            PhysicalMemoryRegion* region = allocate_region(base, region_pages);
-            FK::enforcef(region != nullptr, "PMM: Failed to allocate PhysicalMemoryRegion for base=%p, pages=%lu", base, region_pages);
-
-            add_region(region);
-
-            if (!multiboot2::is_available(entry.type)) {
-                if (region->allocated && !region->bitmap.is_valid()) {
-                    ensure_bitmap_allocated(*region);
-                    mark_pages(*region, 0, region_pages, true);
-                }
-            }
-
-            base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
-            total_pages -= region_pages;
-        }
-    }
-
-    log_memory_status();
-    Log(LogLevel::INFO, "PMM: Initialized with success");
-}
-
 void PhysicalMemoryManager::ensure_bitmap_allocated(PhysicalMemoryRegion& region) noexcept
 {
     FK::enforcef(region.is_allocated(), "PMR: Ensure bitmap called on unallocated region base=%p", region.base_addr);

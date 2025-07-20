@@ -14,9 +14,11 @@ SerialPort& SerialPort::Instance()
 SerialPort::SerialPort(Port port)
     : base_(static_cast<LibC::uint16_t>(port))
 {
-    FK::enforcef(
-        base_ == static_cast<LibC::uint16_t>(Port::COM1) || base_ == static_cast<LibC::uint16_t>(Port::COM2) || base_ == static_cast<LibC::uint16_t>(Port::COM3) || base_ == static_cast<LibC::uint16_t>(Port::COM4),
-        "SerialPort: Invalid port base address: 0x%X", base_);
+    if (FK::alert_if_f(
+            base_ != static_cast<LibC::uint16_t>(Port::COM1) && base_ != static_cast<LibC::uint16_t>(Port::COM2) && base_ != static_cast<LibC::uint16_t>(Port::COM3) && base_ != static_cast<LibC::uint16_t>(Port::COM4),
+            "SerialPort: Invalid port base address: 0x%X, defaulting to COM1", base_)) {
+        base_ = static_cast<LibC::uint16_t>(Port::COM1);
+    }
 }
 
 void SerialPort::initialize() const

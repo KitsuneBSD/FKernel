@@ -47,13 +47,18 @@ void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment)
 
 void FreeListAllocator::free(void* ptr)
 {
-    FK::enforcef(ptr != nullptr, "FreeListAllocator: Free called with null");
+    if (FK::alert_if_f(ptr == nullptr, "FreeListAllocator: Free called with null")) {
+        return;
+    }
 
     LibC::uintptr_t user_addr = reinterpret_cast<LibC::uintptr_t>(ptr);
     auto* header = reinterpret_cast<BlockHeader*>(user_addr - sizeof(BlockHeader));
+
     header = reinterpret_cast<BlockHeader*>(user_addr - sizeof(BlockHeader) - header->padding);
 
-    FK::enforcef(header->is_valid(), "FreeListAllocator: Invalid free: header corrupt or double free");
+    if (FK::alert_if_f(!header->is_valid(), "FreeListAllocator: Invalid free: header corrupt or double free")) {
+        return;
+    }
 
     LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(header);
     auto* block = reinterpret_cast<FreeMemoryBlock*>(block_addr);
@@ -65,7 +70,9 @@ void FreeListAllocator::free(void* ptr)
 
 void FreeListAllocator::insert_block(FreeMemoryBlock* block)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: insert_block received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: insert_block received nullptr")) {
+        return;
+    }
 
     if (free_list.is_empty()) {
         free_list.append(block);
@@ -73,7 +80,9 @@ void FreeListAllocator::insert_block(FreeMemoryBlock* block)
     }
 
     free_list.insert_ordered(block, [](auto* a, auto* b) {
-        FK::enforcef(a != nullptr && b != nullptr, "FreeListAllocator: insert_ordered comparator received nullptr");
+        if (FK::alert_if_f(a == nullptr || b == nullptr, "FreeListAllocator: insert_ordered comparator received nullptr")) {
+            return false; // abort comparison safely
+        }
         return reinterpret_cast<LibC::uintptr_t>(a) < reinterpret_cast<LibC::uintptr_t>(b);
     });
 
@@ -82,14 +91,22 @@ void FreeListAllocator::insert_block(FreeMemoryBlock* block)
 
 void FreeListAllocator::remove_block(FreeMemoryBlock* block)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: remove_block received nullptr");
-    FK::enforcef(block->ListNode.is_linked(), "FreeListAllocator: remove_block called on unlinked node");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: remove_block received nullptr")) {
+        return;
+    }
+
+    if (FK::alert_if_f(!block->ListNode.is_linked(), "FreeListAllocator: remove_block called on unlinked node")) {
+        return;
+    }
+
     free_list.remove(block);
 }
 
 void FreeListAllocator::try_coalesce(FreeMemoryBlock* block)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: try_coalesce received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: try_coalesce received nullptr")) {
+        return;
+    }
 
     coalesce_with_next(block);
     coalesce_with_prev(block);
@@ -97,12 +114,14 @@ void FreeListAllocator::try_coalesce(FreeMemoryBlock* block)
 
 void FreeListAllocator::coalesce_with_next(FreeMemoryBlock* block)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: coalesce_with_next received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: coalesce_with_next received nullptr")) {
+        return;
+    }
 
     auto* next = block->ListNode.next;
-    FK::alert_if_f(next == nullptr, "FreeListAllocator: coalesce_with_next next block is nullptr");
-    if (next == nullptr)
+    if (FK::alert_if_f(next == nullptr, "FreeListAllocator: coalesce_with_next next block is nullptr")) {
         return;
+    }
 
     LibC::uintptr_t block_end = reinterpret_cast<LibC::uintptr_t>(block) + block->size;
     LibC::uintptr_t next_addr = reinterpret_cast<LibC::uintptr_t>(next);
@@ -115,12 +134,14 @@ void FreeListAllocator::coalesce_with_next(FreeMemoryBlock* block)
 
 void FreeListAllocator::coalesce_with_prev(FreeMemoryBlock* block)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: coalesce_with_prev received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: coalesce_with_prev received nullptr")) {
+        return;
+    }
 
     auto* prev = block->ListNode.prev;
-    FK::alert_if_f(prev == nullptr, "FreeListAllocator: coalesce_with_prev prev block is nullptr");
-    if (prev == nullptr)
+    if (FK::alert_if_f(prev == nullptr, "FreeListAllocator: coalesce_with_prev prev block is nullptr")) {
         return;
+    }
 
     LibC::uintptr_t prev_end = reinterpret_cast<LibC::uintptr_t>(prev) + prev->size;
     LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(block);
@@ -134,13 +155,21 @@ void FreeListAllocator::coalesce_with_prev(FreeMemoryBlock* block)
 
 void* FreeListAllocator::try_allocate(LibC::size_t size, LibC::size_t alignment)
 {
-    FK::enforcef(initialized, "FreeListAllocator: try_allocate called before initialization");
-    FK::enforcef(size != 0, "FreeListAllocator: try_allocate with size 0");
-    FK::enforcef((alignment & (alignment - 1)) == 0, "FreeListAllocator: try_allocate alignment must be power of two");
+    if (FK::alert_if_f(!initialized, "FreeListAllocator: try_allocate called before initialization")) {
+        return nullptr;
+    }
+    if (FK::alert_if_f(size == 0, "FreeListAllocator: try_allocate with size 0")) {
+        return nullptr;
+    }
+    if (FK::alert_if_f((alignment & (alignment - 1)) != 0, "FreeListAllocator: try_allocate alignment must be power of two")) {
+        return nullptr;
+    }
 
     for (auto it = free_list.begin(); it != free_list.end(); ++it) {
         FreeMemoryBlock* current = &(*it);
-        FK::enforcef(current != nullptr, "FreeListAllocator: try_allocate found nullptr block");
+        if (FK::alert_if_f(current == nullptr, "FreeListAllocator: try_allocate found nullptr block")) {
+            continue;
+        }
 
         if (can_fit_block(current, size, alignment))
             return place_block_for(current, size, alignment);
@@ -152,7 +181,8 @@ void* FreeListAllocator::try_allocate(LibC::size_t size, LibC::size_t alignment)
 
 bool FreeListAllocator::can_fit_block(FreeMemoryBlock* block, LibC::size_t size, LibC::size_t alignment) const
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: can_fit_block received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: can_fit_block received nullptr"))
+        return false;
 
     LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(block);
     LibC::uintptr_t header_addr = block_addr;
@@ -165,7 +195,8 @@ bool FreeListAllocator::can_fit_block(FreeMemoryBlock* block, LibC::size_t size,
 
 void* FreeListAllocator::place_block_for(FreeMemoryBlock* block, LibC::size_t size, LibC::size_t alignment)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: place_block_for received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: place_block_for received nullptr"))
+        return nullptr;
 
     LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(block);
     LibC::uintptr_t header_addr = block_addr;
@@ -173,7 +204,8 @@ void* FreeListAllocator::place_block_for(FreeMemoryBlock* block, LibC::size_t si
     LibC::size_t padding = user_data_addr - (header_addr + sizeof(BlockHeader));
     LibC::size_t total_needed = sizeof(BlockHeader) + padding + size;
 
-    FK::enforcef(block->size >= total_needed, "FreeListAllocator: place_block_for block too small");
+    if (FK::alert_if_f(block->size < total_needed, "FreeListAllocator: place_block_for block too small"))
+        return nullptr;
 
     handle_split_or_take_block(block, total_needed);
 
@@ -187,15 +219,17 @@ void* FreeListAllocator::place_block_for(FreeMemoryBlock* block, LibC::size_t si
 
 void FreeListAllocator::handle_split_or_take_block(FreeMemoryBlock* block, LibC::size_t total_needed)
 {
-    FK::enforcef(block != nullptr, "FreeListAllocator: handle_split_or_take_block received nullptr");
+    if (FK::alert_if_f(block == nullptr, "FreeListAllocator: handle_split_or_take_block received nullptr"))
+        return;
 
     LibC::size_t remaining = block->size - total_needed;
     bool should_split = remaining > sizeof(FreeMemoryBlock);
 
     if (should_split) {
         LibC::uintptr_t next_block_addr = reinterpret_cast<LibC::uintptr_t>(block) + total_needed;
-        FK::enforcef(next_block_addr + sizeof(FreeMemoryBlock) <= heap_end,
-            "FreeListAllocator: next block out of heap bounds");
+        if (FK::alert_if_f(next_block_addr + sizeof(FreeMemoryBlock) > heap_end,
+                "FreeListAllocator: next block out of heap bounds"))
+            return;
 
         auto* next_block = reinterpret_cast<FreeMemoryBlock*>(next_block_addr);
         next_block->size = remaining;

@@ -82,7 +82,7 @@ constexpr char const* const names[] = {
 
 char const* named_exception(int index) noexcept
 {
-    FK::enforcef(index >= 0 || index < static_cast<int>(sizeof(names) / sizeof(names[0])), "named_exception: invalid exception index %d", index);
-
+    constexpr int count = static_cast<int>(sizeof(names) / sizeof(names[0]));
+    FK::enforcef(index >= 0 && index < count, "named_exception: invalid exception index %d", index);
     return names[index];
 }

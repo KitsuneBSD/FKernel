@@ -2,8 +2,11 @@
 
 #include <LibC/stdint.h>
 
+extern "C" LibC::uint64_t* current_pml4_ptr;
+
 namespace MemoryManagement {
 
+// TODO: Rewrite with builder design pattern
 constexpr LibC::uint64_t PAGE_PRESENT = 1ULL << 0;
 constexpr LibC::uint64_t PAGE_RW = 1ULL << 1;
 constexpr LibC::uint64_t PAGE_USER = 1ULL << 2;
@@ -17,9 +20,6 @@ constexpr LibC::uint64_t PAGE_NX = 1ULL << 63;
 
 class VirtualMemoryManager {
 private:
-    LibC::uint64_t* pml4;
-    void create_tables_if_needed(LibC::uintptr_t virt_addr) noexcept;
-    LibC::uint64_t* get_or_create_pte(LibC::uintptr_t virt_addr) noexcept;
     VirtualMemoryManager() = default;
 
 public:
@@ -30,7 +30,11 @@ public:
         return v_instance;
     }
 
-    void initialize() noexcept;
+    LibC::uint64_t* pml4 = current_pml4_ptr;
+    void create_tables_if_needed(LibC::uintptr_t virt_addr) noexcept;
+    LibC::uint64_t* get_or_create_pte(LibC::uintptr_t virt_addr) noexcept;
+    LibC::uint64_t* get_pte(LibC::uintptr_t virt_addr) noexcept;
+    bool is_mapped(LibC::uintptr_t virt_addr) noexcept;
 
     bool map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept;
     bool unmap_page(LibC::uintptr_t virt_addr) noexcept;

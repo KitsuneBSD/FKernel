@@ -15,6 +15,7 @@ private:
 
     RegionList regions_;
 
+public:
     void add_region(PhysicalMemoryRegion* region) noexcept;
     PhysicalMemoryRegion* find_region(LibC::uintptr_t phys_addr) noexcept;
     void remove_region(PhysicalMemoryRegion* region) noexcept;
@@ -25,8 +26,11 @@ private:
     LibC::size_t allocated_region_count() const noexcept;
     void ensure_bitmap_allocated(PhysicalMemoryRegion& region) noexcept;
     void remove_region(LibC::uintptr_t phys_addr) noexcept;
+    RegionList regions()
+    {
+        return regions_;
+    }
 
-public:
     static PhysicalMemoryManager& instance() noexcept
     {
         static PhysicalMemoryManager s_instance;
@@ -115,8 +119,6 @@ public:
         region->~PhysicalMemoryRegion();
         Ffree(region);
     }
-
-    void initialize(multiboot2::TagMemoryMap const& mmap) noexcept;
 
     LibC::uintptr_t alloc_page() noexcept;
     void free_page(LibC::uintptr_t phys_addr) noexcept;

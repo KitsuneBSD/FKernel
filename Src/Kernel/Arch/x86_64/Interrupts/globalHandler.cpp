@@ -15,8 +15,10 @@ extern "C" void global_default_handler(CpuState* const frame)
 {
     FK::enforcef(frame != nullptr, "Global default Handler: CpuState frame is nullptr");
 
-    FK::alert_if_f(frame->interrupt_id >= MAX_EXCEPTION_ID,
-        "Global Default Handler: Unknown exception interrupt_id %u", frame->interrupt_id);
+    if (frame->interrupt_id >= MAX_EXCEPTION_ID) {
+        FK::alert_if_f(true, "Global Default Handler: Unknown exception interrupt_id %u", frame->interrupt_id);
+        halt();
+    }
 
     FK::alert_if_f(frame->rip == 0, "Global default handler: RIP is NULL");
     FK::alert_if_f(frame->rsp == 0, "Global default handler: RSP is NULL");
