@@ -20,6 +20,4 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
 
     auto& memory_manager = MemoryManagement::MemoryManager::instance();
     memory_manager.initialize(mmap);
-
-    Log(LogLevel::INFO, "OK, look good enough");
 }

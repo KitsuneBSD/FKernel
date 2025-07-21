@@ -14,43 +14,30 @@ namespace FK {
 
 inline void alert(char const* message) noexcept
 {
-    Logf(LogLevel::WARN, "%s", message);
-}
-
-inline void enforce(bool condition, char const* message) noexcept
-{
-    if (condition) [[likely]] {
-        return;
-    }
-
-    char buffer[512];
-    LibC::snprintf(buffer, sizeof(buffer),
-        "PANIC at %s:%d in %s(): %s",
-        __FILE__, __LINE__, __func__, message);
-
-    panic(buffer);
+    Logf(LogLevel::TRACE, "%s", message);
 }
 
 inline void enforce(bool condition, char const* message,
     char const* file, int line, char const* func) noexcept
 {
-    if (condition) [[likely]] {
+    if (condition) [[likely]]
         return;
-    }
 
     char buffer[512];
     LibC::snprintf(buffer, sizeof(buffer),
-        "PANIC at %s:%d in %s(): %s",
-        file, line, func, message);
-
+        "PANIC at %s:%d in %s(): %s", file, line, func, message);
     panic(buffer);
+}
+
+inline void enforce(bool condition, char const* message) noexcept
+{
+    enforce(condition, message, __FILE__, __LINE__, __func__);
 }
 
 inline void enforcef(bool condition, char const* format, ...) noexcept
 {
-    if (condition) [[likely]] {
+    if (condition) [[likely]]
         return;
-    }
 
     char msg[384];
     char buffer[512];
@@ -61,91 +48,86 @@ inline void enforcef(bool condition, char const* format, ...) noexcept
     va_end(args);
 
     LibC::snprintf(buffer, sizeof(buffer),
-        "PANIC at %s:%d in %s(): %s",
-        __FILE__, __LINE__, __func__, msg);
-
+        "PANIC at %s:%d in %s(): %s", __FILE__, __LINE__, __func__, msg);
     panic(buffer);
 }
 
-inline void enforcef(bool condition, char const* format,
-    char const* file, int line, char const* func, ...) noexcept
+inline void enforcef(bool condition,
+    char const* file, int line, char const* func, char const* format, ...) noexcept
 {
-    if (condition) [[likely]] {
+    if (condition) [[likely]]
         return;
-    }
 
     char msg[384];
     char buffer[512];
 
     va_list args;
-    va_start(args, func);
+    va_start(args, format);
     LibC::vsnprintf(msg, sizeof(msg), format, args);
     va_end(args);
 
     LibC::snprintf(buffer, sizeof(buffer),
-        "PANIC at %s:%d in %s(): %s",
-        file, line, func, msg);
-
+        "PANIC at %s:%d in %s(): %s", file, line, func, msg);
     panic(buffer);
-}
-
-inline bool alert_if(bool condition, char const* message) noexcept
-{
-    if (condition) {
-        alert(message);
-    }
-
-    return condition;
-}
-inline bool alert_if_f(bool condition, char const* message, ...) noexcept
-{
-    if (condition) [[likely]] {
-        char buffer[512];
-        LibC::snprintf(buffer, sizeof(buffer),
-            "ALERT at %s:%d in %s(): %s",
-            __FILE__, __LINE__, __func__, message);
-
-        alert(buffer);
-    }
-
-    return condition;
 }
 
 inline bool alert_if(bool condition, char const* message,
     char const* file, int line, char const* func) noexcept
 {
-    if (condition) [[likely]] {
-        char buffer[512];
-        LibC::snprintf(buffer, sizeof(buffer),
-            "ALERT at %s:%d in %s(): %s",
-            file, line, func, message);
+    if (!condition)
+        return false;
 
-        alert(buffer);
-    }
-
-    return condition;
+    char buffer[512];
+    LibC::snprintf(buffer, sizeof(buffer),
+        "ALERT at %s:%d in %s(): %s", file, line, func, message);
+    alert(buffer);
+    return true;
 }
 
-inline bool alert_if_f(bool condition, char const* format,
-    char const* file, int line, char const* func, ...) noexcept
+inline bool alert_if(bool condition, char const* message) noexcept
 {
-    if (condition) [[likely]] {
-        char msg[384];
-        char buffer[512];
+    return alert_if(condition, message, __FILE__, __LINE__, __func__);
+}
 
-        va_list args;
-        va_start(args, func);
-        LibC::vsnprintf(msg, sizeof(msg), format, args);
-        va_end(args);
+inline bool alert_if_f(bool condition, char const* format, ...) noexcept
+{
+    if (!condition)
+        return false;
 
-        LibC::snprintf(buffer, sizeof(buffer),
-            "ALERT at %s:%d in %s(): %s",
-            file, line, func, msg);
+    char msg[384];
+    char buffer[512];
 
-        alert(buffer);
-    }
+    va_list args;
+    va_start(args, format);
+    LibC::vsnprintf(msg, sizeof(msg), format, args);
+    va_end(args);
 
-    return condition;
+    LibC::snprintf(buffer, sizeof(buffer),
+        "ALERT at %s:%d in %s(): %s", __FILE__, __LINE__, __func__, msg);
+    alert(buffer);
+    return true;
+}
+
+inline bool alert_if_f(bool condition,
+    char const* file, int line, char const* func, char const* format...) noexcept
+{
+    if (!condition)
+        return false;
+
+    char msg[384];
+
+    va_list args;
+    va_start(args, format);
+    LibC::vsnprintf(msg, sizeof(msg), format, args);
+    va_end(args);
+
+    char buffer[512];
+    LibC::snprintf(buffer, sizeof(buffer),
+        "ALERT at %s:%d in %s(): %s", file, line, func, msg);
+
+    alert(buffer);
+
+    return true;
 }
 
 } // namespace FK

@@ -2,22 +2,26 @@ ENTRY(start)
 
 SECTIONS
 {
-	. = 1M;
+    . = 1M;
 
-	.boot :
-	{
-		KEEP(*(.multiboot_header))
-	}
+    .kernel : 
+    {
+        *(.multiboot_header)  /* Mantém o header multiboot aqui */
 
-	.text :
-	{
-		*(.text)
-	} 
+        *(.text)
+        *(.rodata)
+        *(.data)
+        *(.bss)
 
-  .bump_heap (NOLOAD) :
+        __kernel_end = .;  /* Marca o fim do kernel */
+    }
+
+    .kernel_heap (NOLOAD) :
     {
         __heap_start = .;
-        . += 16M;               /* Reserva 16 MiB para heap */
+        . += 16M;           /* Reserva 16 MiB para heap do kernel */
         __heap_end = .;
     }
+
+    /* Espaço para usuário: o resto do espaço não é definido aqui no linker */
 }
