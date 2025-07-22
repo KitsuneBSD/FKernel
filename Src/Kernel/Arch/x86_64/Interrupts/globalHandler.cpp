@@ -20,6 +20,10 @@ extern "C" void global_default_handler(CpuState* const frame)
         halt();
     }
 
+    if (frame->interrupt_id == 13) {
+        general_protection_fault_handler(frame);
+    }
+
     FK::alert_if_f(frame->rip == 0, "Global default handler: RIP is NULL");
     FK::alert_if_f(frame->rsp == 0, "Global default handler: RSP is NULL");
     FK::alert_if_f(frame->rbp == 0, "Global default handler: RBP is NULL");

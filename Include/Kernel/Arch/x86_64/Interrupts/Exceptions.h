@@ -12,5 +12,6 @@ void global_default_handler(struct CpuState const* frame);
 
 // === Specific Custom Handle
 void divide_by_zero_handler(struct CpuState* frame);
+void general_protection_fault_handler(struct CpuState* frame);
 
 char const* named_exception(int index) noexcept;
