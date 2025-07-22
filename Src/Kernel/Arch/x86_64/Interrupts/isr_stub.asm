@@ -8,8 +8,8 @@ global isr_common_stub
 %macro ISR_NO_ERRCODE 2
     [global %1]
 %1:
-    push qword 0            
-    push qword %2           
+    push qword %2            
+    push qword 0           
     jmp isr_common_stub
 %endmacro
 

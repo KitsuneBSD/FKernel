@@ -4,9 +4,6 @@
 #include <LibFK/enforce.h>
 
 struct CpuState {
-    LibC::uint64_t interrupt_id;
-    LibC::uint64_t error_code;
-
     LibC::uint64_t r15;
     LibC::uint64_t r14;
     LibC::uint64_t r13;
@@ -23,9 +20,12 @@ struct CpuState {
     LibC::uint64_t rbx;
     LibC::uint64_t rax;
 
+    LibC::uint64_t interrupt_id;
+    LibC::uint64_t error_code;
+
     LibC::uint64_t rip;
     LibC::uint64_t cs;
     LibC::uint64_t rflags;
     LibC::uint64_t rsp;
     LibC::uint64_t ss;
-} __attribute__((aligned(8)));
+} __attribute__((packed, aligned(8)));

@@ -38,9 +38,12 @@ void* FreeListAllocator::alloc_zeroed(LibC::size_t size, LibC::size_t alignment)
 
 void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment)
 {
-    FK::enforcef(initialized, "FreeListAllocator: Alloc before initialization");
-    FK::enforcef(size != 0, "FreeListAllocator: Alloc with size 0");
-    FK::enforcef((alignment & (alignment - 1)) == 0, "FreeListAllocator: Alignment must be power of two");
+    if (FK::alert_if(!initialized, "FreeListAllocator: Alloc before initialization"))
+        return nullptr;
+    if (FK::alert_if(size == 0, "FreeListAllocator: Alloc with size 0"))
+        return nullptr;
+    if (FK::alert_if((alignment & (alignment - 1)) != 0, "FreeListAllocator: Alignment must be power of two"))
+        return nullptr;
 
     return try_allocate(size, alignment);
 }

@@ -78,7 +78,6 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
 
 bool VirtualMemoryManager::map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept
 {
-    // FIXME: PML4 isn't null but is consider as null
     if (FK::alert_if_f(pml4 == nullptr, "VMM: map_page called but PML4 is nullptr"))
         return false;
 
