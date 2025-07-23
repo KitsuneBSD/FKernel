@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Kernel/FileSystem/VFS/FileOperations.h>
+#include <Kernel/FileSystem/VFS/MountPoint.h>
 #include <LibC/stddef.h>
 #include <LibFK/intrusiveList.h>
 
@@ -19,19 +21,6 @@ enum class VNodeType : LibC::uint8_t {
     Mountpoint
 };
 
-struct MountPoint {
-    char path[MAX_PATH_LEN];
-    VNode* root_vnode;
-    FK::IntrusiveNode<MountPoint> list_node;
-};
-
-struct FileStat {
-    LibC::uint64_t size;
-    LibC::uint32_t permissions;
-    LibC::uint64_t inode;
-    VNodeType type;
-};
-
 struct VNodeOperations {
     int (*open)(VNode* vnode, LibC::uint32_t flags);
     LibC::ssize_t (*read)(VNode* vnode, LibC::uint64_t offset, void* buffer, LibC::size_t size);
@@ -40,6 +29,14 @@ struct VNodeOperations {
     int (*stat)(VNode* vnode, FileStat* stat);
     int (*readdir)(VNode* vnode, LibC::uint64_t index, char* name_out, VNode** out_vnode);
     VNode* (*lookup)(VNode* vnode, char const* name);
+    int (*mkdir)(VNode* vnode, char const* name, LibC::uint32_t permissions);
+    int (*unlink)(VNode* vnode, char const* name);
+    int (*create)(VNode* vnode, char const* name, LibC::uint32_t permissions);
+    int (*rename)(VNode* vnode, char const* oldname, char const* newname);
+    int (*symlink)(VNode* vnode, char const* target, char const* linkname);
+    LibC::ssize_t (*readlink)(VNode* vnode, char* buf, LibC::size_t bufsize);
+    int (*chmod)(VNode* vnode, LibC::uint32_t new_permissions);
+    int (*chown)(VNode* vnode, LibC::uint32_t new_uid, LibC::uint32_t new_gid);
 };
 
 struct VNode {
@@ -52,14 +49,6 @@ struct VNode {
 
     void vnode_ref();
     void vnode_unref();
-};
-struct FileHandle {
-    VNode* vnode;
-    LibC::uint64_t offset;
-    LibC::uint32_t flags;
-
-    LibC::ssize_t filehandle_read(void* buf, LibC::size_t size);
-    LibC::ssize_t filehandle_write(void const* buf, LibC::size_t size);
 };
 
 }

@@ -5,15 +5,15 @@
 #include <LibC/string.h>
 #include <LibFK/intrusiveList.h>
 
-#include <Kernel/FileSystem/VFS_Types.h>
+#include <Kernel/FileSystem/VFS/VFSTypes.h>
 
 namespace FileSystem {
 
 class VFS {
-private:
-    FK::IntrusiveList<MountPoint, &MountPoint::list_node> mount_points_;
 
 public:
+    FK::IntrusiveList<MountPoint, &MountPoint::list_node> mount_points_;
+
     VFS();
 
     int mount(char const* path, VNode* root);
