@@ -1,3 +1,4 @@
+#include "Kernel/Boot/init.h"
 #include <Kernel/Arch/x86_64/Segments/Gdt.h>
 #include <Kernel/Arch/x86_64/Segments/Idt.h>
 #include <Kernel/Boot/early_init.h>
@@ -20,4 +21,6 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
 
     auto& memory_manager = MemoryManagement::MemoryManager::instance();
     memory_manager.initialize(mmap);
+
+    init();
 }

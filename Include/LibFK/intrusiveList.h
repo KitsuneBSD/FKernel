@@ -141,15 +141,30 @@ public:
         }
         T& operator*() const noexcept { return *m_node; }
         T* operator->() const noexcept { return m_node; }
+        T* raw_ptr() const noexcept { return m_node; }
+
         Iterator& operator++() noexcept
         {
             m_node = (m_node->*member).next;
             return *this;
         }
+
         bool operator!=(Iterator const& other) const noexcept { return m_node != other.m_node; }
         bool operator==(Iterator const& other) const noexcept { return m_node == other.m_node; }
     };
 
+    Iterator erase(Iterator it) noexcept
+    {
+        T* node = it.raw_ptr();
+        if (FK::alert_if_f(node == nullptr, "IntrusiveList::erase called with end iterator"))
+            return end();
+
+        T* next_node = (node->*member).next;
+
+        remove(node);
+
+        return Iterator(next_node);
+    }
     Iterator begin() const noexcept { return Iterator(head_); }
     Iterator end() const noexcept { return Iterator(nullptr); }
 };

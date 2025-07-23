@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Kernel/FileSystem/VFS/FileOperations.h>
-#include <Kernel/FileSystem/VFS/MountPoint.h>
 #include <LibC/stddef.h>
 #include <LibFK/intrusiveList.h>
 
@@ -9,6 +8,7 @@ namespace FileSystem {
 
 constexpr LibC::size_t MAX_NAME_LEN = 256;
 constexpr LibC::size_t MAX_PATH_LEN = 1024;
+constexpr LibC::size_t MAX_SYMLINK_TARGET_LEN = 256;
 
 struct VNode;
 
@@ -21,6 +21,12 @@ enum class VNodeType : LibC::uint8_t {
     Mountpoint
 };
 
+struct MountPoint {
+    char path[MAX_PATH_LEN];
+    VNode* root_vnode;
+    FK::IntrusiveNode<MountPoint> list_node;
+};
+
 struct VNodeOperations {
     int (*open)(VNode* vnode, LibC::uint32_t flags);
     LibC::ssize_t (*read)(VNode* vnode, LibC::uint64_t offset, void* buffer, LibC::size_t size);
@@ -31,7 +37,7 @@ struct VNodeOperations {
     VNode* (*lookup)(VNode* vnode, char const* name);
     int (*mkdir)(VNode* vnode, char const* name, LibC::uint32_t permissions);
     int (*unlink)(VNode* vnode, char const* name);
-    int (*create)(VNode* vnode, char const* name, LibC::uint32_t permissions);
+    VNode* (*create)(VNode* parent, char const* name, VNodeType type);
     int (*rename)(VNode* vnode, char const* oldname, char const* newname);
     int (*symlink)(VNode* vnode, char const* target, char const* linkname);
     LibC::ssize_t (*readlink)(VNode* vnode, char* buf, LibC::size_t bufsize);
@@ -49,6 +55,21 @@ struct VNode {
 
     void vnode_ref();
     void vnode_unref();
+
+    inline bool is_directory() const
+    {
+        return stat.type == VNodeType::Directory;
+    }
+
+    inline bool is_symbolic() const
+    {
+        return stat.type == VNodeType::Symlink;
+    }
+
+    inline bool is_file() const
+    {
+        return stat.type == VNodeType::File;
+    }
 };
 
 }

@@ -1,4 +1,3 @@
-#include <Kernel/FileSystem/VFS/MountPoint.h>
 #include <Kernel/FileSystem/VFS/VFSTypes.h>
 #include <Kernel/FileSystem/VFS/VirtualFileSystem.h>
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>

@@ -214,4 +214,14 @@ LibC::size_t strlcpy(char* dst, char const* src, LibC::size_t size)
     return i;
 }
 
+int strcmp(char const* a, char const* b)
+{
+    while (*a && (*a == *b)) {
+        ++a;
+        ++b;
+    }
+
+    return *(unsigned char*)a - *(unsigned char*)b;
+}
+
 }

@@ -16,5 +16,7 @@ typedef int64_t ssize_t;
 #endif
 
 #define offsetof(type, member) __builtin_offsetof(type, member)
+#define container_of(ptr, type, member) \
+    ((type*)((char*)(ptr) - offsetof(type, member)))
 
 }

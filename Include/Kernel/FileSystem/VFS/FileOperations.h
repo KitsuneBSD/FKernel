@@ -14,6 +14,10 @@ struct FileStat {
     LibC::uint64_t size;
     LibC::uint32_t permissions;
     LibC::uint64_t inode;
+
+    LibC::uint32_t uid;
+    LibC::uint32_t gid;
+
     VNodeType type;
 };
 

@@ -8,13 +8,18 @@
 #include <Kernel/FileSystem/VFS/VFSTypes.h>
 
 namespace FileSystem {
-
 class VFS {
+private:
+    VFS();
 
 public:
     FK::IntrusiveList<MountPoint, &MountPoint::list_node> mount_points_;
 
-    VFS();
+    static VFS& instance()
+    {
+        static VFS instance;
+        return instance;
+    }
 
     int mount(char const* path, VNode* root);
     MountPoint* find_mount_point(char const* path);
