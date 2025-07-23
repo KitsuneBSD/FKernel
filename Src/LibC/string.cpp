@@ -163,13 +163,7 @@ LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base, bool uppercase)
     return i;
 }
 
-#if (defined(__clang__))
 int strncmp(char const* s1, char const* s2, LibC::size_t n)
-{
-    return __builtin_strncmp(s1, s2, n);
-}
-#else
-int strncmp(const char* s1, const char* s2, size_t n)
 {
     for (size_t i = 0; i < n; ++i) {
         unsigned char c1 = (unsigned char)s1[i];
@@ -183,5 +177,41 @@ int strncmp(const char* s1, const char* s2, size_t n)
     }
     return 0;
 }
-#endif
+
+char* strncpy(char* dest, char const* src, LibC::size_t n)
+{
+    size_t i = 0;
+
+    while (i < n && src[i] != '\0') {
+        dest[i] = src[i];
+        ++i;
+    }
+
+    while (i < n) {
+        dest[i] = '\0';
+        ++i;
+    }
+
+    return dest;
+}
+
+LibC::size_t strlcpy(char* dst, char const* src, LibC::size_t size)
+{
+    if (!dst || !src)
+        return 0;
+
+    LibC::size_t i = 0;
+
+    if (size > 0) {
+        for (; i < size - 1 && src[i]; ++i)
+            dst[i] = src[i];
+        dst[i] = '\0';
+    }
+
+    while (src[i])
+        ++i;
+
+    return i;
+}
+
 }

@@ -16,5 +16,10 @@ char* itoa(int num, char* str, int base);
 
 extern "C" int strncmp(char const* s1, char const* s2, LibC::size_t n);
 
+extern "C" char* strncpy(char* dest, char const* src, LibC::size_t n);
+
 extern "C" LibC::size_t strlen(char const* str);
+
+extern "C" LibC::size_t strlcpy(char* dst, char const* src, LibC::size_t size);
+
 }
