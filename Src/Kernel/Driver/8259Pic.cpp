@@ -36,6 +36,34 @@ void Pic8259::remap(int master_offset, int slave_offset) noexcept
             "PIC8259: Invalid slave offset: 0x%X", slave_offset))
         return;
 
+    FK::enforcef(irq_line < 16, "PIC8259: IRQ line %u out of valid range [0..15]", irq_line);
+}
+
+void Pic8259::send_eoi_master() noexcept
+{
+    Io::outb(PIC1_CMD, PIC_EOI);
+}
+
+void Pic8259::send_eoi_slave() noexcept
+{
+    Io::outb(PIC2_CMD, PIC_EOI);
+}
+
+LibC::uint16_t Pic8259::get_port_for_irq(LibC::uint8_t irq_line) const noexcept
+{
+    return (irq_line < 8) ? PIC1_DATA : PIC2_DATA;
+}
+
+LibC::uint8_t Pic8259::get_irq_mask_bit(LibC::uint8_t irq_line) const noexcept
+{
+    return (irq_line < 8) ? irq_line : (irq_line - 8);
+}
+
+void Pic8259::remap(int master_offset, int slave_offset) noexcept
+{
+    FK::enforcef(master_offset >= 0x20 && master_offset <= 0xF8, "PIC8259: Invalid master offset: 0x%X", master_offset);
+    FK::enforcef(slave_offset >= 0x20 && slave_offset <= 0xF8, "PIC8259: Invalid slave offset: 0x%X", slave_offset);
+
     LibC::uint8_t mask1 = Io::inb(PIC1_DATA);
     LibC::uint8_t mask2 = Io::inb(PIC2_DATA);
 
@@ -58,6 +86,7 @@ void Pic8259::remap(int master_offset, int slave_offset) noexcept
 void Pic8259::send_eoi_master() noexcept
 {
     Io::outb(PIC2_CMD, PIC_EOI);
+
 }
 
 void Pic8259::send_eoi_slave() noexcept
@@ -73,6 +102,10 @@ LibC::uint16_t Pic8259::get_port_for_irq(LibC::uint8_t irq_line) const noexcept
 LibC::uint8_t Pic8259::get_irq_mask_bit(LibC::uint8_t irq_line) const noexcept
 {
     return (irq_line < 8) ? irq_line : (irq_line - 8);
+    if (irq >= 8) {
+        send_eoi_slave();
+    }
+    send_eoi_master();
 }
 
 void Pic8259::mask_irq(LibC::uint8_t irq_line) noexcept

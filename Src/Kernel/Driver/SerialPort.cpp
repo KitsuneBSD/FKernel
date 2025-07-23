@@ -19,6 +19,7 @@ SerialPort::SerialPort(Port port)
             "SerialPort: Invalid port base address: 0x%X, defaulting to COM1", base_)) {
         base_ = static_cast<LibC::uint16_t>(Port::COM1);
     }
+
 }
 
 void SerialPort::initialize() const

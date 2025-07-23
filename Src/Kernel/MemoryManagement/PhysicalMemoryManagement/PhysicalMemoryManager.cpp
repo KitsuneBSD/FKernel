@@ -21,6 +21,7 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
     if (FK::alert_if_f(!region->bitmap.is_valid(), "PMM: add_region received region with existing bitmap"))
         return;
 
+
     if (region->page_count > max_region_in_pages) {
         LibC::uint64_t remaining_pages = region->page_count;
         LibC::uintptr_t current_base = region->base_addr;
@@ -64,6 +65,7 @@ PhysicalMemoryRegion* PhysicalMemoryManager::find_region(LibC::uintptr_t phys_ad
     if (FK::alert_if_f(phys_addr != 0, "PMM: find_region received null physical address"))
         return nullptr;
 
+
     for (auto& region : regions_) {
         if (phys_addr >= region.base_addr && phys_addr < region.base_addr + region.page_count * TOTAL_MEMORY_PAGE_SIZE) {
             return &region;
@@ -98,6 +100,7 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
 void PhysicalMemoryManager::free_page(LibC::uintptr_t phys_addr) noexcept
 {
     Logf(LogLevel::TRACE, "PMM: free_page(addr=%p)", phys_addr);
+
     FK::alert_if_f(phys_addr == 0, "PMM: free_page received null physical address");
     if (phys_addr == 0)
         return;
@@ -152,6 +155,7 @@ void PhysicalMemoryManager::mark_pages(PhysicalMemoryRegion& region, LibC::uint6
     if (FK::alert_if_f(page_index + count <= region.page_count, "PMM: mark_pages range out of bounds base=%p", region.base_addr))
         return;
 
+
     for (LibC::uint64_t i = 0; i < count; ++i) {
         if (allocate)
             region.mark_page(page_index + i);
@@ -176,6 +180,7 @@ LibC::size_t PhysicalMemoryManager::allocated_region_count() const noexcept
         if (region.is_allocated()) {
             ++count;
         }
+
     }
     return count;
 }
@@ -204,6 +209,7 @@ LibC::uint64_t PhysicalMemoryManager::free_pages() const noexcept
     LibC::uint64_t free_count = 0;
 
     for (auto& region : regions_) {
+
         auto is_valid = bitmap_is_valid(region);
 
         free_count += is_valid ? (count_free_pages_in_bitmap_words(region, region_full_words(region)) + count_free_pages_in_remaining_bits(region, region_full_words(region), region_remaining_bits(region)))

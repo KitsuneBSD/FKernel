@@ -1,4 +1,3 @@
-#include "Kernel/Arch/x86_64/Hardware/Io.h"
 #include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Exceptions.h>
@@ -17,6 +16,9 @@ void Manager::validate_index(int index) const noexcept
     if (FK::alert_if_f(index < 0 || index >= MAX_IDT_ENTRIES,
             "IDT: index %d out of bounds [0..%d]", index, MAX_IDT_ENTRIES - 1))
         return;
+
+    FK::enforcef(index >= 0 && index < MAX_IDT_ENTRIES,
+        "IDT: index %d out of bounds [0..%d]", index, MAX_IDT_ENTRIES - 1);
 }
 
 void Manager::validate_irq(int irq) const noexcept
@@ -31,6 +33,7 @@ void Manager::set_entry(int index, void* isr, LibC::uint16_t selector, LibC::uin
     if (FK::alert_if_f(index < 0 || index >= MAX_IDT_ENTRIES,
             "IDT: set_entry: index %d out of bounds", index))
         return;
+    validate_index(index);
 
     idt_entry& entry = entries_[index];
     LibC::uint64_t addr = reinterpret_cast<LibC::uint64_t>(isr);
@@ -69,8 +72,12 @@ void Manager::register_irq(int irq) noexcept
     set_entry(vector, reinterpret_cast<void*>(routine_stubs[irq]),
         KERNEL_CODE_SELECTOR, IDT_TYPE_INTERRUPT_GATE, 0);
 
-    register_irq_handler(irq_table[irq].irq, irq_table[irq].handler);
-    Pic8259::Instance().mask_irq(irq);
+    FK::enforcef(vector >= 0 && vector <= 31,
+        "IDT: Exception vector %d out of valid range [0..31]", vector);
+
+    set_entry(vector, reinterpret_cast<void*>(exception_stubs[vector]), KERNEL_CODE_SELECTOR, IDT_TYPE_INTERRUPT_GATE, isr_ist[vector]);
+
+    Logf(LogLevel::TRACE, "Register Exception Handler: Handler registered for Exception %u (%s)", vector, named_exception(vector));
 }
 
 void Manager::send_eoi(int irq) noexcept
@@ -107,6 +114,7 @@ void Manager::initialize() noexcept
     for (int irq = 0; irq < MAX_IRQ; ++irq)
         register_irq(irq);
 
+
     idtr.limit = sizeof(entries_) - 1;
     idtr.base = reinterpret_cast<LibC::uint64_t>(&entries_[0]);
 
@@ -121,6 +129,7 @@ void Manager::initialize() noexcept
 extern "C" void irq_dispatch(LibC::uint8_t irq, void* context) noexcept
 {
     if (FK::alert_if_f(irq >= MAX_IRQ, "IRQ Dispatch: Invalid IRQ number %u", irq)) {
+
         Pic8259::Instance().send_eoi(irq);
         return;
     }

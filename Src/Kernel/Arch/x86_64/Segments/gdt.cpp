@@ -1,3 +1,4 @@
+
 #include <Kernel/Arch/x86_64/Cpu/Asm.h>
 #include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #include <Kernel/Arch/x86_64/Cpu/Gdt_Constants.h>
@@ -31,6 +32,7 @@ void Manager::set_descriptor(int index, LibC::uint32_t base, LibC::uint32_t limi
     }
 
     Descriptor& desc = descriptors_[index];
+
     desc.limit_low = limit & 0xFFFF;
     desc.base_low = base & 0xFFFF;
     desc.base_middle = (base >> 16) & 0xFF;
@@ -45,6 +47,7 @@ void Manager::set_tss_descriptor(int index, LibC::uint64_t base, LibC::uint32_t 
 
     FK::enforcef(index >= 0 && index < max_index,
         "Gdt: set tss descriptor: index %d out of bounds or no space for TSS", index);
+
 
     Descriptor& low = descriptors_[index];
     Descriptor& high = descriptors_[index + 1];
@@ -97,6 +100,7 @@ void Manager::load_gdt() noexcept
     Logf(LogLevel::INFO, "GDT: Loaded GDTR (limit=0x%04X, base=0x%016llX)",
         gdtr_.limit, static_cast<unsigned long long>(gdtr_.base));
 }
+
 
 void Manager::load_tss() noexcept
 {

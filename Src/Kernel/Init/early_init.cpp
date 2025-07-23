@@ -23,4 +23,5 @@ void early_init(multiboot2::TagMemoryMap const& mmap)
     memory_manager.initialize(mmap);
 
     init();
+
 }

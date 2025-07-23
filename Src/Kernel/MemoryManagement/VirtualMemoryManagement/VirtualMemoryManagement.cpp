@@ -27,6 +27,7 @@ static constexpr LibC::uintptr_t TOTAL_MEMORY_PAGE_SIZE = 4096ULL;
     return table;
 }
 
+
 LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_addr) noexcept
 {
     if (FK::alert_if_f(pml4 == nullptr, "VMM: get_or_create_pte called but PML4 is nullptr"))
@@ -37,6 +38,7 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
 
     if (FK::alert_if_f((virt_addr & (TOTAL_MEMORY_PAGE_SIZE - 1)) != 0, "VMM: unaligned virt_addr 0x%llX", virt_addr))
         return nullptr;
+
 
     LibC::size_t pml4_idx = (virt_addr >> 39) & MASK_BITS;
     LibC::size_t pdpt_idx = (virt_addr >> 30) & MASK_BITS;
@@ -67,7 +69,7 @@ LibC::uint64_t* VirtualMemoryManager::get_or_create_pte(LibC::uintptr_t virt_add
         auto* pt = allocate_page_table();
         if (pt == nullptr)
             return nullptr;
-
+      
         pd[pd_idx] = reinterpret_cast<LibC::uintptr_t>(pt) | PAGE_PRESENT | PAGE_RW;
         Logf(LogLevel::TRACE, "VMM: Created PT at index %zu for virt_addr 0x%llX", pd_idx, virt_addr);
     }
@@ -87,11 +89,13 @@ bool VirtualMemoryManager::map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t p
     if (FK::alert_if_f((phys_addr & (TOTAL_MEMORY_PAGE_SIZE - 1)) != 0, "VMM: unaligned phys_addr 0x%llX", phys_addr))
         return false;
 
+
     virt_addr &= PAGE_MASK;
     phys_addr &= PAGE_MASK;
 
     auto* pte = get_or_create_pte(virt_addr);
-    if (FK::alert_if_f(pte == nullptr, "VMM: get_or_create_pte returned nullptr"))
+
+  if (FK::alert_if_f(pte == nullptr, "VMM: get_or_create_pte returned nullptr"))
         return false;
 
     if (FK::alert_if_f((*pte & PAGE_PRESENT) != 0, "VMM: page already mapped at virt_addr 0x%llX", virt_addr))
@@ -146,6 +150,7 @@ LibC::uintptr_t VirtualMemoryManager::translate(LibC::uintptr_t virt_addr) noexc
 
     if (FK::alert_if_f(virt_addr >= (1ULL << 48), "VMM: translate called with virt_addr beyond 48 bits: 0x%llX", virt_addr))
         return 0;
+
 
     LibC::size_t const pml4_idx = (virt_addr >> 39) & MASK_BITS;
     LibC::size_t const pdpt_idx = (virt_addr >> 30) & MASK_BITS;

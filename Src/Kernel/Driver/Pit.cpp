@@ -17,13 +17,14 @@ void Pit::initialize(LibC::uint32_t frequency) noexcept
     if (FK::alert_if_f(frequency == 0, "PIT: Frequency must be greater than zero"))
         return;
 
+
     LibC::uint16_t divisor = compute_divisor(frequency);
 
     Logf(LogLevel::INFO, "PIT: Initializing — frequency=%llu Hz, divisor=%llu", frequency, divisor);
 
     // TODO: Use builder design pattern instead hard-coded initialize
     send_command(0b00110100);
-    set_divisor(divisor);
+
 }
 
 void Pit::send_command(LibC::uint8_t command) noexcept
@@ -36,6 +37,7 @@ void Pit::set_divisor(LibC::uint16_t divisor) noexcept
     if (FK::alert_if_f(divisor < MIN_DIVISOR || divisor > MAX_DIVISOR,
             "PIT: Divisor out of range: %u", divisor))
         return;
+
 
     Io::outb(PIT_CHANNEL0_PORT, divisor & 0xFF);
     Io::outb(PIT_CHANNEL0_PORT, (divisor >> 8) & 0xFF);

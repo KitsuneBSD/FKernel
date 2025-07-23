@@ -9,6 +9,7 @@ void PhysicalMemoryRegion::init(LibC::uintptr_t base, LibC::uint64_t pages) noex
     FK::alert_if(base == 0, "PMR: init base address cannot be zero");
     FK::alert_if(pages < 0, "PMR: init page count must be positive");
 
+
     base_addr = base;
     page_count = pages;
 
