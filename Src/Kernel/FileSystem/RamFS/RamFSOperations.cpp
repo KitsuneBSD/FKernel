@@ -1,13 +1,16 @@
 #include <Kernel/FileSystem/RamFS/RamFSOperations.h>
 #include <Kernel/FileSystem/RamFS/RamFSTypes.h>
 #include <Kernel/FileSystem/RamFS/RamFSUtils.h>
+#include <Kernel/FileSystem/VFS/FilePermissions.h>
 #include <Kernel/FileSystem/VFS/VFSTypes.h>
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
+#include <Kernel/Posix/errno.h>
 #include <LibC/stddef.h>
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
 #include <LibFK/new.h>
 #include <LibFK/types.h>
+#include <LibFK/utils.h>
 
 namespace FileSystem {
 
@@ -18,10 +21,33 @@ inline RamFSNode* vnode_to_ramfsnode(VNode* vnode)
 
 int ramfs_open(VNode* vnode, LibC::uint32_t flags)
 {
-    UNUSED(vnode)
-    UNUSED(flags)
+    if (!vnode) {
+        Logf(LogLevel::TRACE, "ramfs_open: vnode is null");
+        return -EINVAL;
+    }
 
-    Logf(LogLevel::TRACE, "ramfs_open called");
+    Logf(LogLevel::TRACE, "ramfs_open: vnode=%s flags=0x%x", vnode_to_ramfsnode(vnode)->name, flags);
+
+    if (vnode->stat.type == VNodeType::Directory) {
+        Logf(LogLevel::TRACE, "ramfs_open: cannot open directory as file");
+        return -EISDIR;
+    }
+
+    bool write_mode = (flags & O_WRONLY) || (flags & O_RDWR);
+    bool do_trunc = (flags & O_TRUNC) != 0;
+
+    if (do_trunc && write_mode) {
+        RamFSNode* node = vnode_to_ramfsnode(vnode);
+        if (node->data) {
+            Ffree(node->data);
+            node->data = nullptr;
+        }
+        node->data_size = 0;
+        vnode->stat.size = 0;
+
+        Logf(LogLevel::TRACE, "ramfs_open: file truncated");
+    }
+
     return 0;
 }
 
@@ -51,7 +77,7 @@ LibC::ssize_t ramfs_write(VNode* vnode, LibC::uint64_t offset, void const* buffe
     LibC::size_t needed = offset + size;
     if (!ramfs_node_expand_data(node, needed)) {
         Logf(LogLevel::TRACE, "ramfs_write: failed to expand data");
-        return -1;
+        return -ENOMEM;
     }
 
     LibC::memcpy(node->data + offset, buffer, size);
@@ -89,7 +115,7 @@ int ramfs_readdir(VNode* vnode, LibC::uint64_t index, char* name_out, VNode** ou
 
     if (!node->is_directory) {
         Logf(LogLevel::TRACE, "ramfs_readdir: vnode=%s is not a directory", node->name);
-        return -1;
+        return -ENOTDIR;
     }
 
     LibC::size_t i = 0;
@@ -104,7 +130,7 @@ int ramfs_readdir(VNode* vnode, LibC::uint64_t index, char* name_out, VNode** ou
     }
 
     Logf(LogLevel::TRACE, "ramfs_readdir: no child at index %llu", index);
-    return -1;
+    return -ENOENT;
 }
 
 VNode* ramfs_create(VNode* parent, char const* name, VNodeType type)
@@ -149,7 +175,7 @@ int ramfs_mkdir(VNode* vnode, char const* name, LibC::uint32_t permissions)
 
     if (!dir->is_directory) {
         Logf(LogLevel::TRACE, "ramfs_mkdir: vnode=%s is not a directory", dir->name);
-        return -1;
+        return -ENOTDIR;
     }
 
     Logf(LogLevel::TRACE, "ramfs_mkdir: creating directory '%s' under '%s'", name, dir->name);
@@ -157,14 +183,14 @@ int ramfs_mkdir(VNode* vnode, char const* name, LibC::uint32_t permissions)
     for (auto& child : dir->children) {
         if (LibC::strcmp(child.name, name) == 0) {
             Logf(LogLevel::TRACE, "ramfs_mkdir: directory '%s' already exists", name);
-            return -1; // já existe
+            return -EEXIST;
         }
     }
 
     void* mem = Falloc(sizeof(RamFSNode));
     if (!mem) {
         Logf(LogLevel::TRACE, "ramfs_mkdir: failed to allocate memory for new directory");
-        return -1;
+        return -ENOMEM;
     }
 
     LibC::memset(mem, 0, sizeof(RamFSNode));
@@ -190,7 +216,7 @@ int ramfs_unlink(VNode* parent, char const* name)
     RamFSNode* parent_node = vnode_to_ramfsnode(parent);
     if (!parent_node->is_directory) {
         Logf(LogLevel::TRACE, "ramfs_unlink: vnode=%s is not a directory", parent_node->name);
-        return -1;
+        return -ENOTDIR;
     }
 
     Logf(LogLevel::TRACE, "ramfs_unlink: removing '%s' from '%s'", name, parent_node->name);
@@ -203,7 +229,7 @@ int ramfs_unlink(VNode* parent, char const* name)
     }
 
     Logf(LogLevel::TRACE, "ramfs_unlink: '%s' not found in '%s'", name, parent_node->name);
-    return -1;
+    return -ENOENT;
 }
 
 int ramfs_rename(VNode* vnode, char const* oldname, char const* newname)
@@ -211,7 +237,7 @@ int ramfs_rename(VNode* vnode, char const* oldname, char const* newname)
     RamFSNode* dir = vnode_to_ramfsnode(vnode);
     if (!dir->is_directory) {
         Logf(LogLevel::TRACE, "ramfs_rename: vnode=%s is not a directory", dir->name);
-        return -1;
+        return -ENOTDIR;
     }
 
     Logf(LogLevel::TRACE, "ramfs_rename: renaming '%s' to '%s' in directory '%s'", oldname, newname, dir->name);
@@ -224,26 +250,26 @@ int ramfs_rename(VNode* vnode, char const* oldname, char const* newname)
         }
     }
     Logf(LogLevel::TRACE, "ramfs_rename: '%s' not found in '%s'", oldname, dir->name);
-    return -1;
+    return -ENOENT;
 }
 
 int ramfs_symlink(VNode* vnode, char const* target, char const* linkname)
 {
     if (!vnode || !vnode->ops || !vnode->ops->create) {
         Logf(LogLevel::TRACE, "ramfs_symlink: invalid vnode or ops");
-        return -1;
+        return -EINVAL;
     }
 
     VNode* link_vnode = vnode->ops->create(vnode, linkname, VNodeType::Symlink);
     if (!link_vnode) {
         Logf(LogLevel::TRACE, "ramfs_symlink: failed to create symlink vnode");
-        return -1;
+        return -ENOMEM;
     }
 
     RamFSNode* link_node = vnode_to_ramfsnode(link_vnode);
     if (!link_node) {
         Logf(LogLevel::TRACE, "ramfs_symlink: failed to convert vnode to RamFSNode");
-        return -1;
+        return -EFAULT;
     }
 
     LibC::strncpy(link_node->symlink_target, target, MAX_SYMLINK_TARGET_LEN - 1);
@@ -259,17 +285,17 @@ LibC::ssize_t ramfs_readlink(VNode* vnode, char* buf, LibC::size_t bufsize)
 
     if (node->vnode.stat.type != VNodeType::Symlink) {
         Logf(LogLevel::TRACE, "ramfs_readlink: vnode is not a symlink");
-        return -1;
+        return -EINVAL;
     }
 
     LibC::size_t len = LibC::strlen(node->symlink_target);
-    if (len >= bufsize) {
-        Logf(LogLevel::TRACE, "ramfs_readlink: buffer too small");
-        return -1;
-    }
+    LibC::size_t to_copy = LibFK::min(len, bufsize);
 
-    LibC::strncpy(buf, node->symlink_target, bufsize);
-    return static_cast<LibC::ssize_t>(len);
+    LibC::memcpy(buf, node->symlink_target, to_copy);
+    if (len > bufsize)
+        Logf(LogLevel::TRACE, "ramfs_readlink: truncated symlink ({} > {})", len, bufsize);
+
+    return static_cast<LibC::ssize_t>(to_copy);
 }
 
 int ramfs_chown(VNode* vnode, LibC::uint32_t new_uid, LibC::uint32_t new_gid)

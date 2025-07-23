@@ -17,7 +17,6 @@ typedef LibC::int8_t signed_qword;
 constexpr unsigned KiB = 1024;
 constexpr unsigned MiB = KiB * KiB;
 constexpr unsigned GiB = MiB * KiB;
-
 }
 
 #define UNUSED(x) \
