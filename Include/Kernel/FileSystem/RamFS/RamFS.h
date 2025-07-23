@@ -8,5 +8,6 @@
 namespace FileSystem {
 
 VNode* ramfs_create_root();
+VNode* ramfs_create_unix_tree();
 
 }

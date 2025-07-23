@@ -40,8 +40,7 @@ VNode* ramfs_create_root()
 
     node->is_directory = true;
 
-    if (LibC::strncpy(node->name, "/", MAX_NAME_LEN) == nullptr) {
-        FK::alert("RAMFS: strncpy failed copying root name");
+    if (FK::alert_if(LibC::strncpy(node->name, "/", MAX_NAME_LEN) == nullptr, "RAMFS: strncpy failed copying root name")) {
         return nullptr;
     }
 
@@ -57,6 +56,24 @@ VNode* ramfs_create_root()
         return nullptr;
 
     return &node->vnode;
+}
+
+VNode* ramfs_create_unix_tree()
+{
+    VNode* root = ramfs_create_root();
+    if (FK::alert_if(!root, "RAMFS: failed to create root node for UNIX tree"))
+        return nullptr;
+
+    if (FK::alert_if(ramfs_mkdir(root, "home", 0755) != 0, "RAMFS: failed to mkdir /home"))
+        return nullptr;
+    if (FK::alert_if(ramfs_mkdir(root, "bin", 0755) != 0, "RAMFS: failed to mkdir /bin"))
+        return nullptr;
+    if (FK::alert_if(ramfs_mkdir(root, "etc", 0755) != 0, "RAMFS: failed to mkdir /etc"))
+        return nullptr;
+    if (FK::alert_if(ramfs_mkdir(root, "tmp", 0777) != 0, "RAMFS: failed to mkdir /tmp"))
+        return nullptr;
+
+    return root;
 }
 
 }
