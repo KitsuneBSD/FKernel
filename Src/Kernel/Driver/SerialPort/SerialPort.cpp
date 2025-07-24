@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
-#include <Kernel/Driver/SerialPort.h>
-#include <Kernel/Driver/SerialPort_constants.h>
+#include <Kernel/Driver/SerialPort/SerialPort.h>
+#include <Kernel/Driver/SerialPort/SerialPort_constants.h>
 #include <LibFK/enforce.h>
 
 namespace Serial {
