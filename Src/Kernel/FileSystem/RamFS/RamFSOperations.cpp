@@ -318,21 +318,21 @@ VNode* ramfs_lookup(VNode* vnode, char const* name)
     RamFSNode* node = vnode_to_ramfsnode(vnode);
 
     if (!node->is_directory) {
-        Logf(LogLevel::TRACE, "RAMFS: Node '%s' is not a directory", node->name);
+        Logf(LogLevel::TRACE, "ramfs_lookup: Node '%s' is not a directory", node->name);
         return nullptr;
     }
 
-    Logf(LogLevel::TRACE, "RAMFS lookup: directory='%s', target='%s'", node->name, name);
+    Logf(LogLevel::TRACE, "ramfs_lookup: directory=%s, target=%s", node->name, name);
 
     for (auto& child : node->children) {
-        Logf(LogLevel::TRACE, "Checking child '%s'", child.name);
+        Logf(LogLevel::TRACE, "ramfs_lookup: Checking child '%s'", child.name);
         if (LibC::strcmp(child.name, name) == 0) {
-            Logf(LogLevel::TRACE, "Found child '%s'", child.name);
+            Logf(LogLevel::TRACE, "ramfs_lookup %s", child.name);
             return &child.vnode;
         }
     }
 
-    Logf(LogLevel::TRACE, "Child '%s' not found in directory '%s'", name, node->name);
+    Logf(LogLevel::TRACE, "ramfs_lookup: Child %s not found in directory %s", name, node->name);
     return nullptr;
 }
 
