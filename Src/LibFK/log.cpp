@@ -1,4 +1,4 @@
-#include <Kernel/Driver/SerialPort.h>
+#include <Kernel/Driver/SerialPort/SerialPort.h>
 #include <LibFK/log.h>
 
 #include <LibC/stdarg.h>
@@ -42,7 +42,7 @@ char const* Logger::LevelToString(LogLevel level)
     case LogLevel::ERROR:
         return "ERROR";
     default:
-        return "UNKNOWN";
+        return "TRACE";
     }
 }
 

@@ -7,7 +7,7 @@
 
 #include <Kernel/Boot/early_init.h>
 
-#include <Kernel/Driver/SerialPort.h>
+#include <Kernel/Driver/SerialPort/SerialPort.h>
 
 extern char __heap_start[];
 extern char __heap_end[];

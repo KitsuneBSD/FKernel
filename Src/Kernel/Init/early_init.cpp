@@ -5,7 +5,7 @@
 #include <Kernel/MemoryManagement/MemoryManager/MemoryManager.h>
 #include <LibFK/log.h>
 
-#include <Kernel/Driver/Pit.h>
+#include <Kernel/Driver/Pit/Pit.h>
 
 void early_init(multiboot2::TagMemoryMap const& mmap)
 {
