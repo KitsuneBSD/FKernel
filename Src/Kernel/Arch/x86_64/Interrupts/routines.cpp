@@ -1,3 +1,4 @@
+#include "Kernel/Driver/Ata/AtaTypes.h"
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
 #include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
@@ -6,6 +7,8 @@
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
 #include <LibFK/types.h>
+
+#include <Kernel/Driver/Ata/AtaController.h>
 
 static LibC::uint64_t tick_count = 0;
 
@@ -188,6 +191,8 @@ extern "C" void primary_ata_handler(LibC::uint8_t irq, void* context)
 
     Logf(LogLevel::TRACE, "Primary ATA IRQ14 triggered.");
 
+    ATAController::instance().handle_irq(ChannelType::Primary);
+
     Io::send_eoi(14);
 }
 
@@ -197,6 +202,7 @@ extern "C" void secondary_ata_handler(LibC::uint8_t irq, void* context)
     UNUSED(context)
 
     Logf(LogLevel::TRACE, "Secondary ATA IRQ15 triggered.");
+    ATAController::instance().handle_irq(ChannelType::Secondary);
     Io::send_eoi(15);
 }
 
