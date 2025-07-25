@@ -1,11 +1,14 @@
-#include "LibFK/log.h"
 #include <Kernel/Boot/init.h>
+#include <Kernel/Driver/Ata/AtaController.h>
 #include <Kernel/FileSystem/RamFS/RamFS.h>
 #include <Kernel/FileSystem/VFS/VirtualFileSystem.h>
 #include <LibFK/enforce.h>
+#include <LibFK/log.h>
 
 void init()
 {
+    ATAController::instance().initialize();
+
     auto& vfs = FileSystem::VFS::instance();
     auto* root = FileSystem::ramfs_create_unix_tree();
 
