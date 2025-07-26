@@ -176,7 +176,7 @@ LibC::uint64_t* VirtualMemoryManager::get_pte(LibC::uintptr_t virt_addr) noexcep
 {
     if (FK::alert_if_f(pml4 == nullptr, "VMM: get_pte called but PML4 is nullptr"))
         return nullptr;
-    if (FK::alert_if_f(virt_addr < (1ULL << 48), "VMM: get_pte called with virt_addr beyond 48 bits: 0x%llX", virt_addr))
+    if (FK::alert_if_f(virt_addr >= (1ULL << 48), "VMM: get_pte called with virt_addr beyond 48 bits: 0x%llX", virt_addr))
         return nullptr;
     if (FK::alert_if_f((virt_addr & (TOTAL_MEMORY_PAGE_SIZE - 1)) == 0, "VMM: get_pte called with unaligned virt_addr 0x%llX", virt_addr))
         return nullptr;
@@ -208,6 +208,43 @@ bool VirtualMemoryManager::is_mapped(LibC::uintptr_t virt_addr) noexcept
 {
     auto* pte = get_pte(virt_addr);
     return (pte != nullptr);
+}
+
+LibC::uintptr_t VirtualMemoryManager::allocate_virtual_range(LibC::size_t page_count)
+{
+    LibC::uintptr_t base = find_free_virtual_range(page_count);
+    FK::enforcef(base != 0, "VMM: fail to find a free space in virtual memory");
+    return base;
+}
+
+LibC::uintptr_t VirtualMemoryManager::find_free_virtual_range(LibC::size_t page_count)
+{
+    constexpr LibC::uintptr_t KERNEL_VIRT_BASE = 0xffff800000000000;
+    constexpr LibC::uintptr_t MAX_SEARCH = 0xfffffffffff00000; // limite alto (exemplo)
+    constexpr LibC::size_t PAGE_SIZE = 0x1000;
+
+    LibC::uintptr_t addr = KERNEL_VIRT_BASE;
+
+    while (addr + page_count * PAGE_SIZE < MAX_SEARCH) {
+        bool all_free = true;
+        for (LibC::size_t i = 0; i < page_count; ++i) {
+            if (get_physical_address(addr + i * PAGE_SIZE) != 0) {
+                all_free = false;
+                break;
+            }
+        }
+        if (all_free)
+            return addr;
+
+        addr += page_count * PAGE_SIZE; // pode ser otimizado
+    }
+
+    return 0;
+}
+
+LibC::uintptr_t VirtualMemoryManager::get_physical_address(LibC::uintptr_t virt_addr)
+{
+    return translate(virt_addr);
 }
 
 } // namespace MemoryManagement

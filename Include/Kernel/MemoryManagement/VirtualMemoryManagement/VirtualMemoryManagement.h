@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
 extern "C" LibC::uint64_t* current_pml4_ptr;
@@ -22,6 +23,8 @@ class VirtualMemoryManager {
 private:
     VirtualMemoryManager() = default;
 
+    LibC::uintptr_t find_free_virtual_range(LibC::size_t page_count);
+
 public:
     static VirtualMemoryManager& instance() noexcept
     {
@@ -39,6 +42,9 @@ public:
     bool map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept;
     bool unmap_page(LibC::uintptr_t virt_addr) noexcept;
     LibC::uintptr_t translate(LibC::uintptr_t virt_addr) noexcept;
+
+    LibC::uintptr_t allocate_virtual_range(LibC::size_t page_count);
+    LibC::uintptr_t get_physical_address(LibC::uintptr_t virt_addr);
 };
 
 }
