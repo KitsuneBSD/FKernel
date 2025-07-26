@@ -56,17 +56,17 @@ struct VNode {
     void vnode_ref();
     void vnode_unref();
 
-    inline bool is_directory() const
+    bool is_directory() const
     {
         return stat.type == VNodeType::Directory;
     }
 
-    inline bool is_symbolic() const
+    bool is_symbolic() const
     {
         return stat.type == VNodeType::Symlink;
     }
 
-    inline bool is_file() const
+    bool is_file() const
     {
         return stat.type == VNodeType::File;
     }
