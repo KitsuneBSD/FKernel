@@ -15,7 +15,7 @@ private:
     void identify_device(ChannelType channel, DriveType drive);
 
     void select_drive(ChannelType channel, DriveType drive);
-    bool poll_bsy(ChannelType channel);
+    bool poll_bsy(ChannelType channel, LibC::uint64_t timeout_ticks);
     bool poll_drq(ChannelType channel);
 
     ATAChannel channels_[2] = {
@@ -32,4 +32,10 @@ public:
 
     void initialize();
     void handle_irq(ChannelType channel) noexcept;
+
+    bool read_sector(ChannelType channel, DriveType drive, LibC::uint32_t lba, void* buffer);
+    bool write_sector(ChannelType channel, DriveType drive, LibC::uint32_t lba, void const* buffer);
+
+    bool read_sectors(ChannelType channel, DriveType drive, LibC::uint32_t lba, LibC::uint8_t sector_count, void* buffer);
+    bool write_sectors(ChannelType channel, DriveType drive, LibC::uint32_t lba, LibC::uint8_t sector_count, void const* buffer);
 };
