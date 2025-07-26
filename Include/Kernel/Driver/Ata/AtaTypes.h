@@ -5,13 +5,19 @@
 #include <LibFK/types.h>
 
 enum class ChannelType : LibC::uint8_t {
-    Primary,
-    Secondary
+    Primary = 0,
+    Secondary = 1,
 };
 
 enum class DriveType : LibC::uint8_t {
     Master,
     Slave,
+};
+
+struct AtaDeviceInfo {
+    ChannelType channel;
+    DriveType drive;
+    bool present;
 };
 
 struct ATAChannel {

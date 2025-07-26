@@ -140,4 +140,25 @@ void VNode::vnode_unref()
     }
 }
 
+VNode* VFS::create_device_node(VNode* parent, char const* name, VNodeType type, void* private_data, VNodeOperations* ops)
+{
+    if (!parent || !parent->is_directory())
+        return nullptr;
+
+    if (!parent->ops || !parent->ops->create)
+        return nullptr;
+
+    VNode* vnode = parent->ops->create(parent, name, type);
+    if (!vnode)
+        return nullptr;
+
+    vnode->stat.type = type;
+    vnode->private_data = private_data;
+    vnode->ops = ops;
+
+    vnode->stat.permissions = 0660;
+
+    return vnode;
+}
+
 }

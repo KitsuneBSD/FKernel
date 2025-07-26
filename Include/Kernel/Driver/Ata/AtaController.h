@@ -3,6 +3,8 @@
 #include <Kernel/Driver/Ata/AtaConstants.h>
 #include <Kernel/Driver/Ata/AtaTypes.h>
 
+constexpr int MAX_ATA_DEVICES = 4;
+
 class ATAController {
 private:
     ATAController() = default;
@@ -12,16 +14,20 @@ private:
     ATAController& operator=(ATAController const&) = delete;
 
     void detect_devices();
-    void identify_device(ChannelType channel, DriveType drive);
+    bool identify_device(ChannelType channel, DriveType drive);
 
     void select_drive(ChannelType channel, DriveType drive);
     bool poll_bsy(ChannelType channel, LibC::uint64_t timeout_ticks);
     bool poll_drq(ChannelType channel);
 
+    int device_count_ = 0;
+
     ATAChannel channels_[2] = {
         { PRIMARY_IO_BASE, PRIMARY_CTRL_BASE, 14 },
         { SECONDARY_IO_BASE, SECONDARY_CTRL_BASE, 15 }
     };
+
+    AtaDeviceInfo devices_[MAX_ATA_DEVICES] {};
 
 public:
     static ATAController& instance() noexcept
@@ -29,6 +35,9 @@ public:
         static ATAController instance;
         return instance;
     }
+
+    int get_device_count() const { return device_count_; }
+    AtaDeviceInfo const* enumerate_devices() const { return devices_; }
 
     void initialize();
     void handle_irq(ChannelType channel) noexcept;

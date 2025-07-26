@@ -1,10 +1,10 @@
-#include "Kernel/Arch/x86_64/Interrupts/Routines.h"
-#include "LibFK/enforce.h"
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
 #include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
+#include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #include <Kernel/Driver/Ata/AtaController.h>
 #include <Kernel/Driver/Ata/AtaTypes.h>
 #include <LibC/stdint.h>
+#include <LibFK/enforce.h>
 #include <LibFK/log.h>
 
 void ATAController::initialize()
@@ -15,9 +15,19 @@ void ATAController::initialize()
 
 void ATAController::detect_devices()
 {
+    device_count_ = 0;
     for (int ch = 0; ch < 2; ++ch) {
         for (int dr = 0; dr < 2; ++dr) {
-            identify_device(static_cast<ChannelType>(ch), static_cast<DriveType>(dr));
+            ChannelType channel = static_cast<ChannelType>(ch);
+            DriveType drive = static_cast<DriveType>(dr);
+
+            bool found = identify_device(channel, drive);
+            if (found && device_count_ < MAX_ATA_DEVICES) {
+                devices_[device_count_].channel = channel;
+                devices_[device_count_].drive = drive;
+                devices_[device_count_].present = true;
+                ++device_count_;
+            }
         }
     }
 }
@@ -59,57 +69,45 @@ bool ATAController::poll_drq(ChannelType channel)
     return false;
 }
 
-void ATAController::identify_device(ChannelType channel, DriveType drive)
+bool ATAController::identify_device(ChannelType channel, DriveType drive)
 {
-    ATAChannel const& ch = channels_[static_cast<int>(channel)];
-
     select_drive(channel, drive);
-
-    Io::outb(ch.io_base + 1, 0);
-    Io::outb(ch.io_base + 2, 0);
-    Io::outb(ch.io_base + 3, 0);
-    Io::outb(ch.io_base + 4, 0);
-    Io::outb(ch.io_base + 5, 0);
-    Io::outb(ch.io_base + 7, 0xEC);
+    poll_bsy(channel, 100);
 
     Io::io_wait();
+    Io::outb(channels_[static_cast<int>(channel)].io_base + ATA_REG_SECCOUNT, 0);
+    Io::outb(channels_[static_cast<int>(channel)].io_base + ATA_REG_LBA_LOW, 0);
+    Io::outb(channels_[static_cast<int>(channel)].io_base + ATA_REG_LBA_MID, 0);
+    Io::outb(channels_[static_cast<int>(channel)].io_base + ATA_REG_LBA_HIGH, 0);
+    Io::outb(channels_[static_cast<int>(channel)].io_base + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
 
-    LibC::uint8_t status = Io::inb(ch.io_base + 7);
+    if (!poll_bsy(channel, 100)) {
+        Logf(LogLevel::WARN, "ATA identify_device: Timeout on channel %d drive %d", channel, drive);
+        return false;
+    }
+
+    auto status = Io::inb(channels_[static_cast<int>(channel)].io_base + ATA_REG_STATUS);
     if (status == 0) {
-        Logf(LogLevel::TRACE, "ATAController: No device present at channel %d, drive %d", static_cast<int>(channel), static_cast<int>(drive));
-        return;
+        return false;
     }
 
-    if (!poll_bsy(channel) || !poll_drq(channel))
-        return;
+    auto lba_mid = Io::inb(channels_[static_cast<int>(channel)].io_base + ATA_REG_LBA_MID);
+    auto lba_high = Io::inb(channels_[static_cast<int>(channel)].io_base + ATA_REG_LBA_HIGH);
+    if (lba_mid != 0 || lba_high != 0) {
+        return false;
+    }
 
-    LibC::uint16_t identify_data[256];
+    if (!poll_drq(channel)) {
+        return false;
+    }
+
+    LibC::uint16_t identify_buffer[256];
     for (int i = 0; i < 256; ++i) {
-        identify_data[i] = Io::inw(ch.io_base);
+        identify_buffer[i] = Io::inw(channels_[static_cast<int>(channel)].io_base + ATA_REG_DATA);
     }
 
-    char model[41] = { 0 };
-    for (int i = 0; i < 20; ++i) {
-        model[i * 2] = (identify_data[27 + i] >> 8) & 0xFF;
-        model[i * 2 + 1] = identify_data[27 + i] & 0xFF;
-    }
-
-    Logf(LogLevel::INFO, "ATAController: Detected device on channel %d drive %d - Model: %s", static_cast<int>(channel), static_cast<int>(drive), model);
-}
-
-void ATAController::handle_irq(ChannelType channel) noexcept
-{
-    ATAChannel const& ch = channels_[static_cast<int>(channel)];
-    LibC::uint8_t status = Io::inb(ch.io_base + 7);
-
-    if (status & 0x01) {
-        Logf(LogLevel::ERROR, "ATAController: IRQ Error on channel %d", static_cast<int>(channel));
-        return;
-    }
-
-    if (status & 0x08) {
-        Logf(LogLevel::TRACE, "ATAController: IRQ DRQ set on channel %d", static_cast<int>(channel));
-    }
+    Logf(LogLevel::INFO, "ATA device found at channel %d drive %d", channel, drive);
+    return true;
 }
 
 bool ATAController::read_sector(ChannelType channel, DriveType drive, LibC::uint32_t lba, void* buffer)
@@ -257,4 +255,19 @@ bool ATAController::write_sectors(ChannelType channel, DriveType drive, LibC::ui
         return false;
 
     return true;
+}
+
+void ATAController::handle_irq(ChannelType channel) noexcept
+{
+    ATAChannel const& ch = channels_[static_cast<int>(channel)];
+    LibC::uint8_t status = Io::inb(ch.io_base + 7);
+
+    if (status & 0x01) {
+        Logf(LogLevel::ERROR, "ATAController: IRQ Error on channel %d", static_cast<int>(channel));
+        return;
+    }
+
+    if (status & 0x08) {
+        Logf(LogLevel::TRACE, "ATAController: IRQ DRQ set on channel %d", static_cast<int>(channel));
+    }
 }

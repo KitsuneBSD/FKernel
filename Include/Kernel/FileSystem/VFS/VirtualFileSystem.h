@@ -23,6 +23,7 @@ public:
 
     int mount(char const* path, VNode* root);
     MountPoint* find_mount_point(char const* path);
+    VNode* create_device_node(VNode* parent, char const* name, VNodeType type, void* private_data, VNodeOperations* ops);
     VNode* resolve_path(char const* path, char* relative_path_out, LibC::size_t relative_path_out_size);
     VNode* lookup(VNode* base, char const* path);
 };
