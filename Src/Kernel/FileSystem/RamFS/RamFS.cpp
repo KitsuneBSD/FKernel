@@ -73,6 +73,9 @@ VNode* ramfs_create_unix_tree()
     if (FK::alert_if(ramfs_mkdir(root, "tmp", 0777) != 0, "RAMFS: failed to mkdir /tmp"))
         return nullptr;
 
+    if (FK::alert_if(ramfs_mkdir(root, "dev", 0777) != 0, "RAMFS: failed to mkdir /dev"))
+        return nullptr;
+
     return root;
 }
 

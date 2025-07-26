@@ -137,7 +137,6 @@ bool ATAController::read_sector(ChannelType channel, DriveType drive, LibC::uint
     if (!poll_drq(channel))
         return false;
 
-    // Read 256 words (512 bytes)
     LibC::uint16_t* data = reinterpret_cast<LibC::uint16_t*>(buffer);
     for (int i = 0; i < 256; ++i) {
         data[i] = Io::inw(ch.io_base);
@@ -216,6 +215,46 @@ bool ATAController::read_sectors(ChannelType channel, DriveType drive, LibC::uin
         }
         data += 256;
     }
+
+    return true;
+}
+
+bool ATAController::write_sectors(ChannelType channel, DriveType drive, LibC::uint32_t lba, LibC::uint8_t sector_count, void const* buffer)
+{
+    if (buffer == nullptr || sector_count == 0)
+        return false;
+
+    ATAChannel const& ch = channels_[static_cast<int>(channel)];
+    select_drive(channel, drive);
+
+    Io::outb(ch.io_base + 2, sector_count);
+    Io::outb(ch.io_base + 3, static_cast<LibC::uint8_t>(lba & 0xFF));
+    Io::outb(ch.io_base + 4, static_cast<LibC::uint8_t>((lba >> 8) & 0xFF));
+    Io::outb(ch.io_base + 5, static_cast<LibC::uint8_t>((lba >> 16) & 0xFF));
+
+    LibC::uint8_t drive_head = 0xE0 | (drive == DriveType::Slave ? 0x10 : 0x00) | ((lba >> 24) & 0x0F);
+    Io::outb(ch.io_base + 6, drive_head);
+
+    Io::outb(ch.io_base + 7, 0x30); // WRITE SECTORS command
+
+    auto data = reinterpret_cast<LibC::uint16_t const*>(buffer);
+
+    for (LibC::uint8_t sector = 0; sector < sector_count; ++sector) {
+        if (!poll_bsy(channel))
+            return false;
+        if (!poll_drq(channel))
+            return false;
+
+        for (int i = 0; i < 256; ++i) {
+            Io::outw(ch.io_base, data[i]);
+        }
+        data += 256;
+    }
+
+    Io::outb(ch.io_base + 7, 0xE7); // FLUSH CACHE command
+
+    if (!poll_bsy(channel))
+        return false;
 
     return true;
 }
