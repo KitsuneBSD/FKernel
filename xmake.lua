@@ -17,6 +17,7 @@ local clang_flags = {
   "-mcmodel=kernel",
   "-mno-sse",
   "-mno-avx",
+  "-fno-pic",
 }
 
 local nasm_flags = {
