@@ -1,6 +1,6 @@
 # Building FKernel on a Native Machine
 
-> ⚠️ **Important Notice:**  
+> [!NOTE]
 > Currently, this guide is focused on **Linux** systems.  
 > Support for **Windows** is planned, but not yet fully implemented.  
 > If you're on Windows, it's recommended to use **WSL2** or a **virtual machine** for now.
@@ -66,8 +66,7 @@ Run:
 ```bash
 xmake run
 ```
-
-> 📝 **Note:**
+> [!NOTE]
 > These steps are currently handled via shell scripts, which makes Windows compatibility problematic.
 > A future rewrite may introduce cross-platform support.
 > Contributions are welcome.
