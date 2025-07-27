@@ -1,7 +1,8 @@
 #include <Kernel/FileSystem/RamFS/RamFSOperations.h>
 #include <Kernel/FileSystem/RamFS/RamFSTypes.h>
 #include <Kernel/FileSystem/RamFS/RamFSUtils.h>
-#include <Kernel/FileSystem/VFS/FilePermissions.h>
+#include <Kernel/FileSystem/VFS/File/FileOperations.h>
+#include <Kernel/FileSystem/VFS/File/FilePermissions.h>
 #include <Kernel/FileSystem/VFS/VFSTypes.h>
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/Posix/errno.h>
