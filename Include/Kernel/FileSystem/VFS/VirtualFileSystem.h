@@ -5,6 +5,7 @@
 #include <LibC/string.h>
 #include <LibFK/intrusiveList.h>
 
+#include <Kernel/FileSystem/VFS/MountPoint.h>
 #include <Kernel/FileSystem/VFS/VFSTypes.h>
 
 namespace FileSystem {
