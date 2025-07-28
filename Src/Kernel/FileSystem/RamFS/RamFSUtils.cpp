@@ -5,6 +5,12 @@
 
 namespace FileSystem {
 
+// TODO: Turn this a VFS Template function
+RamFSNode* vnode_to_ramfsnode(VNode* vnode)
+{
+    return container_of(vnode, RamFSNode, vnode);
+}
+
 bool ramfs_node_expand_data(RamFSNode* node, LibC::size_t new_size)
 {
     if (FK::alert_if(new_size <= node->data_capacity, "RAMFS: new_size is minor or equal to ramfs node capacity"))

@@ -15,11 +15,6 @@
 
 namespace FileSystem {
 
-inline RamFSNode* vnode_to_ramfsnode(VNode* vnode)
-{
-    return container_of(vnode, RamFSNode, vnode);
-}
-
 int ramfs_open(VNode* vnode, LibC::uint32_t flags)
 {
     if (!vnode) {
