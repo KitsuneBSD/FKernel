@@ -15,8 +15,8 @@ struct FileHandle {
     LibC::uint64_t offset;
     LibC::uint32_t flags;
 
-    LibC::ssize_t filehandle_read(void* buf, LibC::size_t size);
-    LibC::ssize_t filehandle_write(void const* buf, LibC::size_t size);
+    LibC::ssize_t read(void* buf, LibC::size_t size);
+    LibC::ssize_t write(void const* buf, LibC::size_t size);
 };
 
 }
