@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/FileSystem/VFS/File/FileOperations.h>
+#include <Kernel/FileSystem/VFS/File/FileHandle.h>
 #include <Kernel/FileSystem/VFS/File/FileStat.h>
 #include <Kernel/FileSystem/VFS/VNodeType.h>
 #include <LibC/stddef.h>
