@@ -3,7 +3,7 @@
 #include <Kernel/Devices/Storage/BlockDevice.h>
 #include <Kernel/Devices/Storage/BlockDeviceTypes.h>
 
-extern Device::BlockDeviceOps const AtaBlockDeviceOps;
+extern Device::BlockDeviceOps AtaBlockDeviceOps;
 
 int ata_open(Device::BlockDevice* dev);
 int ata_close(Device::BlockDevice* dev);

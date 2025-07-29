@@ -1,11 +1,18 @@
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
 #include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
 #include <Kernel/Arch/x86_64/Interrupts/Routines.h>
+#include <Kernel/Devices/Storage/BlockDevice.h>
+#include <Kernel/Devices/Storage/BlockDeviceTypes.h>
 #include <Kernel/Driver/Ata/AtaController.h>
+#include <Kernel/Driver/Ata/AtaDevice.h>
 #include <Kernel/Driver/Ata/AtaTypes.h>
+#include <Kernel/FileSystem/DevFS/DevFS.h>
+#include <Kernel/FileSystem/VFS/VFSTypes.h>
+#include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <LibC/stdint.h>
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
+#include <LibFK/new.h>
 
 void ATAController::initialize()
 {
@@ -16,18 +23,49 @@ void ATAController::initialize()
 void ATAController::detect_devices()
 {
     device_count_ = 0;
+
     for (int ch = 0; ch < 2; ++ch) {
         for (int dr = 0; dr < 2; ++dr) {
             ChannelType channel = static_cast<ChannelType>(ch);
             DriveType drive = static_cast<DriveType>(dr);
 
-            bool found = identify_device(channel, drive);
-            if (found && device_count_ < MAX_ATA_DEVICES) {
-                devices_[device_count_].channel = channel;
-                devices_[device_count_].drive = drive;
-                devices_[device_count_].present = true;
-                ++device_count_;
-            }
+            if (!identify_device(channel, drive))
+                continue;
+
+            if (device_count_ >= MAX_ATA_DEVICES)
+                continue;
+
+            devices_[device_count_].channel = channel;
+            devices_[device_count_].drive = drive;
+            devices_[device_count_].present = true;
+
+            void* vnode_mem = Falloc(sizeof(FileSystem::VNode));
+            FK::enforce(vnode_mem != nullptr, "Failed to allocate memory for VNode");
+            auto* vnode = new (vnode_mem) FileSystem::VNode();
+
+            // Aloca e constrói o BlockDevice
+            void* bdev_mem = Falloc(sizeof(Device::BlockDevice));
+            FK::enforce(bdev_mem != nullptr, "Failed to allocate memory for BlockDevice");
+            auto* bdev = new (bdev_mem) Device::BlockDevice();
+
+            static char names[MAX_ATA_DEVICES][8];
+            LibC::snprintf(names[device_count_], sizeof(names[device_count_]), "hd%d", device_count_);
+
+            bdev->name = names[device_count_];
+            bdev->block_size = 512;
+            bdev->block_count = 0; // opcional: pode tentar extrair do identify_buffer
+            bdev->private_data = &devices_[device_count_];
+            bdev->ops = nullptr;
+
+            vnode->stat.type = FileSystem::VNodeType::Device;
+            vnode->private_data = bdev;
+            vnode->ops = nullptr;
+
+            FileSystem::devfs_register_device(bdev->name, vnode);
+
+            Logf(LogLevel::INFO, "DevFS: Registered /dev/%s (ATA device)", bdev->name);
+
+            ++device_count_;
         }
     }
 }

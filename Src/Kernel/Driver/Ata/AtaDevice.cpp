@@ -72,7 +72,7 @@ int ata_ioctl(Device::BlockDevice* dev, int request, void* arg)
     return -ENOTTY;
 }
 
-Device::BlockDeviceOps const AtaBlockDeviceOps = {
+Device::BlockDeviceOps AtaBlockDeviceOps = {
     .open = ata_open,
     .close = ata_close,
     .read = ata_read,
