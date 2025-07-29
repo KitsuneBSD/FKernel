@@ -26,6 +26,7 @@ public:
     LibC::size_t allocated_region_count() const noexcept;
     void ensure_bitmap_allocated(PhysicalMemoryRegion& region) noexcept;
     void remove_region(LibC::uintptr_t phys_addr) noexcept;
+
     RegionList regions()
     {
         return regions_;
@@ -122,9 +123,6 @@ public:
 
     LibC::uintptr_t alloc_page() noexcept;
     void free_page(LibC::uintptr_t phys_addr) noexcept;
-
-    LibC::uintptr_t alloc_contiguous_pages(LibC::uint64_t page_count) noexcept;
-    void free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t page_count) noexcept;
 
     void log_memory_status() const noexcept;
 

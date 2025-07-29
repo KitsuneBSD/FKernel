@@ -1,5 +1,7 @@
+#include "Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h"
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
+#include <Kernel/MemoryManagement/MemoryManager/AllocationResult.h>
 #include <Kernel/MemoryManagement/MemoryManager/MemoryManager.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stdint.h>
@@ -9,7 +11,6 @@
 #include <LibFK/new.h>
 #include <LibFK/pair.h>
 #include <LibFK/types.h>
-
 #ifdef __x86_64__
 #    include <Kernel/Arch/x86_64/Cpu/Asm.h>
 #    include <Kernel/Arch/x86_64/Cpu/Constants.h>
@@ -169,6 +170,77 @@ void MemoryManager::initialize(multiboot2::TagMemoryMap const& mmap)
     is_initialized = true;
 
     Log(LogLevel::INFO, "MemoryManager: Initialized with successfully");
+}
+
+AllocationResult MemoryManager::alloc_pages_and_map(LibC::uint64_t page_count, LibC::uint64_t flags)
+{
+    LibC::uintptr_t virt_base = VirtualMemoryManager::instance().allocate_virtual_range(page_count);
+    FK::enforcef(virt_base != 0, "MemoryManager: Failed to allocate virtual range");
+
+    for (LibC::uint64_t i = 0; i < page_count; ++i) {
+        LibC::uintptr_t phys = PhysicalMemoryManager::instance().alloc_page();
+        FK::enforcef(phys != 0, "MemoryManager: Failed to allocate physical page");
+
+        bool mapped = VirtualMemoryManager::instance().map_page(
+            virt_base + i * TOTAL_MEMORY_PAGE_SIZE, phys, flags);
+
+        FK::enforcef(mapped, "MemoryManager: Failed to map virtual page");
+    }
+
+    AllocationResult result { .virtual_address = virt_base, .physical_address = PhysicalMemoryManager::instance().alloc_page() };
+    return result;
+}
+
+LibC::uintptr_t MemoryManager::alloc_contiguous_pages(LibC::uint64_t page_count) noexcept
+{
+    for (auto& region : PhysicalMemoryManager::instance().regions()) {
+        if (!region.is_allocated()) {
+            Logf(LogLevel::TRACE, "Region at %p not allocated", &region);
+            continue;
+        }
+
+        Logf(LogLevel::TRACE, "Trying region base=%p pages=%llu", region.base_addr, region.page_count);
+        PhysicalMemoryManager::instance().ensure_bitmap_allocated(region);
+
+        LibC::uint64_t current_run = 0;
+        LibC::uint64_t start_index = 0;
+
+        for (LibC::uint64_t i = 0; i < region.page_count; ++i) {
+            if (!region.is_page_used(i)) {
+                if (current_run == 0)
+                    start_index = i;
+
+                current_run++;
+
+                if (current_run == page_count) {
+                    Logf(LogLevel::TRACE, "Allocating from page %llu to %llu", start_index, start_index + page_count - 1);
+                    for (LibC::uint64_t j = 0; j < page_count; ++j)
+                        region.mark_page(start_index + j);
+
+                    return region.base_addr + start_index * TOTAL_MEMORY_PAGE_SIZE;
+                }
+            } else {
+                current_run = 0;
+            }
+        }
+    }
+
+    Logf(LogLevel::WARN, "MemoryManager: Failed to allocate %llu contiguous pages", page_count);
+    return 0;
+}
+
+void MemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t page_count) noexcept
+{
+    auto* region = PhysicalMemoryManager::instance().find_region_containing(phys_addr);
+    if (!region) {
+        Logf(LogLevel::ERROR, "MemoryManager: free_contiguous_pages physical address %p not found", phys_addr);
+        return;
+    }
+
+    LibC::uint64_t page_index = (phys_addr - region->base_addr) / TOTAL_MEMORY_PAGE_SIZE;
+
+    for (LibC::uint64_t i = 0; i < page_count; ++i)
+        region->unmark_page(page_index + i);
 }
 
 }

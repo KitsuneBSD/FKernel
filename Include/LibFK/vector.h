@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Kernel/MemoryManagement/MemoryManager/MemoryManager.h"
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stddef.h>
@@ -39,11 +40,11 @@ private:
         LibC::size_t new_bytes = bytes_for_capacity(new_capacity);
         LibC::size_t new_pages = pages_for_bytes(new_bytes);
 
-        LibC::uintptr_t phys = MemoryManagement::PhysicalMemoryManager::instance().alloc_contiguous_pages(new_pages);
+        LibC::uintptr_t phys = MemoryManagement::MemoryManager::instance().alloc_contiguous_pages(new_pages);
         FK::enforcef(phys != 0, "Vector: failed to allocate physical memory");
 
         LibC::uintptr_t virt = MemoryManagement::VirtualMemoryManager::instance().allocate_virtual_range(new_pages);
-        FK::enforcef(virt != 0, "Vector: failed to allocate virtual range");
+        FK::enforcef(virt != 0, "Vector: failed to allocate virtual memory range");
 
         for (LibC::size_t page = 0; page < new_pages; ++page) {
             bool mapped = MemoryManagement::VirtualMemoryManager::instance().map_page(
@@ -79,7 +80,7 @@ private:
         for (LibC::size_t i = 0; i < pages; ++i)
             MemoryManagement::VirtualMemoryManager::instance().unmap_page(va + i * page_size);
 
-        MemoryManagement::PhysicalMemoryManager::instance().free_contiguous_pages(pa, pages);
+        MemoryManagement::MemoryManager::instance().free_contiguous_pages(pa, pages);
     }
 
 public:

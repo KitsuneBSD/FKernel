@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Kernel/Boot/multiboot2.h"
+#include "Kernel/MemoryManagement/MemoryManager/AllocationResult.h"
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
@@ -32,5 +33,8 @@ public:
     }
 
     void initialize(multiboot2::TagMemoryMap const& mmap);
+    AllocationResult alloc_pages_and_map(LibC::uint64_t page_count, LibC::uint64_t flags = PAGE_PRESENT | PAGE_RW);
+    LibC::uintptr_t alloc_contiguous_pages(LibC::uint64_t page_count) noexcept;
+    void free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t page_count) noexcept;
 };
 }

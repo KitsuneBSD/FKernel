@@ -252,4 +252,13 @@ void PhysicalMemoryManager::log_memory_status() const noexcept
         used_pages_count, free_pages_count, total_pages_count);
 }
 
+PhysicalMemoryRegion* PhysicalMemoryManager::find_region_containing(LibC::uintptr_t addr) noexcept
+{
+    for (auto& region : regions_) {
+        if (addr >= region.base_addr && addr < region.base_addr + region.page_count * TOTAL_MEMORY_PAGE_SIZE)
+            return &region;
+    }
+    return nullptr;
+}
+
 }
