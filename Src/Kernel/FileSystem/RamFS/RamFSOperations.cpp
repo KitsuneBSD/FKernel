@@ -285,7 +285,7 @@ LibC::ssize_t ramfs_readlink(VNode* vnode, char* buf, LibC::size_t bufsize)
     }
 
     LibC::size_t len = LibC::strlen(node->symlink_target);
-    LibC::size_t to_copy = LibFK::min(len, bufsize);
+    LibC::size_t to_copy = LibC::min(len, bufsize);
 
     LibC::memcpy(buf, node->symlink_target, to_copy);
     if (len > bufsize)
