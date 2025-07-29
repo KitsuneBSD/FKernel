@@ -7,11 +7,11 @@
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
 #include <Kernel/Posix/errno.h>
 #include <LibC/stddef.h>
+#include <LibC/stdlib.h>
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
 #include <LibFK/new.h>
 #include <LibFK/types.h>
-#include <LibFK/utils.h>
 
 namespace FileSystem {
 
