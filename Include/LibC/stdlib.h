@@ -1,6 +1,6 @@
 #pragma once
 
-namespace LibFK {
+namespace LibC {
 
 template<typename T>
 constexpr T min(T a, T b)
