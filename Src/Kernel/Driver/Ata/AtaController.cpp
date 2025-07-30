@@ -49,7 +49,7 @@ void ATAController::detect_devices()
             auto* bdev = new (bdev_mem) Device::BlockDevice();
 
             static char names[MAX_ATA_DEVICES][8];
-            LibC::snprintf(names[device_count_], sizeof(names[device_count_]), "hd%d", device_count_);
+            LibC::snprintf(names[device_count_], sizeof(names[device_count_]), "ada%d", device_count_);
 
             bdev->name = names[device_count_];
             bdev->block_size = 512;

@@ -16,7 +16,6 @@ int ata_open(Device::BlockDevice* dev)
         return -EINVAL;
 
     auto* node = Device::blockdevice_node_from_device(dev);
-    // Nada específico a fazer na abertura do dispositivo por enquanto
     (void)node;
     return 0;
 }
