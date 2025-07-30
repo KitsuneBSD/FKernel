@@ -38,23 +38,10 @@ private:
             new_capacity *= 2;
 
         LibC::size_t new_bytes = bytes_for_capacity(new_capacity);
-        LibC::size_t new_pages = pages_for_bytes(new_bytes);
+        void* mem = Kalloc(new_bytes, alignof(T));
+        FK::enforcef(mem != nullptr, "Vector: Kalloc failed");
 
-        LibC::uintptr_t phys = MemoryManagement::MemoryManager::instance().alloc_contiguous_pages(new_pages);
-        FK::enforcef(phys != 0, "Vector: failed to allocate physical memory");
-
-        LibC::uintptr_t virt = MemoryManagement::VirtualMemoryManager::instance().allocate_virtual_range(new_pages);
-        FK::enforcef(virt != 0, "Vector: failed to allocate virtual memory range");
-
-        for (LibC::size_t page = 0; page < new_pages; ++page) {
-            bool mapped = MemoryManagement::VirtualMemoryManager::instance().map_page(
-                virt + page * page_size,
-                phys + page * page_size,
-                MemoryManagement::PAGE_PRESENT | MemoryManagement::PAGE_RW);
-            FK::enforcef(mapped, "Vector: failed to map page %zu", page);
-        }
-
-        T* new_data = reinterpret_cast<T*>(virt);
+        T* new_data = reinterpret_cast<T*>(mem);
 
         for (LibC::size_t i = 0; i < size_; ++i) {
             new (&new_data[i]) T(static_cast<T&&>(data_[i]));
@@ -62,7 +49,7 @@ private:
         }
 
         if (data_)
-            free_memory();
+            Kfree(data_, bytes_for_capacity(capacity_));
 
         data_ = new_data;
         capacity_ = new_capacity;
@@ -72,15 +59,7 @@ private:
     {
         if (!data_)
             return;
-
-        LibC::uintptr_t va = reinterpret_cast<LibC::uintptr_t>(data_);
-        LibC::uintptr_t pa = MemoryManagement::VirtualMemoryManager::instance().get_physical_address(va);
-        LibC::size_t pages = pages_for_bytes(bytes_for_capacity(capacity_));
-
-        for (LibC::size_t i = 0; i < pages; ++i)
-            MemoryManagement::VirtualMemoryManager::instance().unmap_page(va + i * page_size);
-
-        MemoryManagement::MemoryManager::instance().free_contiguous_pages(pa, pages);
+        Kfree(data_, bytes_for_capacity(capacity_));
     }
 
 public:

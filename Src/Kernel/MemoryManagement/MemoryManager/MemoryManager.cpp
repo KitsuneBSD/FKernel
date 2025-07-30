@@ -1,8 +1,7 @@
-#include "Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h"
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
-#include <Kernel/MemoryManagement/MemoryManager/AllocationResult.h>
 #include <Kernel/MemoryManagement/MemoryManager/MemoryManager.h>
+#include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stdint.h>
 #include <LibFK/enforce.h>
@@ -172,75 +171,61 @@ void MemoryManager::initialize(multiboot2::TagMemoryMap const& mmap)
     Log(LogLevel::INFO, "MemoryManager: Initialized with successfully");
 }
 
-AllocationResult MemoryManager::alloc_pages_and_map(LibC::uint64_t page_count, LibC::uint64_t flags)
+void* MemoryManager::Kernel_Alloc(LibC::size_t size, LibC::size_t alignment) noexcept
 {
-    LibC::uintptr_t virt_base = VirtualMemoryManager::instance().allocate_virtual_range(page_count);
-    FK::enforcef(virt_base != 0, "MemoryManager: Failed to allocate virtual range");
+    UNUSED(alignment)
+    if (size == 0)
+        return nullptr;
 
-    for (LibC::uint64_t i = 0; i < page_count; ++i) {
-        LibC::uintptr_t phys = PhysicalMemoryManager::instance().alloc_page();
-        FK::enforcef(phys != 0, "MemoryManager: Failed to allocate physical page");
+    LibC::size_t const page_size = TOTAL_MEMORY_PAGE_SIZE;
+    LibC::size_t const page_count = (size + page_size - 1) / page_size;
 
-        bool mapped = VirtualMemoryManager::instance().map_page(
-            virt_base + i * TOTAL_MEMORY_PAGE_SIZE, phys, flags);
+    auto& pmm = PhysicalMemoryManager::instance();
+    auto& vmm = VirtualMemoryManager::instance();
 
-        FK::enforcef(mapped, "MemoryManager: Failed to map virtual page");
-    }
+    LibC::uintptr_t virt_addr = vmm.allocate_virtual_range(page_count);
+    FK::enforcef(virt_addr != 0, "Kalloc: failed to allocate virtual address range");
 
-    AllocationResult result { .virtual_address = virt_base, .physical_address = PhysicalMemoryManager::instance().alloc_page() };
-    return result;
-}
+    for (LibC::size_t i = 0; i < page_count; ++i) {
+        LibC::uintptr_t phys_addr = pmm.alloc_page();
 
-LibC::uintptr_t MemoryManager::alloc_contiguous_pages(LibC::uint64_t page_count) noexcept
-{
-    for (auto& region : PhysicalMemoryManager::instance().regions()) {
-        if (!region.is_allocated()) {
-            Logf(LogLevel::TRACE, "Region at %p not allocated", &region);
-            continue;
-        }
-
-        Logf(LogLevel::TRACE, "Trying region base=%p pages=%llu", region.base_addr, region.page_count);
-        PhysicalMemoryManager::instance().ensure_bitmap_allocated(region);
-
-        LibC::uint64_t current_run = 0;
-        LibC::uint64_t start_index = 0;
-
-        for (LibC::uint64_t i = 0; i < region.page_count; ++i) {
-            if (!region.is_page_used(i)) {
-                if (current_run == 0)
-                    start_index = i;
-
-                current_run++;
-
-                if (current_run == page_count) {
-                    Logf(LogLevel::TRACE, "Allocating from page %llu to %llu", start_index, start_index + page_count - 1);
-                    for (LibC::uint64_t j = 0; j < page_count; ++j)
-                        region.mark_page(start_index + j);
-
-                    return region.base_addr + start_index * TOTAL_MEMORY_PAGE_SIZE;
-                }
-            } else {
-                current_run = 0;
+        if (FK::alert_if(phys_addr != 0, "Kalloc: Failed to allocate physical page, unrolling")) {
+            for (LibC::size_t j = 0; j < i; ++j) {
+                LibC::uintptr_t unmap_virt = virt_addr + j * page_size;
+                LibC::uintptr_t unmap_phys = vmm.translate(unmap_virt);
+                vmm.unmap_page(unmap_virt);
+                pmm.free_page(unmap_phys);
             }
+            return nullptr;
         }
+
+        bool mapped = vmm.map_page(virt_addr + i * page_size, phys_addr, PAGE_PRESENT | PAGE_RW);
+        FK::enforcef(mapped, "Kalloc: failed to map virtual page");
     }
 
-    Logf(LogLevel::WARN, "MemoryManager: Failed to allocate %llu contiguous pages", page_count);
-    return 0;
+    return reinterpret_cast<void*>(virt_addr);
 }
 
-void MemoryManager::free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t page_count) noexcept
+void MemoryManager::Kernel_Free(void* ptr, LibC::size_t size) noexcept
 {
-    auto* region = PhysicalMemoryManager::instance().find_region_containing(phys_addr);
-    if (!region) {
-        Logf(LogLevel::ERROR, "MemoryManager: free_contiguous_pages physical address %p not found", phys_addr);
+    if (ptr == nullptr || size == 0)
         return;
+
+    LibC::size_t const page_size = TOTAL_MEMORY_PAGE_SIZE;
+    LibC::size_t const page_count = (size + page_size - 1) / page_size;
+
+    auto& vmm = VirtualMemoryManager::instance();
+    auto& pmm = PhysicalMemoryManager::instance();
+
+    LibC::uintptr_t virt_addr = reinterpret_cast<LibC::uintptr_t>(ptr);
+
+    for (LibC::size_t i = 0; i < page_count; ++i) {
+        LibC::uintptr_t vaddr = virt_addr + i * page_size;
+        LibC::uintptr_t phys = vmm.translate(vaddr);
+
+        vmm.unmap_page(vaddr);
+        pmm.free_page(phys);
     }
-
-    LibC::uint64_t page_index = (phys_addr - region->base_addr) / TOTAL_MEMORY_PAGE_SIZE;
-
-    for (LibC::uint64_t i = 0; i < page_count; ++i)
-        region->unmark_page(page_index + i);
 }
 
 }

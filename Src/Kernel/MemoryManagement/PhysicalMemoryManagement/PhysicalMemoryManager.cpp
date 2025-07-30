@@ -92,6 +92,8 @@ LibC::uintptr_t PhysicalMemoryManager::alloc_page() noexcept
     }
 
     FK::alert("PMM: Failed to allocate single page: out of memory");
+
+    log_memory_status();
     return 0;
 }
 

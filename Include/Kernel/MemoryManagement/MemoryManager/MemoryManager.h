@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Kernel/Boot/multiboot2.h"
-#include "Kernel/MemoryManagement/MemoryManager/AllocationResult.h"
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
@@ -33,8 +32,16 @@ public:
     }
 
     void initialize(multiboot2::TagMemoryMap const& mmap);
-    AllocationResult alloc_pages_and_map(LibC::uint64_t page_count, LibC::uint64_t flags = PAGE_PRESENT | PAGE_RW);
-    LibC::uintptr_t alloc_contiguous_pages(LibC::uint64_t page_count) noexcept;
-    void free_contiguous_pages(LibC::uintptr_t phys_addr, LibC::uint64_t page_count) noexcept;
+    void* Kernel_Alloc(LibC::size_t size, LibC::size_t alignment = 16) noexcept;
+    void Kernel_Free(void* ptr, LibC::size_t size) noexcept;
 };
+}
+
+inline void* Kalloc(LibC::size_t size, LibC::size_t alignment) noexcept
+{
+    return MemoryManagement::MemoryManager::instance().Kernel_Alloc(size, alignment);
+}
+inline void Kfree(void* ptr, LibC::size_t size) noexcept
+{
+    MemoryManagement::MemoryManager::instance().Kernel_Free(ptr, size);
 }
