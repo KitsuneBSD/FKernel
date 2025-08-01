@@ -6,7 +6,8 @@
 namespace FK {
 bool Bitmap::test(LibC::size_t bit) noexcept
 {
-    FK::enforcef(bit < size_, "Bitmap: test out of range: bit=%lu (size=%lu)", bit, size_);
+    if (FK::alert_if_f(bit > size_, "Bitmap: test out of range: bit=%lu (size=%lu)", bit, size_))
+        return false;
 
     LibC::size_t idx = bit / 64;
     LibC::size_t offset = bit % 64;
@@ -17,7 +18,8 @@ bool Bitmap::test(LibC::size_t bit) noexcept
 
 bool Bitmap::set(LibC::size_t bit) noexcept
 {
-    FK::enforcef(bit < size_, "Bitmap: set out of range: bit=%lu (size=%lu)", bit, size_);
+    if (FK::alert_if_f(bit > size_, "Bitmap: set out of range: bit=%lu (size=%lu)", bit, size_))
+        return false;
 
     LibC::size_t idx = bit / 64;
     LibC::size_t offset = bit % 64;
@@ -28,7 +30,8 @@ bool Bitmap::set(LibC::size_t bit) noexcept
 
 bool Bitmap::clear(LibC::size_t bit) noexcept
 {
-    FK::enforcef(bit < size_, "Bitmap: clear out of range: bit=%lu (size=%lu)", bit, size_);
+    if (FK::alert_if_f(bit > size_, "Bitmap: clear out of range: bit=%lu (size=%lu)", bit, size_))
+        return false;
 
     LibC::size_t idx = bit / 64;
     LibC::size_t offset = bit % 64;
@@ -39,7 +42,8 @@ bool Bitmap::clear(LibC::size_t bit) noexcept
 
 bool Bitmap::find_first_clear(LibC::size_t& out_bit, LibC::size_t start) const noexcept
 {
-    FK::enforcef(start <= size_, "Bitmap: find_first_clear start out of range: start=%lu (size=%lu)", start, size_);
+    if (FK::alert_if_f(start > size_, "Bitmap: find_first_clear start out of range: start=%lu (size=%lu)", start, size_))
+        return false;
 
     LibC::size_t word_count = (size_ + 63) / 64;
 
