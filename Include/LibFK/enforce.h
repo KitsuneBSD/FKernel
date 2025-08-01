@@ -5,7 +5,7 @@
 
 namespace FK {
 
-[[noreturn]] inline void panic(char const* message) noexcept
+inline void panic(char const* message) noexcept
 {
     Logf(LogLevel::ERROR, "%s", message);
     while (true)
@@ -54,7 +54,6 @@ inline bool alert_if(bool condition, char const* message) noexcept
             "ALERT: %s", message);
         alert(buffer);
     }
-
     return condition;
 }
 
@@ -68,6 +67,8 @@ inline bool alert_if_f(bool condition, char const* format, ...) noexcept
         va_start(args, format);
         LibC::vsnprintf(msg, sizeof(msg), format, args);
         va_end(args);
+
+        msg[sizeof(msg) - 1] = '\0'; // Segurança contra truncamento
 
         LibC::snprintf(buffer, sizeof(buffer),
             "ALERT: %s", msg);

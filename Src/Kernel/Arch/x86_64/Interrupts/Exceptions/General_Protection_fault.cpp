@@ -5,8 +5,6 @@
 
 void general_protection_fault_handler(CpuState* frame)
 {
-    FK::enforce(frame == nullptr, "General Protection Fault: CPUState is null");
-
     Logf(LogLevel::ERROR,
         "[%u] General Protection Fault (#GP) at RIP=%p",
         uptime(),
