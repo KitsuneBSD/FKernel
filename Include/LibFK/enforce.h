@@ -48,33 +48,33 @@ inline void enforcef(bool condition, char const* format, ...) noexcept
 
 inline bool alert_if(bool condition, char const* message) noexcept
 {
-    if (!condition)
-        return false;
+    if (condition) {
+        char buffer[512];
+        LibC::snprintf(buffer, sizeof(buffer),
+            "ALERT: %s", message);
+        alert(buffer);
+    }
 
-    char buffer[512];
-    LibC::snprintf(buffer, sizeof(buffer),
-        "ALERT: %s", message);
-    alert(buffer);
-    return true;
+    return condition;
 }
 
 inline bool alert_if_f(bool condition, char const* format, ...) noexcept
 {
-    if (!condition)
-        return false;
-
     char msg[384];
     char buffer[512];
 
-    va_list args;
-    va_start(args, format);
-    LibC::vsnprintf(msg, sizeof(msg), format, args);
-    va_end(args);
+    if (condition) {
+        va_list args;
+        va_start(args, format);
+        LibC::vsnprintf(msg, sizeof(msg), format, args);
+        va_end(args);
 
-    LibC::snprintf(buffer, sizeof(buffer),
-        "ALERT: %s", msg);
-    alert(buffer);
-    return true;
+        LibC::snprintf(buffer, sizeof(buffer),
+            "ALERT: %s", msg);
+        alert(buffer);
+    }
+
+    return condition;
 }
 
 } // namespace FK
