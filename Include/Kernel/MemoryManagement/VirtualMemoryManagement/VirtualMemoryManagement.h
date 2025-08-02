@@ -3,8 +3,6 @@
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
-extern "C" LibC::uint64_t* current_pml4_ptr;
-
 namespace MemoryManagement {
 
 // TODO: Rewrite with builder design pattern
@@ -33,7 +31,7 @@ public:
         return v_instance;
     }
 
-    LibC::uint64_t* pml4 = current_pml4_ptr;
+    LibC::uint64_t* pml4 = nullptr;
     void create_tables_if_needed(LibC::uintptr_t virt_addr) noexcept;
     LibC::uint64_t* get_or_create_pte(LibC::uintptr_t virt_addr) noexcept;
     LibC::uint64_t* get_pte(LibC::uintptr_t virt_addr) noexcept;

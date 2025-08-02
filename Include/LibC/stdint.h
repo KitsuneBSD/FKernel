@@ -36,4 +36,5 @@ typedef __INTPTR_TYPE__ intptr_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 
 constexpr LibC::uint64_t UINT64_MAX = 0xFFFFFFFFFFFFFFFFULL;
+constexpr LibC::uint64_t UINTPTR_MAX = 0xFFFFFFFFFFFFFFFFULL;
 }

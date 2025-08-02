@@ -19,10 +19,20 @@ namespace MemoryManagement {
 
 extern "C" char __kernel_end[];
 
+constexpr LibC::uintptr_t KERNEL_VIRT_BASE = 0xffff800000000000;                // base virtual onde a RAM é mapeada
+constexpr LibC::uintptr_t KERNEL_DIRECT_MAP_SIZE = 512ull * 1024 * 1024 * 1024; // 512 GiB
+
 // TODO: Put this code in a LibC::ceil function
 static constexpr LibC::uintptr_t align_down(LibC::uintptr_t value, LibC::uintptr_t alignment) noexcept
 {
     return value & ~(alignment - 1);
+}
+
+constexpr LibC::uintptr_t phys_to_virt(LibC::uintptr_t phys)
+{
+    return (phys < KERNEL_DIRECT_MAP_SIZE)
+        ? reinterpret_cast<LibC::uintptr_t>(phys + KERNEL_VIRT_BASE)
+        : 0;
 }
 
 MMapCacheEntry* MemoryManager::find_cache_entry(LibC::uintptr_t phys_addr) noexcept
@@ -42,6 +52,9 @@ MMapCacheEntry* MemoryManager::find_cache_entry(LibC::uintptr_t phys_addr) noexc
 void MemoryManager::initialize(multiboot2::TagMemoryMap const& mmap)
 {
     auto& pmm = PhysicalMemoryManager::instance();
+    auto& vmm = VirtualMemoryManager::instance();
+
+    vmm.pml4 = reinterpret_cast<LibC::uint64_t*>(read_cr3());
 
     for (auto it = mmap.begin(); it != mmap.end(); ++it) {
         auto const& entry = *it;
@@ -67,6 +80,12 @@ void MemoryManager::initialize(multiboot2::TagMemoryMap const& mmap)
                     pmm.ensure_bitmap_allocated(*region);
                     pmm.mark_pages(*region, 0, region_pages, true);
                 }
+
+                auto virt = phys_to_virt(region->base_addr);
+                vmm.map_page(virt, region->base_addr, PAGE_PRESENT);
+            } else {
+                auto virt = phys_to_virt(region->base_addr);
+                vmm.map_page(virt, region->base_addr, PAGE_PRESENT | PAGE_RW);
             }
 
             base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
