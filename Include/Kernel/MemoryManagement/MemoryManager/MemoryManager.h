@@ -18,10 +18,7 @@ class MemoryManager {
 private:
     bool is_initialized = false;
     FK::IntrusiveList<MMapCacheEntry, &MMapCacheEntry::list_node> mmap_cache;
-    void allocate_and_map() noexcept;
-    void populate_cache(multiboot2::TagMemoryMap const& mmap) noexcept;
     MMapCacheEntry* find_cache_entry(LibC::uintptr_t phys_addr) noexcept;
-
     MemoryManager() = default;
 
 public:
@@ -32,5 +29,7 @@ public:
     }
 
     void initialize(multiboot2::TagMemoryMap const& mmap);
+    void* Kernel_Alloc(LibC::size_t size, LibC::uint64_t flags = PAGE_PRESENT | PAGE_RW);
+    void Kernel_Free(void* addr, LibC::size_t size);
 };
 }

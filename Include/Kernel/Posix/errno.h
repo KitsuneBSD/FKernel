@@ -27,5 +27,6 @@ extern int errno;
 #define EROFS 30     /* Read-only filesystem */
 #define EPIPE 32     /* Broken pipe */
 #define EAGAIN 35    /* Resource temporarily unavailable */
+#define ENAMETOOLONG /*  File name too long  */
 #define ENOTEMPTY 66 /* Directory not empty */
 #define ENOSYS 78    /* Function not implemented */

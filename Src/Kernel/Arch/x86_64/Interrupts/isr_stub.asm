@@ -3,20 +3,21 @@ bits 64
 extern global_default_handler
 
 section .text
+
 global isr_common_stub
 
 %macro ISR_NO_ERRCODE 2
-    [global %1]
+    global %1
 %1:
-    push qword %2            
-    push qword 0           
+    push qword %2          ; push interrupt_id
+    push qword 0           ; push fake error_code = 0
     jmp isr_common_stub
 %endmacro
 
 %macro ISR_ERRCODE 2
-    [global %1]
+    global %1
 %1:
-    push qword %2           
+    push qword %2          ; push interrupt_id
     jmp isr_common_stub
 %endmacro
 
@@ -53,10 +54,9 @@ ISR_NO_ERRCODE isr_reserved_29,         29
 ISR_NO_ERRCODE isr_reserved_30,         30
 ISR_NO_ERRCODE isr_reserved_31,         31
 
+
 isr_common_stub:
     cli
-
-    mov rdi, rsp        ; passa o ponteiro para o início do frame, incluindo interrupt_id e error_code
 
     push r15
     push r14
@@ -74,11 +74,16 @@ isr_common_stub:
     push rbx
     push rax
 
-    sub rsp, 8          ; shadow space para alinhamento 16 bytes (Windows ABI compatibilidade, ok manter)
+    ; Agora a pilha está assim (topo -> base):
+    ; [rax ... r15] [error_code] [interrupt_id] [return addr do isr macro ou cpu]
+
+    mov rdi, rsp         ; ponteiro para r15 (primeiro registro salvo manualmente)
+
+    sub rsp, 8           ; alinhamento ABI
 
     call global_default_handler
 
-    add rsp, 8          ; desfaz shadow space
+    add rsp, 8
 
     pop rax
     pop rbx
@@ -96,7 +101,7 @@ isr_common_stub:
     pop r14
     pop r15
 
-    add rsp, 16         ; desfaz os pushes iniciais (interrupt_id, error_code)
+    add rsp, 16          ; remove error_code e interrupt_id
 
     sti
     iretq

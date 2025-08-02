@@ -4,8 +4,8 @@
 #    include <Kernel/Arch/x86_64/Interrupts/Routines.h>
 #endif
 
-#include <Kernel/Driver/8259Pic.h>
-#include <Kernel/Driver/8259Pic_Constants.h>
+#include <Kernel/Driver/8259Pic/8259Pic.h>
+#include <Kernel/Driver/8259Pic/8259Pic_Constants.h>
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
 

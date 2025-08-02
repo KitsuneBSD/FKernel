@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Driver/SerialPort.h>
+#include <Kernel/Driver/SerialPort/SerialPort.h>
 #include <LibC/stdarg.h>
 #include <LibC/stdio.h>
 

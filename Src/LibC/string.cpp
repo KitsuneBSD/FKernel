@@ -224,4 +224,12 @@ int strcmp(char const* a, char const* b)
     return *(unsigned char*)a - *(unsigned char*)b;
 }
 
+extern "C" char* strcpy(char* dest, char const* src)
+{
+    char* original = dest;
+    while ((*dest++ = *src++))
+        ;
+    return original;
+}
+
 }

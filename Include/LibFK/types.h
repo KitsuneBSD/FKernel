@@ -12,12 +12,11 @@ typedef LibC::uint64_t qword;
 typedef LibC::int8_t signed_byte;
 typedef LibC::int16_t signed_word;
 typedef LibC::int32_t signed_dword;
-typedef LibC::int8_t signed_qword;
+typedef LibC::int64_t signed_qword;
 
 constexpr unsigned KiB = 1024;
 constexpr unsigned MiB = KiB * KiB;
 constexpr unsigned GiB = MiB * KiB;
-
 }
 
 #define UNUSED(x) \

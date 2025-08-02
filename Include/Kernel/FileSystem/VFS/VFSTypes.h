@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Kernel/FileSystem/VFS/FileOperations.h>
+#include <Kernel/FileSystem/VFS/File/FileHandle.h>
+#include <Kernel/FileSystem/VFS/File/FileStat.h>
+#include <Kernel/FileSystem/VFS/VNodeType.h>
 #include <LibC/stddef.h>
 #include <LibFK/intrusiveList.h>
 
@@ -9,23 +11,6 @@ namespace FileSystem {
 constexpr LibC::size_t MAX_NAME_LEN = 256;
 constexpr LibC::size_t MAX_PATH_LEN = 1024;
 constexpr LibC::size_t MAX_SYMLINK_TARGET_LEN = 256;
-
-struct VNode;
-
-enum class VNodeType : LibC::uint8_t {
-    Unknown,
-    File,
-    Directory,
-    Symlink,
-    Device,
-    Mountpoint
-};
-
-struct MountPoint {
-    char path[MAX_PATH_LEN];
-    VNode* root_vnode;
-    FK::IntrusiveNode<MountPoint> list_node;
-};
 
 struct VNodeOperations {
     int (*open)(VNode* vnode, LibC::uint32_t flags);
@@ -56,17 +41,17 @@ struct VNode {
     void vnode_ref();
     void vnode_unref();
 
-    inline bool is_directory() const
+    bool is_directory() const
     {
         return stat.type == VNodeType::Directory;
     }
 
-    inline bool is_symbolic() const
+    bool is_symbolic() const
     {
         return stat.type == VNodeType::Symlink;
     }
 
-    inline bool is_file() const
+    bool is_file() const
     {
         return stat.type == VNodeType::File;
     }

@@ -27,4 +27,8 @@ else
 	grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso "build/mockos"
 fi
 
+if [ ! -f "build/FKernel-HDA.qcow2" ]; then 
+qemu-img create "FKernel-HDA.qcow2" 4G -f qcow2
+mv "FKernel-HDA.qcow2" "build/FKernel-HDA.qcow2"
+fi
 rm -rf "build/mockos"

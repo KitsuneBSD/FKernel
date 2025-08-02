@@ -179,6 +179,7 @@ void* FreeListAllocator::try_allocate(LibC::size_t size, LibC::size_t alignment)
     }
 
     Log(LogLevel::WARN, "FreeListAllocator: Out of memory");
+
     return nullptr;
 }
 

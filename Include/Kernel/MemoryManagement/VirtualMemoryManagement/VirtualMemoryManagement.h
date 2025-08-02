@@ -1,8 +1,7 @@
 #pragma once
 
+#include <LibC/stddef.h>
 #include <LibC/stdint.h>
-
-extern "C" LibC::uint64_t* current_pml4_ptr;
 
 namespace MemoryManagement {
 
@@ -22,6 +21,8 @@ class VirtualMemoryManager {
 private:
     VirtualMemoryManager() = default;
 
+    LibC::uintptr_t find_free_virtual_range(LibC::size_t page_count);
+
 public:
     static VirtualMemoryManager& instance() noexcept
     {
@@ -30,7 +31,7 @@ public:
         return v_instance;
     }
 
-    LibC::uint64_t* pml4 = current_pml4_ptr;
+    LibC::uint64_t* pml4 = nullptr;
     void create_tables_if_needed(LibC::uintptr_t virt_addr) noexcept;
     LibC::uint64_t* get_or_create_pte(LibC::uintptr_t virt_addr) noexcept;
     LibC::uint64_t* get_pte(LibC::uintptr_t virt_addr) noexcept;
@@ -39,6 +40,8 @@ public:
     bool map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept;
     bool unmap_page(LibC::uintptr_t virt_addr) noexcept;
     LibC::uintptr_t translate(LibC::uintptr_t virt_addr) noexcept;
+    bool is_canonical(LibC::uintptr_t addr) noexcept;
+    LibC::uintptr_t allocate_virtual_range(LibC::size_t page_count);
 };
 
 }

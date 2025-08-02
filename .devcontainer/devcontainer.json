@@ -1,0 +1,22 @@
+{
+  "name": "FKernel Dev (Podman)",
+ "build": {
+  "dockerfile": "Dockerfile",
+  "context": ".."
+},
+
+  "runArgs": [
+    "--cap-add=SYS_ADMIN",
+    "--device=/dev/kvm",
+    "--security-opt", "label=disable"
+  ],
+  "mounts": [
+    "source=devpod-fkernel-cache,target=/home/devpod/.cache,type=volume"
+  ],
+  "extensions": [
+    "xmake-io.xmake-vscode",
+    "llvm-vs-code-extensions.vscode-clangd",
+    "ms-vscode.cpptools"
+  ],
+  "postCreateCommand": "sudo chown -R devpod:devpod /workspaces/fkernel"
+}

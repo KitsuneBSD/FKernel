@@ -1,8 +1,8 @@
 #include <Kernel/Arch/x86_64/Cpu/Constants.h>
 #include <Kernel/Arch/x86_64/Hardware/Io.h>
 #include <Kernel/Arch/x86_64/Hardware/Io_Constants.h>
-#include <Kernel/Driver/Pit.h>
-#include <Kernel/Driver/Pit_constants.h>
+#include <Kernel/Driver/Pit/Pit.h>
+#include <Kernel/Driver/Pit/Pit_constants.h>
 #include <LibFK/enforce.h>
 #include <LibFK/log.h>
 

@@ -17,7 +17,7 @@ extern "C" void global_default_handler(CpuState* const frame)
 
     if (frame->interrupt_id >= MAX_EXCEPTION_ID) {
         FK::alert_if_f(true, "Global Default Handler: Unknown exception interrupt_id %u", frame->interrupt_id);
-        halt();
+        return;
     }
 
     if (frame->interrupt_id == 13) {
