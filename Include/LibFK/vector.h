@@ -5,6 +5,7 @@
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stddef.h>
+#include <LibC/stdlib.h>
 #include <LibFK/enforce.h>
 #include <LibFK/new.h>
 
@@ -39,8 +40,8 @@ private:
             new_capacity *= 2;
 
         LibC::size_t new_bytes = bytes_for_capacity(new_capacity);
-        void* mem = Falloc(new_bytes, alignof(T));
-        FK::enforcef(mem != nullptr, "Vector: Falloc failed");
+        void* mem = malloc(new_bytes, alignof(T));
+        FK::alert_if(mem == nullptr, "Vector: Falloc failed");
 
         T* new_data = reinterpret_cast<T*>(mem);
 
@@ -50,7 +51,7 @@ private:
         }
 
         if (data_)
-            Ffree(data_);
+            free(data_);
 
         data_ = new_data;
         capacity_ = new_capacity;
@@ -60,7 +61,7 @@ private:
     {
         if (!data_)
             return;
-        Ffree(data_);
+        free(data_);
     }
 
 public:

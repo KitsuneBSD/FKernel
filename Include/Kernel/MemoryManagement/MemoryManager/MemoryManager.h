@@ -29,5 +29,7 @@ public:
     }
 
     void initialize(multiboot2::TagMemoryMap const& mmap);
+    void* Kernel_Alloc(LibC::size_t size, LibC::uint64_t flags = PAGE_PRESENT | PAGE_RW);
+    void Kernel_Free(void* addr, LibC::size_t size);
 };
 }

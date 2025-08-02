@@ -42,7 +42,6 @@ public:
     LibC::uintptr_t translate(LibC::uintptr_t virt_addr) noexcept;
     bool is_canonical(LibC::uintptr_t addr) noexcept;
     LibC::uintptr_t allocate_virtual_range(LibC::size_t page_count);
-    LibC::uintptr_t get_physical_address(LibC::uintptr_t virt_addr);
 };
 
 }
