@@ -40,8 +40,11 @@ public:
 
     static inline bool is_valid_aligned_address(LibC::uintptr_t addr, LibC::uintptr_t base, LibC::uint64_t page_count) noexcept
     {
-        FK::enforcef(base != 0, "PMM: is_valid_aligned_address base cannot be zero");
-        FK::enforcef(page_count > 0, "PMM: is_valid_aligned_address page_count must be positive");
+        if (FK::alert_if_f(base == 0, "PMM: is_valid_aligned_address base %zu cannot be zero"))
+            return false;
+
+        if (FK::alert_if_f(page_count == 0, "PMM: is_valid_aligned_address page_count must be positive"))
+            return false;
 
         if (addr < base)
             return false;
@@ -55,7 +58,8 @@ public:
 
     static bool bitmap_is_valid(PhysicalMemoryRegion const& region) noexcept
     {
-        FK::enforcef(region.is_allocated(), "PMM: bitmap_is_valid called on unallocated region base=%p", region.base_addr);
+        if (FK::alert_if_f(!region.is_allocated(), "PMM: bitmap_is_valid called on unallocated region base=%p", region.base_addr))
+            return false;
         return region.bitmap.is_valid();
     }
 
@@ -93,16 +97,22 @@ public:
         last_word &= mask;
         return remaining_bits - __builtin_popcountll(last_word);
     }
+
     static PhysicalMemoryRegion* allocate_region(LibC::uintptr_t base_addr, LibC::uint64_t page_count) noexcept
     {
-        FK::enforcef(base_addr != 0, "PMM: allocate_region received base_addr=0");
-        FK::enforcef(page_count > 0, "PMM: allocate_region received page_count=0");
+        if (FK::alert_if_f(base_addr == 0, "PMM: allocate_region received base_addr=0"))
+            return nullptr;
+
+        if (FK::alert_if_f(page_count == 0, "PMM: allocate_region received page_count=0"))
+            return nullptr;
 
         void* mem = Falloc_zeroed(sizeof(PhysicalMemoryRegion), alignof(PhysicalMemoryRegion));
-        FK::enforcef(mem != nullptr, "PMM: Failed to allocate memory for region");
+        if (FK::alert_if_f(mem == nullptr, "PMM: Failed to allocate memory for region"))
+            return nullptr;
 
         auto* region = reinterpret_cast<PhysicalMemoryRegion*>(mem);
-        FK::enforcef(!region->is_allocated(), "PMM: Region memory unexpectedly marked as allocated at %p", region);
+        if (FK::alert_if_f(region->is_allocated(), "PMM: Region memory unexpectedly marked as allocated at %p", region))
+            return nullptr;
 
         region->init(base_addr, page_count);
         return region;
@@ -110,11 +120,11 @@ public:
 
     static void deallocate_region(PhysicalMemoryRegion* region) noexcept
     {
-        FK::alert_if_f(region == nullptr, "PMM: deallocate_region received nullptr");
-        if (region == nullptr)
+        if (FK::alert_if_f(region == nullptr, "PMM: deallocate_region received nullptr"))
             return;
 
-        FK::enforcef(!region->is_allocated(), "PMM: Trying to deallocate region that is still allocated base=%p", region->base_addr);
+        if (FK::alert_if_f(!region->is_allocated(), "PMM: Trying to deallocate region that is not allocated base=%p", region->base_addr))
+            return;
 
         region->destroy();
         region->~PhysicalMemoryRegion();

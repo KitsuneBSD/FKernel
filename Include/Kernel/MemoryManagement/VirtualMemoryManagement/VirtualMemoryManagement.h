@@ -42,7 +42,7 @@ public:
     bool map_page(LibC::uintptr_t virt_addr, LibC::uintptr_t phys_addr, LibC::uint64_t flags) noexcept;
     bool unmap_page(LibC::uintptr_t virt_addr) noexcept;
     LibC::uintptr_t translate(LibC::uintptr_t virt_addr) noexcept;
-
+    bool is_canonical(LibC::uintptr_t addr) noexcept;
     LibC::uintptr_t allocate_virtual_range(LibC::size_t page_count);
     LibC::uintptr_t get_physical_address(LibC::uintptr_t virt_addr);
 };

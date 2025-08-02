@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Kernel/MemoryManagement/MemoryManager/MemoryManager.h"
-#include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
+#include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
+#include <Kernel/MemoryManagement/MemoryManager/MemoryManager.h>
+#include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stddef.h>
 #include <LibFK/enforce.h>
@@ -38,8 +39,8 @@ private:
             new_capacity *= 2;
 
         LibC::size_t new_bytes = bytes_for_capacity(new_capacity);
-        void* mem = Kalloc(new_bytes, alignof(T));
-        FK::enforcef(mem != nullptr, "Vector: Kalloc failed");
+        void* mem = Falloc(new_bytes, alignof(T));
+        FK::enforcef(mem != nullptr, "Vector: Falloc failed");
 
         T* new_data = reinterpret_cast<T*>(mem);
 
@@ -49,7 +50,7 @@ private:
         }
 
         if (data_)
-            Kfree(data_, bytes_for_capacity(capacity_));
+            Ffree(data_);
 
         data_ = new_data;
         capacity_ = new_capacity;
@@ -59,7 +60,7 @@ private:
     {
         if (!data_)
             return;
-        Kfree(data_, bytes_for_capacity(capacity_));
+        Ffree(data_);
     }
 
 public:

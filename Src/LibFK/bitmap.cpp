@@ -64,8 +64,10 @@ bool Bitmap::find_first_clear(LibC::size_t& out_bit, LibC::size_t start) const n
 
 void Bitmap::reset(LibC::uint64_t* buffer, LibC::size_t bits) noexcept
 {
-    FK::enforce(buffer != nullptr, "Bitmap: reset called with nullptr buffer");
-    FK::enforce(bits > 0, "Bitmap: reset called with zero bits");
+    if (alert_if(buffer != nullptr, "Bitmap: reset called with nullptr buffer"))
+        return;
+    if (alert_if(bits > 0, "Bitmap: reset called with zero bits"))
+        return;
 
     data_ = buffer;
     size_ = bits;
