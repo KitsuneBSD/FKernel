@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LibFK/intrusiveList.h"
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <LibC/stdint.h>
@@ -12,7 +13,6 @@ namespace MemoryManagement {
 class PhysicalMemoryManager {
 private:
     using RegionList = FK::IntrusiveList<PhysicalMemoryRegion, &PhysicalMemoryRegion::list_node>;
-
     RegionList regions_;
 
 public:
