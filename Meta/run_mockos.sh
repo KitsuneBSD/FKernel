@@ -11,21 +11,23 @@ fi
 
 MockOS="build/FKernel-MockOS.iso"
 
-if [ ! -f "build/FKernel-HDA.qcow2"]; then 
-qemu-system-x86_64 \
-	-cdrom "$MockOS" \
-	-m 2G \
-	-nographic \
-	-serial mon:stdio \
-  -smp 2 \
-	-boot d
+# TODO: Add a dynamic memory size limit from this kernel
+
+if [ ! -f "build/FKernel-HDA.qcow2" ]; then
+	qemu-system-x86_64 \
+		-cdrom "$MockOS" \
+		-m 2G \
+		-nographic \
+		-serial mon:stdio \
+		-smp 2 \
+		-boot d
 else
-  qemu-system-x86_64 \
-    -cdrom "$MockOS" \
-    -m 4G \
-    -nographic \
-    -serial mon:stdio \
-    -smp 2 \
-    -boot d \
-    -hda "build/FKernel-HDA.qcow2"
+	qemu-system-x86_64 \
+		-cdrom "$MockOS" \
+		-m 2G \
+		-nographic \
+		-serial mon:stdio \
+		-smp 2 \
+		-boot d \
+		-hda "build/FKernel-HDA.qcow2"
 fi

@@ -6,12 +6,11 @@
 
 namespace MemoryManagement {
 
-struct alignas(16) BlockHeader {
+struct BlockHeader {
+    static constexpr LibC::uint32_t magic = 0xDEADBEEF;
     LibC::size_t size;
     LibC::size_t padding;
-    LibC::uintptr_t magic_check;
-
-    static constexpr LibC::uintptr_t magic = 0xDEADBEEFDEADBEEFull;
+    LibC::uint32_t magic_check;
 
     bool is_valid() const
     {
@@ -20,8 +19,8 @@ struct alignas(16) BlockHeader {
 };
 
 struct FreeMemoryBlock {
-    LibC::size_t size;
     FK::IntrusiveNode<FreeMemoryBlock> ListNode;
+    LibC::size_t size;
 };
 
 class FreeListAllocator {

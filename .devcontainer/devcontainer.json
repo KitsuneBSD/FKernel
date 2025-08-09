@@ -1,10 +1,11 @@
 {
-  "name": "FKernel Dev (Podman)",
- "build": {
-  "dockerfile": "Dockerfile",
-  "context": ".."
-},
-
+  "name": "FKernel Dev",
+  "build": {
+    "dockerfile": ".devcontainer/Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "devpod",
+  "workspaceFolder": "/workspaces/FKernel",
   "runArgs": [
     "--cap-add=SYS_ADMIN",
     "--device=/dev/kvm",
@@ -13,10 +14,14 @@
   "mounts": [
     "source=devpod-fkernel-cache,target=/home/devpod/.cache,type=volume"
   ],
-  "extensions": [
-    "xmake-io.xmake-vscode",
-    "llvm-vs-code-extensions.vscode-clangd",
-    "ms-vscode.cpptools"
-  ],
-  "postCreateCommand": "sudo chown -R devpod:devpod /workspaces/fkernel"
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "xmake-io.xmake-vscode",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cpptools"
+      ]
+    }
+  },
+  "postCreateCommand": "sudo chown -R devpod:devpod /workspaces/FKernel"
 }

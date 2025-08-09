@@ -47,15 +47,14 @@ void PhysicalMemoryManager::add_region(PhysicalMemoryRegion* region) noexcept
     regions_.append(region);
 }
 
-void PhysicalMemoryManager::remove_region(LibC::uintptr_t phys_addr) noexcept
+void PhysicalMemoryManager::remove_region(PhysicalMemoryRegion* region) noexcept
 {
-    Logf(LogLevel::TRACE, "PMM: remove_region(addr=%p)", phys_addr);
+    Logf(LogLevel::TRACE, "PMM: remove_region(addr=%p)", region->base_addr);
 
-    if (FK::alert_if_f(phys_addr == 0, "PMM: remove_region received null physical address"))
+    if (FK::alert_if_f(region->base_addr == 0, "PMM: remove_region received null physical address"))
         return;
 
-    auto* region = find_region(phys_addr);
-    if (FK::alert_if_f(region == nullptr, "PMM: remove_region failed to find region for address %p", phys_addr))
+    if (FK::alert_if_f(region == nullptr, "PMM: remove_region failed to find region for address %p", region->base_addr))
         return;
 
     regions_.remove(region);

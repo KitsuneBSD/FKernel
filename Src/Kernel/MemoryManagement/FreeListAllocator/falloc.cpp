@@ -50,20 +50,22 @@ void* FreeListAllocator::alloc(LibC::size_t size, LibC::size_t alignment)
 
 void FreeListAllocator::free(void* ptr)
 {
-    if (FK::alert_if_f(ptr == nullptr, "FreeListAllocator: Free called with null")) {
+    if (FK::alert_if_f(ptr == nullptr, "FreeListAllocator: Free called with null"))
         return;
-    }
 
-    LibC::uintptr_t user_addr = reinterpret_cast<LibC::uintptr_t>(ptr);
-    auto* header = reinterpret_cast<BlockHeader*>(user_addr - sizeof(BlockHeader));
+    LibC::uintptr_t user_data_addr = reinterpret_cast<LibC::uintptr_t>(ptr);
+    LibC::uintptr_t header_addr = user_data_addr - sizeof(BlockHeader);
+    auto* header = reinterpret_cast<BlockHeader*>(header_addr);
 
-    header = reinterpret_cast<BlockHeader*>(user_addr - sizeof(BlockHeader) - header->padding);
-
-    if (FK::alert_if_f(!header->is_valid(), "FreeListAllocator: Invalid free: header corrupt or double free")) {
+    if (FK::alert_if_f(!header->is_valid(), "FreeListAllocator: Invalid free: corrupt or double free"))
         return;
-    }
 
-    LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(header);
+    LibC::uintptr_t block_addr = header_addr - header->padding;
+
+    if (FK::alert_if_f(block_addr < heap_start || block_addr >= heap_end,
+            "FreeListAllocator: Block outside heap bounds"))
+        return;
+
     auto* block = reinterpret_cast<FreeMemoryBlock*>(block_addr);
     block->size = header->size;
 
@@ -203,10 +205,12 @@ void* FreeListAllocator::place_block_for(FreeMemoryBlock* block, LibC::size_t si
         return nullptr;
 
     LibC::uintptr_t block_addr = reinterpret_cast<LibC::uintptr_t>(block);
-    LibC::uintptr_t header_addr = block_addr;
-    LibC::uintptr_t user_data_addr = (header_addr + sizeof(BlockHeader) + alignment - 1) & ~(alignment - 1);
-    LibC::size_t padding = user_data_addr - (header_addr + sizeof(BlockHeader));
-    LibC::size_t total_needed = sizeof(BlockHeader) + padding + size;
+
+    LibC::uintptr_t aligned_user_data = (block_addr + sizeof(BlockHeader) + alignment - 1) & ~(alignment - 1);
+    LibC::uintptr_t header_addr = aligned_user_data - sizeof(BlockHeader);
+    LibC::size_t padding = header_addr - block_addr;
+
+    LibC::size_t total_needed = padding + sizeof(BlockHeader) + size;
 
     if (FK::alert_if_f(block->size < total_needed, "FreeListAllocator: place_block_for block too small"))
         return nullptr;
@@ -218,7 +222,7 @@ void* FreeListAllocator::place_block_for(FreeMemoryBlock* block, LibC::size_t si
     header->padding = padding;
     header->magic_check = BlockHeader::magic;
 
-    return reinterpret_cast<void*>(user_data_addr);
+    return reinterpret_cast<void*>(aligned_user_data);
 }
 
 void FreeListAllocator::handle_split_or_take_block(FreeMemoryBlock* block, LibC::size_t total_needed)

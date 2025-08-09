@@ -19,13 +19,10 @@ struct PhysicalMemoryRegion {
 
     LibC::size_t bitmap_word_count = 0;
 
-    FK::IntrusiveNode<PhysicalMemoryRegion> list_node;
-    FK::IntrusiveList<PhysicalMemoryRegion, &PhysicalMemoryRegion::list_node> region_list;
-
     bool bitmap_allocated = false;
     bool allocated = false;
     bool initialized = false;
-
+    FK::IntrusiveNode<PhysicalMemoryRegion> list_node;
     PhysicalMemoryRegion() noexcept = default;
 
     PhysicalMemoryRegion(LibC::uintptr_t base, LibC::uint64_t pages) noexcept

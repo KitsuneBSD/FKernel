@@ -36,7 +36,6 @@ void PhysicalMemoryRegion::destroy() noexcept
     page_count = 0;
     allocated = false;
     bitmap_allocated = false;
-    region_list = {};
 
     LibC::memset(this, 0, sizeof(*this));
 }

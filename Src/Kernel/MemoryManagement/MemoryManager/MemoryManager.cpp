@@ -2,6 +2,7 @@
 #include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/MemoryManagement/MemoryManager/MemoryManager.h>
 #include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryManager.h>
+#include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
 #include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stdint.h>
 #include <LibFK/enforce.h>
@@ -10,6 +11,7 @@
 #include <LibFK/new.h>
 #include <LibFK/pair.h>
 #include <LibFK/types.h>
+
 #ifdef __x86_64__
 #    include <Kernel/Arch/x86_64/Cpu/Asm.h>
 #    include <Kernel/Arch/x86_64/Cpu/Constants.h>
@@ -22,10 +24,16 @@ extern "C" char __kernel_end[];
 constexpr LibC::uintptr_t KERNEL_VIRT_BASE = 0xffff800000000000;                // base virtual onde a RAM é mapeada
 constexpr LibC::uintptr_t KERNEL_DIRECT_MAP_SIZE = 512ull * 1024 * 1024 * 1024; // 512 GiB
 
-// TODO: Put this code in a LibC::ceil function
+// TODO: Put this code in a LibC::floor function
 static constexpr LibC::uintptr_t align_down(LibC::uintptr_t value, LibC::uintptr_t alignment) noexcept
 {
     return value & ~(alignment - 1);
+}
+
+// TODO: Put this code in a LibC::ceil function
+static constexpr LibC::uintptr_t align_up(LibC::uintptr_t value, LibC::uintptr_t alignment) noexcept
+{
+    return (value + alignment - 1) & ~(alignment - 1);
 }
 
 constexpr LibC::uintptr_t phys_to_virt(LibC::uintptr_t phys)
@@ -59,43 +67,66 @@ void MemoryManager::initialize(multiboot2::TagMemoryMap const& mmap)
     for (auto it = mmap.begin(); it != mmap.end(); ++it) {
         auto const& entry = *it;
 
-        if (entry.length < TOTAL_MEMORY_PAGE_SIZE || entry.base_addr < static_cast<FK::qword>(1 * FK::MiB)) {
+        if (entry.length < TOTAL_MEMORY_PAGE_SIZE || entry.base_addr < static_cast<FK::qword>(1 * FK::MiB))
             continue;
-        }
 
-        LibC::uintptr_t base = entry.base_addr;
-        LibC::uint64_t total_pages = entry.length / TOTAL_MEMORY_PAGE_SIZE;
+        LibC::uintptr_t aligned_base = align_up(entry.base_addr, TOTAL_MEMORY_PAGE_SIZE);
+        LibC::uintptr_t end = entry.base_addr + entry.length;
+
+        if (aligned_base >= end)
+            continue;
+
+        LibC::uint64_t total_pages = (end - aligned_base) / TOTAL_MEMORY_PAGE_SIZE;
 
         while (total_pages > 0) {
             LibC::uint64_t region_pages = (total_pages > max_region_in_pages) ? max_region_in_pages : total_pages;
+            PhysicalMemoryRegion* region = pmm.allocate_region(aligned_base, region_pages);
 
-            PhysicalMemoryRegion* region = pmm.allocate_region(base, region_pages);
-            if (FK::alert_if_f(region == nullptr, "PMM: Failed to allocate PhysicalMemoryRegion for base=%p, pages=%lu", base, region_pages))
+            if (!region) {
+                Logf(LogLevel::WARN, "PMM: Failed to allocate region at %p (%lu pages)", aligned_base, region_pages);
+                aligned_base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
+                total_pages -= region_pages;
                 continue;
-
-            pmm.add_region(region);
-
-            if (!multiboot2::is_available(entry.type)) {
-                if (region->allocated && !region->bitmap.is_valid()) {
-                    pmm.ensure_bitmap_allocated(*region);
-                    pmm.mark_pages(*region, 0, region_pages, true);
-                }
-
-                auto virt = phys_to_virt(region->base_addr);
-                vmm.map_page(virt, region->base_addr, PAGE_PRESENT);
-            } else {
-                auto virt = phys_to_virt(region->base_addr);
-                vmm.map_page(virt, region->base_addr, PAGE_PRESENT | PAGE_RW);
             }
 
-            base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
+            pmm.add_region(region);
+            auto virt = phys_to_virt(region->base_addr);
+
+            if (virt == 0) {
+                Logf(LogLevel::ERROR, "VMM: phys_to_virt returned 0 for base=%p", region->base_addr);
+                pmm.remove_region(region);
+                aligned_base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
+                total_pages -= region_pages;
+                continue;
+            }
+
+            LibC::uint64_t flags = PAGE_PRESENT;
+
+            if (multiboot2::is_available(entry.type)) {
+                pmm.ensure_bitmap_allocated(*region);
+                pmm.mark_pages(*region, 0, region_pages, false); // false = livre
+                flags |= PAGE_RW;
+            }
+
+            for (LibC::uint64_t i = 0; i < region_pages; ++i) {
+                LibC::uintptr_t page_virt = virt + i * TOTAL_MEMORY_PAGE_SIZE;
+                LibC::uintptr_t page_phys = region->base_addr + i * TOTAL_MEMORY_PAGE_SIZE;
+
+                if (!vmm.map_page(page_virt, page_phys, flags)) {
+                    Logf(LogLevel::ERROR, "VMM: map_page failed for page %p", page_phys);
+                }
+            }
+
+            aligned_base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
+            total_pages -= region_pages;
+
+            aligned_base += region_pages * TOTAL_MEMORY_PAGE_SIZE;
             total_pages -= region_pages;
         }
     }
 
     Log(LogLevel::INFO, "PMM: Initialized with success");
     pmm.log_memory_status();
-
     this->is_initialized = true;
 }
 
@@ -139,7 +170,6 @@ void* MemoryManager::Kernel_Alloc(LibC::size_t size, LibC::uint64_t flags)
         if (!mapped) {
             Logf(LogLevel::WARN, "MemoryManager: Failed to map virt 0x%p -> phys 0x%p", virt_base + i * TOTAL_MEMORY_PAGE_SIZE, phys);
             pmm.free_page(phys);
-            // rollback também
             for (LibC::size_t j = 0; j < i; ++j) {
                 LibC::uintptr_t virt = virt_base + j * TOTAL_MEMORY_PAGE_SIZE;
                 LibC::uintptr_t mapped_phys = vmm.translate(virt);
