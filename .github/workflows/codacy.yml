@@ -1,0 +1,127 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# This workflow checks out code, performs a Codacy security scan
+# and integrates the results with the
+# GitHub Advanced Security code scanning feature.  For more information on
+# the Codacy security scan action usage and parameters, see
+# https://github.com/codacy/codacy-analysis-cli-action.
+# For more information on Codacy Analysis CLI in general, see
+# https://github.com/codacy/codacy-analysis-cli.
+
+name: Codacy Security Scan + Auto Issues
+
+on:
+  push:
+    branches: [ "main", "dev", "*" ]
+  pull_request:
+    branches: [ "main", "dev", "*" ]
+  schedule:
+    - cron: '22 22 * * 4'
+
+permissions:
+  contents: read
+  issues: write
+  security-events: write
+  actions: read
+
+jobs:
+  codacy-security-scan:
+    name: Codacy Security Scan + Auto Issues
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Codacy Analysis CLI
+        uses: codacy/codacy-analysis-cli-action@d840f886c4bd4edc059706d09c6a1586111c540b
+        id: codacy
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          verbose: true
+          output: results.sarif
+          format: sarif
+          gh-code-scanning-compat: true
+          max-allowed-issues: 2147483647
+
+      - name: Filtrar SARIF para remover runs duplicados
+        id: filter-sarif
+        run: |
+          node -e "
+          const fs = require('fs');
+          const sarif = JSON.parse(fs.readFileSync('results.sarif', 'utf8'));
+          const runsByCategory = new Map();
+          sarif.runs.forEach(run => {
+            const category = run.tool.driver.name;
+            if (!runsByCategory.has(category)) {
+              runsByCategory.set(category, run);
+            }
+          });
+          sarif.runs = Array.from(runsByCategory.values());
+          fs.writeFileSync('results_filtered.sarif', JSON.stringify(sarif, null, 2));
+          "
+      
+      - name: Upload SARIF results file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results_filtered.sarif
+
+      - name: Criar issues automáticas a partir do SARIF
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const sarif = JSON.parse(fs.readFileSync('results_filtered.sarif', 'utf8'));
+            const results = sarif.runs[0]?.results || [];
+            
+            if (results.length === 0) {
+              console.log('Nenhum problema encontrado.');
+              return;
+            }
+
+            // Buscar issues abertas com label auto-generated
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'auto-generated',
+              per_page: 100
+            });
+
+            for (const result of results) {
+              const ruleId = result.ruleId || 'SemRuleId';
+              const location = result.locations?.[0]?.physicalLocation?.artifactLocation?.uri || 'Arquivo não informado';
+              const message = result.message?.text || 'Mensagem não disponível';
+              const title = `Problema Codacy: ${ruleId} em ${location}`;
+
+              // Verificar se já existe issue com título igual
+              const exists = issues.data.some(issue => issue.title === title);
+              if (exists) {
+                console.log(`Issue já existe para: ${title}`);
+                continue;
+              }
+
+              const body = `
+                **Descrição:**
+                ${message}
+                
+                **Arquivo:**
+                ${location}
+                
+                _Este issue foi criado automaticamente pelo workflow Codacy Security Scan._
+              `;
+                
+            await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['auto-generated', 'security']
+              });
+
+              console.log(`Issue criado: ${title}`);
+            }
