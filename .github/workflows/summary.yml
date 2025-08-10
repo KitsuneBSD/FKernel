@@ -1,11 +1,11 @@
-name: Summarize new issues
+name: Analyze and Suggest Fixes for New Issues
 
 on:
   issues:
     types: [opened]
 
 jobs:
-  summary:
+  analyze:
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -21,14 +21,18 @@ jobs:
         uses: actions/ai-inference@v1
         with:
           prompt: |
-            Summarize the following GitHub issue in one paragraph:
+            You are an AI assistant analyzing a newly opened GitHub issue.
+            Provide the following:
+            1. A clear one-paragraph summary of the problem.
+            2. If the issue describes an error, give a minimal reproducible code example.
+            3. Suggest possible fixes or next steps for solving it.
+
+            --- ISSUE ---
             Title: ${{ github.event.issue.title }}
             Body: ${{ github.event.issue.body }}
+            ----------------------------
 
-      - name: Comment with AI summary
-        run: |
-          gh issue comment $ISSUE_NUMBER --body '${{ steps.inference.outputs.response }}'
+      - name: Comment with AI analysis
+        run: gh issue comment "${{ github.event.issue.number }}" --body "${{ steps.inference.outputs.response }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          RESPONSE: ${{ steps.inference.outputs.response }}
