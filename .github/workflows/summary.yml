@@ -1,0 +1,38 @@
+name: Analyze and Suggest Fixes for New Issues
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      models: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run AI inference
+        id: inference
+        uses: actions/ai-inference@v1
+        with:
+          prompt: |
+            You are an AI assistant analyzing a newly opened GitHub issue.
+            Provide the following:
+            1. A clear one-paragraph summary of the problem.
+            2. If the issue describes an error, give a minimal reproducible code example.
+            3. Suggest possible fixes or next steps for solving it.
+
+            --- ISSUE ---
+            Title: ${{ github.event.issue.title }}
+            Body: ${{ github.event.issue.body }}
+            ----------------------------
+
+      - name: Comment with AI analysis
+        run: gh issue comment "${{ github.event.issue.number }}" --body "${{ steps.inference.outputs.response }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
