@@ -1,15 +1,14 @@
 #pragma once
 
 #include <Kernel/MemoryManagement/FreeListAllocator/falloc.h>
-#include <Kernel/MemoryManagement/MemoryManager/MemoryManager.h>
-#include <Kernel/MemoryManagement/PhysicalMemoryManagement/PhysicalMemoryRegion.h>
-#include <Kernel/MemoryManagement/VirtualMemoryManagement/VirtualMemoryManagement.h>
 #include <LibC/stddef.h>
 #include <LibC/stdlib.h>
 #include <LibFK/enforce.h>
 #include <LibFK/new.h>
 
 namespace FK {
+
+constexpr LibC::size_t TOTAL_MEMORY_PAGE_SIZE = 4096;
 
 template<typename T>
 class Vector {
