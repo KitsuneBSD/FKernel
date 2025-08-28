@@ -1,0 +1,41 @@
+name: Codacy Security Scan
+
+on:
+  push:
+    branches: [ "*" ]  # Matches all branches
+  pull_request:
+    branches: [ "*" ]  # Matches all branches
+  schedule:
+    - cron: '26 8 * * 6'  # Every Saturday at 08:26 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  codacy-security-scan:
+    permissions:
+      contents: read        # Required for actions/checkout
+      security-events: write # Required to upload SARIF results
+      actions: read         # Required for private repo status checks
+    name: Codacy Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Codacy Analysis CLI
+        uses: codacy/codacy-analysis-cli-action@v4  # Stable release
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          verbose: true
+          output: results.sarif
+          format: sarif
+          gh-code-scanning-compat: true
+          max-allowed-issues: 2147483647  # Generate SARIF only, no PR blocking
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: "Codacy Security Scan"  # Unique category to avoid conflict
