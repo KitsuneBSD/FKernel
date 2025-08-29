@@ -1,0 +1,4 @@
+build
+.xmake
+.cache
+compile-commands.json
