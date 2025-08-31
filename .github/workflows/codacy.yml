@@ -37,16 +37,32 @@ jobs:
       - name: Make SARIF unique
         run: |
           python3 - <<'EOF'
-          import json, os
+          import json
+          import os
+          
           sarif_file = "results.sarif"
           with open(sarif_file, "r", encoding="utf-8") as f:
               data = json.load(f)
+          
           unique_id = os.environ.get("GITHUB_RUN_ID", "manual")
+          
           for run in data.get("runs", []):
-              run["tool"]["driver"]["name"] += f"-{unique_id}"
-              run["tool"]["driver"] += f" (Run {unique_id})"
+              tool = run.get("tool", {}).get("driver", {})
+              
+              # Atualiza 'name' apenas se for string
+              if "name" in tool and isinstance(tool["name"], str):
+                  tool["name"] = f"{tool['name']}-{unique_id}"
+              
+              if "name" in tool and isinstance(tool["name"], str):
+                  tool["name"] = f"{tool['name']} (Run {unique_id})"
+              elif "name" in tool and isinstance(tool["name"], str):
+                  tool["name"] = f"{tool['name']}"
+              else:
+                  tool["name"] = f"Tool-{unique_id}"
+          
           with open(sarif_file, "w", encoding="utf-8") as f:
               json.dump(data, f, indent=2)
+
           EOF
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
