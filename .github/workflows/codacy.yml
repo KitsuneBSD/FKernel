@@ -34,7 +34,7 @@ jobs:
           gh-code-scanning-compat: true
           max-allowed-issues: 2147483647
 
-      - name: Make SARIF unique
+      - name: Make SARIF runs unique
         run: |
           python3 - <<'EOF'
           import json, os
@@ -47,22 +47,21 @@ jobs:
 
           unique_id = os.environ.get("GITHUB_RUN_ID", "manual")
 
-          for run in data.get("runs", []):
+          for i, run in enumerate(data.get("runs", [])):
               driver = run.get("tool", {}).get("driver", {})
 
-              # Nome único
+              # Garante que name seja string e único
               if isinstance(driver.get("name"), str):
-                  driver["name"] = f"{driver['name']}-{unique_id}"
+                  driver["name"] = f"{driver['name']}-{i}-{unique_id}"
               else:
-                  driver["name"] = f"Tool-{unique_id}"
+                  driver["name"] = f"Tool-{i}-{unique_id}"
 
-              # fullName único
+              # Garante que fullName exista e seja único
               if isinstance(driver.get("fullName"), str):
-                  driver["fullName"] = f"{driver['fullName']} (Run {unique_id})"
+                  driver["fullName"] = f"{driver['fullName']} (Run {i}-{unique_id})"
               else:
-                  driver["fullName"] = driver.get("name", f"Tool-{unique_id}")
+                  driver["fullName"] = driver.get("name", f"Tool-{i}-{unique_id}")
 
-          # Salva em arquivo novo para evitar PermissionError
           with open(output_file, "w", encoding="utf-8") as f:
               json.dump(data, f, indent=2)
           EOF
