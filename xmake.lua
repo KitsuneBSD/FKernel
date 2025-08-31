@@ -87,16 +87,12 @@ target_end()
 
 target("Test")
 set_default(false)
+set_kind("binary")
 
-set_warnings("allextra", "error")
-set_optimize("none")
+set_toolchains("gcc", "clang")
 
-add_includedirs("Include")
-
+add_includedirs("Include", "/usr/include/")
+add_files("Test/test_runner.c", "Test/LibC/*/*.c")
 add_files("Src/LibC/**.c")
--- add_files("Src/LibFK/**.cpp")
-
--- add_files("Test/LibC/**.c")
--- add_files("Test/LibFK/**.cpp")
 
 target_end()
