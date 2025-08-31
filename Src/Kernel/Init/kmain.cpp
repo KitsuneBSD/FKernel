@@ -19,3 +19,5 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
     asm("hlt");
   }
 }
+
+

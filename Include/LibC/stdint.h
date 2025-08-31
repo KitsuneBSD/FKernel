@@ -32,6 +32,3 @@ typedef __UINT_FAST64_TYPE__ uint_fast64_t;
 
 typedef __INTPTR_TYPE__ intptr_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
-
-constexpr uint64_t UINT64_MAX = 0xFFFFFFFFFFFFFFFFULL;
-constexpr uint64_t UINTPTR_MAX = 0xFFFFFFFFFFFFFFFFULL;
