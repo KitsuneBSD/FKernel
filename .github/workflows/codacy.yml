@@ -44,7 +44,7 @@ jobs:
           unique_id = os.environ.get("GITHUB_RUN_ID", "manual")
           for run in data.get("runs", []):
               run["tool"]["driver"]["name"] += f"-{unique_id}"
-              run["tool"]["driver"]["fullName"] += f" (Run {unique_id})"
+              run["tool"]["driver"] += f" (Run {unique_id})"
           with open(sarif_file, "w", encoding="utf-8") as f:
               json.dump(data, f, indent=2)
           EOF
