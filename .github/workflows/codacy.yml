@@ -38,4 +38,4 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
-          category: "Codacy Security Scan"  # Unique category to avoid conflict
+          category: "Codacy Security Scan-${{ github.ref_name }}"
