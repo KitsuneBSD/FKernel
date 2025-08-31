@@ -83,5 +83,20 @@ if is_arch("x86_64", "x64") then
 end
 
 add_files("Src/Kernel/Init/**.cpp")
+target_end()
+
+target("Test")
+set_default(false)
+
+set_warnings("allextra", "error")
+set_optimize("none")
+
+add_includedirs("Include")
+
+add_files("Src/LibC/**.c")
+-- add_files("Src/LibFK/**.cpp")
+
+-- add_files("Test/LibC/**.c")
+-- add_files("Test/LibFK/**.cpp")
 
 target_end()
