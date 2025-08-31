@@ -2,11 +2,11 @@ name: Codacy Security Scan
 
 on:
   push:
-    branches: [ "*" ]  # Matches all branches
+    branches: [ "*" ]
   pull_request:
-    branches: [ "*" ]  # Matches all branches
+    branches: [ "*" ]
   schedule:
-    - cron: '26 8 * * 6'  # Every Saturday at 08:26 UTC
+    - cron: '26 8 * * 6'
 
 permissions:
   contents: read
@@ -14,9 +14,9 @@ permissions:
 jobs:
   codacy-security-scan:
     permissions:
-      contents: read        # Required for actions/checkout
-      security-events: write # Required to upload SARIF results
-      actions: read         # Required for private repo status checks
+      contents: read
+      security-events: write
+      actions: read
     name: Codacy Security Scan
     runs-on: ubuntu-latest
 
@@ -37,35 +37,38 @@ jobs:
       - name: Make SARIF unique
         run: |
           python3 - <<'EOF'
-          import json
-          import os
-          
-          sarif_file = "results.sarif"
-          with open(sarif_file, "r", encoding="utf-8") as f:
-              data = json.load(f)
-          
-          unique_id = os.environ.get("GITHUB_RUN_ID", "manual")
-          
-          for run in data.get("runs", []):
-              tool = run.get("tool", {}).get("driver", {})
-              
-              # Atualiza 'name' apenas se for string
-              if "name" in tool and isinstance(tool["name"], str):
-                  tool["name"] = f"{tool['name']}-{unique_id}"
-              
-              if "name" in tool and isinstance(tool["name"], str):
-                  tool["name"] = f"{tool['name']} (Run {unique_id})"
-              elif "name" in tool and isinstance(tool["name"], str):
-                  tool["name"] = f"{tool['name']}"
-              else:
-                  tool["name"] = f"Tool-{unique_id}"
-          
-          with open(sarif_file, "w", encoding="utf-8") as f:
-              json.dump(data, f, indent=2)
+          import json, os
 
+          input_file = "results.sarif"
+          output_file = "results_unique.sarif"
+
+          with open(input_file, "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          unique_id = os.environ.get("GITHUB_RUN_ID", "manual")
+
+          for run in data.get("runs", []):
+              driver = run.get("tool", {}).get("driver", {})
+
+              # Nome único
+              if isinstance(driver.get("name"), str):
+                  driver["name"] = f"{driver['name']}-{unique_id}"
+              else:
+                  driver["name"] = f"Tool-{unique_id}"
+
+              # fullName único
+              if isinstance(driver.get("fullName"), str):
+                  driver["fullName"] = f"{driver['fullName']} (Run {unique_id})"
+              else:
+                  driver["fullName"] = driver.get("name", f"Tool-{unique_id}")
+
+          # Salva em arquivo novo para evitar PermissionError
+          with open(output_file, "w", encoding="utf-8") as f:
+              json.dump(data, f, indent=2)
           EOF
+
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: results.sarif
+          sarif_file: results_unique.sarif
           category: "Codacy Security Scan-${{ github.ref_name }}"
