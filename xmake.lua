@@ -77,20 +77,22 @@ add_ldflags(lld_flags, { force = true })
 
 add_includedirs("Include")
 
-if is_arch("x86_64") then
-	add_files("Src/Kernel/Arch/x86_64/*/**.asm")
-	add_files("Src/Kernel/Arch/x86_64/*/**.cpp")
+if is_arch("x86_64", "x64") then
+	add_files("Src/Kernel/Arch/x86_64/**.asm")
+	--add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
 
-add_files("Src/LibC/**.cpp")
-add_files("Src/LibFK/**.cpp")
-
 add_files("Src/Kernel/Init/**.cpp")
-add_files("Src/Kernel/Driver/**.cpp")
+target_end()
 
-add_files("Src/Kernel/MemoryManagement/*/**.cpp")
+target("Test")
+set_default(false)
+set_kind("binary")
 
-add_files("Src/Kernel/Devices/*/**.cpp")
-add_files("Src/Kernel/FileSystem/*/**.cpp")
+set_toolchains("gcc", "clang")
+
+add_includedirs("Include", "/usr/include/")
+add_files("Test/test_runner.c", "Test/LibC/*/*.c")
+add_files("Src/LibC/**.c")
 
 target_end()

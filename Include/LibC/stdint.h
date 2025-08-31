@@ -1,7 +1,5 @@
 #pragma once
 
-namespace LibC {
-
 typedef __INT8_TYPE__ int8_t;
 typedef __INT16_TYPE__ int16_t;
 typedef __INT32_TYPE__ int32_t;
@@ -34,7 +32,3 @@ typedef __UINT_FAST64_TYPE__ uint_fast64_t;
 
 typedef __INTPTR_TYPE__ intptr_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
-
-constexpr LibC::uint64_t UINT64_MAX = 0xFFFFFFFFFFFFFFFFULL;
-constexpr LibC::uint64_t UINTPTR_MAX = 0xFFFFFFFFFFFFFFFFULL;
-}
