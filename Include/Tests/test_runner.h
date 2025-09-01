@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #define COLOR_RED "\x1b[31m"
@@ -54,6 +55,35 @@ static void check_result_int(int got, int expected, const char *test_name) {
       (expected > 0 && got > 0)) {
     printf("%s[PASS]%s %s (got %d)\n", COLOR_GREEN, COLOR_RESET, test_name,
            got);
+  } else {
+    printf("%s[FAIL]%s %s\nExpected: %d\nGot     : %d\n", COLOR_RED,
+           COLOR_RESET, test_name, expected, got);
+  }
+}
+
+static void check_pair_int(int first, int second, int expected_first,
+                           int expected_second, const char *test_name) {
+  if (first == expected_first && second == expected_second) {
+    printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, test_name);
+  } else {
+    printf("%s[FAIL]%s %s\nExpected: (%d, %d)\nGot     : (%d, %d)\n", COLOR_RED,
+           COLOR_RESET, test_name, expected_first, expected_second, first,
+           second);
+  }
+}
+
+static void check_bool(bool got, bool expected, const char *test_name) {
+  if (got == expected) {
+    printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, test_name);
+  } else {
+    printf("%s[FAIL]%s %s\nExpected: %d\nGot     : %d\n", COLOR_RED,
+           COLOR_RESET, test_name, expected, got);
+  }
+}
+
+static void check_int(int got, int expected, const char *test_name) {
+  if (got == expected) {
+    printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, test_name);
   } else {
     printf("%s[FAIL]%s %s\nExpected: %d\nGot     : %d\n", COLOR_RED,
            COLOR_RESET, test_name, expected, got);
