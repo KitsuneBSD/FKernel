@@ -1,31 +1,7 @@
 #include <LibC/string.h>
 #include <Tests/LibC/string_test.h>
+#include <Tests/test_runner.h>
 #include <assert.h>
-#include <stdio.h>
-
-// TODO: Move this code in a separated library
-static void check_result(const unsigned char *buffer,
-                         const unsigned char *expected, int size,
-                         const char *test_name) {
-  int passed = 1;
-  for (int i = 0; i < size; i++) {
-    if (buffer[i] != expected[i]) {
-      passed = 0;
-      break;
-    }
-  }
-  if (passed) {
-    printf("[PASS] %s\n", test_name);
-  } else {
-    printf("[FAIL] %s\nExpected: ", test_name);
-    for (int i = 0; i < size; i++)
-      printf("%02X ", expected[i]);
-    printf("\nGot     : ");
-    for (int i = 0; i < size; i++)
-      printf("%02X ", buffer[i]);
-    printf("\n");
-  }
-}
 
 static void test_memmove_overlap_forward() {
   unsigned char buffer[20];
