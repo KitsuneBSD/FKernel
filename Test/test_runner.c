@@ -9,6 +9,9 @@ int main(void) {
   printf("================================ string.h "
          "=====================================\n");
   test_memmove();
+  test_memcpy();
+  test_memset();
+  test_memcmp();
   printf("======================================== LibFK "
          "================================\n");
   return EXIT_SUCCESS;
