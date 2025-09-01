@@ -83,6 +83,7 @@ if is_arch("x86_64", "x64") then
 end
 
 add_files("Src/Kernel/Init/**.cpp")
+add_files("Src/LibC/**.c")
 target_end()
 
 target("Test")
@@ -92,7 +93,7 @@ set_kind("binary")
 set_toolchains("gcc", "clang")
 
 add_includedirs("Include", "/usr/include/")
-add_files("Test/test_runner.c", "Test/LibC/*/*.c")
+add_files("Test/test_runner.c", "Test/LibC/**/*.c")
 add_files("Src/LibC/**.c")
 
 target_end()

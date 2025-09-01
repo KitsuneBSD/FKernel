@@ -28,3 +28,34 @@ static void check_result(const unsigned char *buffer,
     printf("\n");
   }
 }
+
+static void check_result_size(size_t got, size_t expected,
+                              const char *test_name) {
+  if (got == expected) {
+    printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, test_name);
+  } else {
+    printf("%s[FAIL]%s %s\nExpected: %zu\nGot     : %zu\n", COLOR_RED,
+           COLOR_RESET, test_name, expected, got);
+  }
+}
+
+static void check_result_ptr(const char *got, const char *expected,
+                             const char *test_name) {
+  if (got == expected) {
+    printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, test_name);
+  } else {
+    printf("%s[FAIL]%s %s\nExpected: %p\nGot     : %p\n", COLOR_RED,
+           COLOR_RESET, test_name, (void *)expected, (void *)got);
+  }
+}
+
+static void check_result_int(int got, int expected, const char *test_name) {
+  if ((expected == 0 && got == 0) || (expected < 0 && got < 0) ||
+      (expected > 0 && got > 0)) {
+    printf("%s[PASS]%s %s (got %d)\n", COLOR_GREEN, COLOR_RESET, test_name,
+           got);
+  } else {
+    printf("%s[FAIL]%s %s\nExpected: %d\nGot     : %d\n", COLOR_RED,
+           COLOR_RESET, test_name, expected, got);
+  }
+}
