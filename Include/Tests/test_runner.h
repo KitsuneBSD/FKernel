@@ -2,6 +2,10 @@
 
 #include <stdio.h>
 
+#define COLOR_RED "\x1b[31m"
+#define COLOR_GREEN "\x1b[32m"
+#define COLOR_RESET "\x1b[0m"
+
 static void check_result(const unsigned char *buffer,
                          const unsigned char *expected, int size,
                          const char *test_name) {
@@ -13,9 +17,9 @@ static void check_result(const unsigned char *buffer,
     }
   }
   if (passed) {
-    printf("[PASS] %s\n", test_name);
+    printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, test_name);
   } else {
-    printf("[FAIL] %s\nExpected: ", test_name);
+    printf("%s[FAIL]%s %s\nExpected: ", COLOR_RED, COLOR_RESET, test_name);
     for (int i = 0; i < size; i++)
       printf("%02X ", expected[i]);
     printf("\nGot     : ");
