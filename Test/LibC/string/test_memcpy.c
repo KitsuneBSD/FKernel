@@ -36,10 +36,40 @@ static void test_memcpy_partial_copy() {
   check_result(dest, expected, 6, "memcpy_partial_copy");
 }
 
+static void test_memcpy_no_overflow() {
+  unsigned char buffer[6] = {'1', '2', '3', '4', '5', '6'};
+  unsigned char dest[10]; // buffer maior que o necessário
+  for (int i = 6; i < 10; i++)
+    dest[i] = 0xFF;
+
+  memcpy(dest, buffer, 6);
+
+  unsigned char expected[10] = {'1', '2',  '3',  '4',  '5',
+                                '6', 0xFF, 0xFF, 0xFF, 0xFF};
+  check_result(dest, expected, 10, "memcpy_no_overflow");
+}
+
+static void test_memcpy_safe_overflow_simulation() {
+  unsigned char buffer[6] = {'1', '2', '3', '4', '5', '6'};
+  unsigned char dest[10];
+
+  for (int i = 0; i < 10; i++)
+    dest[i] = 0xFF;
+
+  memcpy(dest, buffer, 6);
+
+  unsigned char expected[10] = {'1', '2',  '3',  '4',  '5',
+                                '6', 0xFF, 0xFF, 0xFF, 0xFF};
+
+  check_result(dest, expected, 10, "memcpy_safe_overflow_simulation");
+}
+
 void test_memcpy() {
   test_memcpy_basic();
   test_memcpy_zero_length();
   test_memcpy_partial_copy();
+  test_memcpy_no_overflow();
+  test_memcpy_safe_overflow_simulation();
 
   printf("All memcpy unit tests finished.\n");
 }
