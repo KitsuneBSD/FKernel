@@ -1,4 +1,5 @@
 #include <Tests/LibC/string_test.h>
+#include <Tests/LibFK/container_test.h>
 #include <Tests/LibFK/optional_test.h>
 #include <Tests/LibFK/pair_test.h>
 #include <Tests/LibFK/type_traits_test.h>
@@ -18,5 +19,6 @@ int main(void) {
   test_pair();
   test_optional();
   test_type_traits();
+  test_containers();
   return EXIT_SUCCESS;
 }
