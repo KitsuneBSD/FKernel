@@ -17,13 +17,13 @@ public:
   }
 
   bool get(size_t index) const {
-    if (index > m_size)
+    if (index >= m_size)
       return false;
     return 0 != (m_data[index >> 3] & (1u << (index & 7)));
   }
 
   void set(size_t index, bool value) const {
-    if (index > m_size)
+    if (index >= m_size)
       return;
     if (value)
       m_data[index >> 3] |= static_cast<uint8_t>(1u << (index & 7));
