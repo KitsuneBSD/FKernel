@@ -84,6 +84,7 @@ end
 
 add_files("Src/Kernel/Init/**.cpp")
 add_files("Src/LibC/**.c")
+add_files("Src/LibFK/**.cpp")
 target_end()
 
 target("Test")
@@ -97,6 +98,7 @@ add_files("Test/test_runner.c")
 add_files("Test/LibC/**.c")
 add_files("Test/LibFK/**.cpp")
 add_files("Src/LibC/**.c")
+add_files("Src/LibFK/**.cpp")
 
 set_languages("c17", "cxx20")
 
