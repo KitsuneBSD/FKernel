@@ -100,6 +100,8 @@ add_files("Test/LibFK/**.cpp")
 add_files("Src/LibC/**.c")
 add_files("Src/LibFK/**.cpp")
 
+add_defines("FKERNEL_TEST")
+
 set_languages("c17", "cxx20")
 
 target_end()

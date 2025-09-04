@@ -1,5 +1,7 @@
 #include <LibFK/heap_malloc.h>
-#include <stdio.h>
+#ifdef FKERNEL_TEST
+#include <cstdio>
+#endif
 
 extern "C" uint8_t __heap_start[];
 extern "C" uint8_t __heap_end[];
@@ -26,8 +28,10 @@ void Allocator::initialize() {
               ChunkAllocator<16384>::capacityInBytes();
 
   if (heap_size < required) {
+#ifdef FKERNEL_TEST
     printf("The heap has %zu, and is required %zu. Both has diference of %zu\n",
            heap_size, required, required - heap_size);
+#endif
     return;
   }
 
