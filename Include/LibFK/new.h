@@ -1,15 +1,15 @@
 #pragma once
 
-#include <LibC/stddef.h>
+#include <LibFK/heap_malloc.h>
 
-inline void* operator new(LibC::size_t, void* ptr) noexcept
-{
-    return ptr;
-}
+void *operator new(size_t size) { return kmalloc(size); }
 
-inline void operator delete(void*, void*) noexcept
-{
-}
+void *operator new[](size_t size) { return kmalloc(size); }
 
-inline void* operator new[](LibC::size_t, void* ptr) noexcept { return ptr; }
-inline void operator delete[](void*, void*) noexcept { }
+void operator delete(void *ptr) { return kfree(ptr); }
+
+void operator delete[](void *ptr) { return kfree(ptr); }
+
+void operator delete(void *ptr, size_t) { return kfree(ptr); }
+
+void operator delete[](void *ptr, size_t) { return kfree(ptr); }

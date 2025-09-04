@@ -88,23 +88,6 @@ Artifacts created:
 
 If ISO creation fails, ensure GRUB i386-pc modules are installed (e.g., `grub-pc-bin` on Debian/Ubuntu) and the path `/usr/lib/grub/i386-pc/` exists, or adjust `Meta/mounting_mockos.sh`.
 
-## DevPod:  (Docker/Podman)
-
-Use the provided DevContainer. The image is built from `.devcontainer/Dockerfile` (FROM `ubuntu:24.04`) and already includes all required tools: clang/lld, nasm, xmake, qemu-system-x86_64/qemu-img, grub-mkrescue, xorriso, mtools, and optional dev tools (jq, clang-format/clang-tidy, cppcheck). No extra install inside the container is needed.
-
-Steps:
-
-1) Start a DevPod for this repo:
-   - Docker: `devpod up . --provider=docker`
-   - Podman: `devpod up . --provider=podman`
-2) Open the workspace in your editor (VS Code or DevPod UI).
-3) Inside the DevPod terminal:
-   - Build: `xmake`
-   - Run: `xmake run`
-   - Optional checks: `bash Meta/run_continuous_integration.sh`
-
-If you maintain your own template/image, ensure the same toolset is present.
-
 ## Troubleshooting
 
 - `grub-mkrescue` not found: Use `grub2-mkrescue` or install GRUB utilities, plus `xorriso` and `mtools`.
@@ -112,9 +95,23 @@ If you maintain your own template/image, ensure the same toolset is present.
 - ISO creation fails: Ensure `/usr/lib/grub/i386-pc/` exists on your distro or adjust the path in `Meta/mounting_mockos.sh`.
 - LSP not seeing includes: Generate `compile_commands.json` with `Meta/generate_compile_commands.sh` and point your tools to it.
 
-## Contributing
+## Run Tests
 
-Issues and PRs are welcome. Please run `Meta/run_continuous_integration.sh` before submitting changes.
+In the `xmake` are configured to run tests from `LibC` and `LibFK` on Userland to garantee max security
+
+In new PR's on `LibC`/`LibFK` are mandatory additions of tests.
+
+And you can compile them with:
+
+```bash
+xmake -bv Test # Build target Test
+```
+
+and run with:
+
+```bash
+xmake run Test # Run target Test
+```
 
 ## License
 

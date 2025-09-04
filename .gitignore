@@ -1,2 +1,5 @@
 .xmake/linux/x86_64/cache
 build
+.xmake
+.cache
+compile_commands.json

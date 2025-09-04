@@ -1,26 +1,23 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibC/stdint.h>
 
-namespace LibC {
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
 
-LibC::size_t utoa(LibC::uint64_t value, char* buffer, int base, bool uppercase = true);
+void *memmove(void *dest, const void *src, size_t n);
+void *memcpy(void *dest, const void *src, size_t n);
+void *memset(void *s, int c, size_t n);
+int memcmp(const void *s1, const void *s2, size_t n);
 
-extern "C" void* memcpy(void* dest, void const* src, LibC::size_t n);
-extern "C" void* memset(void* dest, int ch, LibC::size_t n);
+size_t strlen(const char *s);
+char *strcpy(char *dest, const char *src);
+int strcmp(const char *s1, const char *s2);
+char *strchr(const char *s, int c);
+char *strcat(char *dest, const char *src);
+char *strncpy(char *dest, const char *src, size_t n);
 
-int atoi(char const* str);
-
-char* itoa(int num, char* str, int base);
-
-extern "C" int strcmp(char const* a, char const* b);
-extern "C" int strncmp(char const* s1, char const* s2, LibC::size_t n);
-extern "C" char* strncpy(char* dest, char const* src, LibC::size_t n);
-
-extern "C" LibC::size_t strlen(char const* str);
-
-extern "C" LibC::size_t strlcpy(char* dst, char const* src, LibC::size_t size);
-extern "C" char* strcpy(char* dest, char const* src);
-
+#ifdef __cplusplus
 }
+#endif
