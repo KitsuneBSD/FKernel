@@ -2,6 +2,11 @@
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
+/* TODO: Use [Multiboot2
+ * Framebuffer](https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html)
+ * It's the same thing but we follow 100% of specification
+ */
+
 constexpr uint16_t VGA_WIDTH = 80;
 constexpr uint16_t VGA_HEIGHT = 25;
 
