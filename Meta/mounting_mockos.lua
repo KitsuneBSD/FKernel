@@ -38,14 +38,14 @@ if not RunCommand("command -v grub-mkrescue >/dev/null 2>&1") then
 		PrintMessage(true, "grub-mkrescue not found. Please install it before running this script.")
 		os.exit(1)
 	else
-		RunCommand("grub2-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos")
+		RunCommand("grub2-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos >/dev/null 2>&1 ")
 	end
 else
-	RunCommand("grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos")
+	RunCommand("grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos  >/dev/null 2>&1")
 end
 
 if not FileExists("build/FKernel-HDA.qcow2") then
-	RunCommand("qemu-img create FKernel-HDA.qcow2 4G -f qcow2")
+	RunCommand("qemu-img create FKernel-HDA.qcow2 4G -f qcow2 >/dev/null 2>&1 ")
 	RunCommand("mv FKernel-HDA.qcow2 build/FKernel-HDA.qcow2")
 	PrintMessage(false, "Disk image created")
 end
