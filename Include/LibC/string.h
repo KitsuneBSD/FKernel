@@ -23,6 +23,7 @@ char *strncpy(char *dest, const char *src, size_t n);
 int itoa(int val, char *buf, int base);
 int atoi(const char *str);
 long stol(const char *str);
+size_t ultoa(unsigned long value, char *buffer, unsigned int base);
 
 #ifdef __cplusplus
 }

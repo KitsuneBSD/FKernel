@@ -86,6 +86,50 @@ extern "C" void kprintf(const char *fmt, ...) {
       VGA::instance().write(buf);
       break;
     }
+    case 'u': {
+      unsigned int val = va_arg(args, unsigned int);
+      char buf[12];
+      itoa(val, buf, 10);
+      Serial::write(buf);
+      VGA::instance().write(buf);
+      break;
+    }
+    case 'l': {
+      char next = fmt[i + 1];
+      if (next == 'u') {
+        unsigned long val = va_arg(args, unsigned long);
+        char buf[24];
+        ultoa(val, buf, 10);
+        Serial::write(buf);
+        VGA::instance().write(buf);
+        i++; // avançar o 'u'
+      } else if (next == 'x') {
+        unsigned long val = va_arg(args, unsigned long);
+        char buf[24];
+        ultoa(val, buf, 16);
+        Serial::write(buf);
+        VGA::instance().write(buf);
+        i++;
+      } else {
+        Serial::write_char('%');
+        VGA::instance().put_char('%');
+        Serial::write_char('l');
+        VGA::instance().put_char('l');
+      }
+      break;
+    }
+    case 'p': {
+      void *ptr = va_arg(args, void *);
+      uintptr_t val = reinterpret_cast<uintptr_t>(ptr);
+      char buf[24];
+      ultoa(val, buf, 16);
+      Serial::write("0x");
+      VGA::instance().write("0x");
+      Serial::write(buf);
+      VGA::instance().write(buf);
+      break;
+    }
+
     case '%': {
       Serial::write_char('%');
       VGA::instance().put_char('%');
