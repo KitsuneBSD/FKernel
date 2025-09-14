@@ -7,10 +7,11 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 
 typedef int64_t ssize_t;
 
-#if __cplusplus
+#ifdef __cplusplus
 #define NULL nullptr
+using nullptr_t = decltype(nullptr);
 #else
-#define NULL (void *)0
+#define NULL ((void *)0)
 #endif
 
 #define offsetof(type, member) __builtin_offsetof(type, member)
