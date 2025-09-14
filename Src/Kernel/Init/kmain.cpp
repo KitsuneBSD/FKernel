@@ -1,7 +1,7 @@
-#include "Kernel/Driver/Vga/Vga_buffer.h"
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
+#include <Kernel/Driver/Vga/Vga_buffer.h>
 
 #include <Kernel/Arch/x86_64/Io.h>
 #include <Kernel/Driver/SerialPort/Serial.h>
@@ -26,7 +26,11 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
 
   multiboot2::MultibootParser mb_parser(multiboot_ptr);
 
-  kprintf("[Sucess] Reach here");
+  auto mmap =
+      mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
+
+  early_init(*mmap);
+
   while (true) {
     asm("hlt");
   }
