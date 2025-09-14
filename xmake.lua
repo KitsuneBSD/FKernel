@@ -79,7 +79,7 @@ add_includedirs("Include")
 
 if is_arch("x86_64", "x64") then
 	add_files("Src/Kernel/Arch/x86_64/**.asm")
-	--add_files("Src/Kernel/Arch/x86_64/**.cpp")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
 
 add_files("Src/Kernel/Init/**.cpp")
