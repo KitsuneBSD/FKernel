@@ -83,6 +83,8 @@ if is_arch("x86_64", "x64") then
 end
 
 add_files("Src/Kernel/Init/**.cpp")
+add_files("Src/Kernel/Driver/**.cpp")
+
 add_files("Src/LibC/**.c")
 add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
