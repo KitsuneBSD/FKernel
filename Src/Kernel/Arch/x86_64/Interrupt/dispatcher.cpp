@@ -8,3 +8,9 @@ extern "C" void isr_dispatcher(uint8_t vector, InterruptFrame *frame) {
   else
     default_handler(frame, vector);
 }
+
+extern "C" void irq_dispatcher(uint8_t vector, InterruptFrame *frame) {
+  auto handler = g_idt.get_irq_handler(vector);
+  if (handler)
+    handler(frame, vector);
+}

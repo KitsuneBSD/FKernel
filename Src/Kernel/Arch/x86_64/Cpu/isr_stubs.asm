@@ -1,5 +1,5 @@
 BITS 64
-GLOBAL isr0, isr1, ..., isr255  ; ou use %rep para gerar
+GLOBAL isr0, isr1, ..., isr31  ; ou use %rep para gerar
 
 EXTERN isr_dispatcher
 
@@ -16,7 +16,7 @@ isr%1:
 %endmacro
 
 %assign i 0
-%rep 256
+%rep 32
   ISR_STUB i
   %assign i i+1
 %endrep

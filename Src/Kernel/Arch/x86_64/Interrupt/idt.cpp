@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/Interrupt/idt_types.h"
 #include <Kernel/Arch/x86_64/Interrupt/idt.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <LibC/stdio.h>
@@ -27,16 +28,23 @@ void idt::set_gate(uint8_t vector, void (*handler_ptr)(), uint16_t selector,
 void idt::register_isr_handler(uint8_t vector, isr_handler_t handler) {
   isr_handlers[vector] = handler;
 }
+isr_handler_t idt::get_isr_handler(uint8_t vec) const {
+  return isr_handlers[vec];
+}
+
+void idt::register_irq_handler(uint8_t vector, irq_handler_t handler) {
+  irq_handlers[vector] = handler;
+}
+
+irq_handler_t idt::get_irq_handler(uint8_t vec) const {
+  return irq_handlers[vec];
+}
 
 void idt::load() {
   Idt_ptr ptr;
   ptr.limit = static_cast<uint16_t>(sizeof(entries) - 1);
   ptr.base = reinterpret_cast<uint64_t>(&entries);
   flush_idt(&ptr);
-}
-
-isr_handler_t idt::get_isr_handler(uint8_t vec) const {
-  return isr_handlers[vec];
 }
 
 Idt_Entry *idt::raw_entries() { return entries.begin(); }

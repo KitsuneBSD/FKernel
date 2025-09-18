@@ -51,3 +51,4 @@ struct Idt_ptr {
 } __attribute__((packed));
 
 using isr_handler_t = void (*)(InterruptFrame *frame, uint8_t vector);
+using irq_handler_t = void (*)(InterruptFrame *frame, uint8_t vector);
