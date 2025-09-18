@@ -7,7 +7,7 @@ idt::idt() { clear(); }
 void idt::clear() {
   for (size_t i = 0; i < MAX_X86_64_IDT_SIZE; ++i) {
     entries[i] = {};
-    handlers[i] = nullptr;
+    isr_handlers[i] = nullptr;
   }
 }
 
@@ -24,8 +24,8 @@ void idt::set_gate(uint8_t vector, void (*handler_ptr)(), uint16_t selector,
   d.zero = 0;
 }
 
-void idt::register_handler(uint8_t vector, isr_handler_t handler) {
-  handlers[vector] = handler;
+void idt::register_isr_handler(uint8_t vector, isr_handler_t handler) {
+  isr_handlers[vector] = handler;
 }
 
 void idt::load() {
@@ -35,7 +35,9 @@ void idt::load() {
   flush_idt(&ptr);
 }
 
-isr_handler_t idt::get_handler(uint8_t vec) const { return handlers[vec]; }
+isr_handler_t idt::get_isr_handler(uint8_t vec) const {
+  return isr_handlers[vec];
+}
 
 Idt_Entry *idt::raw_entries() { return entries.begin(); }
 const Idt_Entry *idt::raw_entries() const { return entries.begin(); };

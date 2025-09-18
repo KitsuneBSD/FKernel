@@ -11,7 +11,7 @@
 class idt {
 private:
   array<Idt_Entry, MAX_X86_64_IDT_SIZE> entries;
-  isr_handler_t handlers[MAX_X86_64_IDT_SIZE];
+  isr_handler_t isr_handlers[MAX_X86_64_ISR_SIZE];
 
 public:
   idt();
@@ -21,8 +21,9 @@ public:
                 uint8_t ist = 0, uint8_t type_attr = 0x8E);
 
   void load();
-  void register_handler(uint8_t vector, isr_handler_t handler);
-  isr_handler_t get_handler(uint8_t vec) const;
+
+  void register_isr_handler(uint8_t vector, isr_handler_t handler);
+  isr_handler_t get_isr_handler(uint8_t vec) const;
 
   Idt_Entry *raw_entries();
   const Idt_Entry *raw_entries() const;

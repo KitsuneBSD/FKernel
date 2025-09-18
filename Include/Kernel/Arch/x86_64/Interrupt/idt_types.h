@@ -3,6 +3,10 @@
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
+constexpr size_t MAX_X86_64_IDT_SIZE = 256;
+constexpr size_t MAX_X86_64_ISR_SIZE = 32;
+constexpr size_t MAX_X86_64_IRQ_SIZE = 16;
+
 struct InterruptFrame {
   uint64_t r15;
   uint64_t r14;
@@ -47,4 +51,3 @@ struct Idt_ptr {
 } __attribute__((packed));
 
 using isr_handler_t = void (*)(InterruptFrame *frame, uint8_t vector);
-constexpr size_t MAX_X86_64_IDT_SIZE = 256;
