@@ -1,10 +1,10 @@
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
-#include <Kernel/Driver/Vga/Vga_buffer.h>
+#include <Kernel/Driver/Vga/vga_buffer.h>
 
 #include <Kernel/Arch/x86_64/io.h>
-#include <Kernel/Driver/SerialPort/Serial.h>
+#include <Kernel/Driver/SerialPort/serial.h>
 
 #include <LibC/stdio.h>
 
@@ -12,7 +12,7 @@ extern char __heap_start[];
 extern char __heap_end[];
 
 extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
-  Serial::init();
+  serial::init();
   auto vga = VGA::instance();
   vga.clear();
   if (multiboot2_magic != multiboot2::BOOTLOADER_MAGIC) {
