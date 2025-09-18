@@ -4,7 +4,7 @@
 #include <LibC/stdint.h>
 
 #ifdef __x86_64__
-#include <Kernel/Arch/x86_64/Io.h>
+#include <Kernel/Arch/x86_64/io.h>
 #endif // __x86_64__
 
 class Serial {
