@@ -1,6 +1,6 @@
-#include "Tests/LibFK/heap_malloc_test.h"
 #include <LibC/stdint.h>
 #include <LibFK/heap_malloc.h>
+#include <Tests/LibFK/heap_malloc_test.h>
 #include <Tests/test_runner.h>
 
 static uint8_t test_heap[32 * 1024 * 1024]; // 32 MiB

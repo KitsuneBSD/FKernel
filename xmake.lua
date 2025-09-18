@@ -101,7 +101,6 @@ add_files("Test/test_runner.c")
 add_files("Test/LibC/**.c")
 add_files("Test/LibFK/**.cpp")
 add_files("Src/LibC/**.c")
-add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
 
 add_defines("FKERNEL_TEST")
