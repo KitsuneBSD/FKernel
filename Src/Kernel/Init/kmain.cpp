@@ -3,7 +3,7 @@
 #include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/Driver/Vga/Vga_buffer.h>
 
-#include <Kernel/Arch/x86_64/Io.h>
+#include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/SerialPort/Serial.h>
 
 #include <LibC/stdio.h>
