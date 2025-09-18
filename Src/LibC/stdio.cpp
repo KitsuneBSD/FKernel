@@ -53,7 +53,7 @@ extern "C" void kprintf(const char *fmt, ...) {
   for (size_t i = 0; fmt[i]; ++i) {
     if (fmt[i] != '%') {
       serial::write_char(fmt[i]);
-      VGA::instance().put_char(fmt[i]);
+      vga::the().put_char(fmt[i]);
       continue;
     }
 
@@ -66,7 +66,7 @@ extern "C" void kprintf(const char *fmt, ...) {
     case 's': {
       const char *s = va_arg(args, const char *);
       serial::write(s);
-      VGA::instance().write(s);
+      vga::the().write(s);
       break;
     }
     case 'd': {
@@ -75,7 +75,7 @@ extern "C" void kprintf(const char *fmt, ...) {
       char buf[12];
       // Você pode usar sua própria função aqui:
       snprintf(buf, sizeof(buf), "%d", val);
-      VGA::instance().write(buf);
+      vga::the().write(buf);
       break;
     }
     case 'x': {
@@ -83,7 +83,7 @@ extern "C" void kprintf(const char *fmt, ...) {
       serial::write_hex(val);
       char buf[12];
       snprintf(buf, sizeof(buf), "%x", val);
-      VGA::instance().write(buf);
+      vga::the().write(buf);
       break;
     }
     case 'u': {
@@ -91,7 +91,7 @@ extern "C" void kprintf(const char *fmt, ...) {
       char buf[12];
       itoa(val, buf, 10);
       serial::write(buf);
-      VGA::instance().write(buf);
+      vga::the().write(buf);
       break;
     }
     case 'l': {
@@ -101,20 +101,20 @@ extern "C" void kprintf(const char *fmt, ...) {
         char buf[24];
         ultoa(val, buf, 10);
         serial::write(buf);
-        VGA::instance().write(buf);
+        vga::the().write(buf);
         i++; // avançar o 'u'
       } else if (next == 'x') {
         unsigned long val = va_arg(args, unsigned long);
         char buf[24];
         ultoa(val, buf, 16);
         serial::write(buf);
-        VGA::instance().write(buf);
+        vga::the().write(buf);
         i++;
       } else {
         serial::write_char('%');
-        VGA::instance().put_char('%');
+        vga::the().put_char('%');
         serial::write_char('l');
-        VGA::instance().put_char('l');
+        vga::the().put_char('l');
       }
       break;
     }
@@ -124,22 +124,22 @@ extern "C" void kprintf(const char *fmt, ...) {
       char buf[24];
       ultoa(val, buf, 16);
       serial::write("0x");
-      VGA::instance().write("0x");
+      vga::the().write("0x");
       serial::write(buf);
-      VGA::instance().write(buf);
+      vga::the().write(buf);
       break;
     }
 
     case '%': {
       serial::write_char('%');
-      VGA::instance().put_char('%');
+      vga::the().put_char('%');
       break;
     }
     default: {
       serial::write_char('%');
       serial::write_char(spec);
-      VGA::instance().put_char('%');
-      VGA::instance().put_char(spec);
+      vga::the().put_char('%');
+      vga::the().put_char(spec);
       break;
     }
     }

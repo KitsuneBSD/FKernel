@@ -13,7 +13,7 @@ extern char __heap_end[];
 
 extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
   serial::init();
-  auto vga = VGA::instance();
+  auto vga = vga::the();
   vga.clear();
   if (multiboot2_magic != multiboot2::BOOTLOADER_MAGIC) {
     while (true) {
