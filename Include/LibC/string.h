@@ -19,6 +19,7 @@ int strcmp(const char *s1, const char *s2);
 char *strchr(const char *s, int c);
 char *strcat(char *dest, const char *src);
 char *strncpy(char *dest, const char *src, size_t n);
+size_t strnlen(const char *s, size_t maxlen);
 
 int itoa(int val, char *buf, int base);
 int atoi(const char *str);

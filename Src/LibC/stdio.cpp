@@ -1,5 +1,37 @@
+#include <LibC/stdarg.h>
 #include <LibC/stdio.h>
 #include <LibC/string.h>
+
+static inline void itoa_unsigned(uint64_t value, char *buf, int base,
+                                 bool uppercase) {
+  char tmp[65];
+  const char *digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
+  int i = 0;
+
+  if (value == 0) {
+    tmp[i++] = '0';
+  } else {
+    while (value) {
+      tmp[i++] = digits[value % base];
+      value /= base;
+    }
+  }
+
+  int j = 0;
+  while (i > 0) {
+    buf[j++] = tmp[--i];
+  }
+  buf[j] = '\0';
+}
+
+static inline void itoa_signed(int64_t value, char *buf, int base) {
+  if (value < 0) {
+    *buf++ = '-';
+    itoa_unsigned((uint64_t)(-value), buf, base, false);
+  } else {
+    itoa_unsigned((uint64_t)value, buf, base, false);
+  }
+}
 
 extern "C" int snprintf(char *str, size_t size, const char *fmt, ...) {
   va_list args;
@@ -73,7 +105,6 @@ extern "C" void kprintf(const char *fmt, ...) {
       int val = va_arg(args, int);
       serial::write_dec(val);
       char buf[12];
-      // Você pode usar sua própria função aqui:
       snprintf(buf, sizeof(buf), "%d", val);
       vga::the().write(buf);
       break;
@@ -146,4 +177,99 @@ extern "C" void kprintf(const char *fmt, ...) {
   }
 
   va_end(args);
+}
+
+extern "C" int vsnprintf(char *buf, size_t size, const char *fmt,
+                         va_list args) {
+  size_t pos = 0;
+
+  for (size_t i = 0; fmt[i] && pos + 1 < size; i++) {
+    if (fmt[i] != '%') {
+      buf[pos++] = fmt[i];
+      continue;
+    }
+
+    i++;
+    bool is_long = false;
+
+    if (fmt[i] == 'l') {
+      is_long = true;
+      i++;
+    }
+
+    char temp[65];
+    switch (fmt[i]) {
+    case 'c': {
+      char c = (char)va_arg(args, int);
+      if (pos < size - 1)
+        buf[pos++] = c;
+      break;
+    }
+    case 's': {
+      const char *s = va_arg(args, const char *);
+      while (*s && pos + 1 < size)
+        buf[pos++] = *s++;
+      break;
+    }
+    case 'd': {
+      if (is_long) {
+        long val = va_arg(args, long);
+        itoa_signed(val, temp, 10);
+      } else {
+        int val = va_arg(args, int);
+        itoa_signed(val, temp, 10);
+      }
+      for (char *p = temp; *p && pos + 1 < size; p++)
+        buf[pos++] = *p;
+      break;
+    }
+    case 'u': {
+      if (is_long) {
+        unsigned long val = va_arg(args, unsigned long);
+        itoa_unsigned(val, temp, 10, false);
+      } else {
+        unsigned int val = va_arg(args, unsigned int);
+        itoa_unsigned(val, temp, 10, false);
+      }
+      for (char *p = temp; *p && pos + 1 < size; p++)
+        buf[pos++] = *p;
+      break;
+    }
+    case 'x': {
+      if (is_long) {
+        unsigned long val = va_arg(args, unsigned long);
+        itoa_unsigned(val, temp, 16, false);
+      } else {
+        unsigned int val = va_arg(args, unsigned int);
+        itoa_unsigned(val, temp, 16, false);
+      }
+      for (char *p = temp; *p && pos + 1 < size; p++)
+        buf[pos++] = *p;
+      break;
+    }
+    case 'p': {
+      uintptr_t val = (uintptr_t)va_arg(args, void *);
+      itoa_unsigned(val, temp, 16, false);
+      if (pos + 2 < size)
+        buf[pos++] = '0';
+      if (pos + 2 < size)
+        buf[pos++] = 'x';
+      for (char *p = temp; *p && pos + 1 < size; p++)
+        buf[pos++] = *p;
+      break;
+    }
+    case '%': {
+      buf[pos++] = '%';
+      break;
+    }
+    default:
+      buf[pos++] = '%';
+      if (pos + 1 < size)
+        buf[pos++] = fmt[i];
+      break;
+    }
+  }
+
+  buf[pos] = '\0';
+  return (int)pos;
 }
