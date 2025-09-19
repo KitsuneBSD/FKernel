@@ -2,6 +2,7 @@
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/Driver/Vga/vga_buffer.h>
+#include <LibFK/log.h>
 
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/SerialPort/serial.h>
@@ -16,10 +17,10 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
   auto vga = vga::the();
   vga.clear();
   if (multiboot2_magic != multiboot2::BOOTLOADER_MAGIC) {
+    kprintf("kmain: multiboot magic has signature %zu and we expected by %zu\n",
+            multiboot2_magic, multiboot2::BOOTLOADER_MAGIC);
     while (true) {
-      kprintf("[Fail]: Can't start the kernel if multiboot magic has signature "
-              "%zu and we expected by %zu",
-              multiboot2_magic, multiboot2::BOOTLOADER_MAGIC);
+
       __asm__("hlt");
     }
   }
