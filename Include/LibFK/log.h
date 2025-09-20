@@ -3,6 +3,7 @@
 #include <LibC/stdarg.h>
 #include <LibC/stdio.h>
 
+/** ANSI color codes for kernel logging */
 #define KLOG_COLOR_RESET "\033[0m"
 #define KLOG_COLOR_RED "\033[31m"
 #define KLOG_COLOR_GREEN "\033[32m"
@@ -13,17 +14,36 @@
 #define KLOG_COLOR_WHITE "\033[37m"
 
 #ifdef FKERNEL_DEBUG
+
+/**
+ * @brief Print a formatted kernel log message in green by default.
+ *
+ * This function only works in debug mode. In release mode, it is omitted.
+ *
+ * @param prefix Prefix to display before the message (e.g., module name)
+ * @param fmt printf-style format string
+ * @param ... Variadic arguments for formatting
+ */
 inline void klog(const char *prefix, const char *fmt, ...) {
-  char buf[512]; // buffer temporário para a string formatada
+  char buf[512]; ///< Temporary buffer for formatted message
   va_list args;
   va_start(args, fmt);
-  vsnprintf(buf, sizeof(buf), fmt, args); // formata a string
+  vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
 
-  // imprime com prefixo colorido (verde por padrão)
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_GREEN, prefix, KLOG_COLOR_RESET, buf);
 }
 
+/**
+ * @brief Print a formatted kernel log message in a specified ANSI color.
+ *
+ * This function only works in debug mode. In release mode, it is omitted.
+ *
+ * @param prefix Prefix to display before the message
+ * @param color ANSI color code to use for the prefix
+ * @param fmt printf-style format string
+ * @param ... Variadic arguments for formatting
+ */
 inline void klog_color(const char *prefix, const char *color, const char *fmt,
                        ...) {
   char buf[512];
@@ -36,6 +56,8 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
 }
 
 #else
-#define klog(...)       // nada em release
-#define klog_color(...) // nada em release
+/// In release mode, klog does nothing
+#define klog(...)
+/// In release mode, klog_color does nothing
+#define klog_color(...)
 #endif

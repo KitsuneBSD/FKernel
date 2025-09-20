@@ -3,20 +3,56 @@
 #include <LibC/stdint.h>
 #include <LibC/stdio.h>
 
-// NOTE: We need implement a function for make a hash in this traits, i think in
-// use DJB2 on global hash (for any arquicteture). But in enviroments x64 use
-// Crc32
-
+/**
+ * @brief Template de traits para tipos genéricos.
+ *
+ * Permite definir funções auxiliares como hash e dump
+ * para diferentes tipos de dados.
+ *
+ * @tparam T Tipo de dado
+ */
 template <typename T> struct Traits {};
 
+/**
+ * @brief Traits para int
+ */
 template <> struct Traits<int> {
-  // TODO: Use a Real Hash function DJB2 or Crc32
+  /**
+   * @brief Calcula o hash de um inteiro.
+   *
+   * Atualmente retorna o valor diretamente.
+   * TODO: implementar função de hash real, ex: DJB2 ou CRC32.
+   *
+   * @param i Valor a ser hasheado
+   * @return Valor hash
+   */
   static unsigned hash(int i) { return i; }
+
+  /**
+   * @brief Imprime o valor do inteiro.
+   * @param i Valor a ser impresso
+   */
   static void dump(int i) { kprintf("%d", i); }
 };
 
+/**
+ * @brief Traits para unsigned int
+ */
 template <> struct Traits<unsigned> {
-  // TODO: Use a Real Hash function DJB2 or Crc32
+  /**
+   * @brief Calcula o hash de um unsigned int.
+   *
+   * Atualmente retorna o valor diretamente.
+   * TODO: implementar função de hash real, ex: DJB2 ou CRC32.
+   *
+   * @param i Valor a ser hasheado
+   * @return Valor hash
+   */
   static unsigned hash(unsigned i) { return i; }
-  static void dump(unsigned i) { kprintf("%d", i); }
+
+  /**
+   * @brief Imprime o valor do unsigned int.
+   * @param i Valor a ser impresso
+   */
+  static void dump(unsigned i) { kprintf("%u", i); }
 };
