@@ -1,4 +1,4 @@
-#include <Kernel/Driver/SerialPort/serial.h>
+#include <Kernel/Driver/SerialPort/serial_port.h>
 
 void serial::init() {
   outb(COM1 + 1, 0x00); // Desabilita interrupções

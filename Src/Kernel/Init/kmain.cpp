@@ -5,7 +5,7 @@
 #include <LibFK/log.h>
 
 #include <Kernel/Arch/x86_64/io.h>
-#include <Kernel/Driver/SerialPort/serial.h>
+#include <Kernel/Driver/SerialPort/serial_port.h>
 
 #include <LibC/stdio.h>
 

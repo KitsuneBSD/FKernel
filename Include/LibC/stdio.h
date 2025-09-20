@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Driver/SerialPort/serial.h>
+#include <Kernel/Driver/SerialPort/serial_port.h>
 #include <Kernel/Driver/Vga/vga_buffer.h>
 
 #include <LibC/stdarg.h>
