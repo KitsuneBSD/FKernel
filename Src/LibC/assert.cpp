@@ -6,9 +6,11 @@ extern "C" void __kernel_assert_fail(const char *expr, const char *file,
   klog("ASSERT", KLOG_COLOR_RED, "Failed: %s (%s: %s: %d)\n", expr, file, func,
        line);
 
+#ifdef FKERNEL_DEBUG
   while (1) {
     __asm__ volatile("cli; hlt");
   }
+#endif
 
   __builtin_unreachable();
 }
