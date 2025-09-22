@@ -1,12 +1,10 @@
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
-#include <Kernel/Driver/Vga/vga_buffer.h>
-#include <LibFK/log.h>
-
-#include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/SerialPort/serial_port.h>
+#include <Kernel/Driver/Vga/vga_buffer.h>
 
+#include <LibC/assert.h>
 #include <LibC/stdio.h>
 
 extern char __heap_start[];
@@ -16,14 +14,7 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
   serial::init();
   auto vga = vga::the();
   vga.clear();
-  if (multiboot2_magic != multiboot2::BOOTLOADER_MAGIC) {
-    kprintf("kmain: multiboot magic has signature %zu and we expected by %zu\n",
-            multiboot2_magic, multiboot2::BOOTLOADER_MAGIC);
-    while (true) {
-
-      __asm__("hlt");
-    }
-  }
+  ASSERT(multiboot2_magic == multiboot2::BOOTLOADER_MAGIC);
 
   multiboot2::MultibootParser mb_parser(multiboot_ptr);
 
