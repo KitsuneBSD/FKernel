@@ -1,7 +1,9 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h"
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
+#include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
 #include <LibFK/log.h>
 
 extern "C" void flush_idt(void *idtr);
@@ -14,8 +16,13 @@ void InterruptController::initialize() {
     register_interrupt(default_handler, i);
   }
 
+  register_interrupt(nmi_handler, 2);
+
   load();
+  PIC8259::initialize();
   klog("INTERRUPT CONTROLLER", "Interrupt descriptor table initialized");
+
+  NMI::enable_nmi();
 }
 
 void InterruptController::clear() {
