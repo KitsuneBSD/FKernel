@@ -21,7 +21,7 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
   auto mmap =
       mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
 
-  early_init(*mmap);
+  early_init(mmap);
 
   while (true) {
     asm("hlt");
