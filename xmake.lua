@@ -84,6 +84,7 @@ end
 
 add_files("Src/Kernel/Init/**.cpp")
 add_files("Src/Kernel/Driver/**.cpp")
+add_files("Src/Kernel/Hardware/**.cpp")
 
 add_files("Src/LibC/**.c")
 add_files("Src/LibC/**.cpp")
