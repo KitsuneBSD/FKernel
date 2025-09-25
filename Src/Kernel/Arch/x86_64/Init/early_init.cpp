@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h"
 #include <Kernel/Boot/early_init.h>
 #include <LibC/stddef.h>
 #include <LibC/stdio.h>

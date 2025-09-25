@@ -1,16 +1,19 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h"
+#include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
-#include <Kernel/Hardware/Cpu.h>
-#include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
+#include <Kernel/Hardware/Cpu.h>
 #include <LibFK/log.h>
 
 extern "C" void flush_idt(void *idtr);
 
 void InterruptController::initialize() {
+  disable_interrupt();
+
   clear();
 
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
@@ -19,6 +22,7 @@ void InterruptController::initialize() {
   }
 
   register_interrupt(nmi_handler, 2);
+  register_interrupt(timer_handler, 32);
 
   load();
   PIC8259::initialize();
@@ -26,9 +30,13 @@ void InterruptController::initialize() {
   if (CPU::the().has_apic()) {
     APIC::the().enable();
   }
-  klog("INTERRUPT CONTROLLER", "Interrupt descriptor table initialized");
-
   NMI::enable_nmi();
+  PIT::the().initialize(100);
+  PIC8259::unmask_irq(0);
+  PIC8259::unmask_irq(1);
+  enable_interrupt();
+
+  klog("INTERRUPT CONTROLLER", "Interrupt descriptor table initialized");
 }
 
 void InterruptController::clear() {

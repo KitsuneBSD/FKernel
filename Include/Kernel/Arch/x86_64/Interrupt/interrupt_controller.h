@@ -2,6 +2,7 @@
 
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <LibFK/array.h>
+#include <LibFK/log.h>
 
 class InterruptController {
 private:
@@ -9,6 +10,30 @@ private:
   array<interrupt, MAX_x86_64_IDT_SIZE> m_handlers;
 
   InterruptController() { clear(); }
+
+  bool is_interrupt_enable = true;
+
+  void enable_interrupt() {
+    if (is_interrupt_enable) {
+      klog("INTERRUPT CONTROLLER", "Interrupts already enabled");
+      return;
+    }
+
+    asm volatile("sti");
+    is_interrupt_enable = true;
+    klog("INTERRUPT CONTROLLER", "Interrupts enabled");
+  }
+
+  void disable_interrupt() {
+    if (!is_interrupt_enable) {
+      klog("INTERRUPT CONTROLLER", "Interrupts already disabled");
+      return;
+    }
+
+    asm volatile("cli");
+    is_interrupt_enable = false;
+    klog("INTERRUPT CONTROLLER", "Interrupts disabled");
+  }
 
 public:
   static InterruptController &the() {
