@@ -1,4 +1,6 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h"
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
+#include <Kernel/Hardware/Cpu.h>
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
@@ -20,6 +22,10 @@ void InterruptController::initialize() {
 
   load();
   PIC8259::initialize();
+
+  if (CPU::the().has_apic()) {
+    APIC::the().enable();
+  }
   klog("INTERRUPT CONTROLLER", "Interrupt descriptor table initialized");
 
   NMI::enable_nmi();
