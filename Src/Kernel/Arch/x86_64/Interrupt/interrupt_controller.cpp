@@ -1,36 +1,56 @@
+#include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
+#include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <LibFK/log.h>
 
-InterruptController::InterruptController()
-    : m_handlers{}
-{
-    for (auto& handler : m_handlers) {
-        handler = nullptr;
-    }
+extern "C" void flush_idt(void *idtr);
+
+void InterruptController::initialize() {
+  clear();
+
+  for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
+    set_gate(i, g_isr_stubs[i]);
+    register_interrupt(default_handler, i);
+  }
+
+  load();
+  klog("INTERRUPT CONTROLLER", "Interrupt descriptor table initialized");
 }
 
-void InterruptController::initialize()
-{
-    klog("INTERRUPT_CONTROLLER", "Initialized interrupt controller");
+void InterruptController::clear() {
+  for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
+    m_entries[i] = {};
+    m_handlers[i] = nullptr;
+  }
 }
 
-InterruptController& InterruptController::the()
-{
-    static InterruptController controller;
-    return controller;
+void InterruptController::set_gate(uint8_t vector, void (*new_interrupt)(),
+                                   uint16_t selector, uint8_t ist,
+                                   uint8_t type_attr) {
+  const uint64_t handler = reinterpret_cast<uint64_t>(new_interrupt);
+  idt_entry &d = m_entries[vector];
+  d.offset_low = static_cast<uint16_t>(handler & 0xFFFFu);
+  d.selector = selector;
+  d.ist = static_cast<uint8_t>(ist & 0x7u);
+  d.type_attr = type_attr;
+  d.offset_mid = static_cast<uint16_t>((handler >> 16) & 0xFFFFu);
+  d.offset_high = static_cast<uint32_t>((handler >> 32) & 0xFFFFFFFFu);
+  d.zero = 0;
 }
 
-void InterruptController::register_handler(uint8_t interrupt_number, IInterruptHandler* handler)
-{
-    m_handlers[interrupt_number] = handler;
+void InterruptController::register_interrupt(interrupt new_interrupt,
+                                             uint8_t vector) {
+  m_handlers[vector] = new_interrupt;
 }
 
-void InterruptController::unregister_handler(uint8_t interrupt_number)
-{
-    m_handlers[interrupt_number] = nullptr;
+void InterruptController::load() {
+  idt_ptr ptr;
+  ptr.limit = static_cast<uint16_t>(sizeof(m_entries) - 1);
+  ptr.base = reinterpret_cast<uint64_t>(&m_entries);
+  flush_idt(&ptr);
 }
 
-IInterruptHandler* InterruptController::get_handler(uint8_t interrupt_number)
-{
-    return m_handlers[interrupt_number];
+interrupt InterruptController::get_interrupt(uint8_t vector) {
+  return m_handlers[vector];
 }
