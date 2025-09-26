@@ -2,5 +2,8 @@
 #include <LibFK/log.h>
 
 void nmi_handler([[maybe_unused]] uint8_t vector) {
-  klog("NMI", "Non-Maskable Interrupt triggered (vector %u)", vector);
+  kerror("NMI", "Non-Maskable Interrupt triggered (vector %u)", vector);
+  for (;;) {
+    asm volatile("hlt");
+  }
 }

@@ -7,7 +7,7 @@ void APIC::enable() {
   bool is_present = CPU::the().has_apic();
 
   if (!is_present) {
-    klog("APIC", "Local APIC not detected");
+    kerror("APIC", "Local APIC not detected");
     return;
   }
 
