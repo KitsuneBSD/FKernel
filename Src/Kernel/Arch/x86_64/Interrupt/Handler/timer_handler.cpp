@@ -5,7 +5,7 @@ uint64_t ticks = 0;
 
 void timer_handler([[maybe_unused]] uint8_t vector) {
   ticks++;
-  klog("TIMER", "Ticks: %lx", ticks);
+  // klog("TIMER", "Ticks: %lx", ticks);
 
   PIC8259::send_eoi(0);
 }
