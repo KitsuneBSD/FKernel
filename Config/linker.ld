@@ -6,8 +6,9 @@ SECTIONS
 
     .kernel : 
     {
-        *(.multiboot_header)
+        KEEP(*(.multiboot_header))
 
+        __kernel_start =.;
         *(.text)
         *(.rodata)
         *(.data)
