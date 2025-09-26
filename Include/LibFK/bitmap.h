@@ -42,5 +42,10 @@ public:
       data[i] = ~T(0);
   }
 
+  constexpr void populate(size_t counter) {
+    for (size_t i = 0; i < counter; ++i)
+      set(i, true);
+  }
+
   static constexpr size_t sizeInBytes() noexcept { return ELEMS * sizeof(T); }
 };

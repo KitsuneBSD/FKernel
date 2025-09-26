@@ -13,7 +13,7 @@ private:
 
 public:
   explicit rb_node(T new_value)
-      : value(new_value), is_red(true), parent(nullptr), left(nullptr),
+      : is_red(true), value(new_value), parent(nullptr), left(nullptr),
         right(nullptr) {}
 
   rb_node<T>() {
