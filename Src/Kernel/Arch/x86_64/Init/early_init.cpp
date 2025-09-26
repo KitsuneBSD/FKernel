@@ -1,5 +1,6 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h"
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
 #include <Kernel/Boot/early_init.h>
+#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 #include <LibC/stddef.h>
 #include <LibC/stdio.h>
 #include <LibFK/log.h>
@@ -11,4 +12,5 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   klog("MULTIBOOT2", "Reference to multiboot2 memory map: %p", mmap);
 
   InterruptController::the().initialize();
+  PMM::the().initialize(mmap);
 }
