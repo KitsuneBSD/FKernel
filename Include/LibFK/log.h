@@ -13,6 +13,24 @@
 #define KLOG_COLOR_CYAN "\033[36m"
 #define KLOG_COLOR_WHITE "\033[37m"
 
+/**
+ * @brief Print a formatted kernel log message in red by default.
+ *
+ *
+ * @param prefix Prefix to display before the message (e.g., module name)
+ * @param fmt printf-style format string
+ * @param ... Variadic arguments for formatting
+ */
+inline void kerror(const char *prefix, const char *fmt, ...) {
+  char buf[512]; ///< Temporary buffer for formatted message
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
+}
+
 #ifdef FKERNEL_DEBUG
 
 /**
@@ -54,7 +72,6 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
 
   kprintf("%s[%s]%s: %s\n", color, prefix, KLOG_COLOR_RESET, buf);
 }
-
 #else
 /// In release mode, klog does nothing
 #define klog(...)
