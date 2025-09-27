@@ -12,23 +12,25 @@
  * Size of each chunk in bytes.
  */
 
-template <size_t ChunkSize, size_t PoolSizeInBytes = 1048576>
+template <size_t ChunkSize, size_t PoolSizeInBytes = 1048576, typename T = uint64_t>
 class ChunkAllocator {
-  using BitmapType = Bitmap<uint8_t, (PoolSizeInBytes / ChunkSize)>;
-
 private:
-  uint8_t *m_base{nullptr};
   size_t m_free{capacityInAllocations()};
-  BitmapType m_bitmap{};
+  Bitmap<T> m_bitmap;
 
-  const BitmapType &bitmap() const noexcept { return m_bitmap; }
-  BitmapType &bitmap() noexcept { return m_bitmap; }
+  const Bitmap<T> &bitmap() const noexcept { return m_bitmap; }
+  Bitmap<T> &bitmap() noexcept { return m_bitmap; }
 
+  ChunkAllocator(const ChunkAllocator &) = delete;
+  ChunkAllocator &operator=(const ChunkAllocator &) = delete;
+  ChunkAllocator(ChunkAllocator &&) = delete;
+  ChunkAllocator &operator=(ChunkAllocator &&) = delete;
 public:
-  void initialize(uint8_t *base) noexcept {
-    m_base = base;
-    m_free = capacityInAllocations();
-    m_bitmap.clear();
+  ChunkAllocator() = default; 
+
+  void initialize(T *space) noexcept {
+    m_bitmap = Bitmap<T>(sizeOfAllocationBitmapInBytes() * 8);
+    memset(space, 0, sizeOfAllocationBitmapInBytes() + capacityInBytes());
   }
 
   static constexpr size_t capacityInAllocations() noexcept {
@@ -39,11 +41,14 @@ public:
     return capacityInAllocations() * ChunkSize;
   }
 
-  uint8_t *allocate() noexcept {
-    auto bm = bitmap();
+  static constexpr size_t sizeOfAllocationBitmapInBytes() noexcept {
+    return (capacityInAllocations() + (sizeof(T) -1)) / sizeof(T);
+  }
+
+  T *allocate() noexcept {
     for (size_t i = 0; i < capacityInAllocations(); ++i) {
-      if (!bm.get(i)) {
-        bm.set(i, true);
+      if (!m_bitmap.get(i)) {
+        m_bitmap.set(i, true);
         --m_free;
         return pointerToChunk(i);
       }
@@ -51,43 +56,57 @@ public:
     return nullptr;
   }
 
-  void free(uint8_t *ptr) noexcept {
-    auto bm = bitmap();
+  void free(T *ptr) noexcept {
     size_t idx = chunkIndexFromPointer(ptr);
-    bm.set(idx, false);
+    m_bitmap.set(idx, false);
     ++m_free;
   }
 
-  bool isInAllocator(const uint8_t *ptr) const noexcept {
+  bool isInAllocator(const T *ptr) const noexcept {
     return ptr >= pointerToChunk(0) && ptr < addressAfterThisAllocator();
   }
 
-  size_t chunkIndexFromPointer(const uint8_t *ptr) const noexcept {
+  size_t chunkIndexFromPointer(const T *ptr) const noexcept {
     return static_cast<size_t>((ptr - pointerToChunk(0)) / ChunkSize);
   }
 
-  uint8_t *pointerToChunk(size_t index) const noexcept {
-    return m_base + BitmapType::sizeInBytes() + index * ChunkSize;
+  T *pointerToChunk(size_t index) noexcept {
+    return reinterpret_cast<T*>(
+        reinterpret_cast<uint64_t*>(m_bitmap.data()) + sizeOfAllocationBitmapInBytes() + (index * ChunkSize)
+    );
   }
 
-  uint8_t *addressAfterThisAllocator() const noexcept {
-    return m_base + BitmapType::sizeInBytes() + capacityInBytes();
+  const T *pointerToChunk(size_t index) const noexcept {
+    return reinterpret_cast<const T*>(
+        reinterpret_cast<const uint8_t*>(m_bitmap.data())
+        + sizeOfAllocationBitmapInBytes()
+        + index * ChunkSize
+    );
   }
 
-  static constexpr size_t sizeOfAllocationBitmapInBytes() noexcept {
-    return BitmapType::sizeInBytes();
+  T *addressAfterThisAllocator() noexcept {
+    return reinterpret_cast<T*>(
+        reinterpret_cast<uint64_t*>(m_bitmap.data()) + sizeOfAllocationBitmapInBytes() + capacityInBytes()
+    );
+  }
+
+  const T *addressAfterThisAllocator() const noexcept {
+    return reinterpret_cast<const T*>(
+        reinterpret_cast<const uint8_t*>(m_bitmap.data())
+        + sizeOfAllocationBitmapInBytes()
+        + capacityInBytes()
+    );
   }
 
   constexpr size_t chunk_size() const noexcept { return ChunkSize; }
 };
 
-/**
+/** 
  * @brief Global allocator with pools of multiple sizes.
  */
 struct Allocator {
   void initialize();
   void initialize(uint8_t *heap_start, uint8_t *heap_end);
-  void initializeIfNeeded();
 
   ChunkAllocator<8> alloc8;
   ChunkAllocator<16> alloc16;

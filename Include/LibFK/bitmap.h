@@ -1,51 +1,54 @@
 #pragma once
 
+#include <LibC/assert.h>
 #include <LibC/stddef.h>
+#include <LibFK/new.h>
 
-template <typename T, size_t bits> class Bitmap {
-private:
-  static constexpr size_t BITS_PER_ELEM = sizeof(T) * 8;
-  static constexpr size_t ELEMS = (bits + BITS_PER_ELEM - 1) / BITS_PER_ELEM;
+template<typename T> 
+class Bitmap {
+  private:
+    size_t m_size;
+    T* m_bits;
+  public:
+    Bitmap() : m_size(0), m_bits(nullptr) {}
+    Bitmap(size_t size) : m_size(size) {
+        m_bits = new T[(size + sizeof(T) * 8 - 1)
+                        / (sizeof(T) * 8)]();
+    }
 
-  static constexpr size_t elem_index(size_t idx) noexcept {
-    return __builtin_expect(idx >> __builtin_ctz(BITS_PER_ELEM), 0);
-  }
+    ~Bitmap() {
+        delete[] m_bits;
+    }
 
-  static constexpr size_t bit_index(size_t idx) noexcept {
-    return idx & (BITS_PER_ELEM - 1);
-  }
+    size_t sizeInBytes() const {
+        return (m_size + 7) / 8;
+    }
 
-private:
-  T data[ELEMS] = {};
+    const T* data() const {
+        return m_bits;
+    }
 
-public:
-  constexpr bool get(size_t index) const noexcept {
-    return (data[elem_index(index)] >> bit_index(index)) & 1;
-  }
+    T* data() {
+      return m_bits;
+    }
 
-  constexpr void set(size_t index, bool value) noexcept {
-    size_t e = elem_index(index);
-    size_t b = bit_index(index);
-    if (value)
-      data[e] |= T(1) << b;
-    else
-      data[e] &= ~(T(1) << b);
-  }
+    bool get(size_t index) const {
+      return m_bits[index / (sizeof(T) * 8)] & (T(1) << (index % (sizeof(T) * 8)));
+    }
 
-  constexpr void clear() noexcept {
-    for (size_t i = 0; i < ELEMS; ++i)
-      data[i] = T(0);
-  }
+    bool set(size_t index, bool value) {
+      if (value) {
+        m_bits[index / (sizeof(T) * 8)] |= (T(1) << (index % (sizeof(T) * 8)));
+      } else {
+        m_bits[index / (sizeof(T) * 8)] &= ~(T(1) << (index % (sizeof(T) * 8)));
+      }
+      return value;
+    }
 
-  constexpr void fill() noexcept {
-    for (size_t i = 0; i < ELEMS; ++i)
-      data[i] = ~T(0);
-  }
-
-  constexpr void populate(size_t counter) {
-    for (size_t i = 0; i < counter; ++i)
-      set(i, true);
-  }
-
-  static constexpr size_t sizeInBytes() noexcept { return ELEMS * sizeof(T); }
+    void clear() {
+      size_t num_elements = (m_size + sizeof(T) * 8 - 1) / (sizeof(T) * 8);
+      for (size_t i = 0; i < num_elements; ++i) {
+        m_bits[i] = 0;
+      }
+    }
 };

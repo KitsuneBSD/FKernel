@@ -128,7 +128,12 @@ public:
                                          const T &b) { return a < b; })
       : cmp(cmp_func) {}
 
-  void insert(rb_node<T> *node) {
+  
+  void insert(T node) {
+    insert_on_tree(new rb_node<T>(node));
+  }
+
+  void insert_on_tree(rb_node<T> *node) {
     rb_node<T> *y = nullptr;
     rb_node<T> *x = root;
 
