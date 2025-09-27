@@ -10,28 +10,51 @@ extern "C" uintptr_t __kernel_end;
 extern "C" uintptr_t __heap_start;
 extern "C" uintptr_t __heap_end;
 
-struct PageRange {
-  uintptr_t start;
-  uintptr_t end;
-  Bitmap<uint64_t, 0> *m_bitmap;
-  size_t bitmap_size;
-
-  bool operator<(const PageRange &other) const { return start < other.start; }
+enum class MemoryType : uint32_t {
+    Usable,
+    Reserved,
+    ACPIReclaimable,
+    ACPINVS,
+    BadMemory,
+    Kernel,
+    Framebuffer,
+    Heap,
+    Module
 };
 
-class PMM {
-private:
-  PMM() = default;
+struct PhysicalMemoryRange {
+    uintptr_t m_start;
+    uintptr_t m_end;
+    MemoryType m_type;
+    // NOTE: Start the bitmap as ocupated
+    Bitmap<uint64_t> m_bitmap;
 
-  rb_tree<PageRange> m_page_tree;
+    bool operator<(const PhysicalMemoryRange& other) const { return m_start < other.m_start; }
+    bool operator==(const PhysicalMemoryRange& other) const { return m_start == other.m_start && m_end == other.m_end; }
+    bool operator>(const PhysicalMemoryRange& other) const { return m_start > other.m_start; }
+    
+};
+
+class PhysicalMemoryManager {
+private:
+    rb_tree<PhysicalMemoryRange> m_memory_ranges;
+    bool is_initialized = false;
+
+    PhysicalMemoryManager() = default;
+    ~PhysicalMemoryManager() = default;
+    
+    PhysicalMemoryManager(const PhysicalMemoryManager&) = delete;
+    PhysicalMemoryManager& operator=(const PhysicalMemoryManager&) = delete;
+    PhysicalMemoryManager(PhysicalMemoryManager&&) = delete;
+    PhysicalMemoryManager& operator=(PhysicalMemoryManager&&) = delete;
 
 public:
-  static PMM &the() {
-    static PMM inst;
-    return inst;
-  }
+    static PhysicalMemoryManager& the() {
+        static PhysicalMemoryManager instance;
+        return instance;
+    }
 
-  void initialize(const multiboot2::TagMemoryMap *mmap);
-  uintptr_t allocate_page();
-  void free_page(uintptr_t addr);
+    void initialize(const multiboot2::TagMemoryMap* mmap);
+    void* allocate_page();
+    void free_page(void* page);
 };

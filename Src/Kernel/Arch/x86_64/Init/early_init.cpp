@@ -12,5 +12,5 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   klog("MULTIBOOT2", "Reference to multiboot2 memory map: %p", mmap);
 
   InterruptController::the().initialize();
-  PMM::the().initialize(mmap);
+  PhysicalMemoryManager::the().initialize(mmap);
 }
