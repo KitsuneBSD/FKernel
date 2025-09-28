@@ -37,7 +37,5 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
            entry_start, entry_end, entry.type);
   }
 
-  m_memory_ranges.print_tree();
-
   klog("PHYSICAL MEMORY MANAGER", "Initialized Physical Memory Manager...");
 }
