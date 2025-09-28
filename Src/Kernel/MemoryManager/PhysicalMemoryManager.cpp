@@ -22,12 +22,13 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap* mmap) {
             .m_start = entry_start,
             .m_end = entry_end,
             .m_type = type,
-            .m_bitmap = Bitmap<uint64_t>()
+            .m_bitmap = Bitmap<uint64_t, MAX_CHUNKS_PER_RANGE>()
         };
 
         m_memory_ranges.insert(range);
         klog("PHYSICAL MEMORY MANAGER", "Insert memory range: [0x%lx - 0x%lx] type: %u", entry_start, entry_end, entry.type);
     }
+
 
     klog("PHYSICAL MEMORY MANAGER", "Initialized Physical Memory Manager...");
 }
