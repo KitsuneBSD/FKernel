@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/log.h>
 #include <LibFK/new.h>
 
 template <typename T> class rb_node {
@@ -51,7 +52,7 @@ public:
 template <typename T, typename Compare = bool (*)(const T &, const T &)>
 class rb_tree {
 private:
-  rb_node<T> *root{nullptr};
+  rb_node<T> *m_root{nullptr};
   Compare cmp;
 
   void rotate_left(rb_node<T> *x) {
@@ -59,7 +60,7 @@ private:
     x->set_right(y->get_left());
 
     if (x->get_parent() == nullptr)
-      root = y;
+      m_root = y;
     else if (x == x->get_parent()->get_left())
       x->get_parent()->set_left(y);
     else
@@ -72,7 +73,7 @@ private:
     rb_node<T> *y = x->get_left();
     x->set_left(y->get_right());
     if (x->get_parent() == nullptr)
-      root = y;
+      m_root = y;
     else if (x == x->get_parent()->get_right())
       x->get_parent()->set_right(y);
     else
@@ -120,7 +121,7 @@ private:
         }
       }
     }
-    root->set_color(false);
+    m_root->set_color(false);
   }
 
 public:
@@ -128,14 +129,11 @@ public:
                                          const T &b) { return a < b; })
       : cmp(cmp_func) {}
 
-  
-  void insert(T node) {
-    insert_on_tree(new rb_node<T>(node));
-  }
+  void insert(T node) { insert_on_tree(new rb_node<T>(node)); }
 
   void insert_on_tree(rb_node<T> *node) {
     rb_node<T> *y = nullptr;
-    rb_node<T> *x = root;
+    rb_node<T> *x = m_root;
 
     while (x) {
       y = x;
@@ -147,7 +145,7 @@ public:
 
     node->set_parent(y);
     if (!y)
-      root = node;
+      m_root = node;
     else if (cmp(node->get_value(), y->get_value()))
       y->set_left(node);
     else
@@ -161,7 +159,7 @@ public:
   }
 
   rb_node<T> *find(const T &value) const {
-    rb_node<T> *current = root;
+    rb_node<T> *current = m_root;
     while (current) {
       if (cmp(value, current->get_value()))
         current = current->get_left();
@@ -173,5 +171,5 @@ public:
     return nullptr;
   }
 
-  rb_node<T> *get_root() const { return root; }
+  rb_node<T> *get_root() const { return m_root; }
 };
