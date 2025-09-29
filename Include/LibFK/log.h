@@ -31,6 +31,16 @@ inline void kerror(const char *prefix, const char *fmt, ...) {
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
 }
 
+inline void kwarn(const char *prefix, const char *fmt, ...) {
+  char buf[512]; ///< Temporary buffer for formatted message
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_YELLOW, prefix, KLOG_COLOR_RESET, buf);
+}
+
 #ifdef FKERNEL_DEBUG
 
 /**
