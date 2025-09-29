@@ -9,38 +9,52 @@
 
 void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
   if (is_initialized) {
-    kerror("PHYSICAL MEMORY MANAGER",
-           "Physical Memory Manager is already initialized!");
+    kerror("PHYSICAL MEMORY", "Already initialized!");
     return;
   }
 
-  for (auto &entry : *mmap) {
+  for (const auto &entry : *mmap) {
     uintptr_t entry_start = static_cast<uintptr_t>(entry.base_addr);
     uintptr_t entry_end = entry_start + static_cast<uintptr_t>(entry.length);
-    MemoryType type;
-    bool is_on_use;
 
-    // TODO: Apply subdivision on minor ranges with 4096KB
-    // NOTE: To make work we need floor the size
+    if (entry_start <= 1 * 1024 * 1024) {
+      kwarn("PHYSICAL MEMORY", "Unusable memory %p need be ignored",
+            entry_start);
+      continue;
+    }
 
-    if (multiboot2::is_available(entry.type))
-      type = MemoryType::Usable;
-    else
-      type = MemoryType::Reserved;
+    if (entry_end <= entry_start) {
+      kwarn("PHYSICAL MEMORY",
+            "Entry end %p never can be smaller than entry start %p", entry_end,
+            entry_start);
+      continue;
+    }
 
-    if (type == MemoryType::Usable)
-      is_on_use = false;
-    else
-      is_on_use = true;
+    if (multiboot2::is_available(entry.type)) {
+      uintptr_t aligned_start =
+          (entry_start + 4095) & ~static_cast<uintptr_t>(4095);
 
-    PhysicalMemoryRange range{
-        .m_start = entry_start,
-        .m_end = entry_end,
-        .m_type = type,
-        .m_is_on_use = is_on_use,
-    };
-    m_memory_ranges.insert(range);
+      for (uintptr_t addr = aligned_start; addr + 4096 <= entry_end;
+           addr += 4096) {
+        PhysicalMemoryRange page{
+            .m_start = addr,
+            .m_end = addr + 4096,
+            .m_type = MemoryType::Usable,
+            .m_is_on_use = false,
+        };
+        m_memory_ranges.insert(page);
+      }
+    } else {
+      PhysicalMemoryRange reserved{
+          .m_start = entry_start,
+          .m_end = entry_end,
+          .m_type = MemoryType::Reserved,
+          .m_is_on_use = true,
+      };
+      m_memory_ranges.insert(reserved);
+    }
   }
 
   klog("PHYSICAL MEMORY MANAGER", "Initialized Physical Memory Manager...");
+  is_initialized = true;
 }
