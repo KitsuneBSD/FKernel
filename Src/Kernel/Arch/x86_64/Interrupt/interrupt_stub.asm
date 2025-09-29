@@ -8,8 +8,10 @@ section .text
 %macro ISR_STUB 1
 global isr%1
 isr%1:
+    push rax
     mov rdi, %1
     call interrupt_dispatch
+    pop rax
     iretq
 %endmacro
 

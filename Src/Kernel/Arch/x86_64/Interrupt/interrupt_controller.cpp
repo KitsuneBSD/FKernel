@@ -22,6 +22,7 @@ void InterruptController::initialize() {
   }
 
   register_interrupt(nmi_handler, 2);
+  register_interrupt(gp_handler, 13);
   register_interrupt(timer_handler, 32);
 
   load();
