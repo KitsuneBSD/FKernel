@@ -4,7 +4,7 @@
 #include <Kernel/Boot/multiboot2.h>
 #include <LibC/stdint.h>
 #include <LibC/string.h>
-#include <LibFK/bitmap.h>
+#include <LibFK/log.h>
 #include <LibFK/rb_tree.h>
 
 extern "C" uintptr_t __kernel_end;
@@ -20,29 +20,25 @@ struct PhysicalMemoryRange {
   uintptr_t m_start;
   uintptr_t m_end;
   MemoryType m_type;
-  bool m_is_on_use;
 
   bool operator<(const PhysicalMemoryRange &other) const {
-    if (m_type != other.m_type)
-      return m_type < other.m_type;
     return m_start < other.m_start;
   }
 
-  bool operator>(const PhysicalMemoryRange &other) const {
-    if (m_type != other.m_type)
-      return m_type > other.m_type;
-    return m_start > other.m_start;
+  bool operator==(const PhysicalMemoryRange &other) const {
+    return m_start == other.m_start && m_end == other.m_end;
   }
 
-  bool operator==(const PhysicalMemoryRange &other) const {
-    return m_type == other.m_type && m_start == other.m_start &&
-           m_end == other.m_end;
+  bool contains(uintptr_t addr) const {
+    return addr >= m_start && addr < m_end;
   }
+
+  uintptr_t size() const { return m_end - m_start; }
 };
 
 class PhysicalMemoryManager {
 private:
-  rb_tree<PhysicalMemoryRange> m_memory_ranges;
+  rb_tree<PhysicalMemoryRange, 65536> m_memory_ranges;
   bool is_initialized = false;
 
   PhysicalMemoryManager() = default;
