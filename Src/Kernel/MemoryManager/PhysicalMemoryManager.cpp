@@ -17,10 +17,15 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
     uintptr_t entry_start = static_cast<uintptr_t>(entry.base_addr);
     uintptr_t entry_end = entry_start + static_cast<uintptr_t>(entry.length);
 
-    if (entry_start <= 1 * 1024 * 1024) {
-      kwarn("PHYSICAL MEMORY", "Unusable memory %p need be ignored",
+    if (entry_start < 0x100000) {
+      if (entry_end <= 0x100000) {
+        kwarn("PHYSICAL MEMORY", "Unusable memory %p need be ignored",
+              entry_start);
+        continue;
+      }
+      kwarn("PHYSICAL MEMORY", "Truncating unusable memory %p to 0x100000",
             entry_start);
-      continue;
+      entry_start = 0x100000;
     }
 
     if (entry_end <= entry_start) {
