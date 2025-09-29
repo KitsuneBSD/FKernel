@@ -17,24 +17,29 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
   for (auto &entry : *mmap) {
     uintptr_t entry_start = static_cast<uintptr_t>(entry.base_addr);
     uintptr_t entry_end = entry_start + static_cast<uintptr_t>(entry.length);
-    MemoryType type = static_cast<MemoryType>(entry.type);
+    MemoryType type;
+    bool is_on_use;
 
-    PhysicalMemoryRange range{.m_start = entry_start,
-                              .m_end = entry_end,
-                              .m_type = type,
-                              .m_bitmap =
-                                  Bitmap<uint64_t, MAX_CHUNKS_PER_RANGE>()};
-
-    m_memory_ranges.insert(range);
+    // TODO: Apply subdivision on minor ranges with 4096KB
+    // NOTE: To make work we need floor the size
 
     if (multiboot2::is_available(entry.type))
-      klog("PHYSICAL MEMORY MANAGER",
-           "Insert available memory range: [0x%lx - 0x%lx] type: %u",
-           entry_start, entry_end, entry.type);
+      type = MemoryType::Usable;
     else
-      klog("PHYSICAL MEMORY MANAGER",
-           "Insert reserved memory range: [0x%lx - 0x%lx] type: %u",
-           entry_start, entry_end, entry.type);
+      type = MemoryType::Reserved;
+
+    if (type == MemoryType::Usable)
+      is_on_use = false;
+    else
+      is_on_use = true;
+
+    PhysicalMemoryRange range{
+        .m_start = entry_start,
+        .m_end = entry_end,
+        .m_type = type,
+        .m_is_on_use = is_on_use,
+    };
+    m_memory_ranges.insert(range);
   }
 
   klog("PHYSICAL MEMORY MANAGER", "Initialized Physical Memory Manager...");

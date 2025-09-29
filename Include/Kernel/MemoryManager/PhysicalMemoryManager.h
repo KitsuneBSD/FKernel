@@ -14,21 +14,13 @@ extern "C" uintptr_t __heap_end;
 enum class MemoryType : uint32_t {
   Usable,
   Reserved,
-  ACPIReclaimable,
-  ACPINVS,
-  BadMemory,
-  Kernel,
-  Framebuffer,
-  Heap,
-  Module
 };
 
 struct PhysicalMemoryRange {
   uintptr_t m_start;
   uintptr_t m_end;
   MemoryType m_type;
-  // NOTE: Start the bitmap as ocupated
-  Bitmap<uint64_t, MAX_CHUNKS_PER_RANGE> m_bitmap;
+  bool m_is_on_use;
 
   bool operator<(const PhysicalMemoryRange &other) const {
     if (m_type != other.m_type)
