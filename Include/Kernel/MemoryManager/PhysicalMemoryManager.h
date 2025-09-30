@@ -11,30 +11,7 @@ extern "C" uintptr_t __kernel_end;
 extern "C" uintptr_t __heap_start;
 extern "C" uintptr_t __heap_end;
 
-enum class MemoryType : uint32_t {
-  Usable,
-  Reserved,
-};
-
-struct PhysicalMemoryRange {
-  uintptr_t m_start;
-  uintptr_t m_end;
-  MemoryType m_type;
-
-  bool operator<(const PhysicalMemoryRange &other) const {
-    return m_start < other.m_start;
-  }
-
-  bool operator==(const PhysicalMemoryRange &other) const {
-    return m_start == other.m_start && m_end == other.m_end;
-  }
-
-  bool contains(uintptr_t addr) const {
-    return addr >= m_start && addr < m_end;
-  }
-
-  uintptr_t size() const { return m_end - m_start; }
-};
+#include <Kernel/MemoryManager/MemoryRange.h>
 
 class PhysicalMemoryManager {
 private:
@@ -56,6 +33,6 @@ public:
   }
 
   void initialize(const multiboot2::TagMemoryMap *mmap);
-  void *allocate_page();
-  void free_page(void *page);
+  void *alloc_physical_page();
+  void free_physical_page(void *page);
 };
