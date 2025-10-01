@@ -7,8 +7,10 @@ void default_handler([[maybe_unused]] uint8_t vector,
                      InterruptFrame *frame = nullptr);
 void nmi_handler([[maybe_unused]] uint8_t vector,
                  InterruptFrame *frame = nullptr);
-void gp_handler([[maybe_unused]] uint8_t vector,
-                InterruptFrame *frame = nullptr);
+void general_protection_handler([[maybe_unused]] uint8_t vector,
+                                InterruptFrame *frame = nullptr);
+void page_fault_handler([[maybe_unused]] uint8_t vector,
+                        InterruptFrame *frame = nullptr);
 
 void timer_handler([[maybe_unused]] uint8_t vector,
                    InterruptFrame *frame = nullptr);

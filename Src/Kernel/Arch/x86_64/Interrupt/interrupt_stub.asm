@@ -8,7 +8,7 @@ section .text
 %macro ISR_STUB 1
 global isr%1
 isr%1:
-     push r15
+    push r15
     push r14
     push r13
     push r12
