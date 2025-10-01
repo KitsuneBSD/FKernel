@@ -136,12 +136,15 @@ extern "C" void kprintf(const char *fmt, ...) {
     case 'p': {
       void *ptr = va_arg(args, void *);
       uintptr_t val = reinterpret_cast<uintptr_t>(ptr);
-      char numbuf[24];
-      snprintf(numbuf, sizeof(numbuf), "0x%lx", val);
+      char numbuf[20];
+      itoa_unsigned(val, numbuf, 16, false); // converte para hexadecimal
+      write_char_to_buffer('0');
+      write_char_to_buffer('x');
       for (char *p = numbuf; *p; ++p)
         write_char_to_buffer(*p);
       break;
     }
+
     case '%':
       write_char_to_buffer('%');
       break;
@@ -154,10 +157,8 @@ extern "C" void kprintf(const char *fmt, ...) {
 
   va_end(args);
 
-  // Finaliza string
   buffer[buf_index] = '\0';
 
-  // Escreve no serial e na VGA
   serial::write(buffer);
   vga::the().write(buffer);
 }
