@@ -32,7 +32,7 @@ public:
     ChunkAllocator() = default;
 
     void initialize(uint64_t* space) noexcept {
-        m_bitmap.clear();
+        m_bitmap.clear_all();
         memset(space, 0, capacityInBytes());
     }
 
