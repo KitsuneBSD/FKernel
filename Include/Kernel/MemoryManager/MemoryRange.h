@@ -26,8 +26,6 @@ struct PhysicalMemoryRange {
 
   int alloc_page(size_t count = 1, uintptr_t addr_hint = 0){
     if (m_type != MemoryType::Usable || count == 0 || count > m_page_count) {
-      kwarn("PHYSICAL MEMORY RANGE", "We can't allocate pages in this range [%p - %p]",
-            m_start, m_end);
       return -1;
     }
 
