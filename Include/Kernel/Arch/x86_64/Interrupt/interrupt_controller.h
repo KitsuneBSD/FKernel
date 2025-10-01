@@ -15,24 +15,24 @@ private:
 
   void enable_interrupt() {
     if (is_interrupt_enable) {
-      klog("INTERRUPT CONTROLLER", "Interrupts already enabled");
+      klog("INTERRUPT", "Interrupts already enabled");
       return;
     }
 
     asm volatile("sti");
     is_interrupt_enable = true;
-    klog("INTERRUPT CONTROLLER", "Interrupts enabled");
+    klog("INTERRUPT", "Interrupts enabled");
   }
 
   void disable_interrupt() {
     if (!is_interrupt_enable) {
-      klog("INTERRUPT CONTROLLER", "Interrupts already disabled");
+      klog("INTERRUPT", "Interrupts already disabled");
       return;
     }
 
     asm volatile("cli");
     is_interrupt_enable = false;
-    klog("INTERRUPT CONTROLLER", "Interrupts disabled");
+    klog("INTERRUPT", "Interrupts disabled");
   }
 
 public:
