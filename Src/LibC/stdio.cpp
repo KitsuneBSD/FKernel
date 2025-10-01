@@ -79,13 +79,21 @@ extern "C" int snprintf(char *str, size_t size, const char *fmt, ...) {
 }
 
 extern "C" void kprintf(const char *fmt, ...) {
+  char buffer[512]; // tamanho arbitrário para formatação
+  size_t buf_index = 0;
+
+  auto write_char_to_buffer = [&](char c) {
+    if (buf_index < sizeof(buffer) - 1) {
+      buffer[buf_index++] = c;
+    }
+  };
+
   va_list args;
   va_start(args, fmt);
 
   for (size_t i = 0; fmt[i]; ++i) {
     if (fmt[i] != '%') {
-      serial::write_char(fmt[i]);
-      vga::the().put_char(fmt[i]);
+      write_char_to_buffer(fmt[i]);
       continue;
     }
 
@@ -97,86 +105,61 @@ extern "C" void kprintf(const char *fmt, ...) {
     switch (spec) {
     case 's': {
       const char *s = va_arg(args, const char *);
-      serial::write(s);
-      vga::the().write(s);
+      while (*s)
+        write_char_to_buffer(*s++);
       break;
     }
     case 'd': {
       int val = va_arg(args, int);
-      serial::write_dec(val);
-      char buf[12];
-      snprintf(buf, sizeof(buf), "%d", val);
-      vga::the().write(buf);
+      char numbuf[12];
+      snprintf(numbuf, sizeof(numbuf), "%d", val);
+      for (char *p = numbuf; *p; ++p)
+        write_char_to_buffer(*p);
       break;
     }
     case 'x': {
       unsigned int val = va_arg(args, unsigned int);
-      serial::write_hex(val);
-      char buf[12];
-      snprintf(buf, sizeof(buf), "%x", val);
-      vga::the().write(buf);
+      char numbuf[12];
+      snprintf(numbuf, sizeof(numbuf), "%x", val);
+      for (char *p = numbuf; *p; ++p)
+        write_char_to_buffer(*p);
       break;
     }
     case 'u': {
       unsigned int val = va_arg(args, unsigned int);
-      char buf[12];
-      itoa(val, buf, 10);
-      serial::write(buf);
-      vga::the().write(buf);
-      break;
-    }
-    case 'l': {
-      char next = fmt[i + 1];
-      if (next == 'u') {
-        unsigned long val = va_arg(args, unsigned long);
-        char buf[24];
-        ultoa(val, buf, 10);
-        serial::write(buf);
-        vga::the().write(buf);
-        i++; // avançar o 'u'
-      } else if (next == 'x') {
-        unsigned long val = va_arg(args, unsigned long);
-        char buf[24];
-        ultoa(val, buf, 16);
-        serial::write(buf);
-        vga::the().write(buf);
-        i++;
-      } else {
-        serial::write_char('%');
-        vga::the().put_char('%');
-        serial::write_char('l');
-        vga::the().put_char('l');
-      }
+      char numbuf[12];
+      snprintf(numbuf, sizeof(numbuf), "%u", val);
+      for (char *p = numbuf; *p; ++p)
+        write_char_to_buffer(*p);
       break;
     }
     case 'p': {
       void *ptr = va_arg(args, void *);
       uintptr_t val = reinterpret_cast<uintptr_t>(ptr);
-      char buf[24];
-      ultoa(val, buf, 16);
-      serial::write("0x");
-      vga::the().write("0x");
-      serial::write(buf);
-      vga::the().write(buf);
+      char numbuf[24];
+      snprintf(numbuf, sizeof(numbuf), "0x%lx", val);
+      for (char *p = numbuf; *p; ++p)
+        write_char_to_buffer(*p);
       break;
     }
-
-    case '%': {
-      serial::write_char('%');
-      vga::the().put_char('%');
+    case '%':
+      write_char_to_buffer('%');
       break;
-    }
-    default: {
-      serial::write_char('%');
-      serial::write_char(spec);
-      vga::the().put_char('%');
-      vga::the().put_char(spec);
+    default:
+      write_char_to_buffer('%');
+      write_char_to_buffer(spec);
       break;
-    }
     }
   }
 
   va_end(args);
+
+  // Finaliza string
+  buffer[buf_index] = '\0';
+
+  // Escreve no serial e na VGA
+  serial::write(buffer);
+  vga::the().write(buffer);
 }
 
 extern "C" int vsnprintf(char *buf, size_t size, const char *fmt,
