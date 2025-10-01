@@ -51,6 +51,7 @@ inline void kexception(const char *prefix, const char *fmt, ...) {
 
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
 }
+
 inline void kwarn(const char *prefix, const char *fmt, ...) {
   char buf[512]; ///< Temporary buffer for formatted message
   va_list args;

@@ -6,6 +6,9 @@
 #include <LibC/string.h>
 #include <LibFK/log.h>
 #include <LibFK/rb_tree.h>
+#ifdef __x86_64__
+#include <Kernel/Arch/x86_64/arch_defs.h>
+#endif
 
 extern "C" uintptr_t __kernel_end;
 extern "C" uintptr_t __heap_start;
@@ -26,7 +29,8 @@ private:
   PhysicalMemoryManager(PhysicalMemoryManager &&) = delete;
   PhysicalMemoryManager &operator=(PhysicalMemoryManager &&) = delete;
 
-  int alloc_from_node(rb_node<PhysicalMemoryRange>* node, size_t count, uintptr_t addr_hint);
+  int alloc_from_node(rb_node<PhysicalMemoryRange> *node, size_t count,
+                      uintptr_t addr_hint);
 
 public:
   static PhysicalMemoryManager &the() {
@@ -35,6 +39,6 @@ public:
   }
 
   void initialize(const multiboot2::TagMemoryMap *mmap);
-  void *alloc_physical_page(size_t count, uintptr_t addr_hint);
+  void *alloc_physical_page(size_t count, uintptr_t addr_hint = 0);
   void free_physical_page(void *page);
 };
