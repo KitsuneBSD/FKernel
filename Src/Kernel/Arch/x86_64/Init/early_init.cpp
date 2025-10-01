@@ -1,6 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
+#include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibC/stddef.h>
 #include <LibC/stdio.h>
 #include <LibFK/log.h>
@@ -13,4 +14,5 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
 
   InterruptController::the().initialize();
   PhysicalMemoryManager::the().initialize(mmap);
+  VirtualMemoryManager::the().initialize();
 }
