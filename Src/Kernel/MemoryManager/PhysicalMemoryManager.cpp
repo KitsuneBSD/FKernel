@@ -14,8 +14,8 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
     auto entry_start = entry.base_addr;
     auto entry_end = entry.base_addr + entry.length;
 
-    if (entry_start < 1 * MiB) {
-      entry_start = 1 * MiB;
+    if (entry_start < 2 * MiB) {
+      entry_start = 2 * MiB;
     }
 
     if (entry_end <= entry_start) {
