@@ -29,6 +29,10 @@ inline void kerror(const char *prefix, const char *fmt, ...) {
   va_end(args);
 
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
+
+  while(true){
+    asm("cli;hlt");
+  }
 }
 
 inline void kwarn(const char *prefix, const char *fmt, ...) {
