@@ -10,6 +10,7 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 
+extern "C" uintptr_t __kernel_start;
 extern "C" uintptr_t __kernel_end;
 extern "C" uintptr_t __heap_start;
 extern "C" uintptr_t __heap_end;
@@ -17,6 +18,7 @@ extern "C" uintptr_t __heap_end;
 #include <Kernel/MemoryManager/MemoryRange.h>
 
 class PhysicalMemoryManager {
+  friend class VirtualMemoryManager;
 private:
   rb_tree<PhysicalMemoryRange, 65536> m_memory_ranges;
   bool is_initialized = false;
