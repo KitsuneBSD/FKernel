@@ -14,7 +14,7 @@
 #define KLOG_COLOR_WHITE "\033[37m"
 
 /**
- * @brief Print a formatted kernel log message in red by default.
+ * @brief Print a formatted kernel log message in red and block by default.
  *
  *
  * @param prefix Prefix to display before the message (e.g., module name)
@@ -30,11 +30,27 @@ inline void kerror(const char *prefix, const char *fmt, ...) {
 
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
 
-  while(true){
+  while (true) {
     asm("cli;hlt");
   }
 }
+/**
+ * @brief Print a formatted kernel log message in red by default.
+ *
+ *
+ * @param prefix Prefix to display before the message (e.g., module name)
+ * @param fmt printf-style format string
+ * @param ... Variadic arguments for formatting
+ */
+inline void kexception(const char *prefix, const char *fmt, ...) {
+  char buf[512]; ///< Temporary buffer for formatted message
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
 
+  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
+}
 inline void kwarn(const char *prefix, const char *fmt, ...) {
   char buf[512]; ///< Temporary buffer for formatted message
   va_list args;
