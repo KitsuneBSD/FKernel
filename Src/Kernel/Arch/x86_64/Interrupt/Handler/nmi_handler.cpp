@@ -2,10 +2,12 @@
 #include <LibFK/log.h>
 
 void nmi_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
-  kerror("NMI", "Non-Maskable Interrupt triggered (vector %u)", vector);
+  kexception("Non Maskable Interrupt",
+             "Non-Maskable Interrupt triggered (vector %u)", vector);
 
-  kerror("NMI", "RIP=%p CS=%p RFLAGS=%p", frame->rip, frame->cs, frame->rflags);
-  kerror("NMI", "RSP=%p SS=%p", frame->rsp, frame->ss);
+  kexception("Non Maskable Interrupt", "RIP=%p CS=%p RFLAGS=%p", frame->rip,
+             frame->cs, frame->rflags);
+  kexception("Non Maskable Interrupt", "RSP=%p SS=%p", frame->rsp, frame->ss);
 
   for (;;) {
     asm volatile("hlt");
