@@ -15,15 +15,10 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
     auto entry_end = entry.base_addr + entry.length;
 
     if (entry_start < 1 * MiB) {
-      kwarn("PHYSICAL MEMORY", "We can't map the entry low than 1 MiB: %p",
-            entry_start);
       entry_start = 1 * MiB;
-      continue;
     }
 
     if (entry_end <= entry_start) {
-      kwarn("PHYSICAL MEMORY", "Invalid memory range [%p - %p]", entry_start,
-            entry_end);
       continue;
     }
 
