@@ -38,7 +38,7 @@ void InterruptController::initialize() {
   PIC8259::unmask_irq(1);
   enable_interrupt();
 
-  klog("INTERRUPT CONTROLLER", "Interrupt descriptor table initialized");
+  klog("INTERRUPT", "Interrupt descriptor table initialized");
 }
 
 void InterruptController::clear() {
