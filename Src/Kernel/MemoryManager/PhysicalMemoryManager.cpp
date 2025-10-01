@@ -68,7 +68,7 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
   }
 
   is_initialized = true;
-  klog("PHYSICAL MEMORY", "Manager initialized with sucess");
+  klog("PHYSICAL MEMORY", "Physical memory manager initialized");
 }
 
 int PhysicalMemoryManager::alloc_from_node(rb_node<PhysicalMemoryRange> *node,
