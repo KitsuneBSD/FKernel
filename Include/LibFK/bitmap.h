@@ -12,11 +12,11 @@
 
   public:
       Bitmap() : m_size(0) {
-          clear();
+          memset(m_bits, 0, sizeof(m_bits));
       }
 
       explicit Bitmap(size_t size) : m_size(size) {
-          clear();
+          memset(m_bits, 0, sizeof(m_bits));
       }
 
       size_t sizeInBytes() const noexcept {
@@ -38,12 +38,16 @@
           }
       }
 
-      void clear() noexcept {
-          memset(m_bits, 0, sizeof(m_bits));
+      void clear(int index) {
+        set(index, false);
+      }
+
+      void clear_all() noexcept {
+        memset(m_bits, 0, sizeof(m_bits));
       }
 
       void resize(size_t size) noexcept {
           m_size = size;
-          clear();
+          memset(m_bits, 0, sizeof(m_bits));
       }
   };
