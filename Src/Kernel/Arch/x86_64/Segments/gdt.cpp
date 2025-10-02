@@ -1,9 +1,14 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibC/stdint.h>
 
 extern "C" uint64_t stack_top;
 extern "C" void flush_gdt(void *gdtr);
 extern "C" void flush_tss(uint16_t tss_selector);
+
+alignas(16) static uint8_t ist_stacks[7][IST_STACK_SIZE];
+alignas(16) static uint8_t rsp1_stack[IST_STACK_SIZE];
+alignas(16) static uint8_t rsp2_stack[IST_STACK_SIZE];
 
 void GDTController::setupGDT() {
   setupNull();
@@ -19,6 +24,19 @@ void GDTController::set_kernel_stack(uint64_t stack_addr) {
 
 
 void GDTController::setupTSS() {
+    tss.rsp0 = stack_top; // stack do kernel
+    tss.ist1 = reinterpret_cast<uint64_t>(&ist_stacks[0][IST_STACK_SIZE]);
+    tss.ist2 = reinterpret_cast<uint64_t>(&ist_stacks[1][IST_STACK_SIZE]);
+    tss.ist3 = reinterpret_cast<uint64_t>(&ist_stacks[2][IST_STACK_SIZE]);
+    tss.ist4 = reinterpret_cast<uint64_t>(&ist_stacks[3][IST_STACK_SIZE]);
+    tss.ist5 = reinterpret_cast<uint64_t>(&ist_stacks[4][IST_STACK_SIZE]);
+    tss.ist6 = reinterpret_cast<uint64_t>(&ist_stacks[5][IST_STACK_SIZE]);
+    tss.ist7 = reinterpret_cast<uint64_t>(&ist_stacks[6][IST_STACK_SIZE]);
+    tss.io_map_base = sizeof(TSS64);
+
+    tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack);
+    tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack);
+
   uintptr_t addr = reinterpret_cast<uintptr_t>(&tss);
   size_t size = sizeof(TSS64) - 1;
 
@@ -66,9 +84,10 @@ void GDTController::initialize() {
   setupGDTR();
   flush_gdt(&gdtr);
   loadSegments();
-
+  klog("GDT", "Global descriptor table initialized");
+  
   set_kernel_stack(stack_top);
   flush_tss(tss_selector);
-  klog("GDT", "Global descriptor table initialized");
+  klog("TSS", "Task state segment initialized");
   m_initialized = true;
 }
