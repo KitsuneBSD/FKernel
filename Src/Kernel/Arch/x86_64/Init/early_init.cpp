@@ -17,4 +17,6 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   InterruptController::the().initialize();
   PhysicalMemoryManager::the().initialize(mmap);
   VirtualMemoryManager::the().initialize();
+
+  asm volatile("int $0");
 }

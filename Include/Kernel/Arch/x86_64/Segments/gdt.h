@@ -1,7 +1,12 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibC/stdint.h>
 #include <LibFK/Algorithms/log.h>
+
+alignas(16) static uint8_t ist_stacks[7][IST_STACK_SIZE];
+alignas(16) static uint8_t rsp1_stack[IST_STACK_SIZE];
+alignas(16) static uint8_t rsp2_stack[IST_STACK_SIZE];
 
 struct GDTEntry {
   uint16_t limit_low;  // bits 0-15 do limit

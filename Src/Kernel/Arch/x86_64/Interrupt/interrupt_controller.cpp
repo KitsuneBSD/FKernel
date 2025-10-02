@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/arch_defs.h"
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
@@ -6,6 +7,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
+#include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Hardware/Cpu.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -17,7 +19,8 @@ void InterruptController::initialize() {
   clear();
 
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
-    set_gate(i, g_isr_stubs[i]);
+    uint8_t multi_level_queue_selector = (i % 7) + 1;
+    set_gate(i, g_isr_stubs[i], 0x08, *ist_stacks[multi_level_queue_selector]);
     register_interrupt(default_handler, i);
   }
 
