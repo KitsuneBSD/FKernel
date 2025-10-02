@@ -1,13 +1,13 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h"
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
 #include <Kernel/Hardware/Cpu.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 extern "C" void flush_idt(void *idtr);
 

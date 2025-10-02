@@ -2,7 +2,7 @@
 
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibC/stdint.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 static constexpr uint8_t PIC1_CMD = 0x20;
 static constexpr uint8_t PIC1_DATA = 0x21;

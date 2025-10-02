@@ -2,7 +2,7 @@
 
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 #include <LibC/string.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 uint64_t *VirtualMemoryManager::alloc_table() {
   void *page = PhysicalMemoryManager::the().alloc_physical_page(1);

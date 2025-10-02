@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
-#include <LibFK/array.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Container/array.h>
 
 class InterruptController {
 private:

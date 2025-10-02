@@ -4,8 +4,8 @@
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibC/stddef.h>
 #include <LibC/stdio.h>
-#include <LibFK/log.h>
-#include <LibFK/type_traits.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Traits/type_traits.h>
 
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 

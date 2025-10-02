@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 class NMI {
 public:

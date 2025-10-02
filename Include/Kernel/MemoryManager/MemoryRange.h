@@ -3,8 +3,8 @@
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
-#include <LibFK/bitmap.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Container/bitmap.h>
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/arch_defs.h>

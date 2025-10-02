@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LibC/stdint.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 constexpr uint32_t APIC_BASE_MSR = 0x1B;
 constexpr uint32_t APIC_ENABLE = 1 << 11;

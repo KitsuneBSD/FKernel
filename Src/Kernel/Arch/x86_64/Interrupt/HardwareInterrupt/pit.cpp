@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 void PIT::set_frequency(uint32_t frequency) {
   uint16_t divisor = 1193182 / frequency;

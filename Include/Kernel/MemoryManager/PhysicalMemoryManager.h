@@ -4,8 +4,8 @@
 #include <Kernel/Boot/multiboot2.h>
 #include <LibC/stdint.h>
 #include <LibC/string.h>
-#include <LibFK/log.h>
-#include <LibFK/rb_tree.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Tree/rb_tree.h>
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
@@ -19,6 +19,7 @@ extern "C" uintptr_t __heap_end;
 
 class PhysicalMemoryManager {
   friend class VirtualMemoryManager;
+
 private:
   rb_tree<PhysicalMemoryRange, 65536> m_memory_ranges;
   bool is_initialized = false;

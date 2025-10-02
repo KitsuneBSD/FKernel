@@ -3,7 +3,7 @@
 #include <LibC/stdint.h>
 #include <LibC/string.h>
 
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 class CPU {
 private:

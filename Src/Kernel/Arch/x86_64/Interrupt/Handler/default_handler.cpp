@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <LibC/stdint.h>
-#include <LibFK/log.h>
+#include <LibFK/Algorithms/log.h>
 
 void default_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
   kexception("EXCEPTION", "Unhandled interrupt: vector=%u\n", (unsigned)vector);
