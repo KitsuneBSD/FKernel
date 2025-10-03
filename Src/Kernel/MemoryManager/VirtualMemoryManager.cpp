@@ -5,6 +5,30 @@
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 
+void map_ranges_iterative(rb_node<PhysicalMemoryRange> *root) {
+  rb_node<PhysicalMemoryRange> *stack[64];
+  int sp = 0;
+  rb_node<PhysicalMemoryRange> *current = root;
+
+  while (current || sp > 0) {
+    while (current) {
+      stack[sp++] = current;
+      kprintf("Stacking %p ...\n", current);
+      current = current->left();
+    }
+
+    current = stack[--sp];
+
+    auto &range = current->value();
+    kprintf("Map range [ %p - %p ]\n", range.m_start, range.m_end);
+    VirtualMemoryManager::the().map_range(
+        range.m_start, range.m_start, range.m_end - range.m_start,
+        PageFlags::Present | PageFlags::Writable);
+
+    current = current->right();
+  }
+}
+
 uint64_t *VirtualMemoryManager::alloc_table() {
   void *page = PhysicalMemoryManager::the().alloc_physical_page(1);
   if (!page) {
@@ -20,25 +44,20 @@ void VirtualMemoryManager::initialize() {
   if (m_is_initialized)
     return;
 
+  constexpr uintptr_t APIC_PHYS = 0xFEE00000;
+  constexpr size_t APIC_SIZE = 0x4000;
+
   m_pml4 = alloc_table();
   if (!m_pml4) {
     kerror("VIRTUAL MEMORY", "Failed to allocate PML4");
     return;
   }
 
-  for (auto *node = PhysicalMemoryManager::the().m_memory_ranges.root(); node;
-       node = node->left()) {
-    auto &range = node->value();
-    map_range(range.m_start, range.m_start, range.m_end - range.m_start,
-              PageFlags::Present | PageFlags::Writable);
-  }
+  map_ranges_iterative(PhysicalMemoryManager::the().m_memory_ranges.root());
 
-  for (auto *node = PhysicalMemoryManager::the().m_memory_ranges.root(); node;
-       node = node->right()) {
-    auto &range = node->value();
-    map_range(range.m_start, range.m_start, range.m_end - range.m_start,
-              PageFlags::Present | PageFlags::Writable);
-  }
+  map_range(APIC_PHYS, APIC_PHYS, APIC_SIZE,
+            PageFlags::Present | PageFlags::Writable |
+                PageFlags::CacheDisabled);
 
   uintptr_t m_pml4_phys = reinterpret_cast<uintptr_t>(m_pml4);
 
