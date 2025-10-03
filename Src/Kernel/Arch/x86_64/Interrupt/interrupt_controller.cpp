@@ -1,14 +1,14 @@
-#include "Kernel/Arch/x86_64/arch_defs.h"
-#include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
+
+#include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
+
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
-#include <Kernel/Hardware/Cpu.h>
+
 #include <LibFK/Algorithms/log.h>
 
 extern "C" void flush_idt(void *idtr);
@@ -32,9 +32,6 @@ void InterruptController::initialize() {
   load();
   PIC8259::initialize();
 
-  if (CPU::the().has_apic()) {
-    APIC::the().enable();
-  }
   NMI::enable_nmi();
   PIT::the().initialize(100);
   PIC8259::unmask_irq(0);
