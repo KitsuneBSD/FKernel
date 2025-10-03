@@ -1,14 +1,10 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
+#include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
-#include <Kernel/Boot/early_init.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
-#include <LibC/stddef.h>
-#include <LibC/stdio.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Traits/type_traits.h>
 
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <LibFK/Algorithms/log.h>
 
 void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   klog("MULTIBOOT2", "Reference to multiboot2 memory map: %p", mmap);
@@ -17,6 +13,4 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   InterruptController::the().initialize();
   PhysicalMemoryManager::the().initialize(mmap);
   VirtualMemoryManager::the().initialize();
-
-  asm volatile("int $0");
 }
