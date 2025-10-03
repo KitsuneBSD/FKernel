@@ -1,3 +1,4 @@
+#include "Kernel/MemoryManager/Pages/PageFlags.h"
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
@@ -26,14 +27,17 @@ void VirtualMemoryManager::initialize() {
   }
 
   for (auto *node = PhysicalMemoryManager::the().m_memory_ranges.root(); node;
-       /* iter */) {
+       node = node->left()) {
     auto &range = node->value();
-    // NOTE: Identity map of reserved value
-    if (range.m_type != MemoryType::Usable) {
-      map_range(range.m_start, range.m_start, range.m_end - range.m_start,
-                PageFlags::Present | PageFlags::Writable);
-    }
-    node = node->right();
+    map_range(range.m_start, range.m_start, range.m_end - range.m_start,
+              PageFlags::Present | PageFlags::Writable);
+  }
+
+  for (auto *node = PhysicalMemoryManager::the().m_memory_ranges.root(); node;
+       node = node->right()) {
+    auto &range = node->value();
+    map_range(range.m_start, range.m_start, range.m_end - range.m_start,
+              PageFlags::Present | PageFlags::Writable);
   }
 
   uintptr_t m_pml4_phys = reinterpret_cast<uintptr_t>(m_pml4);
@@ -45,38 +49,57 @@ void VirtualMemoryManager::initialize() {
 }
 
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
-                                    uint64_t flags) {
-
-  // kprintf("Map [ %p -> %p ]\n", phys, virt);
+                                    uint64_t flags, size_t page_size) {
   uint64_t pml4_idx = (virt >> 39) & 0x1FF;
   uint64_t pdpt_idx = (virt >> 30) & 0x1FF;
   uint64_t pd_idx = (virt >> 21) & 0x1FF;
   uint64_t pt_idx = (virt >> 12) & 0x1FF;
 
-  uint64_t *pdpt = reinterpret_cast<uint64_t *>(m_pml4[pml4_idx] & ~0xFFF);
-  if (!pdpt) {
+  uint64_t *pdpt;
+  if (!(m_pml4[pml4_idx] & PageFlags::Present)) {
     pdpt = alloc_table();
     m_pml4[pml4_idx] = reinterpret_cast<uint64_t>(pdpt) | PageFlags::Present |
                        PageFlags::Writable;
+  } else {
+    pdpt = reinterpret_cast<uint64_t *>(m_pml4[pml4_idx] & ~0xFFF);
   }
 
-  uint64_t *pd = reinterpret_cast<uint64_t *>(pdpt[pdpt_idx] & ~0xFFF);
-  if (!pd) {
+  if (page_size == 0x40000000 && is_aligned(virt, 0x40000000) &&
+      is_aligned(phys, 0x40000000)) {
+    pdpt[pdpt_idx] = phys | flags | PageFlags::HugePage;
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    return;
+  }
+
+  uint64_t *pd;
+  if (!(pdpt[pdpt_idx] & PageFlags::Present)) {
     pd = alloc_table();
     pdpt[pdpt_idx] = reinterpret_cast<uint64_t>(pd) | PageFlags::Present |
                      PageFlags::Writable;
+  } else {
+    pd = reinterpret_cast<uint64_t *>(pdpt[pdpt_idx] & ~0xFFF);
   }
 
-  uint64_t *pt = reinterpret_cast<uint64_t *>(pd[pd_idx] & ~0xFFF);
-  if (!pt) {
+  if (page_size == 0x200000 && is_aligned(virt, 0x200000) &&
+      is_aligned(phys, 0x200000)) {
+    pd[pd_idx] = phys | flags | PageFlags::HugePage;
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    return;
+  }
+
+  uint64_t *pt;
+  if (!(pd[pd_idx] & PageFlags::Present)) {
     pt = alloc_table();
     pd[pd_idx] = reinterpret_cast<uint64_t>(pt) | PageFlags::Present |
                  PageFlags::Writable;
+  } else {
+    pt = reinterpret_cast<uint64_t *>(pd[pd_idx] & ~0xFFF);
   }
 
-  pt[pt_idx] = phys | flags;
-
-  asm volatile("invlpg (%0)" : : "r"(m_pml4) : "memory");
+  if (!(pt[pt_idx] & PageFlags::Present)) {
+    pt[pt_idx] = phys | flags;
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+  }
 }
 
 void VirtualMemoryManager::map_range(uintptr_t virt_start, uintptr_t phys_start,

@@ -5,6 +5,15 @@
 
 #include <Kernel/MemoryManager/Pages/PageFlags.h>
 
+constexpr uintptr_t align_down(uintptr_t addr, size_t size) {
+    return addr & ~(size - 1);
+}
+
+constexpr bool is_aligned(uintptr_t addr, size_t size) {
+    return (addr & (size - 1)) == 0;
+}
+
+
 /**
  * @class VirtualMemoryManager
  * @brief Manages the system's virtual memory, including page mapping and virtual-to-physical address translation.
@@ -62,8 +71,9 @@ public:
      * @param virt Virtual address to be mapped.
      * @param phys Corresponding physical address.
      * @param flags Configuration flags for the mapping.
+     * @param page_size Size of the page to be mapped (default is 4KB).
      */
-    void map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
+    void map_page(uintptr_t virt, uintptr_t phys, uint64_t flags, uint64_t page_size = 0x1000);
 
     /**
      * @brief Maps a range of virtual addresses to physical addresses.
