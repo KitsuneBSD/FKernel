@@ -1,14 +1,34 @@
-#include <LibFK/Container/heap_malloc.h>
+#include <Kernel/MemoryManager/TlsfHeap.h>
 #include <LibFK/new.h>
 
-void *operator new(size_t size) { return kmalloc(size); }
+void* heap_malloc(size_t size) {
+    return TLSFHeap::the().alloc(size);
+}
 
-void *operator new[](size_t size) { return kmalloc(size); }
+void heap_free(void* ptr) {
+    TLSFHeap::the().free(ptr);
+}
 
-void operator delete(void *ptr) noexcept { kfree(ptr); }
+void *operator new(size_t size) {
+    return heap_malloc(size);
+}
 
-void operator delete[](void *ptr) noexcept { kfree(ptr); }
+void *operator new[](size_t size) {
+    return heap_malloc(size);
+}
 
-void operator delete(void *ptr, size_t) noexcept { kfree(ptr); }
+void operator delete(void *ptr) noexcept {
+    heap_free(ptr);
+}
 
-void operator delete[](void *ptr, size_t) noexcept { kfree(ptr); }
+void operator delete[](void *ptr) noexcept {
+    heap_free(ptr);
+}
+
+void operator delete(void *ptr, size_t) noexcept {
+    heap_free(ptr);
+}
+
+void operator delete[](void *ptr, size_t) noexcept {
+    heap_free(ptr);
+}

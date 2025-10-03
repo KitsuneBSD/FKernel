@@ -17,6 +17,28 @@ typedef __SIZE_TYPE__ size_t;
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
 
 /**
+ * @def __MAX_ALIGN_TYPE__
+ * @brief Define a type with the maximum alignment requirement for any type.
+ *
+ * This is used in freestanding environments where `std::max_align_t` may not
+ * be available.
+ */
+#ifndef __MAX_ALIGN_TYPE__
+#define __MAX_ALIGN_TYPE__ \
+  struct {               \
+    long long __ll;    \
+    long double __ld;  \
+  }
+#endif
+
+/**
+ * @typedef max_align_t
+ * @brief Type with the maximum alignment requirement for any standard type.
+ *
+ * Defined using `__MAX_ALIGN_TYPE__` for freestanding environments.
+ */
+typedef __MAX_ALIGN_TYPE__ max_align_t;
+/**
  * @typedef ssize_t
  * @brief Signed integer type similar to ::size_t but allows negative values.
  */

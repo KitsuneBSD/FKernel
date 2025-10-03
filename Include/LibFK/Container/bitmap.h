@@ -45,4 +45,18 @@ public:
     m_size = size;
     memset(m_bits, 0, sizeof(m_bits));
   }
+
+  T get_mask_from(size_t index) const noexcept {
+    if (index >= m_size) {
+      return 0;
+    }
+    T mask = ~T(0) << (index % (sizeof(T) * 8));
+    return m_bits[index / (sizeof(T) * 8)] & mask;
+  }
+
+  T get_mask() const noexcept { return m_bits[0]; }
+
+  size_t size() const noexcept { return m_size; }
+
+  bool is_empty() const noexcept { return m_size == 0; }
 };
