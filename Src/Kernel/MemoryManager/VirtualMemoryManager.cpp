@@ -47,10 +47,6 @@ void VirtualMemoryManager::initialize() {
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
                                     uint64_t flags) {
 
-  if (!m_is_initialized){
-    initialize();
-  }
-
   // kprintf("Map [ %p -> %p ]\n", phys, virt);
   uint64_t pml4_idx = (virt >> 39) & 0x1FF;
   uint64_t pdpt_idx = (virt >> 30) & 0x1FF;
