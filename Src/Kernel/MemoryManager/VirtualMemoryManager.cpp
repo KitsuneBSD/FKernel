@@ -26,9 +26,10 @@ void map_ranges_iterative(rb_node<PhysicalMemoryRange> *root) {
     current = stack[--sp];
 
     auto &range = current->value();
+    /**
     kprintf("Mapping physical memory range [ %p - %p]\n", range.m_start,
             range.m_end);
-
+**/
     VirtualMemoryManager::the().map_range(
         range.m_start, range.m_start, range.m_end - range.m_start,
         PageFlags::Present | PageFlags::Writable | PageFlags::HugePage);

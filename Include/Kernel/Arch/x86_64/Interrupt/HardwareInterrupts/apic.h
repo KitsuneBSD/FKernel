@@ -10,6 +10,8 @@ constexpr uint32_t APIC_SPURIOUS = 0xF0;
 constexpr uint32_t APIC_SVR_ENABLE = 0x100; // Bit 8
 constexpr uintptr_t APIC_RANGE_SIZE = 0x1000;
 
+constexpr uint32_t APIC_LVT_TIMER_MODE_PERIODIC = (1 << 17);
+constexpr uint32_t APIC_TIMER_DIVISOR = 0x3;
 
 struct local_apic {
   volatile uint32_t id;
@@ -42,6 +44,7 @@ class APIC {
 private:
   APIC() = default;
   local_apic *lapic = nullptr;
+  uint64_t apic_ticks_per_ms = 0;
 
 public:
   static APIC &the() {
@@ -51,4 +54,7 @@ public:
 
   void enable();
   void send_eoi();
+  void calibrate_timer();
+  void setup_timer(uint64_t ms);
+  uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
 };
