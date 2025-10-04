@@ -1,155 +1,115 @@
 #include "Kernel/MemoryManager/Pages/PageFlags.h"
+#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
-#include <LibC/string.h>
-#include <LibFK/Algorithms/log.h>
+#ifdef __x86_64__
+#include <Kernel/Arch/x86_64/arch_defs.h>
+#endif
 
-void map_ranges_iterative(rb_node<PhysicalMemoryRange> *root) {
-  rb_node<PhysicalMemoryRange> *stack[64];
-  int sp = 0;
-  rb_node<PhysicalMemoryRange> *current = root;
-
-  while (current || sp > 0) {
-    while (current) {
-      stack[sp++] = current;
-      kprintf("Stacking %p ...\n", current);
-      current = current->left();
-    }
-
-    current = stack[--sp];
-
-    auto &range = current->value();
-    kprintf("Map range [ %p - %p ]\n", range.m_start, range.m_end);
-    VirtualMemoryManager::the().map_range(
-        range.m_start, range.m_start, range.m_end - range.m_start,
-        PageFlags::Present | PageFlags::Writable);
-
-    current = current->right();
-  }
-}
-
-uint64_t *VirtualMemoryManager::alloc_table() {
-  void *page = PhysicalMemoryManager::the().alloc_physical_page(1);
-  if (!page) {
-    kerror("VIRTUAL MEMORY", "Failed to allocate page table");
-    return nullptr;
-  }
-  uint64_t *table = reinterpret_cast<uint64_t *>(page);
-  memset(table, 0, 4096);
-  return table;
-}
-
-void VirtualMemoryManager::initialize() {
-  if (m_is_initialized)
-    return;
-
-  constexpr uintptr_t APIC_PHYS = 0xFEE00000;
-  constexpr size_t APIC_SIZE = 0x4000;
-
-  m_pml4 = alloc_table();
-  if (!m_pml4) {
-    kerror("VIRTUAL MEMORY", "Failed to allocate PML4");
-    return;
-  }
-
-  map_ranges_iterative(PhysicalMemoryManager::the().m_memory_ranges.root());
-
-  map_range(APIC_PHYS, APIC_PHYS, APIC_SIZE,
-            PageFlags::Present | PageFlags::Writable |
-                PageFlags::CacheDisabled);
-
-  uintptr_t m_pml4_phys = reinterpret_cast<uintptr_t>(m_pml4);
-
-  asm volatile("invlpg (%0)" : : "r"(m_pml4_phys) : "memory");
-
-  m_is_initialized = true;
-  klog("VIRTUAL MEMORY", "PML4 initialized at %p", m_pml4);
-}
+extern "C" void write_on_cr3(void *pml4);
 
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
-                                    uint64_t flags, size_t page_size) {
-  uint64_t pml4_idx = (virt >> 39) & 0x1FF;
-  uint64_t pdpt_idx = (virt >> 30) & 0x1FF;
-  uint64_t pd_idx = (virt >> 21) & 0x1FF;
-  uint64_t pt_idx = (virt >> 12) & 0x1FF;
+                                    uint64_t flags,
+                                    [[maybe_unused]] size_t page_size) {
+  // Is already mapped?
+  if (PhysicalMemoryManager::the().virt_to_phys(virt) == phys) {
+    return;
+  }
 
+  uint64_t pml4_index = (virt >> 39) & 0x1FF;
+  uint64_t pdpt_index = (virt >> 30) & 0x1FF;
+  uint64_t pd_index = (virt >> 21) & 0x1FF;
+  uint64_t pt_index = (virt >> 12) & 0x1FF;
+
+  // Page Directory Pointer Table (PDPT)
   uint64_t *pdpt;
-  if (!(m_pml4[pml4_idx] & PageFlags::Present)) {
+  if (!(m_pml4[pml4_index] & PageFlags::Present)) {
     pdpt = alloc_table();
-    m_pml4[pml4_idx] = reinterpret_cast<uint64_t>(pdpt) | PageFlags::Present |
+    m_pml4[pml4_index] = reinterpret_cast<uintptr_t>(pdpt) |
+                         PageFlags::Present | PageFlags::Writable;
+  } else {
+    pdpt = reinterpret_cast<uint64_t *>(m_pml4[pml4_index] & PAGE_MASK);
+  }
+
+  // Page Directory (PD)
+  uint64_t *pd;
+  if (!(pdpt[pdpt_index] & PageFlags::Present)) {
+    pd = alloc_table();
+    pdpt[pdpt_index] = reinterpret_cast<uintptr_t>(pd) | PageFlags::Present |
                        PageFlags::Writable;
   } else {
-    pdpt = reinterpret_cast<uint64_t *>(m_pml4[pml4_idx] & ~0xFFF);
+    pd = reinterpret_cast<uint64_t *>(pdpt[pdpt_index] & PAGE_MASK);
   }
 
-  if (page_size == 0x40000000 && is_aligned(virt, 0x40000000) &&
-      is_aligned(phys, 0x40000000)) {
-    pdpt[pdpt_idx] = phys | flags | PageFlags::HugePage;
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
-    return;
-  }
-
-  uint64_t *pd;
-  if (!(pdpt[pdpt_idx] & PageFlags::Present)) {
-    pd = alloc_table();
-    pdpt[pdpt_idx] = reinterpret_cast<uint64_t>(pd) | PageFlags::Present |
-                     PageFlags::Writable;
-  } else {
-    pd = reinterpret_cast<uint64_t *>(pdpt[pdpt_idx] & ~0xFFF);
-  }
-
-  if (page_size == 0x200000 && is_aligned(virt, 0x200000) &&
-      is_aligned(phys, 0x200000)) {
-    pd[pd_idx] = phys | flags | PageFlags::HugePage;
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
-    return;
-  }
-
+  // Page Table (PT)
   uint64_t *pt;
-  if (!(pd[pd_idx] & PageFlags::Present)) {
+
+  if (!(pd[pd_index] & PageFlags::Present)) {
     pt = alloc_table();
-    pd[pd_idx] = reinterpret_cast<uint64_t>(pt) | PageFlags::Present |
-                 PageFlags::Writable;
+    pd[pd_index] = reinterpret_cast<uintptr_t>(pt) | PageFlags::Present |
+                   PageFlags::Writable;
   } else {
-    pt = reinterpret_cast<uint64_t *>(pd[pd_idx] & ~0xFFF);
+    pt = reinterpret_cast<uint64_t *>(pd[pd_index] & PAGE_MASK);
   }
 
-  if (!(pt[pt_idx] & PageFlags::Present)) {
-    pt[pt_idx] = phys | flags;
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
-  }
+  pt[pt_index] = phys | (flags & PAGE_MASK);
+  asm volatile("invlpg (%0)" ::"r"((void *)virt) : "memory");
 }
 
 void VirtualMemoryManager::map_range(uintptr_t virt_start, uintptr_t phys_start,
                                      size_t size, uint64_t flags) {
-  size_t pages = (size + 0xFFF) / 0x1000;
-  for (size_t i = 0; i < pages; ++i) {
-    map_page(virt_start + i * 0x1000, phys_start + i * 0x1000, flags);
+  for (size_t offset = 0; offset < size; offset += PAGE_SIZE) {
+    map_page(virt_start + offset, phys_start + offset, flags, PAGE_SIZE);
   }
 }
 
-uintptr_t VirtualMemoryManager::virt_to_phys(uintptr_t virt) {
-  uint64_t pml4_idx = (virt >> 39) & 0x1FF;
-  uint64_t pdpt_idx = (virt >> 30) & 0x1FF;
-  uint64_t pd_idx = (virt >> 21) & 0x1FF;
-  uint64_t pt_idx = (virt >> 12) & 0x1FF;
+uint64_t *VirtualMemoryManager::alloc_table() {
+  void *page = PhysicalMemoryManager::the().alloc_physical_page(PAGE_SIZE);
+  if (!page) {
+    kwarn("VirtualMemoryManager", "Failed to allocate page for table.");
+    return nullptr;
+  }
 
-  uint64_t *pdpt = reinterpret_cast<uint64_t *>(m_pml4[pml4_idx] & ~0xFFF);
-  if (!pdpt)
-    return 0;
+  uint64_t *table = reinterpret_cast<uint64_t *>(page);
+  memset(table, 0, PAGE_SIZE);
+  return table;
+}
 
-  uint64_t *pd = reinterpret_cast<uint64_t *>(pdpt[pdpt_idx] & ~0xFFF);
-  if (!pd)
-    return 0;
+void VirtualMemoryManager::initialize() {
+  if (m_is_initialized) {
+    kwarn("VirtualMemoryManager", "Already initialized.");
+    return;
+  }
 
-  uint64_t *pt = reinterpret_cast<uint64_t *>(pd[pd_idx] & ~0xFFF);
-  if (!pt)
-    return 0;
+  m_pml4 = alloc_table();
+  uint64_t *pdpt = alloc_table();
+  if (!m_pml4 || !pdpt) {
+    kerror("VirtualMemoryManager", "Failed to allocate PML4 or PDPT.");
+    return;
+  }
 
-  uint64_t entry = pt[pt_idx];
-  if (!(entry & PageFlags::Present))
-    return 0;
+  m_pml4[0] = reinterpret_cast<uintptr_t>(pdpt) | PageFlags::Present |
+              PageFlags::Writable;
 
-  return (entry & ~0xFFF) | (virt & 0xFFF);
+  for (int i = 0; i < 4; i++) {
+    uint64_t *pd = alloc_table();
+    if (!pd) {
+      kerror("VirtualMemoryManager", "Failed to allocate Page Directory.");
+      return;
+    }
+
+    pdpt[i] = reinterpret_cast<uintptr_t>(pd) | PageFlags::Present |
+              PageFlags::Writable;
+
+    for (int j = 0; j < 512; j++) {
+      pd[j] = (i * 512 + j) * PAGE_SIZE_2M;
+      pd[j] |= PageFlags::Present | PageFlags::Writable | PageFlags::HugePage;
+    }
+  }
+
+  write_on_cr3(reinterpret_cast<void *>(pdpt));
+
+  klog("VirtualMemoryManager",
+       "Virtual Memory Manager initialized with PDPT (PAE mode).");
+  m_is_initialized = true;
 }

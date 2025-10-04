@@ -1,24 +1,31 @@
-#pragma once 
+#pragma once
 
 #include <LibC/stdint.h>
 #include <LibC/stddef.h>
 
 #include <Kernel/MemoryManager/Pages/PageFlags.h>
 
-constexpr uintptr_t align_down(uintptr_t addr, size_t size) {
+constexpr uintptr_t align_down(uintptr_t addr, size_t size)
+{
     return addr & ~(size - 1);
 }
 
-constexpr bool is_aligned(uintptr_t addr, size_t size) {
-    return (addr & (size - 1)) == 0;
+constexpr uintptr_t align_up(uintptr_t addr, size_t size)
+{
+    return (addr + size - 1) & ~(size - 1);
 }
 
+constexpr bool is_aligned(uintptr_t addr, size_t size)
+{
+    return (addr & (size - 1)) == 0;
+}
 
 /**
  * @class VirtualMemoryManager
  * @brief Manages the system's virtual memory, including page mapping and virtual-to-physical address translation.
  */
-class VirtualMemoryManager {
+class VirtualMemoryManager
+{
 private:
     /**
      * @brief Private constructor to implement the Singleton pattern.
@@ -28,12 +35,12 @@ private:
     /**
      * @brief Deleted copy constructor to prevent copying of the Singleton instance.
      */
-    VirtualMemoryManager(const VirtualMemoryManager&) = delete;
+    VirtualMemoryManager(const VirtualMemoryManager &) = delete;
 
     /**
      * @brief Deleted assignment operator to prevent copying of the Singleton instance.
      */
-    VirtualMemoryManager& operator=(const VirtualMemoryManager&) = delete;
+    VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
 
     /**
      * @brief Indicates whether the virtual memory manager has been initialized.
@@ -43,20 +50,21 @@ private:
     /**
      * @brief Pointer to the PML4 (Page Map Level 4) table used in memory paging.
      */
-    uint64_t* m_pml4 = nullptr;
+    uint64_t *m_pml4 = nullptr;
 
     /**
      * @brief Allocates a new page table.
      * @return Pointer to the allocated page table.
      */
-    uint64_t* alloc_table();
+    uint64_t *alloc_table();
 
 public:
     /**
      * @brief Retrieves the Singleton instance of the VirtualMemoryManager.
      * @return Reference to the Singleton instance.
      */
-    static VirtualMemoryManager& the(){
+    static VirtualMemoryManager &the()
+    {
         static VirtualMemoryManager instance;
         return instance;
     };
@@ -73,7 +81,7 @@ public:
      * @param flags Configuration flags for the mapping.
      * @param page_size Size of the page to be mapped (default is 4KB).
      */
-    void map_page(uintptr_t virt, uintptr_t phys, uint64_t flags, uint64_t page_size = 0x1000);
+    void map_page(uintptr_t virt, uintptr_t phys, uint64_t flags, [[maybe_unused]] uint64_t page_size = 0x1000);
 
     /**
      * @brief Maps a range of virtual addresses to physical addresses.

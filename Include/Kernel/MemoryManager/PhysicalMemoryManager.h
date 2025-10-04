@@ -29,7 +29,8 @@ extern "C" uintptr_t __heap_end;
  * instance exists throughout the system. It is not copyable or movable to
  * maintain the integrity of the singleton instance.
  */
-class PhysicalMemoryManager {
+class PhysicalMemoryManager
+{
   /**
    * @brief Grants access to VirtualMemoryManager as a friend class.
    */
@@ -38,7 +39,7 @@ class PhysicalMemoryManager {
 private:
   /**
    * @brief A red-black tree to manage physical memory ranges.
-   * 
+   *
    * The tree stores memory ranges and allows efficient allocation and
    * deallocation of memory blocks. The template parameter 65536 specifies
    * the maximum number of nodes in the tree.
@@ -82,7 +83,7 @@ private:
 
   /**
    * @brief Allocates memory from a specific node in the red-black tree.
-   * 
+   *
    * @param node The node from which memory is to be allocated.
    * @param count The number of pages to allocate.
    * @param addr_hint A hint for the desired memory address.
@@ -94,24 +95,25 @@ private:
 public:
   /**
    * @brief Provides access to the singleton instance of the class.
-   * 
+   *
    * @return A reference to the singleton instance of PhysicalMemoryManager.
    */
-  static PhysicalMemoryManager &the() {
+  static PhysicalMemoryManager &the()
+  {
     static PhysicalMemoryManager instance;
     return instance;
   }
 
   /**
    * @brief Initializes the physical memory manager with a memory map.
-   * 
+   *
    * @param mmap A pointer to the multiboot2 memory map tag.
    */
   void initialize(const multiboot2::TagMemoryMap *mmap);
 
   /**
    * @brief Allocates one or more physical memory pages.
-   * 
+   *
    * @param count The number of pages to allocate.
    * @param addr_hint A hint for the desired memory address (default is 0).
    * @return A pointer to the allocated memory, or nullptr if allocation fails.
@@ -120,8 +122,15 @@ public:
 
   /**
    * @brief Frees a previously allocated physical memory page.
-   * 
+   *
    * @param page A pointer to the memory page to be freed.
    */
   void free_physical_page(void *page);
+
+  /**
+   * @brief Converts a virtual address to a physical address.
+   * @param addr The virtual address to be converted.
+   * @return The corresponding physical address.
+   */
+  uintptr_t virt_to_phys(uintptr_t addr);
 };
