@@ -1,4 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 
@@ -22,5 +23,9 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
 
   if (CPU::the().has_apic()) {
     APIC::the().enable();
+    APIC::the().calibrate_timer();
+
+    InterruptController::the().register_interrupt(apic_timer_handler, 32);
+    APIC::the().setup_timer(1);
   }
 }

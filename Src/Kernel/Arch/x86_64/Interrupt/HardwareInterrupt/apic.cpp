@@ -34,22 +34,23 @@ void APIC::enable() {
 }
 
 void APIC::calibrate_timer() {
-  if (!this->lapic)
-    return; 
-  
-  lapic->divide_config = APIC_TIMER_DIVISOR;
-  lapic->lvt_timer = 0x10000;
+    if (!lapic) return;
 
-  lapic->initial_count = 0xFFFFFFFF;
+    lapic->divide_config = APIC_TIMER_DIVISOR;
 
-  PIT::the().sleep(10);
+    constexpr uint32_t test_count = 0x100000;
+    lapic->lvt_timer = 0x10000; // mascarado
+    lapic->initial_count = test_count;
 
-  uint64_t elapsed = 0xFFFFFFFF - lapic->current_count;
+    constexpr uint64_t calib_ms = 1; // 1ms
+    PIT::the().sleep(calib_ms);
 
-  apic_ticks_per_ms = elapsed / 10;
+    uint32_t elapsed_ticks = test_count - lapic->current_count;
+    apic_ticks_per_ms = elapsed_ticks / calib_ms;
 
-  klog("APIC", "Timer calibrated: %lu ticks/ms", apic_ticks_per_ms);
+    klog("APIC", "Timer calibrated: %lu ticks/ms", apic_ticks_per_ms);
 }
+
 
 void APIC::setup_timer(uint64_t ms) {
     if (!lapic) return;
