@@ -1,11 +1,9 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibFK/Base/container_base.h>
 #include <LibFK/Container/array.h>
 
-template <typename Type, size_t MAX_SIZE = 4096>
-class Stack : public ContainerBase<Stack<Type, MAX_SIZE>, Type> {
+template <typename Type, size_t MAX_SIZE = 4096> class Stack {
 private:
   array<Type, MAX_SIZE> m_stack;
   size_t top_index = 0;

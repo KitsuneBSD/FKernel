@@ -3,11 +3,9 @@
 #include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibC/string.h>
-#include <LibFK/Base/container_base.h>
 #include <LibFK/new.h>
 
-template <typename T, size_t MaxBits>
-class Bitmap : ContainerBase<Bitmap<T, MaxBits>, T> {
+template <typename T, size_t MaxBits> class Bitmap {
 private:
   size_t m_size;
   T m_bits[(MaxBits + sizeof(T) * 8 - 1) / (sizeof(T) * 8)];

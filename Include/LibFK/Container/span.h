@@ -10,7 +10,7 @@
  *
  * @tparam T Type of the elements in the span
  */
-template <typename T> struct span : ContainerBase<span<T>, T> {
+template <typename T> struct span {
   T *ptr = nullptr; ///< Pointer to the first element
   size_t len = 0;   ///< Number of elements
 

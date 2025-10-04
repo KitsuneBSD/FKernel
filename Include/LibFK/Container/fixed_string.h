@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibFK/Base/container_base.h>
 
 /**
  * @brief Fixed-capacity string container with null-termination.
@@ -11,8 +10,7 @@
  *
  * @tparam N Maximum number of characters (excluding null terminator).
  */
-template <size_t N>
-struct fixed_string : public ContainerBase<fixed_string<N>, char> {
+template <size_t N> struct fixed_string {
   char buffer[N + 1] = {}; ///< Internal buffer (always null-terminated).
   size_t length = 0;       ///< Current string length (not counting terminator).
 

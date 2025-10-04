@@ -1,6 +1,5 @@
 #pragma once
 
-#include "LibFK/Base/container_base.h"
 #include <LibC/stddef.h>
 #include <LibFK/Traits/type_traits.h>
 
@@ -13,8 +12,7 @@
  * @tparam T Type of elements
  * @tparam N Maximum number of elements
  */
-template <typename T, size_t N>
-struct static_vector : public ContainerBase<static_vector<T, N>, T> {
+template <typename T, size_t N> struct static_vector {
   T data[N];        ///< Internal storage
   size_t count = 0; ///< Current number of elements
 

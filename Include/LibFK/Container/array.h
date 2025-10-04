@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibFK/Base/container_base.h>
 #include <LibFK/Traits/type_traits.h>
 
 /**
@@ -10,8 +9,7 @@
  * @tparam T Element type.
  * @tparam N Number of elements.
  */
-template <typename T, size_t N>
-struct array : public ContainerBase<array<T, N>, T> {
+template <typename T, size_t N> struct array {
   using value_type = T;
   using size_type = size_t;
   using difference_type = ptrdiff_t;
