@@ -12,6 +12,7 @@ local clang_flags = {
 	"-fno-exceptions",
 	"-fno-rtti",
 	"-fno-stack-protector",
+	"-fno-use-cxa-atexit",
 	"-nostdlib",
 	"-nostdinc",
 	"-mcmodel=kernel",
@@ -84,28 +85,10 @@ end
 
 add_files("Src/Kernel/Init/**.cpp")
 add_files("Src/Kernel/Driver/**.cpp")
+add_files("Src/Kernel/Hardware/**.cpp")
+add_files("Src/Kernel/MemoryManager/**.cpp")
 
 add_files("Src/LibC/**.c")
 add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
-target_end()
-
-target("Test")
-set_default(false)
-set_kind("binary")
-
-set_toolchains("gcc", "clang")
-
-add_includedirs("Include", "/usr/include/")
-add_files("Test/test_runner.c")
-add_files("Test/LibC/**.c")
-add_files("Test/LibFK/**.cpp")
-add_files("Src/LibC/**.c")
-add_files("Src/LibC/**.cpp")
-add_files("Src/LibFK/**.cpp")
-
-add_defines("FKERNEL_TEST")
-
-set_languages("c17", "cxx20")
-
 target_end()

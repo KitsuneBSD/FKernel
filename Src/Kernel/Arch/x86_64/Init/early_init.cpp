@@ -1,10 +1,26 @@
-#include <Kernel/Arch/x86_64/Interrupt/idt.h>
-#include <Kernel/Boot/early_init.h>
-#include <LibC/stddef.h>
-#include <LibC/stdio.h>
-#include <LibFK/type_traits.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
+#include <Kernel/Arch/x86_64/Segments/gdt.h>
 
-void early_init(const multiboot2::TagMemoryMap &mmap) {
-  kprintf("Reference to multiboot2 memory map: %p\n", mmap);
-  init_idt();
+#include <Kernel/Boot/multiboot2.h>
+
+#include <Kernel/Hardware/Cpu.h>
+
+#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
+#include <Kernel/MemoryManager/VirtualMemoryManager.h>
+
+#include <LibFK/Algorithms/log.h>
+
+
+void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
+  klog("MULTIBOOT2", "Reference to multiboot2 memory map: %p", mmap);
+
+  GDTController::the().initialize();
+  InterruptController::the().initialize();
+  PhysicalMemoryManager::the().initialize(mmap);
+  VirtualMemoryManager::the().initialize();
+
+  if (CPU::the().has_apic()) {
+    APIC::the().enable();
+  }
 }

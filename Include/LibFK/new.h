@@ -1,23 +1,27 @@
 #pragma once
 
-#include <LibFK/heap_malloc.h>
+#include <LibC/stddef.h>
 
-void *operator new(size_t, void *ptr) noexcept { return ptr; }
+/**
+ * Placement new (construct object at given memory location).
+ */
+inline void *operator new(size_t, void *ptr) noexcept { return ptr; }
+inline void *operator new[](size_t, void *ptr) noexcept { return ptr; }
 
-void *operator new[](size_t, void *ptr) noexcept { return ptr; }
+/**
+ * Global new/delete operators (declared only).
+ */
+void *operator new(size_t size);
+void *operator new[](size_t size);
 
-void *operator new(size_t size) { return kmalloc(size); }
+void operator delete(void *ptr) noexcept;
+void operator delete[](void *ptr) noexcept;
 
-void *operator new[](size_t size) { return kmalloc(size); }
+void operator delete(void *ptr, size_t) noexcept;
+void operator delete[](void *ptr, size_t) noexcept;
 
-void operator delete(void *ptr) { return kfree(ptr); }
-
-void operator delete[](void *ptr) { return kfree(ptr); }
-
-void operator delete(void *ptr, size_t) { return kfree(ptr); }
-
-void operator delete[](void *ptr, size_t) { return kfree(ptr); }
-
-void operator delete(void *, void *) noexcept {}
-
-void operator delete[](void *, void *) noexcept {}
+/**
+ * Placement delete (called if constructor throws).
+ */
+inline void operator delete(void *, void *) noexcept {}
+inline void operator delete[](void *, void *) noexcept {}
