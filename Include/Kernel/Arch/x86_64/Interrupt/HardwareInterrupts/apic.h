@@ -8,6 +8,8 @@ constexpr uint32_t APIC_ENABLE = 1 << 11;
 constexpr uint32_t APIC_BSP = 1 << 8;
 constexpr uint32_t APIC_SPURIOUS = 0xF0;
 constexpr uint32_t APIC_SVR_ENABLE = 0x100; // Bit 8
+constexpr uintptr_t APIC_RANGE_SIZE = 0x1000;
+
 
 struct local_apic {
   volatile uint32_t id;
