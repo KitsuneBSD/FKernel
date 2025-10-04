@@ -8,6 +8,48 @@
 
 extern "C" void write_on_cr3(void *pml4);
 
+void check_pml4(uint64_t *m_pml4) {
+  uint64_t cr3_val;
+  asm volatile("mov %%cr3, %0" : "=r"(cr3_val));
+
+  uint64_t *pdpt = reinterpret_cast<uint64_t *>(m_pml4[0] & PAGE_MASK);
+
+  if (cr3_val != reinterpret_cast<uintptr_t>(pdpt)) {
+    klog("VirtualMemoryManager", "PML4 in CR3 does NOT match m_pml4!");
+  } else {
+    klog("VirtualMemoryManager", "CR3 correctly points to m_pml4.");
+  }
+}
+
+void map_ranges_iterative(rb_node<PhysicalMemoryRange> *root) {
+  constexpr int MAX_STACK = 64;
+  rb_node<PhysicalMemoryRange> *stack[MAX_STACK];
+  int sp = 0;
+  rb_node<PhysicalMemoryRange> *current = root;
+
+  while (current || sp > 0) {
+    while (current) {
+      if (sp >= MAX_STACK) {
+        return;
+      }
+      stack[sp++] = current;
+      current = current->left();
+    }
+
+    current = stack[--sp];
+
+    auto &range = current->value();
+    kprintf("Mapping physical memory range [ %p - %p]\n", range.m_start,
+            range.m_end);
+
+    VirtualMemoryManager::the().map_range(
+        range.m_start, range.m_start, range.m_end - range.m_start,
+        PageFlags::Present | PageFlags::Writable | PageFlags::HugePage);
+
+    current = current->right();
+  }
+}
+
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
                                     uint64_t flags,
                                     [[maybe_unused]] size_t page_size) {
@@ -109,6 +151,9 @@ void VirtualMemoryManager::initialize() {
 
   write_on_cr3(reinterpret_cast<void *>(pdpt));
 
+  map_ranges_iterative(PhysicalMemoryManager::the().m_memory_ranges.root());
+
+  check_pml4(m_pml4);
   klog("VirtualMemoryManager",
        "Virtual Memory Manager initialized with PDPT (PAE mode).");
   m_is_initialized = true;
