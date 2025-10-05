@@ -47,9 +47,6 @@ void TLSFHeap::insert_block(BlockHeader *block) {
     block->m_next->m_prev = block;
   block->m_prev = nullptr;
   m_free_lists[fl][sl] = block;
-
-  klog("TLSFHeap", "Inserted block of size %lu at %p (FL: %lu, SL: %lu)",
-       block->m_size, block, fl, sl);
 }
 
 void TLSFHeap::remove_block(BlockHeader *block) {
@@ -75,9 +72,6 @@ void TLSFHeap::remove_block(BlockHeader *block) {
 
   block->m_next = nullptr;
   block->m_prev = nullptr;
-
-  klog("TLSFHeap", "Removed block of size %lu at %p (FL: %lu, SL: %lu)",
-       block->m_size, block, fl, sl);
 }
 
 void TLSFHeap::dump() const {
@@ -104,15 +98,12 @@ void* TLSFHeap::alloc(size_t size, size_t align) {
         return nullptr;
     }
 
-    // Ajusta para o tamanho mínimo, incluindo o header
     size_t adjusted_size = size + sizeof(BlockHeader);
 
-    // Garante alinhamento para múltiplos de 2 do TLSF
     if (adjusted_size < sizeof(BlockHeader) + align) {
         adjusted_size = sizeof(BlockHeader) + align;
     }
 
-    // Localiza o bloco livre adequado
     BlockHeader* block = locate_free_block(adjusted_size);
     if (!block) {
         expand(adjusted_size);
@@ -146,7 +137,6 @@ void* TLSFHeap::alloc(size_t size, size_t align) {
         user_ptr += align - (user_ptr % align);
     }
 
-    klog("TLSFHeap", "Allocated block of size %lu at %p", block->m_size, (void*)user_ptr);
     return reinterpret_cast<void*>(user_ptr);
 }
 
@@ -192,8 +182,6 @@ void TLSFHeap::free(void *ptr) {
   }
 
   insert_block(block);
-
-  klog("TLSFHeap", "Freed block at %p of size %lu", ptr, block->m_size);
 }
 
 BlockHeader* TLSFHeap::locate_free_block(size_t size) {

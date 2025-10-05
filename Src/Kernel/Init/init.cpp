@@ -1,5 +1,5 @@
 #include <Kernel/Boot/init.h>
-#include <Kernel/FileSystem/Vfs/vfs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <Kernel/Posix/unistd.h>
 #include <LibFK/Algorithms/log.h>
 

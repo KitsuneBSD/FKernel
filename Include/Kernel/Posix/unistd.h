@@ -4,7 +4,7 @@
 #include <LibC/stdint.h>
 #include <LibFK/Algorithms/log.h>
 #include <Kernel/Posix/errno.h>
-#include <Kernel/FileSystem/Vfs/vfs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
 
 struct FDEntry {
     OwnPtr<VFSNode> node;
