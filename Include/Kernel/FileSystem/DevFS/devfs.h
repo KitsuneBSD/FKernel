@@ -9,6 +9,6 @@ struct DevFS {
     void *device_data;
 };
 
-VFSNode* devfs_register(const char* name, FileType device_type, VFSOps* ops, void* dev_data = nullptr);
+VFSNode* devfs_register(const char* name, FileType device_type, VFSOps* ops, bool is_enumerable_device = false, void* dev_data = nullptr);
 void devfs_unregister(const char* name);
 void devfs_init();
