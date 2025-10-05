@@ -25,10 +25,10 @@ Install all dependencies with:
 
 ```bash
 # Debian / Ubuntu
-sudo apt install xmake clang lld nasm qemu-system-x86 grub-common lua5.3
+sudo apt install xmake clang lld nasm qemu-system-x86 grub-common lua5.3 mtools xorriso dosfstools
 
 # Arch Linux
-sudo pacman -S xmake clang lld nasm qemu grub lua
+sudo pacman -S xmake clang lld nasm qemu grub lua mtools xorriso dosfstools
 ```
 
 ## 🧩 Project Structure
