@@ -115,8 +115,9 @@ Steps performed:
 
 - Generate a GRUB bootable ISO:
 
-- grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos
-
+```bash
+grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos
+```
 
 ### Create a virtual hard disk:
 
@@ -126,7 +127,7 @@ qemu-img create -f qcow2 build/FKernel-HDA.qcow2 4G
 
 If grub-mkrescue is unavailable, the script automatically falls back to grub2-mkrescue.
 
-🚀 Running FKernel in QEMU
+## 🚀 Running FKernel in QEMU
 
 After compilation, simply run:
 
