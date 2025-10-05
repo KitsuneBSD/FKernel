@@ -14,7 +14,7 @@ struct FDEntry {
     FDEntry(VFSNode* n) : node(n) {}
 };
 
-constexpr size_t MAX_FD = 256;
+constexpr size_t MAX_FD = 65536;
 
 static static_vector<FDEntry, MAX_FD>* fdtable = nullptr;
 

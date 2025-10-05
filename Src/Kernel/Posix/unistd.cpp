@@ -9,12 +9,14 @@ int fd_allocate(VFSNode* node) {
         errno = EMFILE;
         return -1;
     }
+    node->retain();
     fdtable->push_back(FDEntry(node));
     return fdtable->size() - 1;
 }
 
 void fd_release(int fd) {
     if (fd < 0 || fd >= (int)fdtable->size()) return;
+    (*fdtable)[fd].node->release();
     fdtable->erase(fd);
 }
 

@@ -53,13 +53,15 @@ struct VFSNode {
     FileType type{FileType::Unknown};
     FilePermissions perms{};
     size_t size{0};
+    size_t capacity{0};
+    char *data{nullptr};
     VFSOps *ops{nullptr};
     VFSNode *parent{nullptr};
 
     VFSNode(const char* n, FileType t, FilePermissions p) 
         : name(n), type(t), perms(p) {}
 
-    static_vector<OwnPtr<VFSNode>, 128> children;
+    static_vector<OwnPtr<VFSNode>, 65535> children;
 
     uint32_t refcount{1};
 
