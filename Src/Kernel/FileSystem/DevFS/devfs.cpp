@@ -34,7 +34,7 @@ ssize_t DevFSOps::write(VFSNode* node, const void* buf, size_t size, size_t offs
     return -ENOSYS;
 }
 
-VFSNode* devfs_register(const char* prefix, FileType device_type, VFSOps* ops, void* dev_data = nullptr) {
+VFSNode* devfs_register(const char* prefix, FileType device_type, VFSOps* ops, void* dev_data ) {
     ASSERT(device_type == FileType::BlockDevice || device_type == FileType::CharDevice);
 
     // Gera um nome único baseado no prefixo
