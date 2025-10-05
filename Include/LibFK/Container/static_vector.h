@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibFK/Traits/type_traits.h>
 
@@ -48,6 +49,28 @@ struct static_vector {
             data[i] = move(data[i + 1]);
         --count;
     }
+
+    T& back() {
+        ASSERT(count > 0);
+        return data[count - 1];
+    }
+
+    const T& back() const {
+        ASSERT(count > 0);
+        return data[count - 1];
+    }
+
+    // NEW: access first element (complemento útil)
+    T& front() {
+        ASSERT(count > 0);
+        return data[0];
+    }
+
+    const T& front() const {
+        ASSERT(count > 0);
+        return data[0];
+    }
+
 };
 
 

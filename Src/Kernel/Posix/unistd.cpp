@@ -1,6 +1,6 @@
 #include <LibFK/Container/static_vector.h>
 #include <LibFK/Memory/own_ptr.h>
-#include <Kernel/FileSystem/vfs.h>
+#include <Kernel/FileSystem/Vfs/vfs.h>
 #include <Kernel/Posix/unistd.h>
 #include <Kernel/Posix/errno.h>
 

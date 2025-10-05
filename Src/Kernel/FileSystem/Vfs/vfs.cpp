@@ -1,4 +1,4 @@
-#include <Kernel/FileSystem/vfs.h>
+#include <Kernel/FileSystem/Vfs/vfs.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibC/string.h>
 #include <LibFK/new.h>
@@ -119,8 +119,42 @@ int VFS::close(VFSNode* node) {
     return node->ops->close(node);
 }
 
-int VFS::mount(VFSNode* node, const char* path) {
-    if (strcmp(path, "/") != 0) return -1;
-    g_root_raw = node; // just assign raw pointer
+int VFS::mount(VFSNode* node, VFSNode* mountpoint) {
+    if (!node || !mountpoint)
+        return -1;
+
+    if (mountpoint->type != FileType::Directory)
+        return -1;
+
+    mountpoint->ops = node->ops;
+    mountpoint->fs_data = node->fs_data;
+    mountpoint->type = FileType::Directory;
+    mountpoint->children = move(node->children);
+
     return 0;
+}
+
+int VFS::mount(VFSNode* mountpoint, VFSFilesystem* fs) {
+    if (!mountpoint || !fs)
+        return -1;
+
+    if (mountpoint->type != FileType::Directory)
+        return -1;
+
+    VFSNode* fs_root = fs->root;
+    if (!fs_root)
+        return -1;
+
+    return mount(fs_root, mountpoint);
+}
+
+int VFS::mount(VFSNode* fs_root, const char* mount_path) {
+    if (!fs_root || !mount_path)
+        return -1;
+
+    VFSNode* mountpoint = VFS::resolve_path(mount_path);
+    if (!mountpoint)
+        return -1;
+
+    return mount(fs_root, mountpoint);
 }
