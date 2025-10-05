@@ -6,6 +6,7 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/own_ptr.h>
 
+static uint32_t g_devfs_counter = 0;
 VFSNode* g_devfs_root = nullptr;
 
 void devfs_init() {
@@ -33,11 +34,17 @@ ssize_t DevFSOps::write(VFSNode* node, const void* buf, size_t size, size_t offs
     return -ENOSYS;
 }
 
-VFSNode* devfs_register(const char* name, FileType device_type , VFSOps* ops, void* dev_data) {
+VFSNode* devfs_register(const char* prefix, FileType device_type, VFSOps* ops, void* dev_data = nullptr) {
     ASSERT(device_type == FileType::BlockDevice || device_type == FileType::CharDevice);
 
+    // Gera um nome único baseado no prefixo
+    char name[64];
+    snprintf(name, sizeof(name), "%s%u", prefix, g_devfs_counter++);
+
     auto node = new VFSNode(name, device_type, {6,4,4}, ops, dev_data, g_devfs_root);
+
     g_devfs_root->children.push_back(OwnPtr<VFSNode>(node));
+
     klog("DevFS", "Registered device: %s", name);
     return node;
 }
