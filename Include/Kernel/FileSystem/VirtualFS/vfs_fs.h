@@ -1,7 +1,7 @@
 #pragma once 
 
-#include <Kernel/FileSystem/Vfs/vfs_ops.h>
-#include <Kernel/FileSystem/Vfs/vfs_node.h>
+#include <Kernel/FileSystem/VirtualFS/vfs_ops.h>
+#include <Kernel/FileSystem/VirtualFS/vfs_node.h>
 #include <LibFK/Container/fixed_string.h>
 
 constexpr size_t VFS_MAX_MOUNTS = (2 << 16);

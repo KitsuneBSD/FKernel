@@ -8,9 +8,9 @@
 #include <LibFK/Traits/type_traits.h>
 
 #include <Kernel/FileSystem/file_types.h>
-#include <Kernel/FileSystem/Vfs/vfs_fs.h>
-#include <Kernel/FileSystem/Vfs/vfs_ops.h>
-#include <Kernel/FileSystem/Vfs/vfs_node.h>
+#include <Kernel/FileSystem/VirtualFS/vfs_fs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs_ops.h>
+#include <Kernel/FileSystem/VirtualFS/vfs_node.h>
 
 struct VFS {
     static void init();

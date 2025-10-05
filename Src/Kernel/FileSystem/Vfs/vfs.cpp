@@ -1,4 +1,4 @@
-#include <Kernel/FileSystem/Vfs/vfs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibC/string.h>
 #include <LibFK/new.h>

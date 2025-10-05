@@ -1,6 +1,6 @@
 #pragma once 
 
-#include <Kernel/FileSystem/Vfs/vfs_ops.h>
+#include <Kernel/FileSystem/VirtualFS/vfs_ops.h>
 #include <Kernel/FileSystem/file_types.h>
 #include <LibFK/Container/fixed_string.h>
 #include <LibFK/Container/static_vector.h>
