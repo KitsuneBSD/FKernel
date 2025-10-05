@@ -4,6 +4,7 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 
 #include <Kernel/Boot/multiboot2.h>
+#include <Kernel/Boot/init.h>
 
 #include <Kernel/Hardware/Cpu.h>
 
@@ -14,7 +15,7 @@
 
 
 void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
-  klog("MULTIBOOT2", "Reference to multiboot2 memory map: %p", mmap);
+  klog("EARLY_INIT", "Start early init");
 
   GDTController::the().initialize();
   InterruptController::the().initialize();
@@ -28,4 +29,6 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
     InterruptController::the().register_interrupt(apic_timer_handler, 32);
     APIC::the().setup_timer(1);
   }
+
+  init();
 }
