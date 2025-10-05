@@ -9,6 +9,7 @@ extern int errno;
 #define EIO 5           /* I/O error */
 #define ENXIO 6         /* Device not configured */
 #define E2BIG 7         /* Argument list too long */
+#define	EBADF		9		/* Bad file descriptor */
 #define ENOMEM 12       /* Cannot allocate memory */
 #define EACCES 13       /* Permission denied */
 #define EFAULT 14       /* Bad address */
