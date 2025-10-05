@@ -35,6 +35,7 @@ sudo pacman -S xmake clang lld nasm qemu grub lua mtools xorriso dosfstools
 
 A minimal overview of the repository layout:
 
+```
 .
 ├── Config/                 # Build configuration files (linker, GRUB)
 ├── Docs/                   # Documentation
@@ -45,7 +46,7 @@ A minimal overview of the repository layout:
 ├── LICENSE
 ├── README.md
 └── xmake.lua               # Root build configuration
-
+```
 
 The kernel build process is completely self-contained — it uses no external libraries or libc.
 
