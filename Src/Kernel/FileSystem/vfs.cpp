@@ -3,7 +3,6 @@
 #include <LibC/string.h>
 #include <LibFK/new.h>
 
-// no global OwnPtr, just a raw pointer
 static VFSNode* g_root_raw = nullptr;
 
 VFSNode* VFS::root() {
