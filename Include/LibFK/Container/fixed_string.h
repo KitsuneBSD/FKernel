@@ -14,6 +14,16 @@ template <size_t N> struct fixed_string {
   char buffer[N + 1] = {}; ///< Internal buffer (always null-terminated).
   size_t length = 0;       ///< Current string length (not counting terminator).
 
+  constexpr fixed_string(const char* s) {
+        size_t i = 0;
+        while (s[i] != '\0' && i < N) {
+            buffer[i] = s[i];
+            ++i;
+        }
+        length = i;
+        buffer[i] = '\0';
+  }
+
   /// @return Current length of the string.
   [[nodiscard]] constexpr size_t size() const noexcept { return length; }
 

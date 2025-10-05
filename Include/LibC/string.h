@@ -6,6 +6,8 @@
 extern "C" {
 #endif // __cplusplus
 
+static char *strtok_saveptr = NULL;
+
 /**
  * @brief Digits used for number-to-string conversions (base up to 16).
  */
@@ -152,6 +154,24 @@ long stol(const char *str);
  * @return Number of characters written (excluding null terminator).
  */
 size_t ultoa(unsigned long value, char *buffer, unsigned int base);
+
+/**
+ * @brief Locate the last occurrence of a character in a string.
+ *
+ * @param s Pointer to the string.
+ * @param c Character to search for (interpreted as unsigned char).
+ * @return Pointer to the last occurrence of @p c, or NULL if not found.
+ */
+char *strrchr(const char *s, int c);
+
+/**
+ * @brief Tokenize a string using delimiters.
+ *
+ * @param str     String to tokenize (pass NULL to continue tokenizing previous string).
+ * @param delim   Null-terminated string with delimiter characters.
+ * @return Pointer to next token, or NULL if no more tokens.
+ */
+char *strtok(char *str, const char *delim);
 
 #ifdef __cplusplus
 }

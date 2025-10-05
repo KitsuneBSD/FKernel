@@ -12,69 +12,46 @@
  * @tparam T Type of elements
  * @tparam N Maximum number of elements
  */
-template <typename T, size_t N> struct static_vector {
-  T data[N];        ///< Internal storage
-  size_t count = 0; ///< Current number of elements
+template <typename T, size_t N>
+struct static_vector {
+    T data[N];
+    size_t count = 0;
 
-  /**
-   * @brief Get the current number of elements in the vector.
-   * @return Number of elements
-   */
-  constexpr size_t size() const { return count; }
+    constexpr size_t size() const { return count; }
+    constexpr size_t capacity() const { return N; }
 
-  /**
-   * @brief Get the maximum capacity of the vector.
-   * @return Maximum number of elements
-   */
-  constexpr size_t capacity() const { return N; }
+    // push_back for move-only types
+    bool push_back(T &&value) {
+        if (count >= N) return false;
+        data[count++] = move(value);
+        return true;
+    }
 
-  /**
-   * @brief Add a new element at the end of the vector.
-   * @param value Element to add
-   * @return True if the element was added, false if vector is full
-   */
-  bool push_back(const T &value) {
-    if (count >= N)
-      return false;
-    data[count++] = value;
-    return true;
-  }
+    // optional: push_back for lvalues (makes a copy if possible)
+    bool push_back(const T &value) {
+        if (count >= N) return false;
+        data[count++] = T(value); // copy or move ctor
+        return true;
+    }
 
-  /**
-   * @brief Access element by index.
-   * @param i Index of the element
-   * @return Reference to element at index i
-   */
-  T &operator[](size_t i) { return data[i]; }
+    T &operator[](size_t i) { return data[i]; }
+    const T &operator[](size_t i) const { return data[i]; }
 
-  /**
-   * @brief Const access to element by index.
-   * @param i Index of the element
-   * @return Const reference to element at index i
-   */
-  const T &operator[](size_t i) const { return data[i]; }
+    T *begin() { return data; }
+    T *end() { return data + count; }
+    const T *begin() const { return data; }
+    const T *end() const { return data + count; }
 
-  /**
-   * @brief Get pointer to first element (for range-based for loops).
-   * @return Pointer to first element
-   */
-  T *begin() { return data; }
-
-  /**
-   * @brief Get pointer to one past last element (for range-based for loops).
-   * @return Pointer to one past last element
-   */
-  T *end() { return data + count; }
-
-  /**
-   * @brief Const version of begin().
-   * @return Const pointer to first element
-   */
-  const T *begin() const { return data; }
-
-  /**
-   * @brief Const version of end().
-   * @return Const pointer to one past last element
-   */
-  const T *end() const { return data + count; }
+    void erase(size_t index) {
+        if (index >= count) return;
+        for (size_t i = index; i < count - 1; ++i)
+            data[i] = move(data[i + 1]);
+        --count;
+    }
 };
+
+
+  template <typename T>
+constexpr T &&move(T &obj) noexcept {
+    return static_cast<T&&>(obj);
+}
