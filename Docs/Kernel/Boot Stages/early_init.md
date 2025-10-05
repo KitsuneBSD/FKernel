@@ -100,8 +100,10 @@ These features will be considered **only when they become necessary** for FKerne
 
 ## Conclusion
 
-The **`early_init` stage is considered complete** and stable.  
-It provides a clean, consistent, and predictable foundation for the kernel to continue bootstrapping higher-level systems.  
+The **`early_init` stage is considered complete**, but unstable and need more contributors and testers to reach the stability.
+
+It provides a clean, consistent, and predictable foundation for the kernel to continue bootstrapping higher-level systems.
+  
 No further expansion is planned at this time — **by design**.
 
 > *Simplicity is a feature when you’re this close to the metal.*
