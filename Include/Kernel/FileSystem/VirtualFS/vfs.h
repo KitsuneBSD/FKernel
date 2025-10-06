@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
@@ -12,23 +12,48 @@
 #include <Kernel/FileSystem/VirtualFS/vfs_ops.h>
 #include <Kernel/FileSystem/VirtualFS/vfs_node.h>
 
-struct VFS {
-    static void init();
-    static VFSNode* root();
+class VFS
+{
 
-    static int mount(VFSNode* node, VFSNode* mountpoint);
-    static int mount(VFSNode* mountpoint, VFSFilesystem* fs);
-    static int mount(VFSNode* fs_root, const char* mount_path);
+private:
+    VFS() { init(); }
 
-    static VFSNode* resolve_path(const char* path);
+    VFSNode *create_node(const char *name, FileType type, FilePermissions perms);
+    VFSNode *lookup_child(VFSNode *parent, const char *name);
 
-    static int mkdir(const char* path, FilePermissions perms);
-    static int unlink(const char* path);
-    static int rename(const char* old_path, const char* new_path);
+    bool m_is_initialized = false;
+    VFSNode *m_root{nullptr};
 
-    static ssize_t read(VFSNode* node, void* buf, size_t size, size_t offset);
-    static ssize_t write(VFSNode* node, const void* buf, size_t size, size_t offset);
+    // Proibindo cópia/movimento
+    VFS(const VFS &) = delete;
+    VFS &operator=(const VFS &) = delete;
+    VFS(VFS &&) = delete;
+    VFS &operator=(VFS &&) = delete;
 
-    static int open(VFSNode* node, FileMode mode);
-    static int close(VFSNode* node);
+public:
+    static VFS &the()
+    {
+        static VFS instance; // Singleton RAII
+        return instance;
+    }
+
+    void init();
+
+    VFSNode *root() const { return m_root; }
+
+    int mkdir(const char *path, FilePermissions perms);
+    int unlink(const char *path);
+    int rename(const char *old_path, const char *new_path);
+
+    ssize_t read(VFSNode *node, void *buf, size_t size, size_t offset);
+    ssize_t write(VFSNode *node, const void *buf, size_t size, size_t offset);
+
+    int open(VFSNode *node, FileMode mode);
+    int close(VFSNode *node);
+
+    int mount(VFSNode *node, VFSNode *mountpoint);
+    int mount(VFSNode *mountpoint, VFSFilesystem *fs);
+    int mount(VFSNode *fs_root, const char *mount_path);
+
+    VFSNode *resolve_path(const char *path);
 };
