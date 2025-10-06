@@ -4,82 +4,135 @@
 #include <Kernel/Posix/unistd.h>
 #include <Kernel/Posix/errno.h>
 
-int fd_allocate(VFSNode* node) {
-    if (fdtable->size() >= MAX_FD) {
-        errno = EMFILE;
+void FDTable::init()
+{
+    m_entries.clear();
+    klog("FDTable", "File descriptor table initialized");
+}
+
+int FDTable::allocate(VFSNode *node)
+{
+    if (!node)
         return -1;
-    }
-    node->retain();
-    fdtable->push_back(FDEntry(node));
-    return fdtable->size() - 1;
-}
 
-void fd_release(int fd) {
-    if (fd < 0 || fd >= (int)fdtable->size()) return;
-    (*fdtable)[fd].node->release();
-    fdtable->erase(fd);
-}
-
-void fdtable_init() {
-    fdtable = new static_vector<FDEntry, MAX_FD>();
-
-    klog("FD", "File descriptor table initialized");
-}
-
-
-/* open a file and allocate a file descriptor */
-int open(const char* pathname, int flags, int mode) {
-    (void)flags;
-    (void)mode;
-
-    if (!fdtable) fdtable_init();
-
-    VFSNode *node = VFS::resolve_path(pathname);
-    if (!node) {
-        errno = ENOENT;
-        return -1;
+    for (size_t i = 0; i < m_entries.size(); ++i)
+    {
+        if (!m_entries[i].node)
+        {
+            m_entries[i] = FDEntry(node);
+            return static_cast<int>(i);
+        }
     }
 
-    int fd = fd_allocate(node);
-    if (fd < 0) return -1;
+    if (m_entries.size() >= MAX_FD)
+        return -1;
+
+    m_entries.push_back(FDEntry(node));
+    return static_cast<int>(m_entries.size() - 1);
+}
+
+void FDTable::release(int fd)
+{
+    if (fd < 0 || static_cast<size_t>(fd) >= m_entries.size())
+        return;
+    m_entries[fd] = FDEntry(); // destrói entry atual, libera node
+}
+
+FDEntry *FDTable::get(int fd)
+{
+    if (fd < 0 || static_cast<size_t>(fd) >= m_entries.size())
+        return nullptr;
+    if (!m_entries[fd].node)
+        return nullptr;
+    return &m_entries[fd];
+}
+
+int open(const char *pathname, int flags, int /*mode*/)
+{
+    auto node = VFS::the().resolve_path(pathname);
+    if (!node)
+        return -1;
+
+    int fd = FDTable::the().allocate(node);
+    if (fd < 0)
+        return -1;
+
+    if (node->ops)
+        node->ops->open(node, static_cast<FileMode>(flags));
     return fd;
 }
 
-/* close a file descriptor */
-int close(int fd) {
-    if (!fdtable) return -1;
-
-    if (fd < 0 || fd >= (int)fdtable->size()) {
-        errno = EBADF;
+int close(int fd)
+{
+    auto entry = FDTable::the().get(fd);
+    if (!entry)
         return -1;
-    }
+    if (entry->node && entry->node->ops)
+        entry->node->ops->close(entry->node);
 
-    fd_release(fd);
+    FDTable::the().release(fd);
     return 0;
 }
 
-/* read from a file descriptor */
-ssize_t read(int fd, void* buf, size_t size) {
-    if (!fdtable || fd < 0 || fd >= (int)fdtable->size() || !(*fdtable)[fd].node) {
-        errno = EBADF;
+ssize_t read(int fd, void *buf, size_t count)
+{
+    auto entry = FDTable::the().get(fd);
+    if (!entry || !entry->node || !entry->node->ops)
         return -1;
-    }
 
-    FDEntry& entry = (*fdtable)[fd];
-    ssize_t ret = VFS::read(entry.node.ptr(), buf, size, entry.offset);
-    if (ret > 0) entry.offset += ret;
+    ssize_t ret = entry->node->ops->read(entry->node, buf, count, entry->offset);
+    if (ret > 0)
+        entry->offset += static_cast<size_t>(ret);
     return ret;
 }
 
-/* write to a file descriptor */
-ssize_t write(int fd, const void* buf, size_t size) {
-    if (!fdtable || fd < 0 || fd >= (int)fdtable->size() || !(*fdtable)[fd].node) {
-        errno = EBADF;
+ssize_t write(int fd, const void *buf, size_t count)
+{
+    auto entry = FDTable::the().get(fd);
+    if (!entry || !entry->node || !entry->node->ops)
+        return -1;
+
+    ssize_t ret = entry->node->ops->write(entry->node, buf, count, entry->offset);
+    if (ret > 0)
+        entry->offset += static_cast<size_t>(ret);
+    return ret;
+}
+
+off_t lseek(int fd, off_t offset, int whence)
+{
+    auto entry = FDTable::the().get(fd);
+    if (!entry || !entry->node)
+        return -1;
+
+    size_t new_offset = 0;
+    switch (whence)
+    {
+    case SEEK_SET:
+        new_offset = static_cast<size_t>(offset);
+        break;
+    case SEEK_CUR:
+        new_offset = entry->offset + static_cast<size_t>(offset);
+        break;
+    case SEEK_END:
+        new_offset = entry->node->size + static_cast<size_t>(offset);
+        break;
+    default:
         return -1;
     }
 
-    FDEntry& entry = (*fdtable)[fd];
-    ssize_t ret = VFS::write(entry.node.ptr(), buf, size, entry.offset);
-    if (ret > 0) entry.offset += ret;
-    return ret;
+    entry->offset = new_offset;
+    return static_cast<off_t>(entry->offset);
+}
+
+int unlink(const char *pathname)
+{
+    return VFS::the().unlink(pathname);
+}
+
+int mkdir(const char *pathname, mode_t mode)
+{
+    FilePermissions perms{(uint16_t)((mode >> 6) & 7),
+                          (uint16_t)((mode >> 3) & 7),
+                          (uint16_t)(mode & 7)};
+    return VFS::the().mkdir(pathname, perms);
 }
