@@ -7,6 +7,8 @@
 #include <LibC/string.h>
 #include <LibFK/Memory/retain_ptr.h>
 
+struct VNode;
+
 /**
  * @brief Interface for VNode operations.
  *

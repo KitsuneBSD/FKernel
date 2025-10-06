@@ -12,10 +12,15 @@
  * @tparam T Type of object being managed. Must provide `retain()` and
  * `release()`.
  */
-template <typename T> class RetainPtr {
+template <typename T>
+class RetainPtr
+{
 public:
   /// Tag type to indicate adoption of a pointer without retaining
-  enum class Adopt { Yes };
+  enum class Adopt
+  {
+    Yes
+  };
 
   /**
    * @brief Default constructor. Constructs an empty RetainPtr.
@@ -26,7 +31,8 @@ public:
    * @brief Construct RetainPtr managing the given pointer (retains it).
    * @param ptr Pointer to manage
    */
-  explicit RetainPtr(T *ptr) : m_ptr(ptr) {
+  explicit RetainPtr(T *ptr) : m_ptr(ptr)
+  {
     if (m_ptr)
       m_ptr->retain();
   }
@@ -42,7 +48,8 @@ public:
    * @brief Copy constructor. Retains the underlying pointer.
    * @param other Another RetainPtr to copy
    */
-  RetainPtr(const RetainPtr &other) : m_ptr(other.m_ptr) {
+  RetainPtr(const RetainPtr &other) : m_ptr(other.m_ptr)
+  {
     if (m_ptr)
       m_ptr->retain();
   }
@@ -53,7 +60,8 @@ public:
    * @param other Another RetainPtr
    */
   template <typename U>
-  RetainPtr(const RetainPtr<U> &other) : m_ptr(static_cast<T *>(other.get())) {
+  RetainPtr(const RetainPtr<U> &other) : m_ptr(static_cast<T *>(other.get()))
+  {
     if (m_ptr)
       m_ptr->retain();
   }
@@ -80,8 +88,10 @@ public:
 
   // --- Assignment operators ---
 
-  RetainPtr &operator=(const RetainPtr &other) {
-    if (this != &other) {
+  RetainPtr &operator=(const RetainPtr &other)
+  {
+    if (this != &other)
+    {
       if (other.m_ptr)
         other.m_ptr->retain();
       clear();
@@ -90,7 +100,9 @@ public:
     return *this;
   }
 
-  template <typename U> RetainPtr &operator=(const RetainPtr<U> &other) {
+  template <typename U>
+  RetainPtr &operator=(const RetainPtr<U> &other)
+  {
     T *new_ptr = static_cast<T *>(other.get());
     if (new_ptr)
       new_ptr->retain();
@@ -99,22 +111,28 @@ public:
     return *this;
   }
 
-  RetainPtr &operator=(RetainPtr &&other) noexcept {
-    if (this != &other) {
+  RetainPtr &operator=(RetainPtr &&other) noexcept
+  {
+    if (this != &other)
+    {
       clear();
       m_ptr = other.leakRef();
     }
     return *this;
   }
 
-  template <typename U> RetainPtr &operator=(RetainPtr<U> &&other) noexcept {
+  template <typename U>
+  RetainPtr &operator=(RetainPtr<U> &&other) noexcept
+  {
     clear();
     m_ptr = static_cast<T *>(other.leakRef());
     return *this;
   }
 
-  RetainPtr &operator=(T *ptr) {
-    if (m_ptr != ptr) {
+  RetainPtr &operator=(T *ptr)
+  {
+    if (m_ptr != ptr)
+    {
       if (ptr)
         ptr->retain();
       clear();
@@ -129,7 +147,8 @@ public:
    * @brief Adopt a pointer without retaining it.
    * @param ptr Pointer to adopt
    */
-  void adopt(T *ptr) {
+  void adopt(T *ptr)
+  {
     clear();
     m_ptr = ptr;
   }
@@ -138,8 +157,10 @@ public:
    * @brief Release current pointer and optionally set a new one.
    * @param ptr New pointer to manage (optional)
    */
-  void reset(T *ptr = nullptr) {
-    if (ptr != m_ptr) {
+  void reset(T *ptr = nullptr)
+  {
+    if (ptr != m_ptr)
+    {
       if (ptr)
         ptr->retain();
       clear();
@@ -151,7 +172,8 @@ public:
    * @brief Release ownership without releasing the reference.
    * @return The raw pointer
    */
-  T *leakRef() {
+  T *leakRef()
+  {
     T *tmp = m_ptr;
     m_ptr = nullptr;
     return tmp;
@@ -176,7 +198,8 @@ public:
    * @brief Swap contents with another RetainPtr.
    * @param other RetainPtr to swap with
    */
-  void swap(RetainPtr &other) {
+  void swap(RetainPtr &other)
+  {
     T *tmp = m_ptr;
     m_ptr = other.m_ptr;
     other.m_ptr = tmp;
@@ -188,8 +211,10 @@ public:
 private:
   T *m_ptr;
 
-  void clear() {
-    if (m_ptr) {
+  void clear()
+  {
+    if (m_ptr)
+    {
       m_ptr->release();
       m_ptr = nullptr;
     }
@@ -202,8 +227,10 @@ private:
  * @param ptr Pointer to adopt
  * @return RetainPtr managing the pointer
  */
-template <typename T> inline RetainPtr<T> adopt_retain(T *ptr) {
-  return RetainPtr<T>(typename RetainPtr<T>::Adopt::Yes, ptr);
+template <typename T>
+inline RetainPtr<T> adopt_retain(T *ptr)
+{
+  return RetainPtr<T>(typename RetainPtr<T>::Adopt::Yes{}, ptr);
 }
 
 /**
@@ -214,6 +241,8 @@ template <typename T> inline RetainPtr<T> adopt_retain(T *ptr) {
  * @return RetainPtr managing the newly created object
  */
 template <typename T, typename... Args>
-inline RetainPtr<T> make_retain(Args &&...args) {
-  return RetainPtr<T>(new T(static_cast<Args &&>(args)...));
+inline RetainPtr<T> make_retain(Args &&...args)
+{
+  T *obj = new T(static_cast<Args &&>(args)...);
+  return adopt_retain(obj);
 }

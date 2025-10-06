@@ -7,14 +7,17 @@
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 
-void TLSFHeap::expand(size_t bytes) {
+void TLSFHeap::expand(size_t bytes)
+{
   size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
   uintptr_t base = m_heap_base + m_heap_size;
 
-  for (size_t i = 0; i < pages; ++i) {
+  for (size_t i = 0; i < pages; ++i)
+  {
     void *phys_page = PhysicalMemoryManager::the().alloc_physical_page(1);
 
-    if (!phys_page) {
+    if (!phys_page)
+    {
       kwarn("TLSFHeap", "Failed to allocate physical page\n");
       return;
     }
@@ -32,7 +35,8 @@ void TLSFHeap::expand(size_t bytes) {
   m_heap_size += pages * PAGE_SIZE;
 }
 
-void TLSFHeap::insert_block(BlockHeader *block) {
+void TLSFHeap::insert_block(BlockHeader *block)
+{
   size_t fl, sl;
   mapping(block->m_size, fl, sl);
 
@@ -49,23 +53,30 @@ void TLSFHeap::insert_block(BlockHeader *block) {
   m_free_lists[fl][sl] = block;
 }
 
-void TLSFHeap::remove_block(BlockHeader *block) {
+void TLSFHeap::remove_block(BlockHeader *block)
+{
   size_t fl, sl;
   mapping(block->m_size, fl, sl);
 
-  if (block->m_prev) {
+  if (block->m_prev)
+  {
     block->m_prev->m_next = block->m_next;
-  } else {
+  }
+  else
+  {
     m_free_lists[fl][sl] = block->m_next;
   }
 
-  if (block->m_next) {
+  if (block->m_next)
+  {
     block->m_next->m_prev = block->m_prev;
   }
 
-  if (!m_free_lists[fl][sl]) {
+  if (!m_free_lists[fl][sl])
+  {
     m_second_layer_bitmap[fl].set(sl, false);
-    if (m_second_layer_bitmap[fl].is_empty()) {
+    if (m_second_layer_bitmap[fl].is_empty())
+    {
       m_first_layer_bitmap.set(fl, false);
     }
   }
@@ -74,15 +85,21 @@ void TLSFHeap::remove_block(BlockHeader *block) {
   block->m_prev = nullptr;
 }
 
-void TLSFHeap::dump() const {
+void TLSFHeap::dump() const
+{
   klog("TLSFHeap", "Heap Base: %p, Size: %lu, Used: %lu", (void *)m_heap_base,
        m_heap_size, m_used);
-  for (size_t fl = 0; fl < FL_BITS; ++fl) {
-    if (m_first_layer_bitmap.get(fl)) {
-      for (size_t sl = 0; sl < SL_BITS; ++sl) {
-        if (m_second_layer_bitmap[fl].get(sl)) {
+  for (size_t fl = 0; fl < FL_BITS; ++fl)
+  {
+    if (m_first_layer_bitmap.get(fl))
+    {
+      for (size_t sl = 0; sl < SL_BITS; ++sl)
+      {
+        if (m_second_layer_bitmap[fl].get(sl))
+        {
           BlockHeader *block = m_free_lists[fl][sl];
-          while (block) {
+          while (block)
+          {
             klog("TLSFHeap", "Free Block - Address: %p, Size: %lu\n", block,
                  block->m_size);
             block = block->m_next;
@@ -93,63 +110,71 @@ void TLSFHeap::dump() const {
   }
 }
 
-void* TLSFHeap::alloc(size_t size, size_t align) {
-    if (size == 0 || align == 0 || (align & (align - 1)) != 0) {
-        return nullptr;
-    }
+void *TLSFHeap::alloc(size_t size, size_t align)
+{
+  if (size == 0 || align == 0 || (align & (align - 1)) != 0)
+  {
+    return nullptr;
+  }
 
-    size_t adjusted_size = size + sizeof(BlockHeader);
+  size_t adjusted_size = size + sizeof(BlockHeader);
 
-    if (adjusted_size < sizeof(BlockHeader) + align) {
-        adjusted_size = sizeof(BlockHeader) + align;
-    }
+  if (adjusted_size < sizeof(BlockHeader) + align)
+  {
+    adjusted_size = sizeof(BlockHeader) + align;
+  }
 
-    BlockHeader* block = locate_free_block(adjusted_size);
-    if (!block) {
-        expand(adjusted_size);
-        block = locate_free_block(adjusted_size);
-        if (!block) return nullptr;
-    }
+  BlockHeader *block = locate_free_block(adjusted_size);
+  if (!block)
+  {
+    expand(adjusted_size);
+    block = locate_free_block(adjusted_size);
+    if (!block)
+      return nullptr;
+  }
 
-    remove_block(block);
+  remove_block(block);
 
-    // Calcula o tamanho do bloco remanescente
-    size_t total_block_size = block->m_size + sizeof(BlockHeader);
-    size_t remainder = total_block_size - adjusted_size;
+  // Calcula o tamanho do bloco remanescente
+  size_t total_block_size = block->m_size + sizeof(BlockHeader);
+  size_t remainder = total_block_size - adjusted_size;
 
-    // Só cria um novo bloco se o remanescente for grande o suficiente
-    if (remainder >= sizeof(BlockHeader) + 2) { // mínimo para próximo tamanho TLSF
-        auto* new_block = reinterpret_cast<BlockHeader*>(
-            reinterpret_cast<uintptr_t>(block) + adjusted_size
-        );
-        new_block->m_size = remainder - sizeof(BlockHeader);
-        new_block->m_free = true;
-        insert_block(new_block);
+  // Só cria um novo bloco se o remanescente for grande o suficiente
+  if (remainder >= sizeof(BlockHeader) + 2)
+  { // mínimo para próximo tamanho TLSF
+    auto *new_block = reinterpret_cast<BlockHeader *>(
+        reinterpret_cast<uintptr_t>(block) + adjusted_size);
+    new_block->m_size = remainder - sizeof(BlockHeader);
+    new_block->m_free = true;
+    insert_block(new_block);
 
-        block->m_size = adjusted_size - sizeof(BlockHeader);
-    }
+    block->m_size = adjusted_size - sizeof(BlockHeader);
+  }
 
-    block->m_free = false;
-    m_used += block->m_size + sizeof(BlockHeader);
+  block->m_free = false;
+  m_used += block->m_size + sizeof(BlockHeader);
 
-    uintptr_t user_ptr = reinterpret_cast<uintptr_t>(block) + sizeof(BlockHeader);
-    if (user_ptr % align != 0) {
-        user_ptr += align - (user_ptr % align);
-    }
+  uintptr_t user_ptr = reinterpret_cast<uintptr_t>(block) + sizeof(BlockHeader);
+  if (user_ptr % align != 0)
+  {
+    user_ptr += align - (user_ptr % align);
+  }
 
-    return reinterpret_cast<void*>(user_ptr);
+  return reinterpret_cast<void *>(user_ptr);
 }
 
-
-void TLSFHeap::free(void *ptr) {
-  if (!ptr) {
+void TLSFHeap::free(void *ptr)
+{
+  if (!ptr)
+  {
     return;
   }
 
   auto *block = reinterpret_cast<BlockHeader *>(
       reinterpret_cast<uintptr_t>(ptr) - sizeof(BlockHeader));
 
-  if (block->m_free) {
+  if (block->m_free)
+  {
     kwarn("TLSFHeap", "Double free detected at %p\n", ptr);
     return;
   }
@@ -160,22 +185,26 @@ void TLSFHeap::free(void *ptr) {
   auto *next_block = reinterpret_cast<BlockHeader *>(
       reinterpret_cast<uintptr_t>(block) + block->m_size + sizeof(BlockHeader));
   if (reinterpret_cast<uintptr_t>(next_block) < m_heap_base + m_heap_size &&
-      next_block->m_free) {
+      next_block->m_free)
+  {
     remove_block(next_block);
     block->m_size += next_block->m_size + sizeof(BlockHeader);
   }
 
   BlockHeader *prev_block = nullptr;
   uintptr_t scan = m_heap_base;
-  while (scan < reinterpret_cast<uintptr_t>(block)) {
+  while (scan < reinterpret_cast<uintptr_t>(block))
+  {
     auto *current = reinterpret_cast<BlockHeader *>(scan);
-    if (current->m_free) {
+    if (current->m_free)
+    {
       prev_block = current;
     }
     scan += current->m_size + sizeof(BlockHeader);
   }
 
-  if (prev_block && prev_block->m_free) {
+  if (prev_block && prev_block->m_free)
+  {
     remove_block(prev_block);
     prev_block->m_size += block->m_size + sizeof(BlockHeader);
     block = prev_block;
@@ -184,14 +213,17 @@ void TLSFHeap::free(void *ptr) {
   insert_block(block);
 }
 
-BlockHeader* TLSFHeap::locate_free_block(size_t size) {
+BlockHeader *TLSFHeap::locate_free_block(size_t size)
+{
   size_t fl, sl;
   mapping(size, fl, sl);
 
   uint64_t sl_map = m_second_layer_bitmap[fl].get_mask_from(sl);
-  if (sl_map == 0) {
+  if (sl_map == 0)
+  {
     uint64_t fl_map = m_first_layer_bitmap.get_mask_from(fl + 1);
-    if (fl_map == 0) {
+    if (fl_map == 0)
+    {
       return nullptr;
     }
     fl = __builtin_ctzll(fl_map);
@@ -200,9 +232,67 @@ BlockHeader* TLSFHeap::locate_free_block(size_t size) {
 
   sl = __builtin_ctzll(sl_map);
   BlockHeader *block = m_free_lists[fl][sl];
-  while (block && block->m_size < size) {
+  while (block && block->m_size < size)
+  {
     block = block->m_next;
   }
 
   return block;
+}
+
+void *TLSFHeap::realloc(void *ptr, size_t size)
+{
+  if (!ptr)
+  {
+    return alloc(size);
+  }
+
+  if (size == 0)
+  {
+    free(ptr);
+    return nullptr;
+  }
+
+  auto *block = reinterpret_cast<BlockHeader *>(
+      reinterpret_cast<uintptr_t>(ptr) - sizeof(BlockHeader));
+
+  size_t current_size = block->m_size;
+
+  if (size <= current_size)
+  {
+    size_t remainder = current_size - size;
+    if (remainder >= sizeof(BlockHeader) + 2)
+    {
+      auto *new_block = reinterpret_cast<BlockHeader *>(
+          reinterpret_cast<uintptr_t>(block) + sizeof(BlockHeader) + size);
+      new_block->m_size = remainder - sizeof(BlockHeader);
+      new_block->m_free = true;
+      insert_block(new_block);
+
+      block->m_size = size;
+    }
+    return ptr;
+  }
+
+  auto *next_block = reinterpret_cast<BlockHeader *>(
+      reinterpret_cast<uintptr_t>(block) + sizeof(BlockHeader) + block->m_size);
+  if (reinterpret_cast<uintptr_t>(next_block) < m_heap_base + m_heap_size &&
+      next_block->m_free &&
+      (block->m_size + sizeof(BlockHeader) + next_block->m_size) >= size)
+  {
+
+    remove_block(next_block);
+
+    block->m_size += sizeof(BlockHeader) + next_block->m_size;
+    return ptr;
+  }
+
+  void *new_ptr = alloc(size);
+  if (!new_ptr)
+    return nullptr;
+
+  memcpy(new_ptr, ptr, current_size);
+  free(ptr);
+
+  return new_ptr;
 }

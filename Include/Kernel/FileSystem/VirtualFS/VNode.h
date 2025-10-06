@@ -12,6 +12,8 @@
 #include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Memory/own_ptr.h>
 
+struct VNodeOps;
+
 /**
  * @brief Virtual Node (VNode) structure.
  *
@@ -35,6 +37,16 @@ struct VNode
     /// @brief Constructor for files, directories, or symlinks
     VNode(const char *name, VNodeType t, RetainPtr<VNode> parent, uint32_t flags = VNodeFlags::NONE)
         : m_type(t), m_name(name), m_parent(parent), m_flags{flags} {}
+
+    /// @brief Constructor compatible with retain_ptr using raw pointer
+    VNode(const char *name, VNodeType t, VNode *parent_ptr = nullptr, uint32_t flags = VNodeFlags::NONE)
+        : m_type(t), m_name(name), m_flags{flags}
+    {
+        if (parent_ptr)
+        {
+            m_parent = RetainPtr<VNode>(parent_ptr);
+        }
+    }
 
     /// @brief Add a child node (directory only)
     bool add_child(RetainPtr<VNode> child)
