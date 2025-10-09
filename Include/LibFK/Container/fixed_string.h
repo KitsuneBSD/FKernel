@@ -10,19 +10,25 @@
  *
  * @tparam N Maximum number of characters (excluding null terminator).
  */
-template <size_t N> struct fixed_string {
+template <size_t N>
+struct fixed_string
+{
   char buffer[N + 1] = {}; ///< Internal buffer (always null-terminated).
   size_t length = 0;       ///< Current string length (not counting terminator).
 
-  constexpr fixed_string(const char* s) {
-        size_t i = 0;
-        while (s[i] != '\0' && i < N) {
-            buffer[i] = s[i];
-            ++i;
-        }
-        length = i;
-        buffer[i] = '\0';
+  fixed_string(const char *s)
+  {
+    size_t i = 0;
+    while (s[i] != '\0' && i < N)
+    {
+      buffer[i] = s[i];
+      ++i;
+    }
+    length = i;
+    buffer[i] = '\0';
   }
+
+  fixed_string() : buffer{}, length(0) { buffer[0] = '\0'; }
 
   /// @return Current length of the string.
   [[nodiscard]] constexpr size_t size() const noexcept { return length; }
@@ -35,7 +41,8 @@ template <size_t N> struct fixed_string {
   [[nodiscard]] constexpr bool empty() const noexcept { return length == 0; }
 
   /// @brief Clears the string (sets length to zero).
-  constexpr void clear() noexcept {
+  constexpr void clear() noexcept
+  {
     length = 0;
     buffer[0] = '\0';
   }
@@ -45,9 +52,11 @@ template <size_t N> struct fixed_string {
    * @param s Null-terminated string to append.
    * @return True if append succeeded, false if there was not enough capacity.
    */
-  constexpr bool append(const char *s) noexcept {
+  constexpr bool append(const char *s) noexcept
+  {
     size_t i = 0;
-    while (s[i] != '\0') {
+    while (s[i] != '\0')
+    {
       if (length >= N)
         return false;
       buffer[length++] = s[i++];
@@ -61,7 +70,8 @@ template <size_t N> struct fixed_string {
    * @param c Character to append.
    * @return True if append succeeded, false if buffer is full.
    */
-  constexpr bool push_back(char c) noexcept {
+  constexpr bool push_back(char c) noexcept
+  {
     if (length >= N)
       return false;
     buffer[length++] = c;
@@ -73,7 +83,8 @@ template <size_t N> struct fixed_string {
   constexpr char &operator[](size_t i) noexcept { return buffer[i]; }
 
   /// @return Const reference to character at index (unchecked).
-  constexpr const char &operator[](size_t i) const noexcept {
+  constexpr const char &operator[](size_t i) const noexcept
+  {
     return buffer[i];
   }
 

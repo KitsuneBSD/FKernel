@@ -7,9 +7,12 @@
 
 enum class VNodeType : uint8_t
 {
-    File,
+    Regular,
     Directory,
     Symlink,
-    Device
+    CharacterDevice,
+    BlockDevice,
+    Socket,
+    FIFO,
+    Unknown
 };
-

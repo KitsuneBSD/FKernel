@@ -22,6 +22,10 @@ struct VNodeOps;
  */
 struct VNode
 {
+private:
+    uint64_t m_refcount{1};
+
+public:
     fixed_string<64> m_name;            ///< Node name
     VNodeType type{VNodeType::Unknown}; ///< Node type
     uint32_t permission{0};             ///< Node permissions
@@ -31,6 +35,13 @@ struct VNode
     RetainPtr<VNode> parent;      ///< Parent number
     const VNodeOps *ops{nullptr}; ///< Operations Table
     void *fs_private{nullptr};    ///< FileSystem expecific private data
+
+    void retain() { ++m_refcount; }
+    void release()
+    {
+        if (--m_refcount == 0)
+            delete this;
+    }
 
     /**
      * @brief Read from the vnode.

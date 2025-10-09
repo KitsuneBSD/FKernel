@@ -93,6 +93,11 @@ struct static_vector
             destroy(&data[i]);
         count = 0;
     }
+
+    bool is_full() const
+    {
+        return capacity() == count;
+    }
 };
 
 template <typename T>

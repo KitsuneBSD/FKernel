@@ -230,7 +230,7 @@ private:
 template <typename T>
 inline RetainPtr<T> adopt_retain(T *ptr)
 {
-  return RetainPtr<T>(typename RetainPtr<T>::Adopt::Yes{}, ptr);
+  return RetainPtr<T>(RetainPtr<T>::Adopt::Yes, ptr);
 }
 
 /**
