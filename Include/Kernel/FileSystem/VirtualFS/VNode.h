@@ -22,60 +22,79 @@ struct VNodeOps;
  */
 struct VNode
 {
-    VNodeType m_type;                                  ///< Type of node
-    fixed_string<256> m_name;                          ///< Name of node
-    RetainPtr<VNode> m_parent;                         ///< Pointer to parent vnode
-    static_vector<RetainPtr<VNode>, 65535> m_children; ///< Children (only for directories)
-    uint32_t m_flags;
+    fixed_string<64> m_name;            ///< Node name
+    VNodeType type{VNodeType::Unknown}; ///< Node type
+    uint32_t permission{0};             ///< Node permissions
+    uint64_t size{0};                   ///< Node size in bytes
+    uint64_t inode{0};                  ///< INode number
 
-    void *m_data{nullptr}; ///< Generic Pointer about file data
-    uint64_t m_size{0};    ///< Size in Bytes (for files)
-    uint64_t m_inode{0};   ///< Unique inode number
+    RetainPtr<VNode> parent;      ///< Parent number
+    const VNodeOps *ops{nullptr}; ///< Operations Table
+    void *fs_private{nullptr};    ///< FileSystem expecific private data
 
-    VNodeOps *ops = nullptr; ///< Pointer to Vnode Operations
-
-    /// @brief Constructor for files, directories, or symlinks
-    VNode(const char *name, VNodeType t, RetainPtr<VNode> parent, uint32_t flags = VNodeFlags::NONE)
-        : m_type(t), m_name(name), m_parent(parent), m_flags{flags} {}
-
-    /// @brief Constructor compatible with retain_ptr using raw pointer
-    VNode(const char *name, VNodeType t, VNode *parent_ptr = nullptr, uint32_t flags = VNodeFlags::NONE)
-        : m_type(t), m_name(name), m_flags{flags}
+    /**
+     * @brief Read from the vnode.
+     * @param buf Destination buffer.
+     * @param sz Number of bytes to read.
+     * @param off Offset in the file.
+     * @return Number of bytes read, or negative on error.
+     */
+    inline int read(void *buf, size_t sz, size_t off)
     {
-        if (parent_ptr)
-        {
-            m_parent = RetainPtr<VNode>(parent_ptr);
-        }
+        return ops && ops->read ? ops->read(this, buf, sz, off) : -1;
     }
 
-    /// @brief Add a child node (directory only)
-    bool add_child(RetainPtr<VNode> child)
+    /**
+     * @brief Write to the vnode.
+     * @param buf Source buffer.
+     * @param sz Number of bytes to write.
+     * @param off Offset in the file.
+     * @return Number of bytes written, or negative on error.
+     */
+    inline int write(const void *buf, size_t sz, size_t off)
     {
-        if (m_type != VNodeType::Directory)
-            return false;
-        return m_children.push_back(move(child));
+        return ops && ops->write ? ops->write(this, buf, sz, off) : -1;
     }
 
-    /// @brief Remove a child by index
-    void remove_child(size_t index)
+    /**
+     * @brief Open the vnode.
+     * @param flags Open flags.
+     * @return 0 on success or negative on error.
+     */
+    inline int open(int flags)
     {
-        if (m_type != VNodeType::Directory)
-            return;
-        m_children.erase(index);
+        return ops && ops->open ? ops->open(this, flags) : 0;
     }
 
-    /// @brief Get child by name
-    VNode *find_child(const char *child_name)
+    /**
+     * @brief Close the vnode.
+     * @return 0 on success or negative on error.
+     */
+    inline int close()
     {
-        for (size_t i = 0; i < m_children.size(); ++i)
-        {
-            if (strcmp(m_children[i]->m_name.c_str(), child_name) == 0)
-                return m_children[i].get();
-        }
-        return nullptr;
+        return ops && ops->close ? ops->close(this) : 0;
     }
 
-    /// @brief Retain / Release interface for RetainPtr
-    void retain() {}
-    void release() {}
+    /**
+     * @brief Lookup a child vnode by name.
+     * @param name Name of the child.
+     * @param out Output vnode pointer.
+     * @return 0 on success or negative on error.
+     */
+    inline int lookup(const char *name, RetainPtr<VNode> &out)
+    {
+        return ops && ops->lookup ? ops->lookup(this, name, out) : -1;
+    }
+
+    /**
+     * @brief Create a new child vnode.
+     * @param name Name of the new vnode.
+     * @param t Type of the new vnode.
+     * @param out Output vnode pointer.
+     * @return 0 on success or negative on error.
+     */
+    inline int create(const char *name, VNodeType t, RetainPtr<VNode> &out)
+    {
+        return ops && ops->create ? ops->create(this, name, t, out) : -1;
+    }
 };
