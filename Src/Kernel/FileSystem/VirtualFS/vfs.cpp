@@ -1,4 +1,4 @@
-#include <Kernel/FileSystem/VirtualFS/vfs.h>
+#include <Kernel/FileSystem/VirtualFS/Vfs.h>
 #include <LibC/string.h>
 #include <LibC/stdio.h>
 #include <LibFK/Algorithms/log.h>
@@ -32,23 +32,11 @@ RetainPtr<VNode> VirtualFS::root()
 
 VNode *VirtualFS::resolve_path(const char *path)
 {
-    if (!path || !*path)
-    {
-        kwarn("VFS", "resolve_path: empty or null path");
+    if (!path || !*path || !m_root)
         return nullptr;
-    }
-
-    if (!m_root)
-    {
-        kwarn("VFS", "resolve_path: no root vnode");
-        return nullptr;
-    }
 
     if (path[0] != '/')
-    {
-        kwarn("VFS", "resolve_path: path '%s' is not absolute", path);
         return nullptr;
-    }
 
     RetainPtr<VNode> current = m_root;
     char temp[128];
@@ -60,15 +48,11 @@ VNode *VirtualFS::resolve_path(const char *path)
     {
         RetainPtr<VNode> next;
         if (current->lookup(token, next) != 0)
-        {
-            kwarn("VFS", "resolve_path: component '%s' not found in path '%s'", token, path);
             return nullptr;
-        }
         current = next;
         token = strtok(nullptr, "/");
     }
 
-    klog("VFS", "resolve_path: resolved path '%s'", path);
     return current.get();
 }
 

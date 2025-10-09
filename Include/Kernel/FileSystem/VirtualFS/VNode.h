@@ -3,6 +3,8 @@
 #include <Kernel/FileSystem/VirtualFS/VNodeType.h>
 #include <Kernel/FileSystem/VirtualFS/VNodeFlags.h>
 #include <Kernel/FileSystem/VirtualFS/VNodeOps.h>
+#include <Kernel/FileSystem/VirtualFS/Inode.h>
+#include <Kernel/FileSystem/VirtualFS/DirEntry.h>
 
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
@@ -30,11 +32,14 @@ public:
     VNodeType type{VNodeType::Unknown}; ///< Node type
     uint32_t permission{0};             ///< Node permissions
     uint64_t size{0};                   ///< Node size in bytes
-    uint64_t inode{0};                  ///< INode number
+    uint64_t inode_number{0};           ///< INode number
 
     RetainPtr<VNode> parent;      ///< Parent number
     const VNodeOps *ops{nullptr}; ///< Operations Table
     void *fs_private{nullptr};    ///< FileSystem expecific private data
+
+    Inode *inode;
+    static_vector<DirEntry, 16> dir_entries;
 
     void retain() { ++m_refcount; }
     void release()
@@ -94,7 +99,18 @@ public:
      */
     inline int lookup(const char *name, RetainPtr<VNode> &out)
     {
-        return ops && ops->lookup ? ops->lookup(this, name, out) : -1;
+        if (type != VNodeType::Directory)
+            return -1;
+
+        for (size_t i = 0; i < dir_entries.size(); ++i)
+        {
+            if (strcmp(dir_entries[i].m_name.c_str(), name) == 0)
+            {
+                out = reinterpret_cast<VNode *>(dir_entries[i].i_number);
+                return 0;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -106,6 +122,20 @@ public:
      */
     inline int create(const char *name, VNodeType t, RetainPtr<VNode> &out)
     {
-        return ops && ops->create ? ops->create(this, name, t, out) : -1;
+        if (type != VNodeType::Directory)
+            return -1;
+
+        Inode *new_inode = new Inode(inode_number + 1);
+        VNode *child = new VNode();
+        child->m_name = name;
+        child->type = t;
+        child->parent = this;
+        child->inode = new_inode;
+        child->inode_number = new_inode->i_number;
+
+        dir_entries.push_back(DirEntry(name, child->inode_number));
+
+        out = adopt_retain(child);
+        return 0;
     }
 };
