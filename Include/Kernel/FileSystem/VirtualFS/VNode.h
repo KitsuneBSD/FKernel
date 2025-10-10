@@ -9,6 +9,7 @@
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 #include <LibC/string.h>
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Container/static_vector.h>
 #include <LibFK/Container/fixed_string.h>
 #include <LibFK/Memory/retain_ptr.h>
@@ -57,7 +58,12 @@ public:
      */
     inline int read(void *buf, size_t sz, size_t off)
     {
-        return ops && ops->read ? ops->read(this, buf, sz, off) : -1;
+        int ret = ops && ops->read ? ops->read(this, buf, sz, off) : -1;
+        if (ret >= 0)
+            klog("VFS", "Read %d bytes from '%s' at offset %zu", ret, m_name.c_str(), off);
+        else
+            kwarn("VFS", "Failed to read from '%s'", m_name.c_str());
+        return ret;
     }
 
     /**
@@ -69,7 +75,12 @@ public:
      */
     inline int write(const void *buf, size_t sz, size_t off)
     {
-        return ops && ops->write ? ops->write(this, buf, sz, off) : -1;
+        int ret = ops && ops->write ? ops->write(this, buf, sz, off) : -1;
+        if (ret >= 0)
+            klog("VFS", "Wrote %d bytes to '%s' at offset %zu", ret, m_name.c_str(), off);
+        else
+            kwarn("VFS", "Failed to write to '%s'", m_name.c_str());
+        return ret;
     }
 
     /**
@@ -79,7 +90,12 @@ public:
      */
     inline int open(int flags)
     {
-        return ops && ops->open ? ops->open(this, flags) : 0;
+        int ret = ops && ops->open ? ops->open(this, flags) : 0;
+        if (ret == 0)
+            klog("VFS", "Opened '%s' with flags 0x%x", m_name.c_str(), flags);
+        else
+            kwarn("VFS", "Failed to open '%s' with flags 0x%x", m_name.c_str(), flags);
+        return ret;
     }
 
     /**
@@ -88,7 +104,12 @@ public:
      */
     inline int close()
     {
-        return ops && ops->close ? ops->close(this) : 0;
+        int ret = ops && ops->close ? ops->close(this) : 0;
+        if (ret == 0)
+            klog("VFS", "Closed '%s'", m_name.c_str());
+        else
+            kwarn("VFS", "Failed to close '%s'", m_name.c_str());
+        return ret;
     }
 
     /**
@@ -100,16 +121,22 @@ public:
     inline int lookup(const char *name, RetainPtr<VNode> &out)
     {
         if (type != VNodeType::Directory)
+        {
+            kwarn("VFS", "Lookup failed on non-directory '%s'", m_name.c_str());
             return -1;
+        }
 
         for (size_t i = 0; i < dir_entries.size(); ++i)
         {
             if (strcmp(dir_entries[i].m_name.c_str(), name) == 0)
             {
-                out = reinterpret_cast<VNode *>(dir_entries[i].i_number);
+                out = dir_entries[i].m_vnode;
+                klog("VFS", "Lookup: found '%s' in directory '%s'", name, m_name.c_str());
                 return 0;
             }
         }
+
+        kwarn("VFS", "Lookup failed: '%s' not found in directory '%s'", name, m_name.c_str());
         return -1;
     }
 
@@ -123,7 +150,10 @@ public:
     inline int create(const char *name, VNodeType t, RetainPtr<VNode> &out)
     {
         if (type != VNodeType::Directory)
+        {
+            kwarn("VFS", "Create failed: '%s' is not a directory", m_name.c_str());
             return -1;
+        }
 
         Inode *new_inode = new Inode(inode_number + 1);
         VNode *child = new VNode();
@@ -133,9 +163,10 @@ public:
         child->inode = new_inode;
         child->inode_number = new_inode->i_number;
 
-        dir_entries.push_back(DirEntry(name, child->inode_number));
-
+        dir_entries.push_back(DirEntry{name, adopt_retain(child)});
         out = adopt_retain(child);
+
+        klog("VFS", "Created '%s' in directory '%s'", name, m_name.c_str());
         return 0;
     }
 };
