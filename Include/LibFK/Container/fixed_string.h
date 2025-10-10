@@ -48,6 +48,33 @@ struct fixed_string
   }
 
   /**
+   * @brief Assign a new C-string to this fixed_string.
+   * Replaces the current contents.
+   *
+   * @param s Null-terminated C-string to assign.
+   * @return True if assignment succeeded, false if string is too long.
+   */
+  constexpr bool assign(const char *s) noexcept
+  {
+    size_t i = 0;
+    while (s[i] != '\0')
+    {
+      if (i >= N)
+      {
+        length = N;
+        buffer[N] = '\0';
+        return false;
+      }
+
+      buffer[i] = s[i];
+      ++i;
+    }
+    length = i;
+    buffer[length] = '\0';
+    return true;
+  }
+
+  /**
    * @brief Append a C-string.
    * @param s Null-terminated string to append.
    * @return True if append succeeded, false if there was not enough capacity.
