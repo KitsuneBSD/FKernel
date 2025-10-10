@@ -1,10 +1,10 @@
 #pragma once
 
-#include <Kernel/FileSystem/VirtualFS/VNodeType.h>
-#include <Kernel/FileSystem/VirtualFS/VNodeFlags.h>
-#include <Kernel/FileSystem/VirtualFS/VNodeOps.h>
-#include <Kernel/FileSystem/VirtualFS/Inode.h>
-#include <Kernel/FileSystem/VirtualFS/DirEntry.h>
+#include <Kernel/FileSystem/VirtualFS/vnode_type.h>
+#include <Kernel/FileSystem/VirtualFS/vnode_flags.h>
+#include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
+#include <Kernel/FileSystem/VirtualFS/inode.h>
+#include <Kernel/FileSystem/VirtualFS/dir_entry.h>
 
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>

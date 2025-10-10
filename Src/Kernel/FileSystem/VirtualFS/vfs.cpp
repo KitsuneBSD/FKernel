@@ -1,4 +1,5 @@
-#include <Kernel/FileSystem/VirtualFS/Vfs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
+
 #include <LibC/string.h>
 #include <LibC/stdio.h>
 #include <LibFK/Algorithms/log.h>
@@ -33,26 +34,79 @@ RetainPtr<VNode> VirtualFS::root()
 VNode *VirtualFS::resolve_path(const char *path)
 {
     if (!path || !*path || !m_root)
-        return nullptr;
-
-    if (path[0] != '/')
-        return nullptr;
-
-    RetainPtr<VNode> current = m_root;
-    char temp[128];
-    strncpy(temp, path + 1, sizeof(temp) - 1);
-    temp[sizeof(temp) - 1] = '\0';
-
-    char *token = strtok(temp, "/");
-    while (token)
     {
-        RetainPtr<VNode> next;
-        if (current->lookup(token, next) != 0)
-            return nullptr;
-        current = next;
-        token = strtok(nullptr, "/");
+        kwarn("VFS", "resolve_path failed: empty path or root not mounted");
+        return nullptr;
     }
 
+    if (path[0] != '/')
+    {
+        kwarn("VFS", "resolve_path failed: path '%s' is not absolute", path);
+        return nullptr; // só suportamos paths absolutos
+    }
+
+    RetainPtr<VNode> current = m_root;
+    klog("VFS", "Resolving path: '%s'", path);
+
+    const char *p = path;
+    while (*p)
+    {
+        // Pula múltiplos '/'
+        while (*p == '/')
+            ++p;
+        if (!*p)
+            break;
+
+        // Encontra o final do próximo componente
+        const char *end = p;
+        while (*end && *end != '/')
+            ++end;
+        size_t len = end - p;
+
+        if (len == 0)
+            break;
+
+        fixed_string<256> token;
+        if (len >= token.capacity())
+        {
+            kwarn("VFS", "Path component too long: '%.*s'", int(len), p);
+            return nullptr;
+        }
+        token.assign(p);
+
+        if (strcmp(token.c_str(), ".") == 0)
+        {
+            // nada, permanece no current
+        }
+        else if (strcmp(token.c_str(), "..") == 0)
+        {
+            if (current->parent)
+            {
+                klog("VFS", "Going up from '%s' to parent '%s'", current->m_name.c_str(), current->parent->m_name.c_str());
+                current = current->parent;
+            }
+            else
+            {
+                klog("VFS", "Already at root, cannot go up");
+            }
+        }
+        else
+        {
+            RetainPtr<VNode> next;
+            if (current->lookup(token.c_str(), next) != 0)
+            {
+                kwarn("VFS", "resolve_path failed: component '%s' not found in directory '%s'",
+                      token.c_str(), current->m_name.c_str());
+                return nullptr; // componente não encontrado
+            }
+            klog("VFS", "Resolved component '%s' in directory '%s'", token.c_str(), current->m_name.c_str());
+            current = next;
+        }
+
+        p = end;
+    }
+
+    klog("VFS", "resolve_path successful: '%s'", path);
     return current.get();
 }
 

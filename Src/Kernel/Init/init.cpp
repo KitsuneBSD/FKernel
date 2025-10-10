@@ -1,6 +1,6 @@
 #include <Kernel/Boot/init.h>
 #include <LibFK/Algorithms/log.h>
-#include <Kernel/FileSystem/VirtualFS/Vfs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
 
 void init()
 {

@@ -1,9 +1,9 @@
 #pragma once
 
-#include <Kernel/FileSystem/VirtualFS/VNode.h>
-#include <Kernel/FileSystem/VirtualFS/VNodeFlags.h>
-#include <Kernel/FileSystem/VirtualFS/VNodeOps.h>
-#include <Kernel/FileSystem/VirtualFS/VNodeType.h>
+#include <Kernel/FileSystem/VirtualFS/vnode.h>
+#include <Kernel/FileSystem/VirtualFS/vnode_flags.h>
+#include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
+#include <Kernel/FileSystem/VirtualFS/vnode_type.h>
 
 struct Mountpoint
 {

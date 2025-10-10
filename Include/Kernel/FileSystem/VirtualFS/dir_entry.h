@@ -2,6 +2,7 @@
 
 #include <LibFK/Container/fixed_string.h>
 #include <LibC/stdint.h>
+#include <Kernel/FileSystem/VirtualFS/vnode.h>
 
 /**
  * @brief Represents a directory entry in the filesystem.

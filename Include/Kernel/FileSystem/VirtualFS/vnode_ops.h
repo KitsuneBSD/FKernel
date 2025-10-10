@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/FileSystem/VirtualFS/VNode.h>
+#include <Kernel/FileSystem/VirtualFS/vnode.h>
 
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
