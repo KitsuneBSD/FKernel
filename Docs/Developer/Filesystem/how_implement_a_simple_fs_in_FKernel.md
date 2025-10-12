@@ -12,18 +12,18 @@ The approach is generic and can be adapted to different types of filesystems:
 ```mermaid 
 flowchart TD
     %% Root of the VirtualFS
-    A[VirtualFS Root "/"] --> B[Mounted FS Root "/mnt"]
+    A[VirtualFS Root] --> B[Mounted FS Root]
     
     %% Example FS structure
-    B --> C[bin (Directory)]
-    B --> D[etc (Directory)]
-    B --> E[home (Directory)]
+    B --> C[bin]
+    B --> D[etc]
+    B --> E[home]
     
-    C --> F[test_file.txt (Regular File)]
-    C --> G[ls (Executable File)]
+    C --> F[test_file.txt]
+    C --> G[ls]
     
-    E --> H[user1 (Directory)]
-    H --> I[notes.txt (Regular File)]
+    E --> H[user1]
+    H --> I[notes.txt]
     
     %% VNode details
     subgraph VNode
@@ -43,12 +43,12 @@ flowchart TD
     click F2 "https://en.cppreference.com/w/cpp/language/pointer" "VNodeOps functions"
     
     subgraph Operations
-        OP1[read(buf, size, offset)]
-        OP2[write(buf, size, offset)]
-        OP3[create(name, type)]
-        OP4[lookup(name)]
-        OP5[readdir(buffer)]
-        OP6[unlink(name)]
+        OP1[read]
+        OP2[write]
+        OP3[create]
+        OP4[lookup]
+        OP5[readdir]
+        OP6[unlink]
     end
     
     F2 --> OP1
