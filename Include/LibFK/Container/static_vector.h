@@ -4,6 +4,12 @@
 #include <LibC/stddef.h>
 #include <LibFK/Traits/type_traits.h>
 
+template <typename T>
+constexpr T &&move(T &obj) noexcept
+{
+    return static_cast<T &&>(obj);
+}
+
 /*
  * @brief Fixed-capacity vector with stack allocation.
  *
@@ -99,9 +105,3 @@ struct static_vector
         return capacity() == count;
     }
 };
-
-template <typename T>
-constexpr T &&move(T &obj) noexcept
-{
-    return static_cast<T &&>(obj);
-}

@@ -22,7 +22,7 @@ private:
     RetainPtr<VNode> m_root;
     // TODO: Apply b+ tree instead static_vector
     static_vector<Mountpoint, 8> m_mounts;
-    VNode* resolve_path(const char *path);
+    RetainPtr<VNode> resolve_path(const char *path);
 
 public:
     static VirtualFS &the()

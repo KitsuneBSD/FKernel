@@ -35,9 +35,9 @@ public:
     uint64_t size{0};                   ///< Node size in bytes
     uint64_t inode_number{0};           ///< INode number
 
-    RetainPtr<VNode> parent;      ///< Parent number
-    const VNodeOps *ops{nullptr}; ///< Operations Table
-    void *fs_private{nullptr};    ///< FileSystem expecific private data
+    RetainPtr<VNode> parent;   ///< Parent number
+    VNodeOps *ops{nullptr};    ///< Operations Table
+    void *fs_private{nullptr}; ///< FileSystem expecific private data
 
     Inode *inode;
     static_vector<DirEntry, 16> dir_entries;
