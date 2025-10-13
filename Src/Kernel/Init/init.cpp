@@ -6,6 +6,8 @@
 
 void init()
 {
+    klog("INIT", "Start init");
+
     auto &vfs = VirtualFS::the();
     auto &ramfs = RamFS::the();
     auto &devfs = DevFS::the();

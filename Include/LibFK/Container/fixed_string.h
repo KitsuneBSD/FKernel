@@ -48,16 +48,17 @@ struct fixed_string
   }
 
   /**
-   * @brief Assign a new C-string to this fixed_string.
+   * @brief Assign a C-string of given length to this fixed_string.
    * Replaces the current contents.
    *
-   * @param s Null-terminated C-string to assign.
+   * @param s Pointer to the characters to assign.
+   * @param len Number of characters to copy from s.
    * @return True if assignment succeeded, false if string is too long.
    */
-  constexpr bool assign(const char *s) noexcept
+  constexpr bool assign(const char *s, size_t len) noexcept
   {
     size_t i = 0;
-    while (s[i] != '\0')
+    while (i < len)
     {
       if (i >= N)
       {
@@ -69,6 +70,7 @@ struct fixed_string
       buffer[i] = s[i];
       ++i;
     }
+
     length = i;
     buffer[length] = '\0';
     return true;

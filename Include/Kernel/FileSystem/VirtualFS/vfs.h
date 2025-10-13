@@ -20,22 +20,25 @@ class VirtualFS
 private:
     VirtualFS() = default;
     RetainPtr<VNode> v_root;
+    RetainPtr<VNode> v_cwd;
     // TODO: Apply b+ tree instead static_vector
     static_vector<Mountpoint, 8> v_mounts;
-    RetainPtr<VNode> resolve_path(const char *path);
+
+    RetainPtr<VNode> resolve_path(const char *path, RetainPtr<VNode> cwd);
+    void set_cwd(RetainPtr<VNode> vnode);
 
 public:
     static VirtualFS &the()
     {
-        static VirtualFS* fs = new VirtualFS();
-        return *fs;
+        static VirtualFS inst;
+        return inst;
     }
-
     int mount(const char *name, RetainPtr<VNode> root);
     int lookup(const char *path, RetainPtr<VNode> &out);
     int open(const char *path, int flags, RetainPtr<VNode> &out);
     int read(const char *path, void *buf, size_t sz, size_t off);
     int write(const char *path, const void *buf, size_t sz, size_t off);
 
-    RetainPtr<VNode> root();
+    RetainPtr<VNode> root() const;
+    RetainPtr<VNode> cwd() const;
 };
