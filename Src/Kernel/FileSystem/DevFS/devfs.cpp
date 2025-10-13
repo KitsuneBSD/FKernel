@@ -32,7 +32,7 @@ int DevFS::register_device(const char *name, VNodeType type, VNodeOps *ops, void
 
     if (d_devices.size() >= d_devices.capacity())
     {
-        kwarn("DevFS", "Device table full, cannot register '%s'", name);
+        kwarn("DEVFS", "Device table full, cannot register '%s'", name);
         return -1;
     }
 
@@ -54,7 +54,7 @@ int DevFS::register_device(const char *name, VNodeType type, VNodeOps *ops, void
 
     d_root->dir_entries.push_back(DirEntry{name, dev_node});
 
-    klog("DevFS", "Registered device '%s' (type=%d) at %p", name, (int)type, driver_data);
+    klog("DEVFS", "Registered device '%s' (type=%d) at %p", name, (int)type, driver_data);
     return 0;
 }
 
@@ -75,12 +75,12 @@ int DevFS::unregister_device(const char *name)
                 }
             }
 
-            klog("DevFS", "Unregistered device '%s'", name);
+            klog("DEVFS", "Unregistered device '%s'", name);
             return 0;
         }
     }
 
-    kwarn("DevFS", "unregister_device: '%s' not found", name);
+    kwarn("DEVFS", "Unregister_device: '%s' not found", name);
     return -1;
 }
 
@@ -98,7 +98,7 @@ int DevFS::devfs_lookup(VNode *vnode, const char *name, RetainPtr<VNode> &out)
         }
     }
 
-    kwarn("DevFS", "lookup: device '%s' not found", name);
+    kwarn("DEVFS", "Lookup: device '%s' not found", name);
     return -1;
 }
 
@@ -161,7 +161,7 @@ int DevFS::devfs_create(VNode *dir, const char *name, VNodeType type, RetainPtr<
 
     out = new_node; // importante!
 
-    klog("DevFS", "Created node '%s' in %s", name, dir->m_name.c_str());
+    klog("DEVFS", "Created node '%s' in %s", name, dir->m_name.c_str());
     return 0;
 }
 
@@ -175,12 +175,12 @@ int DevFS::devfs_unlink(VNode *dir, const char *name)
         if (strcmp(dir->dir_entries[i].m_name.c_str(), name) == 0)
         {
             dir->dir_entries.erase(i);
-            klog("DevFS", "Unlinked '%s' from %s", name, dir->m_name.c_str());
+            klog("DEVFS", "Unlinked '%s' from %s", name, dir->m_name.c_str());
             return 0;
         }
     }
 
-    kwarn("DevFS", "unlink: '%s' not found in %s", name, dir->m_name.c_str());
+    kwarn("DEVFS", "Unlink: '%s' not found in %s", name, dir->m_name.c_str());
     return -1;
 }
 
