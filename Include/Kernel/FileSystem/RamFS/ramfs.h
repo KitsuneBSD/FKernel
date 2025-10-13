@@ -9,15 +9,15 @@
 
 struct RamFile
 {
-    char name[256];
-    uint8_t data[1024];
-    size_t size{0}; // tamanho atual do arquivo
+    char r_name[256];
+    uint8_t r_data[1024];
+    size_t r_size{0}; // tamanho atual do arquivo
 };
 
 struct RamFS
 {
 private:
-    RetainPtr<VNode> m_root;
+    RetainPtr<VNode> r_root;
 
 public:
     RamFS();

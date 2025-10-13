@@ -2,23 +2,26 @@
 #include <LibFK/Algorithms/log.h>
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <Kernel/FileSystem/RamFS/ramfs.h>
+#include <Kernel/FileSystem/DevFS/devfs.h>
 
 void init()
 {
     auto &vfs = VirtualFS::the();
     auto &ramfs = RamFS::the();
+    auto &devfs = DevFS::the();
 
-    // Monta o RamFS na raiz
+    // Monta RamFS em /
     vfs.mount("/", ramfs.root());
 
     RetainPtr<VNode> root;
-    if (vfs.lookup("/", root) == 0)
-    {
-        klog("VFS", "Root lookup success: %s", root.get()->m_name.c_str());
-    }
-    else
+    if (vfs.lookup("/", root) != 0)
     {
         kwarn("VFS", "Root lookup failed");
         return;
     }
+
+    vfs.mount("dev", devfs.root());
+
+    RetainPtr<VNode> dev;
+    vfs.lookup("/dev", dev);
 }

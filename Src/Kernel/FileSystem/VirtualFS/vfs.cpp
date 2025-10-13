@@ -5,12 +5,12 @@
 
 RetainPtr<VNode> VirtualFS::root()
 {
-    return m_root;
+    return v_root;
 }
 
 int VirtualFS::mount(const char *name, RetainPtr<VNode> root)
 {
-    if (m_mounts.is_full())
+    if (v_mounts.is_full())
     {
         kwarn("VFS", "Failed to mount '%s': mount table full", name);
         return -1;
@@ -18,17 +18,22 @@ int VirtualFS::mount(const char *name, RetainPtr<VNode> root)
 
     Mountpoint m(name, root);
 
-    if (!m_root)
-        m_root = root; // first mount becomes '/'
+    if (!v_root)
+        v_root = root; // first mount becomes '/'
+    else
+    {
+        v_root->dir_entries.push_back(DirEntry{name, root});
+        klog("VFS", "Mounted '%s' at '/%s' successfully", name, name);
+    }
 
-    m_mounts.push_back(m);
+    v_mounts.push_back(m);
     klog("VFS", "Mounted '%s' successfully", name);
     return 0;
 }
 
 RetainPtr<VNode> VirtualFS::resolve_path(const char *path)
 {
-    if (!path || !*path || !m_root)
+    if (!path || !*path || !v_root)
     {
         kwarn("VFS", "Resolve path failed: empty path or root not mounted");
         return RetainPtr<VNode>();
@@ -40,7 +45,7 @@ RetainPtr<VNode> VirtualFS::resolve_path(const char *path)
         return RetainPtr<VNode>();
     }
 
-    RetainPtr<VNode> current = m_root;
+    RetainPtr<VNode> current = v_root;
     klog("VFS", "Resolving path: '%s'", path);
 
     const char *p = path;

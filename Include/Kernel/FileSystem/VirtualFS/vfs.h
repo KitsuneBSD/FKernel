@@ -19,9 +19,9 @@ class VirtualFS
 {
 private:
     VirtualFS() = default;
-    RetainPtr<VNode> m_root;
+    RetainPtr<VNode> v_root;
     // TODO: Apply b+ tree instead static_vector
-    static_vector<Mountpoint, 8> m_mounts;
+    static_vector<Mountpoint, 8> v_mounts;
     RetainPtr<VNode> resolve_path(const char *path);
 
 public:

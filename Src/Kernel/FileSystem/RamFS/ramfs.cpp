@@ -9,7 +9,7 @@ RamFS::RamFS()
     root_node->type = VNodeType::Directory;
     root_node->inode = new Inode(1);
     root_node->ops = &ops;
-    m_root = adopt_retain(root_node);
+    r_root = adopt_retain(root_node);
 }
 
 RamFS &RamFS::the()
@@ -20,7 +20,7 @@ RamFS &RamFS::the()
 
 RetainPtr<VNode> RamFS::root()
 {
-    return m_root;
+    return r_root;
 }
 
 int RamFS::ramfs_read(VNode *vnode, void *buffer, size_t size, size_t offset)
@@ -45,13 +45,13 @@ int RamFS::ramfs_read(VNode *vnode, void *buffer, size_t size, size_t offset)
 
     RamFile *file = reinterpret_cast<RamFile *>(vnode->fs_private);
 
-    if (offset >= file->size)
+    if (offset >= file->r_size)
     {
-        klog("RamFS", "Read request at offset %zu exceeds file size %zu in '%s'", offset, file->size, vnode->m_name.c_str());
+        klog("RamFS", "Read request at offset %zu exceeds file size %zu in '%s'", offset, file->r_size, vnode->m_name.c_str());
         return 0;
     }
 
-    size_t available = file->size - offset;
+    size_t available = file->r_size - offset;
     size_t to_read = (size < available) ? size : available;
 
     if (!buffer)
@@ -60,9 +60,9 @@ int RamFS::ramfs_read(VNode *vnode, void *buffer, size_t size, size_t offset)
         return -1;
     }
 
-    memcpy(buffer, file->data + offset, to_read);
+    memcpy(buffer, file->r_data + offset, to_read);
 
-    klog("RamFS", "Read %zu bytes from '%s' at offset %zu (file size: %zu)", to_read, vnode->m_name.c_str(), offset, file->size);
+    klog("RamFS", "Read %zu bytes from '%s' at offset %zu (file size: %zu)", to_read, vnode->m_name.c_str(), offset, file->r_size);
     return static_cast<int>(to_read);
 }
 
@@ -93,7 +93,7 @@ int RamFS::ramfs_write(VNode *vnode, const void *buffer, size_t size, size_t off
     }
 
     RamFile *file = reinterpret_cast<RamFile *>(vnode->fs_private);
-    const size_t MAX_SIZE = sizeof(file->data);
+    const size_t MAX_SIZE = sizeof(file->r_data);
 
     if (offset >= MAX_SIZE)
     {
@@ -104,12 +104,12 @@ int RamFS::ramfs_write(VNode *vnode, const void *buffer, size_t size, size_t off
     size_t space_left = MAX_SIZE - offset;
     size_t to_write = (size < space_left) ? size : space_left;
 
-    memcpy(file->data + offset, buffer, to_write);
+    memcpy(file->r_data + offset, buffer, to_write);
 
-    if (offset + to_write > file->size)
-        file->size = offset + to_write;
+    if (offset + to_write > file->r_size)
+        file->r_size = offset + to_write;
 
-    vnode->size = file->size;
+    vnode->size = file->r_size;
 
     klog("RamFS", "Wrote %zu bytes to '%s' at offset %zu (new file size: %zu)", to_write, vnode->m_name.c_str(), offset, vnode->size);
     return static_cast<int>(to_write);
@@ -150,7 +150,7 @@ int RamFS::ramfs_create(VNode *vnode, const char *name, VNodeType type, RetainPt
     {
         auto file = new RamFile();
         memset(file, 0, sizeof(RamFile));
-        strncpy(file->name, name, sizeof(file->name) - 1);
+        strncpy(file->r_name, name, sizeof(file->r_name) - 1);
         new_node->fs_private = file;
 
         klog("RamFS", "Allocated RamFile for vnode '%s' at %p", name, file);
