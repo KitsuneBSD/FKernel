@@ -15,7 +15,8 @@ public:
 
     RetainPtr<VNode> root();
 
-    int register_device(const char *name, VNodeType type, VNodeOps *ops, void *driver_data);
+    int register_device_static(const char *name, VNodeType type, VNodeOps *ops, void *driver_data);
+    int register_device(const char *name, VNodeType type, VNodeOps *ops, void *driver_data, bool has_multiple = false);
     int unregister_device(const char *name);
 
     static int devfs_lookup(VNode *vnode, const char *name, RetainPtr<VNode> &out);

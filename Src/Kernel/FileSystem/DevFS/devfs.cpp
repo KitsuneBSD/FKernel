@@ -1,6 +1,8 @@
 #include <Kernel/FileSystem/DevFS/devfs.h>
 #include <Kernel/FileSystem/DevFS/device.h>
 
+#include <LibC/string.h>
+
 DevFS::DevFS()
 {
     VNode *root_node = new VNode();
@@ -22,7 +24,28 @@ RetainPtr<VNode> DevFS::root()
     return d_root;
 }
 
-int DevFS::register_device(const char *name, VNodeType type, VNodeOps *ops, void *driver_data)
+int DevFS::register_device(const char *prefix, VNodeType type, VNodeOps *ops, void *driver_data, bool has_multiple)
+{
+    int index = 0;
+    for (auto &dev : d_devices)
+    {
+        if (strncmp(dev.d_name.c_str(), prefix, strlen(prefix)) == 0)
+            ++index;
+    }
+
+    char name_buf[64];
+
+    snprintf(name_buf, sizeof(name_buf), "%s", prefix);
+
+    if (has_multiple)
+    {
+        snprintf(name_buf, sizeof(name_buf), "%s%d", prefix, index);
+    }
+
+    return register_device_static(name_buf, type, ops, driver_data);
+}
+
+int DevFS::register_device_static(const char *name, VNodeType type, VNodeOps *ops, void *driver_data)
 {
     if ((type != VNodeType::CharacterDevice) && (type != VNodeType::BlockDevice))
     {

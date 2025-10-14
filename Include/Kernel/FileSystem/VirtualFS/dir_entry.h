@@ -1,8 +1,11 @@
 #pragma once
 
+#include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Container/fixed_string.h>
 #include <LibC/stdint.h>
 #include <Kernel/FileSystem/VirtualFS/vnode.h>
+
+struct VNode;
 
 /**
  * @brief Represents a directory entry in the filesystem.

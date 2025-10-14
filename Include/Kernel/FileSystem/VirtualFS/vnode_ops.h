@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Kernel/FileSystem/VirtualFS/vnode.h>
-
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 #include <LibC/string.h>
 #include <LibFK/Memory/retain_ptr.h>
+
+#include <Kernel/FileSystem/VirtualFS/vnode_type.h>
 
 struct VNode;
 

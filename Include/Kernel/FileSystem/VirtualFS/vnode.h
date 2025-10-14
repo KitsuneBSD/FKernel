@@ -40,6 +40,7 @@ public:
     void *fs_private{nullptr}; ///< FileSystem expecific private data
 
     Inode *inode;
+    // TODO: Change static_vector to dynamic_vector
     static_vector<DirEntry, 16> dir_entries;
 
     void retain() { ++m_refcount; }

@@ -225,6 +225,25 @@ extern "C"
    */
   char *strtok(char *str, const char *delim);
 
+  /**
+ * @brief Compare two strings up to a specified number of characters.
+ *
+ * Compares at most @p n characters of the null-terminated strings @p s1 and @p s2.
+ * The comparison is done using unsigned characters.
+ *
+ * @param s1 Pointer to the first string to compare.
+ * @param s2 Pointer to the second string to compare.
+ * @param n Maximum number of characters to compare.
+ * @return
+ *   - < 0 if @p s1 is lexicographically less than @p s2  
+ *   - 0 if the compared parts of both strings are equal  
+ *   - > 0 if @p s1 is lexicographically greater than @p s2
+ *
+ * @note
+ * If @p n is zero, the function returns 0 immediately.
+ */
+  int strncmp(const char *s1, const char *s2, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

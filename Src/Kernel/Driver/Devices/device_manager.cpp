@@ -11,17 +11,13 @@ void init_basic_device()
 {
     // /Dev/null
     DevFS::the().register_device("null", VNodeType::CharacterDevice, &null_ops, nullptr);
-    klog("DEVFS", "/dev/null registered");
 
     // /Dev/zero
     DevFS::the().register_device("zero", VNodeType::CharacterDevice, &zero_ops, nullptr);
-    klog("DEVFS", "/dev/zero registered");
 
-    // /Dev/ttyS0
-    DevFS::the().register_device("ttyS0", VNodeType::CharacterDevice, &SerialTTY::ops, nullptr);
-    klog("DEVFS", "/dev/ttyS0 registered");
+    // /Dev/ttyS*
+    DevFS::the().register_device("ttyS", VNodeType::CharacterDevice, &SerialTTY::ops, nullptr, true);
 
     // /dev/console
     DevFS::the().register_device("console", VNodeType::CharacterDevice, &ConsoleDevice::ops, nullptr);
-    klog("DEVFS", "/dev/console registered");
 }
