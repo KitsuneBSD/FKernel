@@ -28,6 +28,7 @@ void InterruptController::initialize() {
   register_interrupt(general_protection_handler, 13);
   register_interrupt(page_fault_handler, 14);
   register_interrupt(timer_handler, 32);
+  register_interrupt(keyboard_handler, 33);
 
   load();
   PIC8259::initialize();

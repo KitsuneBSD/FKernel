@@ -7,6 +7,17 @@
 #include <Kernel/FileSystem/RamFS/ramfs.h>
 #include <Kernel/FileSystem/DevFS/devfs.h>
 
+void test_console_write()
+{
+    VNode *root = DevFS::the().root().get();
+
+    RetainPtr<VNode> Console;
+    root->lookup("console", Console);
+
+    const char *msg = "Hello, FKernel!\n";
+    Console->ops->write(Console.get(), msg, strlen(msg), 0);
+}
+
 void init()
 {
     auto &vfs = VirtualFS::the();
@@ -30,4 +41,6 @@ void init()
     vfs.lookup("/dev", dev);
 
     init_basic_device();
+
+    test_console_write();
 }

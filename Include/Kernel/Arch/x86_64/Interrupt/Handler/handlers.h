@@ -18,5 +18,8 @@ void page_fault_handler([[maybe_unused]] uint8_t vector,
 
 void timer_handler([[maybe_unused]] uint8_t vector,
                    InterruptFrame *frame = nullptr);
+
+void keyboard_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame = nullptr);
+
 void apic_timer_handler([[maybe_unused]] uint8_t vector,
-                   InterruptFrame *frame = nullptr);
+                        InterruptFrame *frame = nullptr);

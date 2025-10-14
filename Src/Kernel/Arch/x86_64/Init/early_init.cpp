@@ -13,8 +13,8 @@
 
 #include <LibFK/Algorithms/log.h>
 
-
-void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
+void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap)
+{
   klog("EARLY_INIT", "Start early init");
 
   GDTController::the().initialize();
@@ -22,7 +22,8 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   PhysicalMemoryManager::the().initialize(mmap);
   VirtualMemoryManager::the().initialize();
 
-  if (CPU::the().has_apic()) {
+  if (CPU::the().has_apic())
+  {
     APIC::the().enable();
     APIC::the().calibrate_timer();
 
