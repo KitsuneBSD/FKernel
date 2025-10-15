@@ -57,12 +57,11 @@ void AtaController::detect_devices()
                 klog("ATA", "Detected %s %s: Model '%s'",
                      bus_str[b], drive_str[d], dev.model);
 
-                // Registra o dispositivo no DevFS
                 char name[16];
-                snprintf(name, sizeof(name), "ata");
+                snprintf(name, sizeof(name), "ada");
 
-                DevFS::the().register_device_static(
-                    name, VNodeType::BlockDevice, nullptr, nullptr);
+                DevFS::the().register_device(
+                    name, VNodeType::BlockDevice, nullptr, nullptr, true);
             }
         }
     }
@@ -87,7 +86,7 @@ bool AtaController::identify_device(Bus bus, Drive drive, AtaDeviceInfo &out)
 
     status = inb(io_base + ATA_REG_STATUS);
     if (status == 0)
-        return false; // Nenhum dispositivo
+        return false;
 
     while ((status & ATA_STATUS_BUSY) && !(status & ATA_STATUS_ERR))
         status = inb(io_base + ATA_REG_STATUS);
