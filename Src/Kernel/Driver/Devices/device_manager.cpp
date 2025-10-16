@@ -4,6 +4,8 @@
 #include <Kernel/Driver/Devices/serial_device.h>
 #include <Kernel/Driver/Devices/console_device.h>
 
+#include <Kernel/Driver/Ata/AtaController.h>
+
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <Kernel/FileSystem/DevFS/devfs.h>
 
