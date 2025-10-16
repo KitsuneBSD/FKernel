@@ -1,12 +1,16 @@
-#include <Kernel/Driver/Ata/AtaBlockDevice.h>
-#include <Kernel/Driver/Ata/AtaController.h>
-#include <Kernel/FileSystem/DevFS/devfs.h>
-#include <Kernel/FileSystem/VirtualFS/vfs.h>
-#include <LibFK/Algorithms/log.h>
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #endif
+
+#include <Kernel/Driver/Ata/AtaBlockDevice.h>
+#include <Kernel/Driver/Ata/AtaController.h>
+#include <Kernel/Driver/Ata/AtaBlockCache.h>
+
+#include <Kernel/FileSystem/DevFS/devfs.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
+
+#include <LibFK/Algorithms/log.h>
 
 void ata_irq_primary()
 {
@@ -181,3 +185,4 @@ int AtaController::write_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t
 
     return sector_count * 512;
 }
+

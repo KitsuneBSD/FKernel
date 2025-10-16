@@ -46,12 +46,7 @@ struct AtaDeviceInfo
 
 class AtaController
 {
-public:
-    static AtaController &the();
-    void initialize();
-
-    int read_sectors_pio(const AtaDeviceInfo &device, uint32_t lba, uint8_t count, void *buffer);
-    int write_sectors_pio(const AtaDeviceInfo &device, uint32_t lba, uint8_t count, const void *buffer);
+    friend class AtaCache;
 
 private:
     AtaController() = default;
@@ -61,6 +56,14 @@ private:
 
     uint16_t base_io(Bus bus);
     uint16_t ctrl_io(Bus bus);
+
     int read_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t sector_count, void *buffer);
     int write_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t sector_count, const void *buffer);
+
+public:
+    static AtaController &the();
+    void initialize();
+
+    int read_sectors_pio(const AtaDeviceInfo &device, uint32_t lba, uint8_t count, void *buffer);
+    int write_sectors_pio(const AtaDeviceInfo &device, uint32_t lba, uint8_t count, const void *buffer);
 };
