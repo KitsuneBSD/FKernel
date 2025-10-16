@@ -145,3 +145,39 @@ int AtaController::read_sectors_pio(const AtaDeviceInfo &device, uint32_t lba, u
 {
     return read_sectors_pio(device.bus, device.drive, lba, count, buffer);
 }
+
+int AtaController::write_sectors_pio(const AtaDeviceInfo &device, uint32_t lba, uint8_t count, const void *buffer)
+{
+    return write_sectors_pio(device.bus, device.drive, lba, count, buffer);
+}
+
+int AtaController::write_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t sector_count, const void *buffer)
+{
+    uint16_t base = base_io(bus);
+    uint8_t head = 0xE0 | ((drive == Drive::Slave) << 4) | ((lba >> 24) & 0x0F);
+
+    outb(base + ATA_REG_HDDEVSEL, head);
+    io_wait();
+
+    outb(base + ATA_REG_SECCOUNT, sector_count);
+    outb(base + ATA_REG_LBA0, lba & 0xFF);
+    outb(base + ATA_REG_LBA1, (lba >> 8) & 0xFF);
+    outb(base + ATA_REG_LBA2, (lba >> 16) & 0xFF);
+
+    outb(base + ATA_REG_COMMAND, 0x30); // WRITE SECTORS
+
+    // Espera DRQ
+    while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ))
+        ;
+
+    const uint16_t *data = reinterpret_cast<const uint16_t *>(buffer);
+    for (int i = 0; i < 256 * sector_count; ++i)
+    {
+        outw(base + ATA_REG_DATA, data[i]);
+    }
+
+    while (inb(base + ATA_REG_STATUS) & ATA_STATUS_BUSY)
+        ;
+
+    return sector_count * 512;
+}

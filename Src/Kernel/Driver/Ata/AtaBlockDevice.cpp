@@ -39,12 +39,23 @@ int AtaBlockDevice::read(VNode *vnode, void *buffer, size_t size, size_t offset)
 
 int AtaBlockDevice::write(VNode *vnode, const void *buffer, size_t size, size_t offset)
 {
-    (void)vnode;
-    (void)buffer;
-    (void)size;
-    (void)offset;
-    // escrever: não implementado ainda
-    return -1;
+    if (!vnode->fs_private)
+        return -1;
+
+    auto info = reinterpret_cast<AtaDeviceInfo *>(vnode->fs_private);
+
+    if (!info->exists)
+        return -1;
+
+    if (offset % 512 != 0 || size % 512 != 0)
+    {
+        return -1;
+    }
+
+    uint32_t sector = offset / 512;
+    uint8_t count = size / 512;
+
+    return AtaController::the().write_sectors_pio(*info, sector, count, buffer);
 }
 
 VNodeOps AtaBlockDevice::ops = {
