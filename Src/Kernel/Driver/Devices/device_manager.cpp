@@ -20,4 +20,7 @@ void init_basic_device()
 
     // /dev/console
     DevFS::the().register_device("console", VNodeType::CharacterDevice, &ConsoleDevice::ops, nullptr);
+
+    // /dev/ada
+    AtaController::the().initialize();
 }

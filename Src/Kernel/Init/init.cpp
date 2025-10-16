@@ -32,6 +32,4 @@ void init()
     vfs.lookup("/dev", dev);
 
     init_basic_device();
-
-    AtaController::the().initialize();
 }
