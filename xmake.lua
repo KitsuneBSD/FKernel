@@ -67,11 +67,7 @@ on_clean(function(target)
 end)
 
 on_run(function(target)
-	if is_mode("debug") then
-		os.execv("lua Meta/run_mockos_debug_mode.lua")
-	else
-		os.execv("lua Meta/run_mockos.lua")
-	end
+	os.execv("lua Meta/run_mockos.lua")
 end)
 
 set_warnings("allextra", "error")
