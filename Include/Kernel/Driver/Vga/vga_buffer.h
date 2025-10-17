@@ -10,8 +10,7 @@
 constexpr uint16_t VGA_WIDTH = 80;
 constexpr uint16_t VGA_HEIGHT = 25;
 
-enum class Color : uint8_t
-{
+enum class Color : uint8_t {
   Black = 0,
   Blue,
   Green,
@@ -30,18 +29,15 @@ enum class Color : uint8_t
   White
 };
 
-constexpr uint8_t vga_entry_color(Color fg, Color bg)
-{
+constexpr uint8_t vga_entry_color(Color fg, Color bg) {
   return static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4);
 }
 
-constexpr uint16_t vga_entry(char c, uint8_t color)
-{
+constexpr uint16_t vga_entry(char c, uint8_t color) {
   return (static_cast<uint16_t>(color) << 8) | c;
 }
 
-class vga
-{
+class vga {
 private:
   volatile uint16_t *const buffer =
       reinterpret_cast<volatile uint16_t *>(0xB8000);
@@ -52,10 +48,10 @@ private:
   vga() = default; // construtor privado
 
   void scroll();
+  void update_cursor();
 
 public:
-  static vga &the()
-  {
+  static vga &the() {
     static vga drv;
     return drv;
   }

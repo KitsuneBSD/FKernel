@@ -24,6 +24,7 @@ local clang_flags = {
 local nasm_flags = {
 	"-f elf64",
 	"-w-label-orphan",
+	"-w-implicit-abs-deprecated",
 	"-w-other",
 }
 

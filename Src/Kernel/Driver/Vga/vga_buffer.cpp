@@ -1,20 +1,30 @@
 #include <Kernel/Driver/Vga/vga_buffer.h>
 
-void vga::scroll()
-{
+#ifdef __x86_64
+#include <Kernel/Arch/x86_64/io.h>
+#endif
+
+void vga::update_cursor() {
+  uint16_t pos = static_cast<uint16_t>(row * VGA_WIDTH + col);
+
+  outb(0x3D4, 0x0F);
+  outb(0x3D5, static_cast<uint8_t>(pos & 0xFF));
+
+  outb(0x3D4, 0x0E);
+  outb(0x3D5, static_cast<uint8_t>((pos >> 8) & 0xFF));
+}
+
+void vga::scroll() {
   if (row < VGA_HEIGHT)
     return;
 
-  for (size_t r = 1; r < VGA_HEIGHT; ++r)
-  {
-    for (size_t c = 0; c < VGA_WIDTH; ++c)
-    {
+  for (size_t r = 1; r < VGA_HEIGHT; ++r) {
+    for (size_t c = 0; c < VGA_WIDTH; ++c) {
       buffer[(r - 1) * VGA_WIDTH + c] = buffer[r * VGA_WIDTH + c];
     }
   }
 
-  for (size_t c = 0; c < VGA_WIDTH; ++c)
-  {
+  for (size_t c = 0; c < VGA_WIDTH; ++c) {
     buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + c] = vga_entry(' ', color);
   }
 
@@ -23,10 +33,8 @@ void vga::scroll()
 
 void vga::set_color(Color fg, Color bg) { color = vga_entry_color(fg, bg); }
 
-void vga::put_char(char c)
-{
-  if (c == '\n')
-  {
+void vga::put_char(char c) {
+  if (c == '\n') {
     col = 0;
     ++row;
     scroll();
@@ -35,28 +43,24 @@ void vga::put_char(char c)
 
   buffer[row * VGA_WIDTH + col] = vga_entry(c, color);
   ++col;
-  if (col >= VGA_WIDTH)
-  {
+  if (col >= VGA_WIDTH) {
     col = 0;
     ++row;
     scroll();
   }
+
+  update_cursor();
 }
 
-void vga::write(const char *str)
-{
-  for (size_t i = 0; str[i]; ++i)
-  {
+void vga::write(const char *str) {
+  for (size_t i = 0; str[i]; ++i) {
     put_char(str[i]);
   }
 }
 
-void vga::clear()
-{
-  for (size_t r = 0; r < VGA_HEIGHT; ++r)
-  {
-    for (size_t c = 0; c < VGA_WIDTH; ++c)
-    {
+void vga::clear() {
+  for (size_t r = 0; r < VGA_HEIGHT; ++r) {
+    for (size_t c = 0; c < VGA_WIDTH; ++c) {
       buffer[r * VGA_WIDTH + c] = vga_entry(' ', color);
     }
   }
@@ -64,27 +68,21 @@ void vga::clear()
   col = 0;
 }
 
-void vga::write_ansi(const char *str)
-{
+void vga::write_ansi(const char *str) {
   Color current_fg = Color::LightGray;
   Color current_bg = Color::Black;
 
   size_t i = 0;
-  while (str[i])
-  {
-    if (str[i] == '\033' && str[i + 1] == '[')
-    {
+  while (str[i]) {
+    if (str[i] == '\033' && str[i + 1] == '[') {
       i += 2;
       int code = 0;
-      while (str[i] >= '0' && str[i] <= '9')
-      {
+      while (str[i] >= '0' && str[i] <= '9') {
         code = code * 10 + (str[i] - '0');
         ++i;
       }
-      if (str[i] == 'm')
-      {
-        switch (code)
-        {
+      if (str[i] == 'm') {
+        switch (code) {
         case 0:
           current_fg = Color::LightGray;
           current_bg = Color::Black;
