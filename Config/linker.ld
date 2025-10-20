@@ -1,11 +1,12 @@
 ENTRY(start)
 
 SECTIONS {
+    .multiboot_header ALIGN(8) : {
+      KEEP(*(.multiboot_header))
+    }
+  
     . = 1M;
 
-    .multiboot_header ALIGN(8) : {
-        KEEP(*(.multiboot_header))
-    }
 
     .kernel : {
         __kernel_start = .;
