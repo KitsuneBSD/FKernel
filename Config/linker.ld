@@ -1,26 +1,25 @@
 ENTRY(start)
 
-SECTIONS
-{
+SECTIONS {
     . = 1M;
 
-    .kernel : 
-    {
+    .multiboot_header ALIGN(8) : {
         KEEP(*(.multiboot_header))
+    }
 
-        __kernel_start =.;
+    .kernel : {
+        __kernel_start = .;
         *(.text)
         *(.rodata)
         *(.data)
         *(.bss)
-
         __kernel_end = .;
     }
 
-    .kernel_heap (NOLOAD) :
-    {
+    .kernel_heap (NOLOAD) : {
         __heap_start = .;
         . += 32M;
         __heap_end = .;
     }
 }
+

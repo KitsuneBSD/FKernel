@@ -3,6 +3,7 @@
 require("Meta.Lib.run_command")
 require("Meta.Lib.print_message")
 require("Meta.Lib.os_interact")
+require("Meta.x86_64-tools.check-kernel")
 
 -- Path's
 local grub_dir = "build/mockos/boot/grub"

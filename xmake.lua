@@ -31,6 +31,8 @@ local nasm_flags = {
 local lld_flags = {
 	"-T Config/linker.ld",
 	"-nostdlib",
+  "-z max-page-size=0x1000",
+ -- "--oformat binary"
 }
 
 toolchain("FKernel_Compiling")
