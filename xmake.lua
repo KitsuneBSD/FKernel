@@ -88,6 +88,7 @@ end
 
 add_files("Src/Kernel/Init/**.cpp")
 add_files("Src/Kernel/Driver/**.cpp")
+add_files("Src/Kernel/Block/**.cpp")
 add_files("Src/Kernel/Hardware/**.cpp")
 add_files("Src/Kernel/MemoryManager/**.cpp")
 add_files("Src/Kernel/FileSystem/**.cpp")

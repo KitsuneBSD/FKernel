@@ -3,6 +3,9 @@
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #endif
 
+#include <Kernel/Block/partition.h>
+#include <Kernel/Block/partition_device.h>
+
 #include <Kernel/Driver/Ata/AtaBlockDevice.h>
 #include <Kernel/Driver/Ata/AtaController.h>
 #include <Kernel/Driver/Ata/AtaBlockCache.h>
@@ -48,7 +51,6 @@ void AtaController::initialize()
 
 void AtaController::detect_devices()
 {
-    AtaDeviceInfo dev{};
     const char *bus_str[] = {"Primary", "Secondary"};
     const char *drive_str[] = {"Master", "Slave"};
 
@@ -56,16 +58,47 @@ void AtaController::detect_devices()
     {
         for (int d = 0; d < 2; ++d)
         {
-            if (identify_device(static_cast<Bus>(b), static_cast<Drive>(d), dev))
+            AtaDeviceInfo dev_local{};
+            if (identify_device(static_cast<Bus>(b), static_cast<Drive>(d), dev_local))
             {
+                // allocate persistent device info
+                auto *dev_ptr = new AtaDeviceInfo(dev_local);
+
                 klog("ATA", "Detected %s %s: Model '%s'",
-                     bus_str[b], drive_str[d], dev.model);
+                     bus_str[b], drive_str[d], dev_ptr->model);
 
                 char name[16];
-                snprintf(name, sizeof(name), "ada");
+                snprintf(name, sizeof(name), "ada%u", b * 2 + d);
 
+                // Register the whole device node with driver_data pointing to AtaDeviceInfo
                 DevFS::the().register_device(
-                    name, VNodeType::BlockDevice, nullptr, nullptr, true);
+                    name, VNodeType::BlockDevice, &AtaBlockDevice::ops, dev_ptr, true);
+
+                // Read sector 0 to check for partition table (MBR) or other labels
+                uint8_t sector[512];
+                if (read_sectors_pio(*dev_ptr, 0, 1, sector) > 0)
+                {
+                    PartitionEntry parts[4];
+                    int pcount = parse_mbr(sector, parts);
+                    for (int pi = 0; pi < pcount; ++pi)
+                    {
+                        // allocate partition info
+                        PartitionInfo *pinfo = new PartitionInfo();
+                        pinfo->device = dev_ptr;
+                        pinfo->lba_first = parts[pi].lba_first;
+                        pinfo->sectors_count = parts[pi].sectors_count;
+                        pinfo->type = parts[pi].type;
+
+                        // Register child device like ada0p1
+                        char part_name[24];
+                        snprintf(part_name, sizeof(part_name), "%sp%d", name, pi + 1);
+                        DevFS::the().register_device(part_name, VNodeType::BlockDevice, &PartitionBlockDevice::ops, pinfo, false);
+                        klog("ATA", "Registered partition %s: type=0x%02x, lba=%u, sectors=%u",
+                             part_name, pinfo->type, pinfo->lba_first, pinfo->sectors_count);
+                    }
+                    // TODO: If BSD disklabel is found inside MBR or alternate sectors,
+                    // implement parse_bsd_label and register BSD slices accordingly.
+                }
             }
         }
     }
