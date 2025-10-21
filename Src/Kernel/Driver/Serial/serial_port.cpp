@@ -1,6 +1,11 @@
 #include <Kernel/Driver/SerialPort/serial_port.h>
 
 void serial::init() {
+  // TODO: Consider wrapping port access into a Port class with RAII and
+  //       explicit volatile semantics to avoid accidental optimizations.
+  // FIXME: This function uses bare port I/O and assumes the port is present
+  //        and ready. Add graceful handling if COM1 is absent. Also the
+  //        hardcoded baud divisor assumes a specific clock rate.
   outb(COM1 + 1, 0x00); // Desabilita interrupções
   outb(COM1 + 3, 0x80); // Ativa DLAB
   outb(COM1 + 0, 0x03); // Baud divisor low byte (38400)
@@ -11,12 +16,17 @@ void serial::init() {
 }
 
 void serial::write_char(char c) {
+  // FIXME: Busy-wait loop; consider an interrupt-driven transmit buffer or
+  //        at least a timeout to avoid locking the CPU in pathological
+  //        scenarios. Also this is not reentrant.
   while (!is_transmit_empty())
     ;
   outb(COM1, c);
 }
 
 void serial::write(const char *str) {
+  // TODO: Provide a write(const span<char>&) overload and a bufferified
+  //       path to avoid per-character overhead.
   for (size_t i = 0; str[i] != '\0'; i++) {
     write_char(str[i]);
   }

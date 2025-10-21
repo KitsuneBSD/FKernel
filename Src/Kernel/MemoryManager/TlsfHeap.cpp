@@ -45,6 +45,20 @@ void TLSFHeap::expand(size_t bytes)
   m_heap_size += pages * PAGE_SIZE;
 }
 
+// TODO/FIXME:
+// - TLSF relies heavily on raw pointer arithmetic casting physical page
+//   addresses into usable pointers. Ensure these addresses are mapped to
+//   the kernel virtual address space before dereferencing. Otherwise this
+//   will cause memory corruption or machine checks on some platforms.
+// - This allocator is not thread-safe; add locking for SMP or document
+//   single-core usage.
+// - The expand path uses PhysicalMemoryManager to allocate pages and then
+//   maps them; consider failure/rollback semantics if part of the expand
+//   sequence fails (currently it returns silently causing fragmentation).
+// - Beware integer overflow when computing sizes and addresses (e.g., when
+//   m_heap_size is large). Add bounds checks and static_asserts where
+//   appropriate.
+
 void TLSFHeap::insert_block(BlockHeader *block)
 {
   size_t fl, sl;

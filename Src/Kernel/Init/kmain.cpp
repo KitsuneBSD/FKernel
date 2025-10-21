@@ -11,9 +11,15 @@ extern char __heap_start[];
 extern char __heap_end[];
 
 extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
+  // TODO: Improve ownership and lifecycle of boot resources using RAII
+  // FIXME: Currently we assume serial and VGA init cannot fail; add error handling
   serial::init();
   auto vga = vga::the();
   vga.clear();
+  // FIXME: multiboot2_magic is read as a 32-bit value from boot registers.
+  // Ensure this matches all supported bootloaders; otherwise provide a
+  // fallback path. Consider using a safer validation routine and returning
+  // an error code instead of an assert in production builds.
   ASSERT(multiboot2_magic == multiboot2::BOOTLOADER_MAGIC);
 
   multiboot2::MultibootParser mb_parser(multiboot_ptr);
@@ -23,6 +29,9 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
 
   early_init(mmap);
 
+  // TODO: Replace the infinite HLT loop with a scheduler idle task or
+  //       a proper kernel halt that can power-down or enter a more
+  //       debuggable state. Also consider wiring a panic handler here.
   while (true) {
     asm("hlt");
   }

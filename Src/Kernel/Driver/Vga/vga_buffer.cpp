@@ -53,6 +53,10 @@ void vga::put_char(char c) {
 }
 
 void vga::write(const char *str) {
+  // TODO: This implementation writes character-by-character which can be
+  // inefficient. Consider a batched write path or memcpy for contiguous
+  // blocks to speed up large prints. Also consider making this reentrant
+  // or protected by a spinlock if used across multiple cores.
   for (size_t i = 0; str[i]; ++i) {
     put_char(str[i]);
   }
@@ -136,7 +140,11 @@ void vga::write_ansi(const char *str) {
           current_bg = Color::White;
           break;
         }
-        set_color(current_fg, current_bg);
+  // TODO: ANSI parsing is minimal; expand it to support sequences
+  // like bold/underline and parameter lists (e.g., "\x1b[1;31m").
+  // Also consider extracting the parser into a small finite state
+  // machine class for testability.
+  set_color(current_fg, current_bg);
       }
       ++i;
       continue;

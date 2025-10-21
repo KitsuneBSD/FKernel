@@ -40,3 +40,12 @@ start:
 	jmp gdt64.code_segment:long_mode_start
 
 	hlt
+
+; TODO: The boot flow here is very linear and uses calls that assume
+;       success. Consider introducing a lightweight BootManager in C++
+;       (or a structured set of checks) that can provide better
+;       diagnostic messages on failure and transition to fallback
+;       recovery states instead of HLT.
+; FIXME: cpuid/long mode checks should be more defensive: some CPUs may
+;        return unexpected feature flags; prepare a clear compatibility
+;        matrix and fail gracefully with a message on serial VGA.

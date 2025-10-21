@@ -44,6 +44,12 @@ void GDTController::setupTSS() {
 
   gdt[3] = low;
   gdt[4] = high;
+  // TODO: Consider moving TSS construction into a helper class to avoid
+  // raw pointer arithmetic and manual packing. Use static_asserts to
+  // validate size/alignment assumptions about TSS64 and IST stacks.
+  // FIXME: The code assumes IST stacks and RSP values exist at compile
+  // time; add validation and fail-safe defaults for platforms where
+  // the memory layout differs.
 }
 
 void GDTController::setupGDTR() {
@@ -85,4 +91,6 @@ void GDTController::initialize() {
   flush_tss(tss_selector);
   klog("TSS", "Task state segment initialized");
   m_initialized = true;
+  // TODO: Document why tss_selector is 0x28 and centralize selector
+  // generation; magic numbers for selectors are fragile across changes.
 }

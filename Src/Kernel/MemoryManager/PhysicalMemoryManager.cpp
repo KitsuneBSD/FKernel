@@ -73,8 +73,8 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap)
 
     if (!m_memory_ranges.insert(range))
     {
-      kwarn("PHYSICAL MEMORY", "We can't insert the new memory range [%p - %p]",
-            entry_start, entry_end);
+  kwarn("PHYSICAL MEMORY", "We can't insert the new memory range [%p - %p]",
+    entry_start, entry_end);
     }
 
     klog("PHYSICAL MEMORY", "Insert a new range of memory [ %p - %p | %s ]",
@@ -195,3 +195,18 @@ uintptr_t PhysicalMemoryManager::virt_to_phys(uintptr_t addr)
         addr);
   return 0;
 }
+
+// TODO: Potential issues and improvements:
+// - virt_to_phys currently computes `addr - range.m_start + range.m_start`,
+//   which is identity; double-check intended behavior (should likely return
+//   a physical address translation or an offset mapping). This looks like a
+//   no-op and probably hides a logic bug.
+// - Consider returning std::optional<uintptr_t> or a sentinel (e.g., 0) is
+//   fragile; an explicit error type would be clearer.
+// - Allocation and free paths are not synchronized for SMP; add a spinlock
+//   or use LibFK retain/own pointer containers for RAII and concurrency
+//   correctness.
+// - The memory range insertion code silently skips/adjusts overlaps; add
+//   clearer validation and unit tests covering fragmented/overlapping maps.
+// - Using a large fixed-size Bitmap template may waste memory; consider a
+//   dynamic bitmap or borrowing LibFK smart pointers for large structures.
