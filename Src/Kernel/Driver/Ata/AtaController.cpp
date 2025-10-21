@@ -54,6 +54,7 @@ void AtaController::detect_devices()
     const char *bus_str[] = {"Primary", "Secondary"};
     const char *drive_str[] = {"Master", "Slave"};
 
+    int device_index = 0;
     for (int b = 0; b < 2; ++b)
     {
         for (int d = 0; d < 2; ++d)
@@ -67,12 +68,14 @@ void AtaController::detect_devices()
                 klog("ATA", "Detected %s %s: Model '%s'",
                      bus_str[b], drive_str[d], dev_ptr->model);
 
+                // Use a sequential device index (ada0, ada1, ...)
                 char name[16];
-                snprintf(name, sizeof(name), "ada%u", b * 2 + d);
+                snprintf(name, sizeof(name), "ada%d", device_index);
 
                 // Register the whole device node with driver_data pointing to AtaDeviceInfo
+                // Pass the base prefix "ada" and let DevFS append the numeric index
                 DevFS::the().register_device(
-                    name, VNodeType::BlockDevice, &AtaBlockDevice::ops, dev_ptr, true);
+                    "ada", VNodeType::BlockDevice, &AtaBlockDevice::ops, dev_ptr, true);
 
                 // Read sector 0 to check for partition table (MBR) or other labels
                 uint8_t sector[512];
@@ -99,6 +102,8 @@ void AtaController::detect_devices()
                     // TODO: If BSD disklabel is found inside MBR or alternate sectors,
                     // implement parse_bsd_label and register BSD slices accordingly.
                 }
+
+                device_index++;
             }
         }
     }
