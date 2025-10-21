@@ -146,7 +146,7 @@ int VirtualFS::open(const char *path, int flags, RetainPtr<VNode> &out)
         return -1;
     }
 
-    int ret = vnode->ops->open(vnode.get(), flags);
+    int ret = vnode->open(flags);
     out = vnode;
     return ret;
 }
@@ -161,13 +161,7 @@ int VirtualFS::read(const char *path, void *buf, size_t sz, size_t off)
         return -1;
     }
 
-    if (!vnode->ops || !vnode->ops->read)
-    {
-        kwarn("VNode", "Read failed: vnode '%s' has no read operation assigned", vnode->m_name.c_str());
-        return -1;
-    }
-
-    int ret = vnode->ops->read(vnode.get(), buf, sz, off);
+    int ret = vnode->read(buf, sz, off);
     if (ret < 0)
         kwarn("VNode", "Read op on '%s' returned error %d", vnode->m_name.c_str(), ret);
     else
@@ -186,13 +180,7 @@ int VirtualFS::write(const char *path, const void *buf, size_t sz, size_t off)
         return -1;
     }
 
-    if (!vnode->ops || !vnode->ops->write)
-    {
-        kwarn("VNode", "Write failed: vnode '%s' has no write operation assigned", vnode->m_name.c_str());
-        return -1;
-    }
-
-    int ret = vnode->ops->write(vnode.get(), buf, sz, off);
+    int ret = vnode->write(buf, sz, off);
     if (ret < 0)
         kwarn("VNode", "Write op on '%s' returned error %d", vnode->m_name.c_str(), ret);
     else

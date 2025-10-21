@@ -59,7 +59,7 @@ public:
      */
     inline int read(void *buf, size_t sz, size_t off)
     {
-        int ret = ops && ops->read ? ops->read(this, buf, sz, off) : -1;
+        int ret = ops && ops->read ? ops->read(this, nullptr, buf, sz, off) : -1;
         if (ret >= 0)
             klog("VFS", "Read %d bytes from '%s' at offset %zu", ret, m_name.c_str(), off);
         else
@@ -76,7 +76,7 @@ public:
      */
     inline int write(const void *buf, size_t sz, size_t off)
     {
-        int ret = ops && ops->write ? ops->write(this, buf, sz, off) : -1;
+        int ret = ops && ops->write ? ops->write(this, nullptr, buf, sz, off) : -1;
         if (ret >= 0)
             klog("VFS", "Wrote %d bytes to '%s' at offset %zu", ret, m_name.c_str(), off);
         else
@@ -91,7 +91,7 @@ public:
      */
     inline int open(int flags)
     {
-        int ret = ops && ops->open ? ops->open(this, flags) : 0;
+        int ret = ops && ops->open ? ops->open(this, nullptr, flags) : 0;
         if (ret == 0)
             klog("VFS", "Opened '%s' with flags 0x%x", m_name.c_str(), flags);
         else
@@ -105,7 +105,7 @@ public:
      */
     inline int close()
     {
-        int ret = ops && ops->close ? ops->close(this) : 0;
+        int ret = ops && ops->close ? ops->close(this, nullptr) : 0;
         if (ret == 0)
             klog("VFS", "Closed '%s'", m_name.c_str());
         else

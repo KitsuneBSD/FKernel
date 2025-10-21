@@ -4,24 +4,27 @@
 
 #include <LibFK/Algorithms/log.h>
 
-int ConsoleDevice::open(VNode *vnode, int flags)
+int ConsoleDevice::open(VNode *vnode, FileDescriptor *fd, int flags)
 {
     (void)vnode;
+    (void)fd;
     (void)flags;
     klog("CONSOLE", "Opened /dev/console");
     return 0;
 }
 
-int ConsoleDevice::close(VNode *vnode)
+int ConsoleDevice::close(VNode *vnode, FileDescriptor *fd)
 {
     (void)vnode;
+    (void)fd;
     klog("CONSOLE", "Closed /dev/console");
     return 0;
 }
 
-int ConsoleDevice::write(VNode *vnode, const void *buffer, size_t size, size_t offset)
+int ConsoleDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size, size_t offset)
 {
     (void)vnode;
+    (void)fd;
     (void)offset;
 
     const char *str = reinterpret_cast<const char *>(buffer);
@@ -33,9 +36,10 @@ int ConsoleDevice::write(VNode *vnode, const void *buffer, size_t size, size_t o
     return static_cast<int>(size);
 }
 
-int ConsoleDevice::read(VNode *vnode, void *buffer, size_t size, size_t offset)
+int ConsoleDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size, size_t offset)
 {
     (void)vnode;
+    (void)fd;
     (void)offset;
 
     char *buf = reinterpret_cast<char *>(buffer);

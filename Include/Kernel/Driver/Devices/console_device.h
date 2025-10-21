@@ -4,15 +4,16 @@
 #include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
 #include <Kernel/FileSystem/VirtualFS/vnode_type.h>
 #include <LibC/stddef.h>
+#include <Kernel/FileSystem/fd.h>
 
 struct VNode;
 
 struct ConsoleDevice
 {
-    static int open(VNode *vnode, int flags);
-    static int close(VNode *vnode);
-    static int write(VNode *vnode, const void *buffer, size_t size, size_t offset);
-    static int read(VNode *vnode, void *buffer, size_t size, size_t offset);
+    static int open(VNode *vnode, FileDescriptor *fd, int flags);
+    static int close(VNode *vnode, FileDescriptor *fd);
+    static int write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size, size_t offset);
+    static int read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size, size_t offset);
 
     static VNodeOps ops;
 };

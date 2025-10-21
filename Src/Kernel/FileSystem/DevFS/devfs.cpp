@@ -1,5 +1,6 @@
 #include <Kernel/FileSystem/DevFS/devfs.h>
 #include <Kernel/FileSystem/DevFS/device.h>
+#include <Kernel/FileSystem/fd.h>
 
 #include <LibC/string.h>
 
@@ -107,8 +108,9 @@ int DevFS::unregister_device(const char *name)
     return -1;
 }
 
-int DevFS::devfs_lookup(VNode *vnode, const char *name, RetainPtr<VNode> &out)
+int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name, RetainPtr<VNode> &out)
 {
+    (void)fd;
     if (!vnode || vnode->type != VNodeType::Directory)
         return -1;
 
@@ -125,8 +127,9 @@ int DevFS::devfs_lookup(VNode *vnode, const char *name, RetainPtr<VNode> &out)
     return -1;
 }
 
-int DevFS::devfs_readdir(VNode *vnode, void *buffer, size_t max_entries)
+int DevFS::devfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer, size_t max_entries)
 {
+    (void)fd;
     if (!vnode || vnode->type != VNodeType::Directory)
         return -1;
 
@@ -141,36 +144,40 @@ int DevFS::devfs_readdir(VNode *vnode, void *buffer, size_t max_entries)
     return static_cast<int>(n);
 }
 
-int DevFS::devfs_open(VNode *vnode, int flags)
+int DevFS::devfs_open(VNode *vnode, FileDescriptor *fd, int flags)
 {
+    (void)fd;
     if (vnode->ops && vnode->ops->open)
-        return vnode->ops->open(vnode, flags);
+        return vnode->ops->open(vnode, fd, flags);
     return 0;
 }
 
-int DevFS::devfs_close(VNode *vnode)
+int DevFS::devfs_close(VNode *vnode, FileDescriptor *fd)
 {
+    (void)fd;
     if (vnode->ops && vnode->ops->close)
-        return vnode->ops->close(vnode);
+        return vnode->ops->close(vnode, fd);
     return 0;
 }
 
-int DevFS::devfs_read(VNode *vnode, void *buffer, size_t size, size_t offset)
-{
+int DevFS::devfs_read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size, size_t offset)
+{(void)fd;
     if (vnode->ops && vnode->ops->read)
-        return vnode->ops->read(vnode, buffer, size, offset);
+        return vnode->ops->read(vnode, fd, buffer, size, offset);
     return -1;
 }
 
-int DevFS::devfs_write(VNode *vnode, const void *buffer, size_t size, size_t offset)
+int DevFS::devfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size, size_t offset)
 {
+    (void)fd;
     if (vnode->ops && vnode->ops->write)
-        return vnode->ops->write(vnode, buffer, size, offset);
+        return vnode->ops->write(vnode, fd, buffer, size, offset);
     return -1;
 }
 
-int DevFS::devfs_create(VNode *dir, const char *name, VNodeType type, RetainPtr<VNode> &out)
+int DevFS::devfs_create(VNode *dir, FileDescriptor *fd, const char *name, VNodeType type, RetainPtr<VNode> &out)
 {
+    (void)fd;
     if (!dir || dir->type != VNodeType::Directory)
         return -1;
 
@@ -188,8 +195,9 @@ int DevFS::devfs_create(VNode *dir, const char *name, VNodeType type, RetainPtr<
     return 0;
 }
 
-int DevFS::devfs_unlink(VNode *dir, const char *name)
+int DevFS::devfs_unlink(VNode *dir, FileDescriptor *fd, const char *name)
 {
+    (void)fd;
     if (!dir || dir->type != VNodeType::Directory)
         return -1;
 

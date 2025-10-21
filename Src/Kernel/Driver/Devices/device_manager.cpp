@@ -8,6 +8,7 @@
 
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <Kernel/FileSystem/DevFS/devfs.h>
+#include <Kernel/FileSystem/fd.h>
 
 void init_basic_device()
 {
@@ -25,4 +26,14 @@ void init_basic_device()
 
     // /dev/ada
     AtaController::the().initialize();
+
+    int fd = fd_open_path("/dev/console", 0);
+    if (fd < 0)
+        fd = fd_open_path("/dev/ttyS0", 0);
+
+    if (fd >= 0)
+    {
+        (void)fd_open_path("/dev/console", 0);
+        (void)fd_open_path("/dev/console", 0);
+    }
 }

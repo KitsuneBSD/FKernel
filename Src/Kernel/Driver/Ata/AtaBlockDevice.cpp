@@ -3,21 +3,24 @@
 #include <Kernel/Driver/Ata/AtaController.h>
 #include <LibFK/Algorithms/log.h>
 
-int AtaBlockDevice::open(VNode *vnode, int flags)
+int AtaBlockDevice::open(VNode *vnode, FileDescriptor *fd, int flags)
 {
     (void)vnode;
+    (void)fd;
     (void)flags;
     return 0;
 }
 
-int AtaBlockDevice::close(VNode *vnode)
+int AtaBlockDevice::close(VNode *vnode, FileDescriptor *fd)
 {
     (void)vnode;
+    (void)fd;
     return 0;
 }
 
-int AtaBlockDevice::read(VNode *vnode, void *buffer, size_t size, size_t offset)
+int AtaBlockDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size, size_t offset)
 {
+    (void)fd;
     if (!vnode->fs_private)
         return -1;
     auto *info = reinterpret_cast<AtaDeviceInfo *>(vnode->fs_private);
@@ -43,8 +46,9 @@ int AtaBlockDevice::read(VNode *vnode, void *buffer, size_t size, size_t offset)
     return static_cast<int>(size);
 }
 
-int AtaBlockDevice::write(VNode *vnode, const void *buffer, size_t size, size_t offset)
+int AtaBlockDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size, size_t offset)
 {
+    (void)fd;
     if (!vnode->fs_private)
         return -1;
     auto *info = reinterpret_cast<AtaDeviceInfo *>(vnode->fs_private);

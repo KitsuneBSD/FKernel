@@ -1,25 +1,29 @@
 #pragma once
 #include <Kernel/FileSystem/DevFS/devfs.h>
+#include <Kernel/FileSystem/fd.h>
 #include <Kernel/Driver/SerialPort/serial_port.h>
 #include <LibFK/Memory/retain_ptr.h>
 
 struct SerialTTY
 {
-    static int open(VNode *vnode, int flags)
+    static int open(VNode *vnode, FileDescriptor *fd, int flags)
     {
         (void)vnode;
+        (void)fd;
         (void)flags;
         return 0; // Não precisa de nada especial
     }
 
-    static int close(VNode *vnode)
+    static int close(VNode *vnode, FileDescriptor *fd)
     {
+        (void)fd;
         (void)vnode;
         return 0;
     }
 
-    static int write(VNode *vnode, const void *buf, size_t size, [[maybe_unused]] size_t offset)
+    static int write(VNode *vnode, FileDescriptor *fd, const void *buf, size_t size, [[maybe_unused]] size_t offset)
     {
+        (void)fd;
         (void)vnode;
         const char *str = reinterpret_cast<const char *>(buf);
         for (size_t i = 0; i < size; ++i)
@@ -27,9 +31,10 @@ struct SerialTTY
         return static_cast<int>(size);
     }
 
-    static int read(VNode *vnode, void *buf, size_t size, size_t offset)
+    static int read(VNode *vnode, FileDescriptor *fd, void *buf, size_t size, size_t offset)
     {
         (void)vnode;
+        (void)fd;
         (void)buf;
         (void)size;
         (void)offset;

@@ -23,8 +23,9 @@ RetainPtr<VNode> RamFS::root()
     return r_root;
 }
 
-int RamFS::ramfs_read(VNode *vnode, void *buffer, size_t size, size_t offset)
+int RamFS::ramfs_read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size, size_t offset)
 {
+    (void)fd;
     if (!vnode)
     {
         kwarn("RamFS", "Read failed: vnode is nullptr");
@@ -66,8 +67,9 @@ int RamFS::ramfs_read(VNode *vnode, void *buffer, size_t size, size_t offset)
     return static_cast<int>(to_read);
 }
 
-int RamFS::ramfs_write(VNode *vnode, const void *buffer, size_t size, size_t offset)
+int RamFS::ramfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size, size_t offset)
 {
+    (void)fd;
     if (!vnode)
     {
         kwarn("RamFS", "Write failed: vnode is nullptr");
@@ -115,26 +117,30 @@ int RamFS::ramfs_write(VNode *vnode, const void *buffer, size_t size, size_t off
     return static_cast<int>(to_write);
 }
 
-int RamFS::ramfs_open(VNode *vnode, int flags)
+int RamFS::ramfs_open(VNode *vnode, FileDescriptor *fd, int flags)
 {
+    (void)fd;
     (void)vnode;
     (void)flags;
     return 0;
 }
 
-int RamFS::ramfs_close(VNode *vnode)
+int RamFS::ramfs_close(VNode *vnode, FileDescriptor *fd)
 {
+    (void)fd;
     (void)vnode;
     return 0;
 }
 
-int RamFS::ramfs_lookup(VNode *vnode, const char *name, RetainPtr<VNode> &out)
+int RamFS::ramfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name, RetainPtr<VNode> &out)
 {
+    (void)fd;
     return vnode->lookup(name, out);
 }
 
-int RamFS::ramfs_create(VNode *vnode, const char *name, VNodeType type, RetainPtr<VNode> &out)
+int RamFS::ramfs_create(VNode *vnode, FileDescriptor *fd, const char *name, VNodeType type, RetainPtr<VNode> &out)
 {
+    (void)fd;
     if (!vnode || vnode->type != VNodeType::Directory)
         return -1;
 
@@ -163,8 +169,9 @@ int RamFS::ramfs_create(VNode *vnode, const char *name, VNodeType type, RetainPt
     return 0;
 }
 
-int RamFS::ramfs_readdir(VNode *vnode, void *buffer, size_t max_entries)
+int RamFS::ramfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer, size_t max_entries)
 {
+    (void)fd;
     if (!vnode || vnode->type != VNodeType::Directory)
         return -1;
 
@@ -179,8 +186,9 @@ int RamFS::ramfs_readdir(VNode *vnode, void *buffer, size_t max_entries)
     return static_cast<int>(n);
 }
 
-int RamFS::ramfs_unlink(VNode *vnode, const char *name)
+int RamFS::ramfs_unlink(VNode *vnode, FileDescriptor *fd, const char *name)
 {
+    (void)fd;
     if (!vnode || vnode->type != VNodeType::Directory)
         return -1;
 
