@@ -107,3 +107,19 @@ It provides a clean, consistent, and predictable foundation for the kernel to co
 No further expansion is planned at this time — **by design**.
 
 > *Simplicity is a feature when you’re this close to the metal.*
+ 
+## Recent implementation notes (branch: feature/init)
+
+The `early_init` subsystem received a small but useful extension to make boot-time memory parsing more flexible:
+
+- A generic `MemoryMapView` representation was added under `Include/Kernel/Boot/memory_map.h`.
+- Two adapter entrypoints, `early_init_from_view` and `early_init_from_uefi`, were added to allow `early_init` to consume memory maps produced by either Multiboot2 or a UEFI-style provider. The UEFI path is currently an adapter only — a native UEFI entrypoint is still planned.
+
+How to exercise the adapters:
+
+1. Build and run the kernel (`xmake` / `xmake run`).
+2. Check the serial output for messages indicating `early_init` consumed a memory map. The adapter will translate the provided map and resume the normal initialization flow.
+
+Notes:
+
+- The adapter focuses on reusing existing early_init logic; it does not yet implement a full UEFI boot path. SMP and advanced memory features are still pending.

@@ -122,3 +122,12 @@ Future extensions can include:
 - Read/write/execute permissions
 
 - Special flags for system files 
+ 
+## Recent changes (branch: feature/init)
+
+Partition and device-node plumbing was recently added:
+
+- The ATA controller registers block devices and partitions. In DeviceFS you will now see device nodes like `/dev/ada0` and partition nodes like `/dev/ada0p1`.
+- A `PartitionBlockDevice` wrapper was added; filesystems mounting partitions should open the partition VNode and use its read/write ops rather than assuming raw disk offsets.
+
+When implementing DiskFS, ensure your mount code accepts a partition VNode and uses its provided VNodeOps for block I/O.

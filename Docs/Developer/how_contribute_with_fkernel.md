@@ -162,3 +162,17 @@ Kernel development is complex, but collaboration makes it fun and powerful.
 Whether you’re fixing a bug, documenting a subsystem, or adding a new driver, each contribution helps shape FKernel into a cleaner and more modular system.
 
 Keep exploring, keep commenting, and don’t be afraid to leave a well-placed TODO — it’s how great kernels grow.
+
+## Recent changes (branch: feature/init)
+
+If you are contributing now, be aware of recent infrastructure and subsystem changes that may affect drivers and tests:
+
+- Partition handling: MBR parsing and partition block-device wrappers were added. Device nodes such as `/dev/ada0` and `/dev/ada0p1` are now created by the ATA controller during device detection.
+- EBR (extended MBR chain) parsing and minimal GPT detection were added; however GPT parsing is conservative and may not expose every field yet.
+- The early initialization code now supports a generic memory-map view and provides adapters to consume UEFI-style memory maps. Full UEFI boot entrypoints are still work-in-progress.
+
+When submitting patches that touch boot, block devices, or initialization code, please:
+
+1. Include a short test plan describing how you validated the change in QEMU.
+2. If you modify ATA/block code, include a disk-image (`.raw` or `.qcow2`) reproducible test or clear instructions to generate one with `qemu-img` and `grub-mkrescue`.
+3. Run `xmake` in debug mode and attach the kernel serial log showing the relevant messages.

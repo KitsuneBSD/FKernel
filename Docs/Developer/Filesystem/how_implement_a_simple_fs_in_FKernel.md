@@ -245,4 +245,13 @@ int n = vnode->ops->readdir(vnode.get(), buffer, 32);
 for (int i = 0; i < n; ++i) {
     printf("%s\n", buffer[i].m_name.c_str());
 }
+
+## Recent changes (branch: feature/init)
+
+Note for filesystem implementers:
+
+- Partition-aware device nodes are now created by the ATA controller. When writing a DiskFS, prefer to accept a partition VNode (e.g. `/dev/ada0p1`) and perform block I/O via the VNodeOps provided by the partition node.
+- A `PartitionBlockDevice` adapter exists to translate partition-relative offsets into LBA-based requests to the underlying disk; you do not need to perform manual offset math when using those VNodes.
+
+Design tip: keep your DiskFS mount code small and accept a `VNode` representing a block device; if your code needs direct access to the raw disk image, document the requirement and provide safe checks.
 ```
