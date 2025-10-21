@@ -62,22 +62,17 @@ void AtaController::detect_devices()
             AtaDeviceInfo dev_local{};
             if (identify_device(static_cast<Bus>(b), static_cast<Drive>(d), dev_local))
             {
-                // allocate persistent device info
                 auto *dev_ptr = new AtaDeviceInfo(dev_local);
 
                 klog("ATA", "Detected %s %s: Model '%s'",
                      bus_str[b], drive_str[d], dev_ptr->model);
 
-                // Use a sequential device index (ada0, ada1, ...)
                 char name[16];
                 snprintf(name, sizeof(name), "ada%d", device_index);
 
-                // Register the whole device node with driver_data pointing to AtaDeviceInfo
-                // Pass the base prefix "ada" and let DevFS append the numeric index
                 DevFS::the().register_device(
                     "ada", VNodeType::BlockDevice, &AtaBlockDevice::ops, dev_ptr, true);
 
-                // Read sector 0 to check for partition table (MBR) or other labels
                 uint8_t sector[512];
                 if (read_sectors_pio(*dev_ptr, 0, 1, sector) > 0)
                 {
@@ -85,14 +80,12 @@ void AtaController::detect_devices()
                     int pcount = parse_mbr(sector, parts);
                     for (int pi = 0; pi < pcount; ++pi)
                     {
-                        // allocate partition info
                         PartitionInfo *pinfo = new PartitionInfo();
                         pinfo->device = dev_ptr;
                         pinfo->lba_first = parts[pi].lba_first;
                         pinfo->sectors_count = parts[pi].sectors_count;
                         pinfo->type = parts[pi].type;
 
-                        // Register child device like ada0p1
                         char part_name[24];
                         snprintf(part_name, sizeof(part_name), "%sp%d", name, pi + 1);
                         DevFS::the().register_device(part_name, VNodeType::BlockDevice, &PartitionBlockDevice::ops, pinfo, false);
@@ -158,7 +151,6 @@ bool AtaController::identify_device(Bus bus, Drive drive, AtaDeviceInfo &out)
 
 int AtaController::read_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t sector_count, void *buffer)
 {
-    // 1. Seleciona drive e LBA
     uint16_t base = (bus == Bus::Primary) ? 0x1F0 : 0x170;
     uint8_t head = 0xE0 | ((drive == Drive::Slave) << 4) | ((lba >> 24) & 0x0F);
     outb(base + 6, head);
@@ -169,12 +161,10 @@ int AtaController::read_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t 
     outb(base + 4, (lba >> 16) & 0xFF);
     outb(base + 7, 0x20); // Comando READ SECTORS
 
-    // 2. Espera DRQ
     while (!(inb(base + 7) & 0x08))
     {
     }
 
-    // 3. Lê dados
     for (int i = 0; i < 256 * sector_count; ++i)
     {
         ((uint16_t *)buffer)[i] = inw(base);
@@ -206,7 +196,7 @@ int AtaController::write_sectors_pio(Bus bus, Drive drive, uint32_t lba, uint8_t
     outb(base + ATA_REG_LBA1, (lba >> 8) & 0xFF);
     outb(base + ATA_REG_LBA2, (lba >> 16) & 0xFF);
 
-    outb(base + ATA_REG_COMMAND, 0x30); // WRITE SECTORS
+    outb(base + ATA_REG_COMMAND, 0x30);
 
     // Espera DRQ
     while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ))
