@@ -33,3 +33,8 @@ void init()
 
     init_basic_device();
 }
+
+// TODO/FIXME: High-level init routine — document ordering constraints and error
+// handling. Consider returning an error code on failure instead of void so callers can
+// make decisions. Also review concurrency/initialization races and ensure subsystems are
+// initialized deterministically across different boot paths.

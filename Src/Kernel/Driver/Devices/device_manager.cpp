@@ -37,3 +37,8 @@ void init_basic_device()
         (void)fd_open_path("/dev/console", 0);
     }
 }
+
+// TODO/FIXME: Basic device initialization — consider returning error codes if
+// device registration or controller initialization fails, and avoid duplicate
+// fd_open_path calls. Add clearer ownership semantics and initialization order
+// documentation for drivers that depend on these devices.

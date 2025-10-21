@@ -6,6 +6,9 @@ extern error
 
 section .text
 bits 32
+; TODO/FIXME: Entry point check — verify calling convention and registers preserved.
+; Review behavior when called from different CPU modes and ensure this code is
+; safe to run in the early boot environment.
 check_multiboot:
 	cmp eax, 0x36d76289
 	jne .no_multiboot
@@ -14,6 +17,9 @@ check_multiboot:
 	mov al, "M"
 	jmp error
 
+; TODO/FIXME: CPUID check — ensure flags manipulation preserves processor state
+; correctly and that this sequence is compatible with interrupt/exception contexts.
+; Consider using safer register save/restore idioms if this runs in sensitive contexts.
 check_cpuid:
 	pushfd
 	pop eax
@@ -32,6 +38,8 @@ check_cpuid:
 	mov al, "C"
 	jmp error
 
+; TODO/FIXME: Long mode feature check — validate CPUID usage and ensure the bit
+; tested is correct across vendors. Consider fallbacks or clearer error reporting.
 check_long_mode:
 	mov eax, 0x80000000
 	cpuid
