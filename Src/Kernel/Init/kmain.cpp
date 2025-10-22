@@ -23,9 +23,15 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
   ASSERT(multiboot2_magic == multiboot2::BOOTLOADER_MAGIC);
 
   multiboot2::MultibootParser mb_parser(multiboot_ptr);
+  auto mmap = mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
 
-  auto mmap =
-      mb_parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
+  // Prefer framebuffer if provided by the bootloader (multiboot2).
+  if (auto fb_tag = mb_parser.find_tag<multiboot2::TagFramebuffer>(multiboot2::TagType::Framebuffer)) {
+    // Try to initialize VGA from framebuffer tag; fall back to text mode silently.
+    if (!vga.initialize_framebuffer(fb_tag)) {
+      // initialization failed; continue with text mode already set up
+    }
+  }
 
   early_init(mmap);
 

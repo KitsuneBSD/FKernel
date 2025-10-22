@@ -151,4 +151,27 @@ struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
 static_assert(alignof(TagMemoryMap) == 8,
               "TagMemoryMap must be aligned to 8 bytes");
 
+struct alignas(TAG_ALIGN) TagFramebuffer : Tag {
+  uint64_t framebuffer_addr;
+  uint32_t framebuffer_pitch;
+  uint32_t framebuffer_width;
+  uint32_t framebuffer_height;
+  uint8_t framebuffer_bpp;
+  uint8_t framebuffer_type; // 0=indexed, 1=RGB, 2=EGA text
+  uint16_t reserved;
+
+  struct RGBInfo {
+    uint8_t red_field_position;
+    uint8_t red_mask_size;
+    uint8_t green_field_position;
+    uint8_t green_mask_size;
+    uint8_t blue_field_position;
+    uint8_t blue_mask_size;
+  } rgb;
+
+  // For indexed color there follows palette info; we don't parse it here.
+};
+static_assert(alignof(TagFramebuffer) == 8,
+              "TagFramebuffer must be aligned to 8 bytes");
+
 }; // namespace multiboot2
