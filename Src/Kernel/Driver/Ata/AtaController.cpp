@@ -92,8 +92,27 @@ void AtaController::detect_devices()
                         klog("ATA", "Registered partition %s: type=0x%02x, lba=%u, sectors=%u",
                              part_name, pinfo->type, pinfo->lba_first, pinfo->sectors_count);
                     }
-                    // TODO: If BSD disklabel is found inside MBR or alternate sectors,
-                    // implement parse_bsd_label and register BSD slices accordingly.
+                    // Try to detect BSD disklabel in sector 1 (or other alternate locations)
+                    uint8_t alt_sector[512];
+                    if (read_sectors_pio(*dev_ptr, 1, 1, alt_sector) > 0)
+                    {
+                        PartitionEntry bsd_parts[16];
+                        int bcount = parse_bsd_label(*dev_ptr, alt_sector, bsd_parts, 16);
+                        for (int bi = 0; bi < bcount; ++bi)
+                        {
+                            PartitionInfo *pinfo = new PartitionInfo();
+                            pinfo->device = dev_ptr;
+                            pinfo->lba_first = bsd_parts[bi].lba_first;
+                            pinfo->sectors_count = bsd_parts[bi].sectors_count;
+                            pinfo->type = bsd_parts[bi].type;
+
+                            char part_name[24];
+                            int slice_index = pcount + bi; // continue numbering after MBR partitions
+                            snprintf(part_name, sizeof(part_name), "%sp%d", name, slice_index + 1);
+                            DevFS::the().register_device(part_name, VNodeType::BlockDevice, &PartitionBlockDevice::ops, pinfo, false);
+                            klog("ATA", "Registered BSD slice %s: lba=%u, sectors=%u", part_name, pinfo->lba_first, pinfo->sectors_count);
+                        }
+                    }
                 }
 
                 device_index++;

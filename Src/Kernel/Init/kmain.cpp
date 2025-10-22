@@ -36,3 +36,23 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
     asm("hlt");
   }
 }
+
+// UEFI-friendly entrypoint. Some UEFI bootloaders may call into the
+// kernel directly after switching to long mode and provide an EFI memory
+// map. This symbol lets external boot code call into the kernel using a
+// simple C ABI: a pointer to the EFI memory map and the number of
+// entries. The adapter will convert the EFI-style map into the internal
+// MemoryMapView and continue initialization.
+extern "C" void kmain_uefi(void const *efi_mmap, size_t entry_count)
+{
+  // Initialize basic output so early_init_from_uefi can use logging.
+  serial::init();
+  auto vga = vga::the();
+  vga.clear();
+
+  early_init_from_uefi(efi_mmap, entry_count);
+
+  while (true) {
+    asm("hlt");
+  }
+}

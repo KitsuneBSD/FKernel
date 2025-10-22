@@ -24,10 +24,92 @@ int parse_mbr(const void *sector512, PartitionEntry out[4]) {
 }
 
 bool parse_bsd_label(const void *sector512) {
-  // TODO: Implement BSD disklabel parsing (e.g., NetBSD/FreeBSD formats).
-  // For now, return false as a stub.
   (void)sector512;
   return false;
+}
+
+
+// BSD disklabel basic structures (NetBSD/FreeBSD style, simplified)
+struct bsd_disklabel {
+  uint32_t d_magic; /* 0x82564557 */
+  uint16_t d_type;
+  uint16_t d_subtype;
+  char d_packname[16];
+  uint32_t d_secsize;
+  uint32_t d_nsectors;
+  uint32_t d_ntracks;
+  uint32_t d_ncylinders;
+  uint32_t d_secpercyl;
+  uint32_t d_secperunit;
+  uint32_t d_sparespertrack;
+  uint32_t d_sparespercyl;
+  uint32_t d_acylinders;
+  uint32_t d_rpm;
+  uint32_t d_interleave;
+  uint32_t d_trackskew;
+  uint32_t d_cylskew;
+  uint32_t d_headswitch;
+  uint32_t d_trkseek;
+  uint32_t d_flags;
+  uint32_t d_drivedata[5];
+  uint32_t d_spare[5];
+  char d_boot0[64];
+  char d_boot1[64];
+  char d_boot2[64];
+  uint32_t d_map[16]; /* pairs of (start, size) for partitions */
+  uint32_t d_magic2;
+};
+
+int parse_bsd_label(const AtaDeviceInfo &device, const void *sector512, PartitionEntry *out, int max_out) {
+  (void)device;
+  if (!sector512 || !out || max_out <= 0)
+    return 0;
+
+  // Search sector for BSD disklabel magic (0x82564557) at any 4-byte aligned offset
+  const uint8_t *buf = reinterpret_cast<const uint8_t *>(sector512);
+  const uint32_t MAGIC = 0x82564557u;
+  const int buf_len = 512;
+  int found_offset = -1;
+
+  for (int off = 0; off + (int)sizeof(uint32_t) <= buf_len; off += 4) {
+    uint32_t v;
+    memcpy(&v, buf + off, sizeof(v));
+    if (v == MAGIC) {
+      // basic sanity check: ensure there's room for header
+      if (off + (int)sizeof(struct bsd_disklabel) <= buf_len) {
+        found_offset = off;
+        break;
+      }
+    }
+  }
+
+  if (found_offset < 0)
+    return 0;
+
+  const bsd_disklabel *lbl = reinterpret_cast<const bsd_disklabel *>(buf + found_offset);
+
+  // Additional validation: check trailing magic if present
+  if (lbl->d_magic != MAGIC || (lbl->d_magic2 != MAGIC && lbl->d_magic2 != 0))
+    return 0;
+
+  // Partition map: `d_map` contains 16 u32 entries in pairs: (offset, size)
+  int found = 0;
+  for (int i = 0; i < 16 && found < max_out; i += 2) {
+    uint32_t start = lbl->d_map[i];
+    uint32_t size = lbl->d_map[i + 1];
+    if (start == 0 && size == 0)
+      continue;
+    PartitionEntry p;
+    p.boot_flag = 0;
+    memset(p.chs_first, 0, 3);
+    p.type = 0xA5; // BSD partition type marker (legacy)
+    memset(p.chs_last, 0, 3);
+    p.lba_first = start;
+    p.sectors_count = size;
+    out[found++] = p;
+  }
+
+  return found;
 }
 
 int parse_ebr_chain(const AtaDeviceInfo &device, uint32_t ebr_lba_first, PartitionEntry *out, int max_out) {
