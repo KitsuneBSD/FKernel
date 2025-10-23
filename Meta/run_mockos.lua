@@ -9,6 +9,10 @@ if not RunCommand("command -v qemu-system-x86_64 >/dev/null 2>&1") then
 	os.exit(1)
 end
 
+if not FileExists("logs") then
+  RunCommand("mkdir -p logs/")
+end
+
 local MockOS = "build/FKernel-MockOS.iso"
 local HDA = "build/FKernel-HDA.qcow2"
 
