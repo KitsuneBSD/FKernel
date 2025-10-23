@@ -4,3 +4,4 @@ build
 .cache
 compile_commands.json
 doxyfile
+logs

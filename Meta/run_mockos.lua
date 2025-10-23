@@ -18,15 +18,11 @@ end
 
 local qemu_cmd = {
 	"qemu-system-x86_64",
-	"-cdrom",
-	MockOS,
-	"-m",
-	"2G",
-	"-nographic",
-	"-serial mon:stdio",
+	"-cdrom " .. MockOS,
+	"-m 2G",
+  "-serial file:logs/serial.log",
 	"-smp 2",
-	"-boot",
-	"d",
+	"-boot d",
 }
 
 local file = io.open(HDA, "r")
