@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
-#include <Kernel/FileSystem/fd.h>
+#include <Kernel/FileSystem/file_descriptor.h>
 #include <Kernel/Driver/Ata/AtaController.h>
 #include <Kernel/Block/partition.h>
 

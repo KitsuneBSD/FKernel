@@ -2,7 +2,7 @@
 
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <Kernel/FileSystem/DevFS/devfs.h>
-#include <Kernel/FileSystem/fd.h>
+#include <Kernel/FileSystem/file_descriptor.h>
 
 struct VNode;
 

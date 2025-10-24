@@ -1,4 +1,5 @@
 #include <Kernel/FileSystem/RamFS/ramfs.h>
+#include <Kernel/FileSystem/RamFS/ramfs_file.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibC/string.h>
 

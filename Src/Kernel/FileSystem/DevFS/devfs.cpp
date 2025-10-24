@@ -1,6 +1,6 @@
 #include <Kernel/FileSystem/DevFS/devfs.h>
 #include <Kernel/FileSystem/DevFS/device.h>
-#include <Kernel/FileSystem/fd.h>
+#include <Kernel/FileSystem/file_descriptor.h>
 
 #include <LibC/string.h>
 

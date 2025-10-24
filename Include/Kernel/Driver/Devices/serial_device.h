@@ -1,6 +1,6 @@
 #pragma once
 #include <Kernel/FileSystem/DevFS/devfs.h>
-#include <Kernel/FileSystem/fd.h>
+#include <Kernel/FileSystem/file_descriptor.h>
 #include <Kernel/Driver/SerialPort/serial_port.h>
 #include <LibFK/Memory/retain_ptr.h>
 

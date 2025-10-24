@@ -4,7 +4,7 @@
 #include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
 #include <Kernel/FileSystem/VirtualFS/vnode_type.h>
 #include <LibC/stddef.h>
-#include <Kernel/FileSystem/fd.h>
+#include <Kernel/FileSystem/file_descriptor.h>
 
 struct VNode;
 
