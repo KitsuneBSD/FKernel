@@ -45,6 +45,16 @@ local flags = {
   }
 }
 
+local kernel_non_architecture_related = {
+  "Src/Kernel/Block/**.cpp",
+  "Src/Kernel/Driver/**.cpp",
+  "Src/Kernel/FileSystem/**.cpp",
+  "Src/Kernel/Hardware/**.cpp",
+  "Src/Kernel/Init/**.cpp",
+  "Src/Kernel/MemoryManager/**.cpp",
+  "Src/Kernel/Posix/**.cpp",
+}
+
 toolchain("FKernel_Compiling")
 set_kind("standalone")
 set_toolset("cc", "clang", "tcc", "cl", "gcc")
@@ -90,7 +100,7 @@ if is_arch("x86_64", "x64") then
   add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
 
-add_files("Src/Kernel/**.cpp")
+add_files(kernel_non_architecture_related)
 
 if is_arch("x86_64", "x64") then
   after_link(function(target)
