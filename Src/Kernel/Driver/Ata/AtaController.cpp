@@ -6,6 +6,9 @@
 #include <Kernel/Block/partition.h>
 #include <Kernel/Block/partition_device.h>
 
+#include <Kernel/Block/BootSector/mbr_partition.h>
+#include <Kernel/Block/BootSector/bsd_partition.h>
+
 #include <Kernel/Driver/Ata/AtaBlockDevice.h>
 #include <Kernel/Driver/Ata/AtaController.h>
 #include <Kernel/Driver/Ata/AtaBlockCache.h>
@@ -14,6 +17,8 @@
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 
 #include <LibFK/Algorithms/log.h>
+
+//TODO: Separe responsabilities between the controller driver and the block bootsector
 
 void ata_irq_primary()
 {
