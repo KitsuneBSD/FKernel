@@ -78,48 +78,6 @@ void AtaController::detect_devices()
                 DevFS::the().register_device(
                     "ada", VNodeType::BlockDevice, &AtaBlockDevice::ops, dev_ptr, true);
 
-                uint8_t sector[512];
-                if (read_sectors_pio(*dev_ptr, 0, 1, sector) > 0)
-                {
-                    PartitionEntry parts[4];
-                    int pcount = parse_mbr(sector, parts);
-                    for (int pi = 0; pi < pcount; ++pi)
-                    {
-                        PartitionInfo *pinfo = new PartitionInfo();
-                        pinfo->device = dev_ptr;
-                        pinfo->lba_first = parts[pi].lba_first;
-                        pinfo->sectors_count = parts[pi].sectors_count;
-                        pinfo->type = parts[pi].type;
-
-                        char part_name[24];
-                        snprintf(part_name, sizeof(part_name), "%sp%d", name, pi + 1);
-                        DevFS::the().register_device(part_name, VNodeType::BlockDevice, &PartitionBlockDevice::ops, pinfo, false);
-                        klog("ATA", "Registered partition %s: type=0x%02x, lba=%u, sectors=%u",
-                             part_name, pinfo->type, pinfo->lba_first, pinfo->sectors_count);
-                    }
-                    // Try to detect BSD disklabel in sector 1 (or other alternate locations)
-                    uint8_t alt_sector[512];
-                    if (read_sectors_pio(*dev_ptr, 1, 1, alt_sector) > 0)
-                    {
-                        PartitionEntry bsd_parts[16];
-                        int bcount = parse_bsd_label(*dev_ptr, alt_sector, bsd_parts, 16);
-                        for (int bi = 0; bi < bcount; ++bi)
-                        {
-                            PartitionInfo *pinfo = new PartitionInfo();
-                            pinfo->device = dev_ptr;
-                            pinfo->lba_first = bsd_parts[bi].lba_first;
-                            pinfo->sectors_count = bsd_parts[bi].sectors_count;
-                            pinfo->type = bsd_parts[bi].type;
-
-                            char part_name[24];
-                            int slice_index = pcount + bi; // continue numbering after MBR partitions
-                            snprintf(part_name, sizeof(part_name), "%sp%d", name, slice_index + 1);
-                            DevFS::the().register_device(part_name, VNodeType::BlockDevice, &PartitionBlockDevice::ops, pinfo, false);
-                            klog("ATA", "Registered BSD slice %s: lba=%u, sectors=%u", part_name, pinfo->lba_first, pinfo->sectors_count);
-                        }
-                    }
-                }
-
                 device_index++;
             }
         }
