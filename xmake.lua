@@ -14,9 +14,10 @@ local flags = {
       "-fno-rtti",
       "-fno-stack-protector",
       "-fno-use-cxa-atexit",
+      "-fno-pic",
+      "-fno-omit-frame-pointer",
       "-nostdlib",
       "-nostdinc",
-      "-fno-pic",
     },
 
     asm = {
