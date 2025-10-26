@@ -75,11 +75,14 @@ if is_mode("debug") then
   set_symbols("debug")
   set_optimize("fast")
   add_defines("FKERNEL_DEBUG")
+
+  --TODO: add tests load on the kernel if this mode is setted
 end
 
 if is_mode("release") then
   set_symbols("hidden")
   set_optimize("faster")
+  set_strip("all")
 end
 
 add_includedirs("Include")
@@ -95,7 +98,7 @@ add_files("Src/LibFK/**.cpp")
 if is_arch("x86_64", "x64") then
   add_cxflags(flags.x86_64.cxx)
   add_asflags(flags.x86_64.asm)
-  
+
   add_files("Src/Kernel/Arch/x86_64/**.asm")
   add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
