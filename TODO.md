@@ -10,6 +10,13 @@ Rule:
     Each Header need be a choose, keep the structure with relatives or separate on a another header multiple structures on FKernel
 
 ### Specific
+
+- [ ] LibC:
+    - [ ] Apply `Duff-Device` on critical LibC functions
+
+- [ ] LibFK:
+    - [ ] Create a `LibFK/Algorithms/Duff-Device`
+
 - [ ] VNode: 
     - [ ] Add a lot of flags to manipulate the files
     - [ ] Rewrite to use the LibFK as base
