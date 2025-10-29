@@ -1,6 +1,7 @@
 global long_mode_start 
 extern kmain
 
+extern stack_top
 extern page_table_l4 
 extern current_pml4_ptr 
 extern multiboot_magic 
@@ -16,6 +17,7 @@ long_mode_start:
   mov edi, eax
   mov rsi, [multiboot_info_ptr]
   
+  mov rsp, stack_top
 
   mov ax, 0
   mov ss, ax
