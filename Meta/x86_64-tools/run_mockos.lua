@@ -4,6 +4,8 @@ require("Meta.Lib.os_interact")
 require("Meta.Lib.print_message")
 require("Meta.Lib.run_command")
 
+local is_graphical_mode = true
+
 if not RunCommand("command -v qemu-system-x86_64 >/dev/null 2>&1") then
 	PrintMessage(true, "qemu-system-x86_64 not found. Please install it before running this script.")
 	os.exit(1)
@@ -24,10 +26,17 @@ local qemu_cmd = {
 	"qemu-system-x86_64",
 	"-cdrom " .. MockOS,
 	"-m 2G",
-  "-serial file:logs/serial.log",
 	"-smp 2",
 	"-boot d",
 }
+
+if is_graphical_mode then
+	table.insert(qemu_cmd, "-vga qxl")
+  	table.insert(qemu_cmd,"-serial file:logs/serial.log")
+else
+	table.insert(qemu_cmd, "-nographic")
+	table.insert(qemu_cmd, "-serial mon:stdio")
+end
 
 local file = io.open(HDA, "r")
 if file then
