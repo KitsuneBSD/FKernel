@@ -31,17 +31,19 @@ struct PhysicalMemoryRange {
 
   int alloc_page(size_t count = 1, uintptr_t addr_hint = 0) {
     if (m_type != MemoryType::Usable || count == 0 || count > m_page_count) {
+      kwarn("PHYSICAL MEMORY RANGE",
+            "Cannot allocate %zu pages in range [%p - %p]", count, m_start,
+            m_end);
       return -1;
     }
 
     size_t start_index = 0;
     if (addr_hint) {
-      if (addr_hint >= m_start && addr_hint * count + PAGE_SIZE <= m_end) {
+      if (addr_hint >= m_start && addr_hint + count * PAGE_SIZE <= m_end) {
         start_index = (addr_hint - m_start) / PAGE_SIZE;
       } else {
-        kwarn("PHYSICAL MEMORY RANGE",
-              "The address hint %p is out of range [%p - %p]", addr_hint,
-              m_start, m_end);
+        kwarn("PHYSICAL MEMORY RANGE", "Address hint %p out of range [%p - %p]",
+              addr_hint, m_start, m_end);
         addr_hint = 0;
       }
     }
@@ -59,7 +61,6 @@ struct PhysicalMemoryRange {
         for (size_t j = 0; j < count; ++j) {
           m_bitmap.set(i + j, true);
         }
-
         return static_cast<int>(i);
       }
 
@@ -69,19 +70,22 @@ struct PhysicalMemoryRange {
       }
     }
 
+    kwarn("PHYSICAL MEMORY RANGE",
+           "No available pages for %zu pages in range [%p - %p]", count,
+           m_start, m_end);
     return -1;
   }
 
   void free_page(uintptr_t addr, size_t count = 1) {
     if (m_type != MemoryType::Usable || count == 0) {
       kwarn("PHYSICAL MEMORY RANGE",
-            "We can't free pages in this range [%p - %p]", m_start, m_end);
+            "Cannot free pages in this range [%p - %p]", m_start, m_end);
       return;
     }
 
     if (addr < m_start || addr + count * PAGE_SIZE > m_end) {
-      kwarn("PHYSICAL MEMORY RANGE", "The address %p is out of range [%p - %p]",
-            addr, m_start, m_end);
+      kwarn("PHYSICAL MEMORY RANGE", "Address %p out of range [%p - %p]", addr,
+            m_start, m_end);
       return;
     }
 
@@ -89,7 +93,7 @@ struct PhysicalMemoryRange {
 
     for (size_t i = 0; i < count; ++i) {
       if (!m_bitmap.get(index + i)) {
-        kwarn("PHYSICAL MEMORY RANGE", "The page at address %p is already free",
+        kwarn("PHYSICAL MEMORY RANGE", "Page at 0x%lx already free",
               addr + i * PAGE_SIZE);
       } else {
         m_bitmap.clear(index + i);
