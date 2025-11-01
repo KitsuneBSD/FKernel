@@ -62,6 +62,16 @@ inline void kwarn(const char *prefix, const char *fmt, ...) {
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_YELLOW, prefix, KLOG_COLOR_RESET, buf);
 }
 
+inline void kdebug(const char *prefix, const char *fmt, ...) {
+  char buf[512]; ///< Temporary buffer for formatted message
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_WHITE, prefix, KLOG_COLOR_RESET, buf);
+}
+
 #ifdef FKERNEL_DEBUG
 
 /**
@@ -104,6 +114,8 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
   kprintf("%s[%s]%s: %s\n", color, prefix, KLOG_COLOR_RESET, buf);
 }
 #else
+/// In release mode, kebug does nothing
+#define kdebug(...)
 /// In release mode, klog does nothing
 #define klog(...)
 /// In release mode, klog_color does nothing
