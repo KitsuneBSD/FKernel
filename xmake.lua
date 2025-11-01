@@ -18,6 +18,8 @@ local flags = {
       "-fno-omit-frame-pointer",
       "-nostdlib",
       "-nostdinc",
+      "-Wno-constant-conversion",
+      "-Wno-c++11-narrowing",
     },
 
     asm = {
