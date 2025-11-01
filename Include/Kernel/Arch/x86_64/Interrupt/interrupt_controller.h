@@ -15,24 +15,24 @@ private:
 
   void enable_interrupt() {
     if (is_interrupt_enable) {
-      klog("INTERRUPT", "Interrupts already enabled");
+      kwarn("INTERRUPT", "Interrupts already enabled");
       return;
     }
 
     asm volatile("sti");
     is_interrupt_enable = true;
-    klog("INTERRUPT", "Interrupts enabled");
+    kdebug("INTERRUPT", "Interrupts enabled");
   }
 
   void disable_interrupt() {
     if (!is_interrupt_enable) {
-      klog("INTERRUPT", "Interrupts already disabled");
+      kwarn("INTERRUPT", "Interrupts already disabled");
       return;
     }
 
     asm volatile("cli");
     is_interrupt_enable = false;
-    klog("INTERRUPT", "Interrupts disabled");
+    kdebug("INTERRUPT", "Interrupts disabled");
   }
 
 public:
