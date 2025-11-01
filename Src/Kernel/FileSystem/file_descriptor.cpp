@@ -31,16 +31,8 @@ int FileDescriptorTable::allocate(RetainPtr<VNode> vnode, int flags)
     int idx = static_cast<int>(m_file_descriptors.size()) - 1;
     m_file_descriptors[idx].file_descriptor = idx;
 
-    klog("FD", "Allocated file_descriptor %d for vnode '%s'", idx, vnode->m_name.c_str());
+    kdebug("FD", "Allocated file_descriptor %d for vnode '%s'", idx, vnode->m_name.c_str());
     return idx;
-}
-
-FileDescriptor *FileDescriptorTable::get(int file_descriptor)
-{
-    if (file_descriptor < 0 || static_cast<size_t>(file_descriptor) >= m_file_descriptors.size())
-        return nullptr;
-    FileDescriptor &f = m_file_descriptors[file_descriptor];
-    return f.used ? &f : nullptr;
 }
 
 int FileDescriptorTable::close(int file_descriptor)
@@ -51,8 +43,18 @@ int FileDescriptorTable::close(int file_descriptor)
     if (f->vnode)
         f->vnode->close();
     f->used = false;
-    klog("FD", "Closed file_descriptor %d", file_descriptor);
+
+    kdebug("FD", "Closed file_descriptor %d", file_descriptor);
     return 0;
+}
+
+
+FileDescriptor *FileDescriptorTable::get(int file_descriptor)
+{
+    if (file_descriptor < 0 || static_cast<size_t>(file_descriptor) >= m_file_descriptors.size())
+        return nullptr;
+    FileDescriptor &f = m_file_descriptors[file_descriptor];
+    return f.used ? &f : nullptr;
 }
 
 int file_descriptor_open_path(const char *path, int flags)

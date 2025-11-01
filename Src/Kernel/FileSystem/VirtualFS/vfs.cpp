@@ -35,69 +35,44 @@ int VirtualFS::mount(const char *name, RetainPtr<VNode> root)
     return 0;
 }
 
-// Resolve path absoluto ou relativo ao cwd
 RetainPtr<VNode> VirtualFS::resolve_path(const char *path, RetainPtr<VNode> cwd)
 {
-    if (!path || !*path || !v_root)
-    {
+    if (!path || !*path || !v_root) {
         kwarn("VFS", "Resolve path failed: empty path or root not mounted");
         return RetainPtr<VNode>();
     }
 
-    RetainPtr<VNode> current;
+    RetainPtr<VNode> current = (path[0] == '/') ? v_root : (cwd ? cwd : v_cwd);
 
-    if (path[0] == '/')
-    {
-        current = v_root; // absoluto ignora cwd
-    }
-    else
-    {
-        current = cwd ? cwd : v_cwd; // relativo a cwd
-    }
-
-    klog("VFS", "Resolving path: '%s'", path);
+    kdebug("VFS", "Resolving path: '%s'", path);
 
     const char *p = path;
-
-    while (*p)
-    {
-        while (*p == '/')
-            ++p;
-        if (!*p)
-            break;
+    while (*p) {
+        while (*p == '/') ++p;
+        if (!*p) break;
 
         const char *end = p;
-        while (*end && *end != '/')
-            ++end;
-
+        while (*end && *end != '/') ++end;
         size_t len = end - p;
-        if (len == 0)
-            break;
+        if (len == 0) break;
 
         fixed_string<256> token;
-        if (len >= token.capacity())
-        {
+        if (len >= token.capacity()) {
             kwarn("VFS", "Path component too long: '%.*s'", int(len), p);
             return RetainPtr<VNode>();
         }
 
         token.assign(p, len);
 
-        if (strcmp(token.c_str(), ".") == 0)
-        {
-            // não faz nada
-        }
-        else if (strcmp(token.c_str(), "..") == 0)
-        {
+        if (strcmp(token.c_str(), ".") == 0) {
+            // nada
+        } else if (strcmp(token.c_str(), "..") == 0) {
             if (current->parent)
                 current = current->parent;
-        }
-        else
-        {
+        } else {
             RetainPtr<VNode> next;
-            if (current->lookup(token.c_str(), next) != 0)
-            {
-                kwarn("VFS", "Component '%s' not found in '%s'", token.c_str(), current->m_name.c_str());
+            if (current->lookup(token.c_str(), next) != 0) {
+                kdebug("VFS", "Component '%s' not found in '%s'", token.c_str(), current->m_name.c_str());
                 return RetainPtr<VNode>();
             }
             current = next;
@@ -106,11 +81,12 @@ RetainPtr<VNode> VirtualFS::resolve_path(const char *path, RetainPtr<VNode> cwd)
         p = end;
     }
 
-    klog("VFS", "Resolved path successfully: '%s'", path);
+    kdebug("VFS", "Resolved path successfully: '%s'", path);
     return current;
 }
 
-// Define ou retorna o cwd atual
+
+
 RetainPtr<VNode> VirtualFS::cwd() const
 {
     return v_cwd;
@@ -122,7 +98,6 @@ void VirtualFS::set_cwd(RetainPtr<VNode> vnode)
         v_cwd = vnode;
 }
 
-// Lookup ajustado para suportar cwd
 int VirtualFS::lookup(const char *path, RetainPtr<VNode> &out)
 {
     RetainPtr<VNode> vnode = resolve_path(path, v_cwd);
@@ -136,7 +111,6 @@ int VirtualFS::lookup(const char *path, RetainPtr<VNode> &out)
     return 0;
 }
 
-// Open ajustado para suportar cwd
 int VirtualFS::open(const char *path, int flags, RetainPtr<VNode> &out)
 {
     RetainPtr<VNode> vnode = resolve_path(path, v_cwd);
@@ -151,40 +125,28 @@ int VirtualFS::open(const char *path, int flags, RetainPtr<VNode> &out)
     return ret;
 }
 
-// Read ajustado para suportar cwd
 int VirtualFS::read(const char *path, void *buf, size_t sz, size_t off)
 {
     RetainPtr<VNode> vnode = resolve_path(path, v_cwd);
-    if (!vnode)
-    {
-        kwarn("VFS", "Read failed: path '%s' not found", path);
+    if (!vnode) {
+        kdebug("VFS", "Read failed: path '%s' not found", path);
         return -1;
     }
 
     int ret = vnode->read(buf, sz, off);
-    if (ret < 0)
-        kwarn("VNode", "Read op on '%s' returned error %d", vnode->m_name.c_str(), ret);
-    else
-        klog("VNode", "Read %d bytes from '%s' (offset=%zu)", ret, vnode->m_name.c_str(), off);
-
+    kdebug("VNode", "Read %d bytes from '%s' (offset=%zu)", ret, vnode->m_name.c_str(), off);
     return ret;
 }
 
-// Write ajustado para suportar cwd
 int VirtualFS::write(const char *path, const void *buf, size_t sz, size_t off)
 {
     RetainPtr<VNode> vnode = resolve_path(path, v_cwd);
-    if (!vnode)
-    {
-        kwarn("VFS", "Write failed: path '%s' not found", path);
+    if (!vnode) {
+        kdebug("VFS", "Write failed: path '%s' not found", path);
         return -1;
     }
 
     int ret = vnode->write(buf, sz, off);
-    if (ret < 0)
-        kwarn("VNode", "Write op on '%s' returned error %d", vnode->m_name.c_str(), ret);
-    else
-        klog("VNode", "Wrote %d bytes to '%s' (offset=%zu)", ret, vnode->m_name.c_str(), off);
-
+    kdebug("VNode", "Wrote %d bytes to '%s' (offset=%zu)", ret, vnode->m_name.c_str(), off);
     return ret;
 }

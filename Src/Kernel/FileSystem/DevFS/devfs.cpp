@@ -50,7 +50,7 @@ int DevFS::register_device_static(const char *name, VNodeType type, VNodeOps *op
 {
     if ((type != VNodeType::CharacterDevice) && (type != VNodeType::BlockDevice))
     {
-        kwarn("DEVFS", "To register in a devfs we need the type of VNode be a character device or a block device");
+        kwarn("DEVFS", "To register in devfs we need VNode to be a character or block device");
         return -1;
     }
 
@@ -78,7 +78,7 @@ int DevFS::register_device_static(const char *name, VNodeType type, VNodeOps *op
 
     d_root->dir_entries.push_back(DirEntry{name, dev_node});
 
-    klog("DEVFS", "Registered device '%s' (type=%d) at %p", name, (int)type, driver_data);
+    kdebug("DEVFS", "Registered device '%s' (type=%d)", name, (int)type);
     return 0;
 }
 
@@ -99,7 +99,7 @@ int DevFS::unregister_device(const char *name)
                 }
             }
 
-            klog("DEVFS", "Unregistered device '%s'", name);
+            kdebug("DEVFS", "Unregistered device '%s'", name);
             return 0;
         }
     }
@@ -107,6 +107,8 @@ int DevFS::unregister_device(const char *name)
     kwarn("DEVFS", "Unregister_device: '%s' not found", name);
     return -1;
 }
+
+
 
 int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name, RetainPtr<VNode> &out)
 {
@@ -191,7 +193,7 @@ int DevFS::devfs_create(VNode *dir, FileDescriptor *fd, const char *name, VNodeT
 
     out = new_node; // importante!
 
-    klog("DEVFS", "Created node '%s' in %s", name, dir->m_name.c_str());
+    kdebug("DEVFS", "Created node '%s' in %s", name, dir->m_name.c_str());
     return 0;
 }
 
@@ -206,7 +208,7 @@ int DevFS::devfs_unlink(VNode *dir, FileDescriptor *fd, const char *name)
         if (strcmp(dir->dir_entries[i].m_name.c_str(), name) == 0)
         {
             dir->dir_entries.erase(i);
-            klog("DEVFS", "Unlinked '%s' from %s", name, dir->m_name.c_str());
+            kdebug("DEVFS", "Unlinked '%s' from %s", name, dir->m_name.c_str());
             return 0;
         }
     }
@@ -214,6 +216,7 @@ int DevFS::devfs_unlink(VNode *dir, FileDescriptor *fd, const char *name)
     kwarn("DEVFS", "Unlink: '%s' not found in %s", name, dir->m_name.c_str());
     return -1;
 }
+
 
 VNodeOps DevFS::ops = {
     .read = &DevFS::devfs_read,
