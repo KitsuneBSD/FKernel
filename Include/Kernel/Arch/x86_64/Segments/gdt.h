@@ -82,7 +82,7 @@ class GDTController {
 private:
   bool m_initialized = false;
 
-  uint64_t gdt[5] = {0};
+  uint64_t gdt[6] = {0};
   struct TSS64 tss = {};
   GDTR gdtr = {};
 
