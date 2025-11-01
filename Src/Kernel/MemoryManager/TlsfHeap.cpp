@@ -9,40 +9,48 @@
 
 void TLSFHeap::expand(size_t bytes)
 {
-  size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
-  uintptr_t base = m_heap_base + m_heap_size;
+    size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+    uintptr_t base = m_heap_base + m_heap_size;
 
-  // Se o heap ainda não existe, aloca o bloco inicial
-  if (m_heap_base == 0)
-  {
-    void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
-    if (!phys)
-      return;
-    m_heap_base = reinterpret_cast<uintptr_t>(phys);
-    m_heap_size = PAGE_SIZE;
-    auto *block = reinterpret_cast<BlockHeader *>(m_heap_base);
-    block->m_size = PAGE_SIZE - sizeof(BlockHeader);
+    if (m_heap_base == 0)
+    {
+        void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
+        if (!phys) {
+            kwarn("TLSF", "Failed to allocate initial physical page");
+            return;
+        }
+
+        m_heap_base = reinterpret_cast<uintptr_t>(phys);
+        m_heap_size = PAGE_SIZE;
+        auto *block = reinterpret_cast<BlockHeader *>(m_heap_base);
+        block->m_size = PAGE_SIZE - sizeof(BlockHeader);
+        block->m_free = true;
+        insert_block(block);
+
+        klog("TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base, m_heap_size);
+        return;
+    }
+
+    for (size_t i = 0; i < pages; ++i)
+    {
+        void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
+        if (!phys) {
+            kwarn("TLSF", "Failed to allocate physical page for heap expansion");
+            return;
+        }
+
+        VirtualMemoryManager::the().map_page(base + i * PAGE_SIZE,
+                                             (uintptr_t)phys,
+                                             PageFlags::Present | PageFlags::Writable);
+    }
+
+    auto *block = reinterpret_cast<BlockHeader *>(base);
+    block->m_size = pages * PAGE_SIZE - sizeof(BlockHeader);
     block->m_free = true;
     insert_block(block);
-    return;
-  }
 
-  // Aloca novas páginas
-  for (size_t i = 0; i < pages; ++i)
-  {
-    void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
-    if (!phys)
-      return;
-    VirtualMemoryManager::the().map_page(base + i * PAGE_SIZE, (uintptr_t)phys,
-                                         PageFlags::Present | PageFlags::Writable);
-  }
-
-  auto *block = reinterpret_cast<BlockHeader *>(base);
-  block->m_size = pages * PAGE_SIZE - sizeof(BlockHeader);
-  block->m_free = true;
-  insert_block(block);
-
-  m_heap_size += pages * PAGE_SIZE;
+    m_heap_size += pages * PAGE_SIZE;
+    kdebug("TLSF", "Heap expanded by %zu pages, new size=%zu", pages, m_heap_size);
 }
 
 // TODO/FIXME:

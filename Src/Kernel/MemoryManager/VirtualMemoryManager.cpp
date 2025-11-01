@@ -40,8 +40,7 @@ void map_ranges_iterative(rb_node<PhysicalMemoryRange> *root) {
 
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
                                     uint64_t flags,
-                                    [[maybe_unused]] size_t page_size) {
-  // Is already mapped?
+                                    [[maybe_unused]] uint64_t page_size) {
   if (PhysicalMemoryManager::the().virt_to_phys(virt) == phys) {
     return;
   }
@@ -51,7 +50,6 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
   uint64_t pd_index = (virt >> 21) & 0x1FF;
   uint64_t pt_index = (virt >> 12) & 0x1FF;
 
-  // Page Directory Pointer Table (PDPT)
   uint64_t *pdpt;
   if (!(m_pml4[pml4_index] & PageFlags::Present)) {
     pdpt = alloc_table();
@@ -61,7 +59,6 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
     pdpt = reinterpret_cast<uint64_t *>(m_pml4[pml4_index] & PAGE_MASK);
   }
 
-  // Page Directory (PD)
   uint64_t *pd;
   if (!(pdpt[pdpt_index] & PageFlags::Present)) {
     pd = alloc_table();
@@ -71,9 +68,7 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
     pd = reinterpret_cast<uint64_t *>(pdpt[pdpt_index] & PAGE_MASK);
   }
 
-  // Page Table (PT)
   uint64_t *pt;
-
   if (!(pd[pd_index] & PageFlags::Present)) {
     pt = alloc_table();
     pd[pd_index] = reinterpret_cast<uintptr_t>(pt) | PageFlags::Present |
@@ -82,8 +77,11 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
     pt = reinterpret_cast<uint64_t *>(pd[pd_index] & PAGE_MASK);
   }
 
-  pt[pt_index] = phys | (flags & PAGE_MASK);
+  pt[pt_index] = phys | (flags & ~PAGE_MASK);
   asm volatile("invlpg (%0)" ::"r"((void *)virt) : "memory");
+
+  kdebug("VIRTUAL MEMORY", "Mapped page V:0x%lx -> P:0x%lx (flags 0x%lx)", virt,
+         phys, flags);
 }
 
 void VirtualMemoryManager::map_range(uintptr_t virt_start, uintptr_t phys_start,

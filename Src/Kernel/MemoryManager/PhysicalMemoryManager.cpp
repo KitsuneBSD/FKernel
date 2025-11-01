@@ -73,11 +73,10 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap)
 
     if (!m_memory_ranges.insert(range))
     {
-  kwarn("PHYSICAL MEMORY", "We can't insert the new memory range [%p - %p]",
-    entry_start, entry_end);
+      kwarn("PHYSICAL MEMORY", "We can't insert the new memory range [%p - %p]", entry_start, entry_end);
     }
 
-    klog("PHYSICAL MEMORY", "Insert a new range of memory [ %p - %p | %s ]",
+    kdebug("PHYSICAL MEMORY", "Insert a new range of memory [ %p - %p | %s ]",
          entry_start, entry_end,
          multiboot2::is_available(entry.type) ? "usable" : "reserved");
   }
@@ -89,53 +88,46 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap)
 int PhysicalMemoryManager::alloc_from_node(rb_node<PhysicalMemoryRange> *node,
                                            size_t count, uintptr_t addr_hint)
 {
-  if (!node)
-  {
-    return -1;
-  }
+    if (!node)
+        return -1;
 
-  int index = alloc_from_node(node->left(), count, addr_hint);
-  if (index >= 0)
-  {
-    return index;
-  }
-
-  if (node->value().m_type == MemoryType::Usable)
-  {
-    index = node->value().alloc_page(count, addr_hint);
-
+    int index = alloc_from_node(node->left(), count, addr_hint);
     if (index >= 0)
-    {
-      return node->value().m_start + index * PAGE_SIZE;
-    }
-  }
+        return index;
 
-  return alloc_from_node(node->right(), count, addr_hint);
+    //TODO: If we work on continuous memory we can make allocation of more pages instead one page per range
+    if (node->value().m_type == MemoryType::Usable) {
+        index = node->value().alloc_page(count, addr_hint);
+        if (index >= 0) {
+            uintptr_t addr = node->value().m_start + index * PAGE_SIZE;
+            kdebug("PHYSICAL MEMORY", "Allocated %zu page(s) at 0x%lx", count, addr);
+            return addr;
+        }
+    }
+
+    return alloc_from_node(node->right(), count, addr_hint);
 }
 
 void *PhysicalMemoryManager::alloc_physical_page(size_t count,
                                                  uintptr_t addr_hint)
 {
-  if (!is_initialized)
-  {
-    kwarn("PHYSICAL MEMORY", "Not initialized!");
-    return nullptr;
-  }
+    if (!is_initialized) {
+        kwarn("PHYSICAL MEMORY", "Not initialized!");
+        return nullptr;
+    }
 
-  if (count == 0)
-  {
-    kwarn("PHYSICAL MEMORY", "We can't allocate zero pages");
-    return nullptr;
-  }
+    if (count == 0) {
+        kwarn("PHYSICAL MEMORY", "Cannot allocate zero pages");
+        return nullptr;
+    }
 
-  uintptr_t addr = alloc_from_node(m_memory_ranges.root(), count, addr_hint);
-  if (!addr)
-  {
-    kwarn("PHYSICAL MEMORY", "No more physical memory available");
-    return nullptr;
-  }
+    uintptr_t addr = alloc_from_node(m_memory_ranges.root(), count, addr_hint);
+    if (addr == static_cast<uintptr_t>(-1)) {
+        kwarn("PHYSICAL MEMORY", "No more physical memory available");
+        return nullptr;
+    }
 
-  return reinterpret_cast<void *>(addr);
+    return reinterpret_cast<void *>(addr);
 }
 
 void PhysicalMemoryManager::free_physical_page(void *page)

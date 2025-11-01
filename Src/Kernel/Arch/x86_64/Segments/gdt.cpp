@@ -3,53 +3,80 @@
 #include <LibC/stdint.h>
 
 extern "C" uint64_t stack_top;
+extern "C" uint64_t stack_bottom;
 extern "C" void flush_tss(uint16_t tss_selector);
 extern "C" void flush_gdt(void *gdtr);
 
 void GDTController::setupGDT() {
-  setupNull();
-  setupKernelCode();
-  setupKernelData();
-  setupTSS();
-  setupGDTR();
-}
-
-void GDTController::set_kernel_stack(uint64_t stack_addr) {
-  tss.rsp0 = stack_addr;
+    kdebug("GDT", "Setting up GDT entries...");
+    setupNull();
+    setupKernelCode();
+    setupKernelData();
+    setupTSS();
+    setupGDTR();
+    kdebug("GDT", "GDTR configured");
 }
 
 void GDTController::setupTSS() {
-  tss.rsp0 = stack_top; // stack do kernel
-  tss.ist1 = reinterpret_cast<uint64_t>(&ist_stacks[0][IST_STACK_SIZE]);
-  tss.ist2 = reinterpret_cast<uint64_t>(&ist_stacks[1][IST_STACK_SIZE]);
-  tss.ist3 = reinterpret_cast<uint64_t>(&ist_stacks[2][IST_STACK_SIZE]);
-  tss.ist4 = reinterpret_cast<uint64_t>(&ist_stacks[3][IST_STACK_SIZE]);
-  tss.ist5 = reinterpret_cast<uint64_t>(&ist_stacks[4][IST_STACK_SIZE]);
-  tss.ist6 = reinterpret_cast<uint64_t>(&ist_stacks[5][IST_STACK_SIZE]);
-  tss.ist7 = reinterpret_cast<uint64_t>(&ist_stacks[6][IST_STACK_SIZE]);
-  tss.io_map_base = sizeof(TSS64);
+    kdebug("TSS", "Initializing TSS stacks and IST entries...");
 
-  tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack);
-  tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack);
+    tss.rsp0 = reinterpret_cast<uint64_t>(&stack_bottom) + 4096 * 4;
+    
+    if (tss.rsp0 == 0){
+      kdebug("TSS", "Warning: RSP0 is 0");
+    }
 
-  uintptr_t addr = reinterpret_cast<uintptr_t>(&tss);
-  size_t size = sizeof(TSS64) - 1;
+    kdebug("TSS", "RSP0 set on %p", tss.rsp0);
 
-  uint64_t low = (size & 0xFFFFULL) | ((addr & 0xFFFFFFULL) << 16) |
-                 (static_cast<uint64_t>(SegmentAccess::TSS64) << 40) |
-                 (((size >> 16) & 0x0FULL) << 48) |
-                 (((addr >> 24) & 0xFFULL) << 56);
+    for (int i = 0; i < 7; i++) {
+        tss.ist1 = (i == 0) ? reinterpret_cast<uint64_t>(&ist_stacks[0][IST_STACK_SIZE]) : tss.ist1;
+        tss.ist2 = (i == 1) ? reinterpret_cast<uint64_t>(&ist_stacks[1][IST_STACK_SIZE]) : tss.ist2;
+        tss.ist3 = (i == 2) ? reinterpret_cast<uint64_t>(&ist_stacks[2][IST_STACK_SIZE]) : tss.ist3;
+        tss.ist4 = (i == 3) ? reinterpret_cast<uint64_t>(&ist_stacks[3][IST_STACK_SIZE]) : tss.ist4;
+        tss.ist5 = (i == 4) ? reinterpret_cast<uint64_t>(&ist_stacks[4][IST_STACK_SIZE]) : tss.ist5;
+        tss.ist6 = (i == 5) ? reinterpret_cast<uint64_t>(&ist_stacks[5][IST_STACK_SIZE]) : tss.ist6;
+        tss.ist7 = (i == 6) ? reinterpret_cast<uint64_t>(&ist_stacks[6][IST_STACK_SIZE]) : tss.ist7;
 
-  uint64_t high = (addr >> 32) & 0xFFFFFFFFULL;
+        uint64_t ist_val = 0;
+        switch (i) {
+            case 0: ist_val = tss.ist1; break;
+            case 1: ist_val = tss.ist2; break;
+            case 2: ist_val = tss.ist3; break;
+            case 3: ist_val = tss.ist4; break;
+            case 4: ist_val = tss.ist5; break;
+            case 5: ist_val = tss.ist6; break;
+            case 6: ist_val = tss.ist7; break;
+        }
 
-  gdt[3] = low;
-  gdt[4] = high;
-  // TODO: Consider moving TSS construction into a helper class to avoid
-  // raw pointer arithmetic and manual packing. Use static_asserts to
-  // validate size/alignment assumptions about TSS64 and IST stacks.
-  // FIXME: The code assumes IST stacks and RSP values exist at compile
-  // time; add validation and fail-safe defaults for platforms where
-  // the memory layout differs.
+        if (ist_val == 0){
+          kdebug("TSS", "Warning: IST stack is 0", i);
+        }
+
+        kdebug("TSS", "IST stack %d configured %p", i, ist_val);
+    }
+
+    tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack);
+    tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack);
+    kdebug("TSS", "RSP1 set on %p", tss.rsp1);
+    kdebug("TSS", "RSP2 set on %p", tss.rsp2);
+
+    tss.io_map_base = sizeof(TSS64);
+    kdebug("TSS", "IO map base set on %p", tss.io_map_base);
+
+    uintptr_t addr = reinterpret_cast<uintptr_t>(&tss);
+    size_t size = sizeof(TSS64) - 1;
+
+    uint64_t low = (size & 0xFFFFULL) | ((addr & 0xFFFFFFULL) << 16) |
+                   (static_cast<uint64_t>(SegmentAccess::TSS64) << 40) |
+                   (((size >> 16) & 0x0FULL) << 48) |
+                   (((addr >> 24) & 0xFFULL) << 56);
+
+    uint64_t high = (addr >> 32) & 0xFFFFFFFFULL;
+
+    gdt[3] = low;
+    gdt[4] = high;
+
+    kdebug("TSS", "TSS descriptor added to GDT", low, high);
 }
 
 void GDTController::setupGDTR() {
@@ -57,40 +84,43 @@ void GDTController::setupGDTR() {
   gdtr.base = reinterpret_cast<uint64_t>(&gdt);
 }
 
-// C++
 void GDTController::loadSegments() {
-  asm volatile("mov $0x10, %%ax\n"
-               "mov %%ax, %%ds\n"
-               "mov %%ax, %%es\n"
-               "mov %%ax, %%fs\n"
-               "mov %%ax, %%gs\n"
-               "mov %%ax, %%ss\n"
-               "pushq $0x08\n"
-               "lea 1f(%%rip), %%rax\n"
-               "push %%rax\n"
-               "lretq\n"
-               "1:\n"
-               :
-               :
-               : "rax");
+    kdebug("GDT", "Loading segment registers...");
+    asm volatile(
+        "mov $0x10, %%ax\n"
+        "mov %%ax, %%ds\n"
+        "mov %%ax, %%es\n"
+        "mov %%ax, %%fs\n"
+        "mov %%ax, %%gs\n"
+        "mov %%ax, %%ss\n"
+        "pushq $0x08\n"
+        "lea 1f(%%rip), %%rax\n"
+        "push %%rax\n"
+        "lretq\n"
+        "1:\n"
+        :
+        :
+        : "rax");
+    kdebug("GDT", "Segment registers loaded");
 }
 
 void GDTController::initialize() {
-  uint16_t tss_selector = 0x28;
 
-  if (m_initialized)
-    return;
+    if (m_initialized) {
+        kdebug("GDT", "GDT already initialized, skipping");
+        return;
+    }
 
-  setupGDT();
-  setupGDTR();
-  flush_gdt(&gdtr);
-  loadSegments();
-  klog("GDT", "Global descriptor table initialized");
+    kdebug("GDT", "Starting GDT initialization...");
+    setupGDT();
+    setupGDTR();
+    flush_gdt(&gdtr);
+    loadSegments();
+    kdebug("GDT", "Global descriptor table initialized");
 
-  set_kernel_stack(stack_top);
-  flush_tss(tss_selector);
-  klog("TSS", "Task state segment initialized");
-  m_initialized = true;
-  // TODO: Document why tss_selector is 0x28 and centralize selector
-  // generation; magic numbers for selectors are fragile across changes.
+    flush_tss(TSS_SELECTOR);
+    kdebug("TSS", "Task state segment initialized");
+
+    m_initialized = true;
+    klog("GDT", "Initialization complete, TSS selector: 0x%lu",  TSS_SELECTOR);
 }

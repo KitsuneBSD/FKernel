@@ -10,14 +10,14 @@ extern multiboot_info_ptr
 section .text
 bits 64
 long_mode_start:
+  mov rsp, stack_top
+
   mov ax, 0
   mov ss, ax
   mov ds, ax
   mov es, ax
   mov fs, ax
   mov gs, ax
-
-  mov rsp, stack_top
 
   lea rax, [page_table_l4]
   mov [current_pml4_ptr], rax
