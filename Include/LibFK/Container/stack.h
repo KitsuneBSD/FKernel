@@ -1,7 +1,7 @@
 #pragma once
 
-#include <LibC/stddef.h>
 #include <LibFK/Container/array.h>
+#include <LibFK/Types/types.h>
 
 template <typename Type, size_t MAX_SIZE = 4096> class Stack {
 private:

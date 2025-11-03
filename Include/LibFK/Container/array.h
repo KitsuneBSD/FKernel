@@ -1,7 +1,7 @@
 #pragma once
 
-#include <LibC/stddef.h>
 #include <LibFK/Traits/type_traits.h>
+#include <LibFK/Types/types.h>
 
 /**
  * @brief Fixed-size array container (similar to std::array).

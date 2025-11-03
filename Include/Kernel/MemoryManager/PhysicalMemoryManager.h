@@ -2,10 +2,10 @@
 
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Boot/multiboot2.h>
-#include <LibC/stdint.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Tree/rb_tree.h>
+#include <LibFK/Types/types.h>
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
@@ -29,8 +29,7 @@ extern "C" uintptr_t __heap_end;
  * instance exists throughout the system. It is not copyable or movable to
  * maintain the integrity of the singleton instance.
  */
-class PhysicalMemoryManager
-{
+class PhysicalMemoryManager {
   /**
    * @brief Grants access to VirtualMemoryManager as a friend class.
    */
@@ -98,8 +97,7 @@ public:
    *
    * @return A reference to the singleton instance of PhysicalMemoryManager.
    */
-  static PhysicalMemoryManager &the()
-  {
+  static PhysicalMemoryManager &the() {
     static PhysicalMemoryManager instance;
     return instance;
   }

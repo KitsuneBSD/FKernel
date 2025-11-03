@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibC/stddef.h>
+#include <LibFK/Types/types.h>
 
 /**
  * @brief Fixed-capacity string container with null-termination.
@@ -10,17 +10,13 @@
  *
  * @tparam N Maximum number of characters (excluding null terminator).
  */
-template <size_t N>
-struct fixed_string
-{
+template <size_t N> struct fixed_string {
   char buffer[N + 1] = {}; ///< Internal buffer (always null-terminated).
   size_t length = 0;       ///< Current string length (not counting terminator).
 
-  fixed_string(const char *s)
-  {
+  fixed_string(const char *s) {
     size_t i = 0;
-    while (s[i] != '\0' && i < N)
-    {
+    while (s[i] != '\0' && i < N) {
       buffer[i] = s[i];
       ++i;
     }
@@ -41,8 +37,7 @@ struct fixed_string
   [[nodiscard]] constexpr bool empty() const noexcept { return length == 0; }
 
   /// @brief Clears the string (sets length to zero).
-  constexpr void clear() noexcept
-  {
+  constexpr void clear() noexcept {
     length = 0;
     buffer[0] = '\0';
   }
@@ -55,13 +50,10 @@ struct fixed_string
    * @param len Number of characters to copy from s.
    * @return True if assignment succeeded, false if string is too long.
    */
-  constexpr bool assign(const char *s, size_t len) noexcept
-  {
+  constexpr bool assign(const char *s, size_t len) noexcept {
     size_t i = 0;
-    while (i < len)
-    {
-      if (i >= N)
-      {
+    while (i < len) {
+      if (i >= N) {
         length = N;
         buffer[N] = '\0';
         return false;
@@ -81,11 +73,9 @@ struct fixed_string
    * @param s Null-terminated string to append.
    * @return True if append succeeded, false if there was not enough capacity.
    */
-  constexpr bool append(const char *s) noexcept
-  {
+  constexpr bool append(const char *s) noexcept {
     size_t i = 0;
-    while (s[i] != '\0')
-    {
+    while (s[i] != '\0') {
       if (length >= N)
         return false;
       buffer[length++] = s[i++];
@@ -99,8 +89,7 @@ struct fixed_string
    * @param c Character to append.
    * @return True if append succeeded, false if buffer is full.
    */
-  constexpr bool push_back(char c) noexcept
-  {
+  constexpr bool push_back(char c) noexcept {
     if (length >= N)
       return false;
     buffer[length++] = c;
@@ -112,8 +101,7 @@ struct fixed_string
   constexpr char &operator[](size_t i) noexcept { return buffer[i]; }
 
   /// @return Const reference to character at index (unchecked).
-  constexpr const char &operator[](size_t i) const noexcept
-  {
+  constexpr const char &operator[](size_t i) const noexcept {
     return buffer[i];
   }
 

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <LibC/stddef.h>
-#include <LibC/stdint.h>
 #include <LibC/string.h>
 #include <LibFK/Container/bitmap.h>
+#include <LibFK/Types/types.h>
 
 /**
  * @brief Fixed-size chunk allocator using a bitmap.
