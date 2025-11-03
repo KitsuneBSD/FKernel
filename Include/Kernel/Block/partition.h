@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Driver/Ata/AtaController.h>
-#include <LibFK/Traits/types.h>
+#include <LibFK/Types/types.h>
 
 struct PartitionEntry {
   uint8_t boot_flag;

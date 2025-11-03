@@ -1,6 +1,9 @@
 #pragma once
 
 #include <LibC/stdint.h>
+#include <LibC/stddef.h>
+#include <LibC/stdbool.h>
+#include <LibC/limits.h>
 
 constexpr uint64_t KiB = 1024;
 constexpr uint64_t MiB = 1024 * KiB;

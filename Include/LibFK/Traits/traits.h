@@ -1,7 +1,14 @@
 #pragma once
 
-#include <LibC/stdint.h>
-#include <LibC/stdio.h>
+#include <LibFK/Types/types.h>
+
+#ifdef __x86_64
+#include <Kernel/Arch/x86_64/arch_defs.h>
+#endif 
+
+static unsigned int crc32(const void* data, size_t length){
+  
+}
 
 /**
  * @brief Template de traits para tipos genéricos.

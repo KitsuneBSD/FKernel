@@ -2,7 +2,7 @@
 #include <Kernel/MemoryManager/TlsfHeap.h>
 
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Traits/types.h>
+#include <LibFK/Types/types.h>
 
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>

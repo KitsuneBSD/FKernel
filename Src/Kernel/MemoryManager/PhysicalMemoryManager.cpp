@@ -4,7 +4,7 @@
 #include <Kernel/MemoryManager/PhysicalMemoryManager.h>
 
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Traits/types.h>
+#include <LibFK/Types/types.h>
 
 void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
   if (is_initialized) {

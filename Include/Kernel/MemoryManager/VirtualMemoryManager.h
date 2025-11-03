@@ -1,12 +1,10 @@
 #pragma once
 
-#include <LibC/stddef.h>
-#include <LibC/stdint.h>
-
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 
+#include <LibFK/Types/types.h>
 #include <Kernel/MemoryManager/Pages/PageFlags.h>
 
 constexpr uintptr_t align_down(uintptr_t addr, size_t size) {
