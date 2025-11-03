@@ -1,36 +1,67 @@
 #pragma once
 
-#include <LibC/stdint.h>
-#include <LibC/stddef.h>
+#include <LibFK/Types/types.h>
 
-constexpr uint16_t PS2_DATA_PORT = 0x60;
-constexpr uint16_t PS2_STATUS_PORT = 0x64;
+static constexpr uint16_t PS2_DATA_PORT = 0x60;     ///< PS/2 data port
+static constexpr uint16_t PS2_STATUS_PORT = 0x64;   ///< PS/2 status port
+static constexpr size_t KEYBOARD_BUFFER_SIZE = 256; ///< Size of the key buffer
 
-constexpr size_t KEYBOARD_BUFFER_SIZE = 256;
-
-class PS2Keyboard
-{
+/**
+ * @brief PS/2 keyboard controller
+ *
+ * Handles PS/2 keyboard input, manages an internal key buffer, and
+ * provides a singleton interface for reading key presses.
+ */
+class PS2Keyboard {
 private:
-    char buffer[KEYBOARD_BUFFER_SIZE];
-    size_t head = 0;
-    size_t tail = 0;
-    bool shift_pressed = false;
+  char buffer[KEYBOARD_BUFFER_SIZE]; ///< Circular buffer for pressed keys
+  size_t head = 0;                   ///< Head index of the buffer
+  size_t tail = 0;                   ///< Tail index of the buffer
+  bool shift_pressed = false;        ///< Track shift key state
 
-    PS2Keyboard() = default;
+  PS2Keyboard() = default; ///< Private constructor for singleton
 
-    void push_char(char c);
-    void handle_scancode(uint8_t scancode);
+  /**
+   * @brief Push a character into the internal buffer
+   * @param c Character to push
+   */
+  void push_char(char c);
+
+  /**
+   * @brief Handle an incoming scancode from the PS/2 controller
+   * @param scancode Scancode byte
+   */
+  void handle_scancode(uint8_t scancode);
 
 public:
-    static PS2Keyboard &the()
-    {
-        static PS2Keyboard instance;
-        return instance;
-    }
+  /**
+   * @brief Get the singleton instance of the PS2Keyboard
+   * @return Reference to the keyboard instance
+   */
+  static PS2Keyboard &the() {
+    static PS2Keyboard instance;
+    return instance;
+  }
 
-    void initialize();
-    void irq_handler();
+  /**
+   * @brief Initialize the PS/2 keyboard
+   */
+  void initialize();
 
-    bool has_key() const;
-    char pop_key();
+  /**
+   * @brief PS/2 IRQ handler to be called on keyboard interrupts
+   */
+  void irq_handler();
+
+  /**
+   * @brief Check if a key is available in the buffer
+   * @return true if a key is available, false otherwise
+   */
+  bool has_key() const;
+
+  /**
+   * @brief Pop a key from the buffer
+   * @return The next available character
+   */
+  char pop_key();
 };
