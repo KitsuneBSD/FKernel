@@ -1,34 +1,32 @@
 #pragma once
 
+#include <LibFK/Container/static_vector.h>
 #include <LibFK/Memory/retain_ptr.h>
+#include <LibFK/Types/types.h>
 
 // Forward declare VNode
 struct VNode;
 
-#include <LibFK/Container/static_vector.h>
-
-#include <LibC/stdint.h>
-
 struct FileDescriptor {
-    int file_descriptor{-1};
-    RetainPtr<VNode> vnode;
-    int flags{0};
-    uint64_t offset{0};
-    bool used{false};
+  int file_descriptor{-1};
+  RetainPtr<VNode> vnode;
+  int flags{0};
+  uint64_t offset{0};
+  bool used{false};
 };
 
 class FileDescriptorTable {
 public:
-    static FileDescriptorTable &the();
+  static FileDescriptorTable &the();
 
-    int allocate(RetainPtr<VNode> vnode, int flags);
-    FileDescriptor *get(int file_descriptor);
-    int close(int file_descriptor);
+  int allocate(RetainPtr<VNode> vnode, int flags);
+  FileDescriptor *get(int file_descriptor);
+  int close(int file_descriptor);
 
 private:
-    FileDescriptorTable();
-    static const size_t MAX_file_descriptorS = 256;
-    static_vector<FileDescriptor, MAX_file_descriptorS> m_file_descriptors;
+  FileDescriptorTable();
+  static const size_t MAX_file_descriptorS = 256;
+  static_vector<FileDescriptor, MAX_file_descriptorS> m_file_descriptors;
 };
 
 // High-level helpers that bind VFS operations to file descriptors
