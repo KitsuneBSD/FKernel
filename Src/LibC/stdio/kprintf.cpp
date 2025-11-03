@@ -2,15 +2,13 @@
 #include <LibC/stdio.h>
 #include <LibC/string.h>
 
-extern "C" void kprintf(const char *fmt, ...)
-{
-  char buffer[512]; // tamanho arbitrário para formatação
+// TODO: Add support to '/r'
+extern "C" void kprintf(const char *fmt, ...) {
+  char buffer[512];
   size_t buf_index = 0;
 
-  auto write_char_to_buffer = [&](char c)
-  {
-    if (buf_index < sizeof(buffer) - 1)
-    {
+  auto write_char_to_buffer = [&](char c) {
+    if (buf_index < sizeof(buffer) - 1) {
       buffer[buf_index++] = c;
     }
   };
@@ -18,10 +16,8 @@ extern "C" void kprintf(const char *fmt, ...)
   va_list args;
   va_start(args, fmt);
 
-  for (size_t i = 0; fmt[i]; ++i)
-  {
-    if (fmt[i] != '%')
-    {
+  for (size_t i = 0; fmt[i]; ++i) {
+    if (fmt[i] != '%') {
       write_char_to_buffer(fmt[i]);
       continue;
     }
@@ -31,17 +27,14 @@ extern "C" void kprintf(const char *fmt, ...)
 
     ++i;
     char spec = fmt[i];
-    switch (spec)
-    {
-    case 's':
-    {
+    switch (spec) {
+    case 's': {
       const char *s = va_arg(args, const char *);
       while (*s)
         write_char_to_buffer(*s++);
       break;
     }
-    case 'd':
-    {
+    case 'd': {
       int val = va_arg(args, int);
       char numbuf[12];
       snprintf(numbuf, sizeof(numbuf), "%d", val);
@@ -49,8 +42,7 @@ extern "C" void kprintf(const char *fmt, ...)
         write_char_to_buffer(*p);
       break;
     }
-    case 'x':
-    {
+    case 'x': {
       unsigned int val = va_arg(args, unsigned int);
       char numbuf[12];
       snprintf(numbuf, sizeof(numbuf), "%x", val);
@@ -58,8 +50,7 @@ extern "C" void kprintf(const char *fmt, ...)
         write_char_to_buffer(*p);
       break;
     }
-    case 'u':
-    {
+    case 'u': {
       unsigned int val = va_arg(args, unsigned int);
       char numbuf[12];
       snprintf(numbuf, sizeof(numbuf), "%u", val);
@@ -67,8 +58,7 @@ extern "C" void kprintf(const char *fmt, ...)
         write_char_to_buffer(*p);
       break;
     }
-    case 'p':
-    {
+    case 'p': {
       void *ptr = va_arg(args, void *);
       uintptr_t val = reinterpret_cast<uintptr_t>(ptr);
       char numbuf[20];

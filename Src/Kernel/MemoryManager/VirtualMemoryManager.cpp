@@ -141,18 +141,4 @@ void VirtualMemoryManager::initialize() {
 
   klog("VIRTUAL MEMORY", "Virtual Memory Manager initialized");
   m_is_initialized = true;
-  // TODOs and FIXMEs:
-  // - alloc_table returns a physical page pointer cast to a uint64_t*; ensure
-  //   that the returned pointer is identity-mapped or that the caller sets up
-  //   temporary mapping before touching it. Otherwise this will dereference
-  //   raw physical addresses leading to undefined behavior.
-  // - map_page uses invlpg for a single page; bulk mappings should batch
-  //   invalidations for performance.
-  // - The implementation assumes PAGE_SIZE and supports only one page size
-  //   for alloc_table and map_range; unify page size handling and consider
-  //   supporting 2MiB/1GiB huge pages where appropriate.
-  // - No locks exist around page table modifications; add synchronization
-  //   for SMP systems.
-  // - Add unit tests for mapping corner cases (unaligned ranges, overlaps,
-  //   re-mapping different flags) to avoid regressions.
 }

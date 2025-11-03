@@ -1,12 +1,12 @@
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 
-#include <Kernel/Boot/multiboot2.h>
+#include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/init.h>
 #include <Kernel/Boot/memory_map.h>
-#include <Kernel/Boot/early_init.h>
+#include <Kernel/Boot/multiboot2.h>
 
 #include <Kernel/Hardware/Cpu.h>
 
@@ -15,8 +15,7 @@
 
 #include <LibFK/Algorithms/log.h>
 
-void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap)
-{
+void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   klog("EARLY_INIT", "Start early init (multiboot2)");
 
   GDTController::the().initialize();
@@ -24,8 +23,7 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap)
   PhysicalMemoryManager::the().initialize(mmap);
   VirtualMemoryManager::the().initialize();
 
-  if (CPU::the().has_apic())
-  {
+  if (CPU::the().has_apic()) {
     APIC::the().enable();
     APIC::the().calibrate_timer();
     APIC::the().setup_timer(1);

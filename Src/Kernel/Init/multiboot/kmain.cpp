@@ -11,24 +11,25 @@
 extern char __heap_start[];
 extern char __heap_end[];
 
-extern "C" void kmain(uint32_t multiboot2_magic, void* multiboot_ptr) {
-    serial::init();
+extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
+  serial::init();
 
-    auto& vga = vga::the();
-    vga.clear();
+  auto &vga = vga::the();
+  vga.clear();
 
-    if (multiboot2_magic != multiboot2::BOOTLOADER_MAGIC) {
-        kprintf("Invalid bootloader magic: 0x%x\n", multiboot2_magic);
-    }
+  if (multiboot2_magic != multiboot2::BOOTLOADER_MAGIC) {
+    kprintf("Invalid bootloader magic: 0x%x\n", multiboot2_magic);
+  }
 
-    multiboot2::MultibootParser parser(multiboot_ptr);
+  multiboot2::MultibootParser parser(multiboot_ptr);
 
-    auto mmap_tag = parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
-    ASSERT(mmap_tag);
+  auto mmap_tag =
+      parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
+  ASSERT(mmap_tag);
 
-    early_init(mmap_tag);
+  early_init(mmap_tag);
 
-    while (true) {
-        asm volatile("hlt");
-    }
+  while (true) {
+    asm volatile("hlt");
+  }
 }

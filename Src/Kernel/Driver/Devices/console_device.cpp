@@ -4,53 +4,50 @@
 
 #include <LibFK/Algorithms/log.h>
 
-int ConsoleDevice::open(VNode *vnode, FileDescriptor *fd, int flags)
-{
-    (void)vnode;
-    (void)fd;
-    (void)flags;
-    klog("CONSOLE", "Opened /dev/console");
-    return 0;
+int ConsoleDevice::open(VNode *vnode, FileDescriptor *fd, int flags) {
+  (void)vnode;
+  (void)fd;
+  (void)flags;
+  klog("CONSOLE", "Opened /dev/console");
+  return 0;
 }
 
-int ConsoleDevice::close(VNode *vnode, FileDescriptor *fd)
-{
-    (void)vnode;
-    (void)fd;
-    klog("CONSOLE", "Closed /dev/console");
-    return 0;
+int ConsoleDevice::close(VNode *vnode, FileDescriptor *fd) {
+  (void)vnode;
+  (void)fd;
+  klog("CONSOLE", "Closed /dev/console");
+  return 0;
 }
 
-int ConsoleDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size, size_t offset)
-{
-    (void)vnode;
-    (void)fd;
-    (void)offset;
+int ConsoleDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer,
+                         size_t size, size_t offset) {
+  (void)vnode;
+  (void)fd;
+  (void)offset;
 
-    const char *str = reinterpret_cast<const char *>(buffer);
-    auto &vga = vga::the();
+  const char *str = reinterpret_cast<const char *>(buffer);
+  auto &vga = vga::the();
 
-    for (size_t i = 0; i < size; ++i)
-        vga.put_char(str[i]);
+  for (size_t i = 0; i < size; ++i)
+    vga.put_char(str[i]);
 
-    return static_cast<int>(size);
+  return static_cast<int>(size);
 }
 
-int ConsoleDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size, size_t offset)
-{
-    (void)vnode;
-    (void)fd;
-    (void)offset;
+int ConsoleDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer,
+                        size_t size, size_t offset) {
+  (void)vnode;
+  (void)fd;
+  (void)offset;
 
-    char *buf = reinterpret_cast<char *>(buffer);
-    size_t bytes = 0;
+  char *buf = reinterpret_cast<char *>(buffer);
+  size_t bytes = 0;
 
-    while (bytes < size && PS2Keyboard::the().has_key())
-    {
-        buf[bytes++] = PS2Keyboard::the().pop_key();
-    }
+  while (bytes < size && PS2Keyboard::the().has_key()) {
+    buf[bytes++] = PS2Keyboard::the().pop_key();
+  }
 
-    return static_cast<int>(bytes);
+  return static_cast<int>(bytes);
 }
 
 VNodeOps ConsoleDevice::ops = {

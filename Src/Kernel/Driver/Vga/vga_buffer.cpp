@@ -1,5 +1,5 @@
-#include <Kernel/Driver/Vga/vga_buffer.h>
 #include <Kernel/Boot/multiboot2.h>
+#include <Kernel/Driver/Vga/vga_buffer.h>
 
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/io.h>
@@ -60,10 +60,6 @@ void vga::put_char(char c) {
 }
 
 void vga::write(const char *str) {
-  // TODO: This implementation writes character-by-character which can be
-  // inefficient. Consider a batched write path or memcpy for contiguous
-  // blocks to speed up large prints. Also consider making this reentrant
-  // or protected by a spinlock if used across multiple cores.
   for (size_t i = 0; str[i]; ++i) {
     put_char(str[i]);
   }
@@ -134,14 +130,20 @@ static const uint8_t font8x8_basic[96][8] = {
     {0x7C, 0xC6, 0xC6, 0x7C, 0xC6, 0xC6, 0x7C, 0x00},
     {0x7C, 0xC6, 0xC6, 0x7E, 0x06, 0x0C, 0x78, 0x00},
     // ':'..'@' (58..64) - blank/minimal
-    {0}, {0}, {0}, {0}, {0}, {0}, {0}
-};
+    {0},
+    {0},
+    {0},
+    {0},
+    {0},
+    {0},
+    {0}};
 
 void vga::fb_put_pixel(uint32_t x, uint32_t y, uint32_t rgba) {
   if (x >= fb_width || y >= fb_height || fb_addr == 0)
     return;
 
-  uint8_t *ptr = reinterpret_cast<uint8_t *>(fb_addr) + y * fb_pitch + x * (fb_bpp / 8);
+  uint8_t *ptr =
+      reinterpret_cast<uint8_t *>(fb_addr) + y * fb_pitch + x * (fb_bpp / 8);
   // Support common 32bpp and 24bpp packed RGB
   if (fb_bpp == 32) {
     *reinterpret_cast<uint32_t *>(ptr) = rgba;
@@ -152,7 +154,8 @@ void vga::fb_put_pixel(uint32_t x, uint32_t y, uint32_t rgba) {
   }
 }
 
-uint32_t vga::color_to_rgba(Color fg, [[maybe_unused]] Color bg) const noexcept {
+uint32_t vga::color_to_rgba(Color fg,
+                            [[maybe_unused]] Color bg) const noexcept {
   // Map a few colors to reasonable RGB values (ARGB/packed into 32-bit)
   switch (fg) {
   case Color::Black:
@@ -195,8 +198,10 @@ void vga::fb_put_char(char c) {
   }
 
   const uint8_t *glyph = font8x8_basic[c - 32];
-  uint32_t fg = color_to_rgba(static_cast<Color>(color & 0xF), static_cast<Color>((color >> 4) & 0xF));
-  uint32_t bg = color_to_rgba(static_cast<Color>((color >> 4) & 0xF), Color::Black);
+  uint32_t fg = color_to_rgba(static_cast<Color>(color & 0xF),
+                              static_cast<Color>((color >> 4) & 0xF));
+  uint32_t bg =
+      color_to_rgba(static_cast<Color>((color >> 4) & 0xF), Color::Black);
 
   uint32_t glyph_x = static_cast<uint32_t>(col * 8);
   uint32_t glyph_y = static_cast<uint32_t>(row * 8);
@@ -230,11 +235,13 @@ void vga::fb_clear() {
   }
 }
 
-bool vga::initialize_framebuffer(const multiboot2::TagFramebuffer *fb_tag) noexcept {
+bool vga::initialize_framebuffer(
+    const multiboot2::TagFramebuffer *fb_tag) noexcept {
   if (!fb_tag)
     return false;
   // Basic validation
-  if (fb_tag->framebuffer_addr == 0 || fb_tag->framebuffer_width == 0 || fb_tag->framebuffer_height == 0)
+  if (fb_tag->framebuffer_addr == 0 || fb_tag->framebuffer_width == 0 ||
+      fb_tag->framebuffer_height == 0)
     return false;
 
   fb_addr = static_cast<uintptr_t>(fb_tag->framebuffer_addr);
@@ -320,11 +327,7 @@ void vga::write_ansi(const char *str) {
           current_bg = Color::White;
           break;
         }
-  // TODO: ANSI parsing is minimal; expand it to support sequences
-  // like bold/underline and parameter lists (e.g., "\x1b[1;31m").
-  // Also consider extracting the parser into a small finite state
-  // machine class for testability.
-  set_color(current_fg, current_bg);
+        set_color(current_fg, current_bg);
       }
       ++i;
       continue;
