@@ -5,7 +5,6 @@
 
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/init.h>
-#include <Kernel/Boot/memory_map.h>
 #include <Kernel/Boot/multiboot2.h>
 
 #include <Kernel/Hardware/Cpu.h>
