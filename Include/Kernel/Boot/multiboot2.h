@@ -1,29 +1,56 @@
 #pragma once
 
-#include <LibC/stddef.h>
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 
 namespace multiboot2 {
+
+/**
+ * @brief Multiboot2 header alignment
+ */
 constexpr uint32_t HEADER_ALIGN = 8;
+
+/**
+ * @brief Multiboot2 header magic number
+ */
 constexpr uint32_t HEADER_MAGIC = 0xe85250d6;
+
+/**
+ * @brief Magic number passed by the bootloader
+ */
 constexpr uint32_t BOOTLOADER_MAGIC = 0x36d76289;
 
+/**
+ * @brief Module alignment
+ */
 constexpr uint32_t MOD_ALIGN = 0x00001000;
+
+/**
+ * @brief Info structure alignment
+ */
 constexpr uint32_t INFO_ALIGN = 0x00000008;
+
+/**
+ * @brief Tag alignment
+ */
 constexpr uint32_t TAG_ALIGN = 8;
 
+/**
+ * @brief Multiboot2 memory types
+ */
 enum class MemoryType : uint32_t {
-  Available = 1,             // Usável pelo sistema
-  Reserved = 2,              // Reservado; não deve ser usado
-  ACPIReclaimable = 3,       // Memória ACPI reutilizável após parsing
-  ACPINVS = 4,               // ACPI NVS – não volátil, deve ser preservada
-  BadMemory = 5,             // Áreas defeituosas; não devem ser usadas
-  BootloaderReclaimable = 6, // Pode ser reutilizada após o boot
-  KernelAndModules = 7, // Ocupada pelo kernel e módulos (não padrão, mas alguns
-                        // bootloaders usam)
-  Unknown = 0xFFFFFFFF  // Para tipos não reconhecidos
+  Available = 1,             ///< Usable by the OS
+  Reserved = 2,              ///< Reserved, must not be used
+  ACPIReclaimable = 3,       ///< ACPI reclaimable memory
+  ACPINVS = 4,               ///< ACPI NVS (non-volatile)
+  BadMemory = 5,             ///< Defective memory regions
+  BootloaderReclaimable = 6, ///< Can be reused after boot
+  KernelAndModules = 7,      ///< Occupied by kernel/modules (non-standard)
+  Unknown = 0xFFFFFFFF       ///< Unrecognized type
 };
 
+/**
+ * @brief Multiboot2 tag types
+ */
 enum class TagType : uint32_t {
   End = 0,
   Cmdline = 1,
@@ -49,6 +76,9 @@ enum class TagType : uint32_t {
   LoadBaseAddr = 21
 };
 
+/**
+ * @brief Multiboot2 header tag types
+ */
 enum class HeaderTagType : uint32_t {
   End = 0,
   InformationRequest = 1,
@@ -63,58 +93,80 @@ enum class HeaderTagType : uint32_t {
   Relocatable = 10
 };
 
+/**
+ * @brief Multiboot2 console flags
+ */
 enum class ConsoleFlags : uint32_t {
   ConsoleRequired = 1,
   EGATextSupported = 2
 };
 
+/**
+ * @brief Supported architectures
+ */
 enum class Architecture : uint32_t { I386 = 0, MIPS32 = 4 };
 
+/**
+ * @brief Load preferences for multiboot modules
+ */
 enum class LoadPreference : uint32_t { None = 0, Low = 1, High = 2 };
 
+/**
+ * @brief Generic multiboot2 tag
+ */
 struct alignas(TAG_ALIGN) Tag {
-  TagType type;
-  uint32_t size;
+  TagType type;  ///< Tag type
+  uint32_t size; ///< Size of the tag including header
 
+  /**
+   * @brief Get the next tag in memory
+   * @return Pointer to the next tag
+   */
   Tag const *next() const noexcept {
     return reinterpret_cast<Tag const *>(
         reinterpret_cast<uint8_t const *>(this) + ((size + 7) & ~7u));
   }
 };
-
 static_assert(sizeof(Tag) == 8, "Tag struct must be exactly 8 bytes");
 static_assert(alignof(Tag) == 8, "Tag struct must be aligned to 8 bytes");
 
+/**
+ * @brief Tag containing a string
+ */
 struct alignas(TAG_ALIGN) TagString {
   Tag tag;
-  char string[0];
+  char string[0]; ///< Flexible array member
 
   [[nodiscard]]
   char const *get_string() const noexcept {
     return reinterpret_cast<char const *>(this + 1);
   }
 };
-
 static_assert(alignof(TagString) == 8, "TagString must be aligned to 8 bytes");
 
+/**
+ * @brief Tag describing a loaded module
+ */
 struct alignas(TAG_ALIGN) TagModule {
   Tag tag;
-  uint32_t mod_start;
-  uint32_t mod_end;
-  char cmdline[0];
+  uint32_t mod_start; ///< Start address of the module
+  uint32_t mod_end;   ///< End address of the module
+  char cmdline[0];    ///< Module command line (flexible array member)
 
   [[nodiscard]]
   char const *get_cmdline() const noexcept {
     return reinterpret_cast<char const *>(this + 1);
   }
 };
-
 static_assert(alignof(TagModule) == 8, "TagModule must be aligned to 8 bytes");
 
+/**
+ * @brief Multiboot2 information structure
+ */
 struct alignas(TAG_ALIGN) Info {
-  uint32_t total_size;
-  uint32_t reserved;
-  Tag tags[0];
+  uint32_t total_size; ///< Total size of the info structure
+  uint32_t reserved;   ///< Reserved field
+  Tag tags[0];         ///< Flexible array of tags
 
   [[nodiscard]]
   Tag const *first_tag() const noexcept {
@@ -124,21 +176,24 @@ struct alignas(TAG_ALIGN) Info {
 static_assert(sizeof(Info) == 8, "Info struct must be exactly 8 bytes");
 static_assert(alignof(Info) == 8, "Info struct must be aligned to 8 bytes");
 
+/**
+ * @brief Memory map tag
+ */
 struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
   struct Entry {
-    uint64_t base_addr;
-    uint64_t length;
-    uint32_t type;
-    uint32_t reserved;
+    uint64_t base_addr; ///< Base address of memory region
+    uint64_t length;    ///< Length of memory region
+    uint32_t type;      ///< Memory type (MemoryType enum)
+    uint32_t reserved;  ///< Reserved field
   };
   static_assert(sizeof(Entry) == 24,
                 "TagMemoryMap::Entry must be exactly 24 bytes");
   static_assert(alignof(Entry) == 8,
                 "TagMemoryMap::Entry must be aligned to 8 bytes");
 
-  uint32_t entry_size;
-  uint32_t entry_version;
-  Entry entries[0];
+  uint32_t entry_size;    ///< Size of each entry
+  uint32_t entry_version; ///< Version of the entry format
+  Entry entries[0];       ///< Flexible array of entries
 
   Entry const *begin() const noexcept { return entries; }
 
@@ -151,13 +206,16 @@ struct alignas(TAG_ALIGN) TagMemoryMap : Tag {
 static_assert(alignof(TagMemoryMap) == 8,
               "TagMemoryMap must be aligned to 8 bytes");
 
+/**
+ * @brief Framebuffer tag
+ */
 struct alignas(TAG_ALIGN) TagFramebuffer : Tag {
-  uint64_t framebuffer_addr;
-  uint32_t framebuffer_pitch;
-  uint32_t framebuffer_width;
-  uint32_t framebuffer_height;
-  uint8_t framebuffer_bpp;
-  uint8_t framebuffer_type; // 0=indexed, 1=RGB, 2=EGA text
+  uint64_t framebuffer_addr;   ///< Physical address of framebuffer
+  uint32_t framebuffer_pitch;  ///< Number of bytes per row
+  uint32_t framebuffer_width;  ///< Width in pixels
+  uint32_t framebuffer_height; ///< Height in pixels
+  uint8_t framebuffer_bpp;     ///< Bits per pixel
+  uint8_t framebuffer_type;    ///< 0=indexed, 1=RGB, 2=EGA text
   uint16_t reserved;
 
   struct RGBInfo {
@@ -168,10 +226,8 @@ struct alignas(TAG_ALIGN) TagFramebuffer : Tag {
     uint8_t blue_field_position;
     uint8_t blue_mask_size;
   } rgb;
-
-  // For indexed color there follows palette info; we don't parse it here.
 };
 static_assert(alignof(TagFramebuffer) == 8,
               "TagFramebuffer must be aligned to 8 bytes");
 
-}; // namespace multiboot2
+} // namespace multiboot2
