@@ -1,8 +1,8 @@
 #pragma once
 
 #include <LibC/assert.h>
-#include <LibC/stddef.h>
 #include <LibC/string.h>
+#include <LibFK/Types/types.h>
 #include <LibFK/new.h>
 
 template <typename T, size_t MaxBits> class Bitmap {
