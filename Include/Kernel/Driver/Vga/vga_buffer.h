@@ -6,6 +6,46 @@ namespace multiboot2 {
 struct TagFramebuffer;
 }
 
+// VGA text-mode constants
+constexpr uint16_t VGA_WIDTH = 80;
+constexpr uint16_t VGA_HEIGHT = 25;
+
+/**
+ * @brief VGA color enumeration
+ */
+enum class Color : uint8_t {
+  Black = 0,
+  Blue,
+  Green,
+  Cyan,
+  Red,
+  Magenta,
+  Brown,
+  LightGray,
+  DarkGray,
+  LightBlue,
+  LightGreen,
+  LightCyan,
+  LightRed,
+  LightMagenta,
+  Yellow,
+  White
+};
+
+/**
+ * @brief Create a VGA color byte from foreground and background colors
+ */
+constexpr uint8_t vga_entry_color(Color fg, Color bg) {
+  return static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4);
+}
+
+/**
+ * @brief Create a VGA text-mode entry combining a character and color
+ */
+constexpr uint16_t vga_entry(char c, uint8_t color) {
+  return (static_cast<uint16_t>(color) << 8) | c;
+}
+
 /**
  * @brief VGA text and framebuffer driver
  *
@@ -98,43 +138,3 @@ public:
    */
   void clear();
 };
-
-// VGA text-mode constants
-constexpr uint16_t VGA_WIDTH = 80;
-constexpr uint16_t VGA_HEIGHT = 25;
-
-/**
- * @brief VGA color enumeration
- */
-enum class Color : uint8_t {
-  Black = 0,
-  Blue,
-  Green,
-  Cyan,
-  Red,
-  Magenta,
-  Brown,
-  LightGray,
-  DarkGray,
-  LightBlue,
-  LightGreen,
-  LightCyan,
-  LightRed,
-  LightMagenta,
-  Yellow,
-  White
-};
-
-/**
- * @brief Create a VGA color byte from foreground and background colors
- */
-constexpr uint8_t vga_entry_color(Color fg, Color bg) {
-  return static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4);
-}
-
-/**
- * @brief Create a VGA text-mode entry combining a character and color
- */
-constexpr uint16_t vga_entry(char c, uint8_t color) {
-  return (static_cast<uint16_t>(color) << 8) | c;
-}
