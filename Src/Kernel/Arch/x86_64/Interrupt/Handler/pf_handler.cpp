@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
-#include <LibC/stdint.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Types/types.h>
 
 void page_fault_handler([[maybe_unused]] uint8_t vector,
                         InterruptFrame *frame) {
