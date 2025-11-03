@@ -1,65 +1,59 @@
 #pragma once
 
+#include <LibFK/Algorithms/djb2.h>
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
 
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#endif 
-
-static unsigned int crc32(const void* data, size_t length){
-  
-}
+#endif
 
 /**
- * @brief Template de traits para tipos genéricos.
+ * @brief Template traits for generic types.
  *
- * Permite definir funções auxiliares como hash e dump
- * para diferentes tipos de dados.
+ * Provides auxiliary functions such as hashing and dumping
+ * for different data types.
  *
- * @tparam T Tipo de dado
+ * @tparam T Data type
  */
 template <typename T> struct Traits {};
 
 /**
- * @brief Traits para int
+ * @brief Traits specialization for int
  */
 template <> struct Traits<int> {
   /**
-   * @brief Calcula o hash de um inteiro.
+   * @brief Computes the hash of an integer using DJB2.
    *
-   * Atualmente retorna o valor diretamente.
-   * TODO: implementar função de hash real, ex: DJB2 ou CRC32.
-   *
-   * @param i Valor a ser hasheado
-   * @return Valor hash
+   * @param i Integer value to hash
+   * @return Hash value
    */
-  static unsigned hash(int i) { return i; }
+  static unsigned hash(int i) { return djb2(&i, sizeof(i)); }
 
   /**
-   * @brief Imprime o valor do inteiro.
-   * @param i Valor a ser impresso
+   * @brief Prints the integer value.
+   *
+   * @param i Integer value to print
    */
   static void dump(int i) { kprintf("%d", i); }
 };
 
 /**
- * @brief Traits para unsigned int
+ * @brief Traits specialization for unsigned int
  */
 template <> struct Traits<unsigned> {
   /**
-   * @brief Calcula o hash de um unsigned int.
+   * @brief Computes the hash of an unsigned integer using DJB2.
    *
-   * Atualmente retorna o valor diretamente.
-   * TODO: implementar função de hash real, ex: DJB2 ou CRC32.
-   *
-   * @param i Valor a ser hasheado
-   * @return Valor hash
+   * @param i Unsigned integer value to hash
+   * @return Hash value
    */
-  static unsigned hash(unsigned i) { return i; }
+  static unsigned hash(unsigned i) { return djb2(&i, sizeof(i)); }
 
   /**
-   * @brief Imprime o valor do unsigned int.
-   * @param i Valor a ser impresso
+   * @brief Prints the unsigned integer value.
+   *
+   * @param i Unsigned integer value to print
    */
   static void dump(unsigned i) { kprintf("%u", i); }
 };
