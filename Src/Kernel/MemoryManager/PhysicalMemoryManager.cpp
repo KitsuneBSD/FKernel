@@ -88,7 +88,8 @@ int PhysicalMemoryManager::alloc_from_node(rb_node<PhysicalMemoryRange> *node,
     index = node->value().alloc_page(count, addr_hint);
     if (index >= 0) {
       uintptr_t addr = node->value().m_start + index * PAGE_SIZE;
-      kdebug("PHYSICAL MEMORY", "Allocated %zu page(s) at 0x%lx", count, addr);
+      // kdebug("PHYSICAL MEMORY", "Allocated %zu page(s) at 0x%lx", count,
+      // addr);
       return addr;
     }
   }
