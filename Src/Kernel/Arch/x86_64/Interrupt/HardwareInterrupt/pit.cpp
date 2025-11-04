@@ -24,7 +24,7 @@ void PIT::sleep(uint64_t ms) {
   start_count |= (inb(PIT_CHANNEL0) << 8);
 
   uint64_t elapsed_ticks = 0;
-  kdebug("PIT", "Starting sleep: %llu ms, waiting for %llu ticks", ms,
+  kdebug("PIT", "Starting sleep: %lu ms, waiting for %lu ticks", ms,
          ticks_to_wait);
 
   while (elapsed_ticks < ticks_to_wait) {
