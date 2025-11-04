@@ -40,5 +40,5 @@ void PIT::sleep(uint64_t ms) {
     start_count = current_count;
   }
 
-  kdebug("PIT", "Sleep finished, elapsed ticks: %llu", elapsed_ticks);
+  kdebug("PIT", "Sleep finished, elapsed ticks: %lu", elapsed_ticks);
 }
