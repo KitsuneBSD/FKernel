@@ -33,11 +33,6 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
   // Check if framebuffer tag was found
   if (!fb_tag) {
     kprintf("Framebuffer tag not found. Falling back to text mode.\n");
-  } else {
-    // Attempt to initialize framebuffer mode
-    if (!vga.initialize_framebuffer(fb_tag)) {
-      kprintf("Failed to initialize framebuffer. Falling back to text mode.\n");
-    }
   }
 
   early_init(mmap_tag);

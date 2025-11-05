@@ -21,7 +21,11 @@ void InterruptController::initialize() {
     kdebug("INTERRUPT", "Setting up IDT entries...");
     for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
         uint8_t multiple_ist_selector = (i % 7) + 1;
-        set_gate(i, g_isr_stubs[i], 0x08, *ist_stacks[multiple_ist_selector]);
+        if (i < 32) { // Exceptions
+            set_gate(i, g_isr_stubs[i], GateType::InterruptGate, 0x08, *ist_stacks[multiple_ist_selector]);
+        } else { // IRQs
+            set_gate(i, g_isr_stubs[i], GateType::TrapGate, 0x08, *ist_stacks[multiple_ist_selector]);
+        }
         register_interrupt(default_handler, i);
     }
 
@@ -57,14 +61,13 @@ void InterruptController::clear() {
 
 
 void InterruptController::set_gate(uint8_t vector, void (*new_interrupt)(),
-                                   uint16_t selector, uint8_t ist,
-                                   uint8_t type_attr) {
+                                   GateType type, uint16_t selector, uint8_t ist) {
     const uint64_t handler = reinterpret_cast<uint64_t>(new_interrupt);
     idt_entry &d = m_entries[vector];
     d.offset_low = static_cast<uint16_t>(handler & 0xFFFFu);
     d.selector = selector;
     d.ist = static_cast<uint8_t>(ist & 0x7u);
-    d.type_attr = type_attr;
+    d.type_attr = static_cast<uint8_t>(type);
     d.offset_mid = static_cast<uint16_t>((handler >> 16) & 0xFFFFu);
     d.offset_high = static_cast<uint32_t>((handler >> 32) & 0xFFFFFFFFu);
     d.zero = 0;
