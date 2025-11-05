@@ -11,6 +11,12 @@
  * including setting gates, registering handlers, and enabling/disabling
  * CPU interrupts.
  */
+
+enum class GateType : uint8_t {
+  InterruptGate = 0x8E, ///< 64-bit Interrupt Gate
+  TrapGate = 0x8F       ///< 64-bit Trap Gate
+};
+
 class InterruptController {
 private:
   /// Array of IDT entries
@@ -86,9 +92,8 @@ public:
    * @param ist Interrupt Stack Table index (default 0)
    * @param type_attr Type and attributes of the IDT gate (default 0x8E)
    */
-  void set_gate(uint8_t vector, void (*new_interrupt)(),
-                uint16_t selector = 0x08, uint8_t ist = 0,
-                uint8_t type_attr = 0x8E);
+  void set_gate(uint8_t vector, void (*new_interrupt)(), GateType type,
+                uint16_t selector = 0x08, uint8_t ist = 0);
 
   /**
    * @brief Clear all IDT entries and handlers

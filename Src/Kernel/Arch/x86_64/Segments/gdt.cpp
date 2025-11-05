@@ -1,6 +1,8 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+#include <Kernel/Arch/x86_64/Segments/gdt_structures.h>
+#include <Kernel/Arch/x86_64/Segments/tss_stacks.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 
 extern "C" uint64_t stack_top;
 extern "C" uint64_t stack_bottom;
