@@ -27,6 +27,19 @@ extern "C" void kmain(uint32_t multiboot2_magic, void *multiboot_ptr) {
       parser.find_tag<multiboot2::TagMemoryMap>(multiboot2::TagType::MMap);
   ASSERT(mmap_tag);
 
+  auto fb_tag = parser.find_tag<multiboot2::TagFramebuffer>(
+      multiboot2::TagType::Framebuffer);
+
+  // Check if framebuffer tag was found
+  if (!fb_tag) {
+    kprintf("Framebuffer tag not found. Falling back to text mode.\n");
+  } else {
+    // Attempt to initialize framebuffer mode
+    if (!vga.initialize_framebuffer(fb_tag)) {
+      kprintf("Failed to initialize framebuffer. Falling back to text mode.\n");
+    }
+  }
+
   early_init(mmap_tag);
 
   while (true) {

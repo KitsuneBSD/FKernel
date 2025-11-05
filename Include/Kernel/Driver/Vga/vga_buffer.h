@@ -46,6 +46,34 @@ constexpr uint16_t vga_entry(char c, uint8_t color) {
   return (static_cast<uint16_t>(color) << 8) | c;
 }
 
+// Helper: pack 8-bit r/g/b into framebuffer pixel according to mask/pos/size
+static inline uint32_t pack_pixel_from_rgb(uint8_t r, uint8_t g, uint8_t b,
+                                           uint8_t red_pos, uint8_t red_size,
+                                           uint8_t green_pos,
+                                           uint8_t green_size, uint8_t blue_pos,
+                                           uint8_t blue_size) noexcept {
+  uint32_t out = 0;
+
+  if (red_size) {
+    uint32_t rmax = (1u << red_size) - 1u;
+    uint32_t rscaled =
+        (static_cast<uint32_t>(r) * rmax + 127) / 255; // rounding
+    out |= (rscaled & rmax) << red_pos;
+  }
+  if (green_size) {
+    uint32_t gmax = (1u << green_size) - 1u;
+    uint32_t gscaled = (static_cast<uint32_t>(g) * gmax + 127) / 255;
+    out |= (gscaled & gmax) << green_pos;
+  }
+  if (blue_size) {
+    uint32_t bmax = (1u << blue_size) - 1u;
+    uint32_t bscaled = (static_cast<uint32_t>(b) * bmax + 127) / 255;
+    out |= (bscaled & bmax) << blue_pos;
+  }
+
+  return out;
+}
+
 /**
  * @brief VGA text and framebuffer driver
  *
@@ -54,6 +82,26 @@ constexpr uint16_t vga_entry(char c, uint8_t color) {
  */
 class vga {
 private:
+  /// RGBA representations of VGA colors
+  static constexpr uint32_t vga_color_to_rgba[16] = {
+      0x000000FF, // Black
+      0x0000AAFF, // Blue
+      0x00AA00FF, // Green
+      0x00AAAAFF, // Cyan
+      0xAA0000FF, // Red
+      0xAA00AAFF, // Magenta
+      0xAA5500FF, // Brown
+      0xAAAAAAFF, // LightGray
+      0x555555FF, // DarkGray
+      0x5555FFFF, // LightBlue
+      0x55FF55FF, // LightGreen
+      0x55FFFFFF, // LightCyan
+      0xFF5555FF, // LightRed
+      0xFF55FFFF, // LightMagenta
+      0xFFFF55FF, // Yellow
+      0xFFFFFFFF  // White
+  };
+
   /// Dual-mode driver: text-mode buffer or framebuffer
   enum class Mode { Text, Framebuffer } mode = Mode::Text;
 
@@ -67,7 +115,15 @@ private:
   uint32_t fb_height = 0;
   uint32_t fb_pitch = 0;
   uint8_t fb_bpp = 0;
-  uint8_t fb_type = 0; ///< Framebuffer type from multiboot tag
+  uint8_t fb_type = 0; ///< Framebuffer type from multiboot tag (0=indexed, 1=RGB, 2=EGA text)
+
+  // Framebuffer color mask information
+  uint8_t fb_red_pos = 0;
+  uint8_t fb_red_size = 0;
+  uint8_t fb_green_pos = 0;
+  uint8_t fb_green_size = 0;
+  uint8_t fb_blue_pos = 0;
+  uint8_t fb_blue_size = 0;
 
   /// Current cursor position
   size_t row = 0;
@@ -88,7 +144,7 @@ private:
   void fb_put_char(char c);
   void fb_clear();
   void fb_put_pixel(uint32_t x, uint32_t y, uint32_t rgba);
-  uint32_t color_to_rgba(Color fg, Color bg) const noexcept;
+  uint32_t get_rgba_for_vga_color(Color vga_color) const noexcept;
 
 public:
   /**
