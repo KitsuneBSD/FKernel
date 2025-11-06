@@ -9,6 +9,7 @@
 #include <Kernel/FileSystem/DevFS/devfs.h>
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <Kernel/FileSystem/file_descriptor.h>
+#include <LibFK/Algorithms/log.h>
 
 void init_basic_device() {
   // /Dev/null
@@ -27,15 +28,18 @@ void init_basic_device() {
   DevFS::the().register_device("console", VNodeType::CharacterDevice,
                                &ConsoleDevice::ops, nullptr);
 
+  // Open /dev/console for stdin, stdout, stderr
+  int console_fd = file_descriptor_open_path("/dev/console", 0);
+  if (console_fd >= 0) {
+    // Duplicate the file descriptor to stdin (0), stdout (1), and stderr (2)
+    FileDescriptorTable::the().dup2(console_fd, 0);
+    FileDescriptorTable::the().dup2(console_fd, 1);
+    FileDescriptorTable::the().dup2(console_fd, 2);
+    file_descriptor_close(console_fd);
+  } else {
+    kwarn("DeviceManager", "Failed to open /dev/console");
+  }
+
   // /dev/ada
   AtaController::the().initialize();
-
-  int fd = file_descriptor_open_path("/dev/console", 0);
-  if (fd < 0)
-    fd = file_descriptor_open_path("/dev/ttyS0", 0);
-
-  if (fd >= 0) {
-    (void)file_descriptor_open_path("/dev/console", 0);
-    (void)file_descriptor_open_path("/dev/console", 0);
-  }
 }
