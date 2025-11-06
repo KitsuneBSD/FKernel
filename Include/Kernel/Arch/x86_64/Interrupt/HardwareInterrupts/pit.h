@@ -3,6 +3,8 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Types/types.h>
 
+// TODO: USE Strategy to select between Timers
+
 /**
  * @brief Global tick counter incremented by the PIT interrupt
  */

@@ -4,6 +4,8 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
 
+// TODO: USE Strategy to select between 8259Pic and APIC
+
 /**
  * @brief Master PIC command port
  */

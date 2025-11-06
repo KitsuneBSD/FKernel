@@ -3,6 +3,8 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
 
+// TODO: USE Strategy to select between 8259Pic and APIC
+
 // Model-specific register (MSR) for the APIC base address
 constexpr uint32_t APIC_BASE_MSR = 0x1B;
 
