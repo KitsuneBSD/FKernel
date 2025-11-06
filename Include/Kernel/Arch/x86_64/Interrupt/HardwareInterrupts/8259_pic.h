@@ -113,4 +113,13 @@ public:
    * @param irq IRQ number to send EOI for
    */
   static void send_eoi_safe(uint8_t irq);
+
+  /**
+   * @brief Disable the PIC by masking all IRQ lines.
+   */
+  static void disable() {
+    outb(PIC1_DATA, 0xFF); // Mask all IRQs on master PIC
+    outb(PIC2_DATA, 0xFF); // Mask all IRQs on slave PIC
+    klog("PIC8259", "PIC disabled by masking all IRQs.");
+  }
 };

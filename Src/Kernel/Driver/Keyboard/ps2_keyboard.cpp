@@ -61,10 +61,8 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
 void PS2Keyboard::irq_handler() {
   uint8_t scancode = inb(PS2_DATA_PORT);
   handle_scancode(scancode);
-  PIC8259::send_eoi(1);
 }
 
 void PS2Keyboard::initialize() {
-  PIC8259::unmask_irq(1);
   klog("Keyboard", "PS/2 keyboard initialized on IRQ1");
 }
