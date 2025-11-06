@@ -5,4 +5,3 @@
   - [ ] Clang
   - [x] Nasm
   - [ ] Lld
-  - [ ] Xmake
