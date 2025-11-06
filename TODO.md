@@ -1,8 +1,8 @@
 # FKernel - List of changes
 
 - [ ] Create a custom toolchain to FKernel
-  - [ ] Lua
+  - [x] Lua
   - [ ] Clang
-  - [ ] Nasm
+  - [x] Nasm
   - [ ] Lld
   - [ ] Xmake
