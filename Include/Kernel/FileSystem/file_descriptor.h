@@ -22,6 +22,7 @@ public:
   int allocate(RetainPtr<VNode> vnode, int flags);
   FileDescriptor *get(int file_descriptor);
   int close(int file_descriptor);
+  int dup2(int old_fd, int new_fd);
 
 private:
   FileDescriptorTable();
@@ -34,3 +35,4 @@ int file_descriptor_open_path(const char *path, int flags);
 int file_descriptor_read(int file_descriptor, void *buf, size_t sz);
 int file_descriptor_write(int file_descriptor, const void *buf, size_t sz);
 int file_descriptor_close(int file_descriptor);
+// int file_descriptor_dup2(int old_fd, int new_fd);
