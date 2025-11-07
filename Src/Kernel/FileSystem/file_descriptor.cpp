@@ -36,7 +36,7 @@ int FileDescriptorTable::close(int file_descriptor) {
   if (!f)
     return -1;
   if (f->vnode)
-    f->vnode->close();
+    f->vnode->close(f);
   f->used = false;
 
   kdebug("FD", "Closed file_descriptor %d", file_descriptor);
@@ -52,18 +52,17 @@ FileDescriptor *FileDescriptorTable::get(int file_descriptor) {
 }
 
 int file_descriptor_open_path(const char *path, int flags) {
-  RetainPtr<VNode> vnode;
-  int ret = VirtualFS::the().open(path, flags, vnode);
-  if (ret < 0)
-    return ret;
-  return FileDescriptorTable::the().allocate(vnode, flags);
+  int fd = VirtualFS::the().open(path, flags);
+  if (fd < 0)
+    return fd;
+  return fd;
 }
 
 int file_descriptor_read(int file_descriptor, void *buf, size_t sz) {
   FileDescriptor *f = FileDescriptorTable::the().get(file_descriptor);
   if (!f || !f->vnode)
     return -1;
-  int ret = f->vnode->read(buf, sz, f->offset);
+  int ret = f->vnode->read(f, buf, sz, f->offset);
   if (ret > 0)
     f->offset += static_cast<uint64_t>(ret);
   return ret;
@@ -73,7 +72,7 @@ int file_descriptor_write(int file_descriptor, const void *buf, size_t sz) {
   FileDescriptor *f = FileDescriptorTable::the().get(file_descriptor);
   if (!f || !f->vnode)
     return -1;
-  int ret = f->vnode->write(buf, sz, f->offset);
+  int ret = f->vnode->write(f, buf, sz, f->offset);
   if (ret > 0)
     f->offset += static_cast<uint64_t>(ret);
   return ret;
