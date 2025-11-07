@@ -7,7 +7,6 @@
 constexpr uint64_t IOAPIC_REDIR_MASKED = 1 << 16;
 
 void IOAPIC::write(uint32_t reg, uint32_t value) {
-  kdebug("IOAPIC", "Writing to register 0x%x with value 0x%x", reg, value);
   *reinterpret_cast<volatile uint32_t *>(ioapic_base) = reg;
   *reinterpret_cast<volatile uint32_t *>(ioapic_base + 0x10) = value;
 }
@@ -42,7 +41,6 @@ void IOAPIC::initialize(uintptr_t base_addr) {
 
 void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
                        uint32_t flags) {
-  kdebug("IOAPIC", "Remapping IRQ %u to vector %u on LAPIC %u with flags 0x%x", irq, vector, lapic_id, flags);
   uint64_t redirection_entry = 0;
   redirection_entry |= vector;
   redirection_entry |= (uint64_t)lapic_id << 56;
@@ -53,13 +51,9 @@ void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
 
   write(reg_low, (uint32_t)redirection_entry);
   write(reg_high, (uint32_t)(redirection_entry >> 32));
-
-  kdebug("IOAPIC", "Remapped IRQ %u to vector %u on LAPIC %u", irq, vector,
-         lapic_id);
 }
 
 void IOAPIC::mask_irq(uint8_t irq) {
-  kdebug("IOAPIC", "Masking IRQ %u", irq);
   uint32_t reg_low = IOAPIC_REG_TABLE_BASE + (irq * 2);
   uint32_t reg_high = IOAPIC_REG_TABLE_BASE + (irq * 2) + 1;
 
@@ -71,7 +65,6 @@ void IOAPIC::mask_irq(uint8_t irq) {
 }
 
 void IOAPIC::unmask_irq(uint8_t irq) {
-  kdebug("IOAPIC", "Unmasking IRQ %u", irq);
   uint32_t reg_low = IOAPIC_REG_TABLE_BASE + (irq * 2);
   uint32_t reg_high = IOAPIC_REG_TABLE_BASE + (irq * 2) + 1;
 
