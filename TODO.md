@@ -17,4 +17,4 @@ Use OpTables to configure globally
 
 ## LibFK
 
-- [ ] Create a class to make [CRTP](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern)
+- [x] Create a class to make [CRTP](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern)
