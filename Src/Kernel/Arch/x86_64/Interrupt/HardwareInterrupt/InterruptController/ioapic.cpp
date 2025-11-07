@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
@@ -57,7 +58,11 @@ void IOAPIC::unmask_interrupt(uint8_t irq) {
   write(reg_high, (uint32_t)(entry >> 32));
 }
 
-void IOAPIC::send_eoi([[maybe_unused]] uint8_t irq) { APIC::the().send_eoi(); }
+void IOAPIC::send_eoi([[maybe_unused]] uint8_t irq) {
+  static APIC value;
+  HardwareInterrupt *hw = &value;
+  hw->send_eoi(irq);
+}
 
 void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
                        uint32_t flags) {
