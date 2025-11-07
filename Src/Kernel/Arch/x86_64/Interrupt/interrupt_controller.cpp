@@ -1,10 +1,10 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h"
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
 
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
 
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
@@ -14,63 +14,73 @@
 extern "C" void flush_idt(void *idtr);
 
 void InterruptController::initialize() {
-    disable_interrupt();
+  disable_interrupt();
 
-    clear();
+  clear();
 
-    kdebug("INTERRUPT", "Setting up IDT entries...");
-    for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
-        uint8_t multiple_ist_selector = (i % 7) + 1;
-        if (i < 32) { // Exceptions
-            set_gate(i, g_isr_stubs[i], GateType::InterruptGate, 0x08, *ist_stacks[multiple_ist_selector]);
-        } else { // IRQs
-            set_gate(i, g_isr_stubs[i], GateType::TrapGate, 0x08, *ist_stacks[multiple_ist_selector]);
-        }
-        register_interrupt(default_handler, i);
+  if (!m_hardware_interrupt_controller) {
+    kdebug("Hardware Interrupt", "Initializing PIC8259...");
+    static PIC8259 pic;
+    pic.initialize();
+    m_hardware_interrupt_controller = &pic;
+  }
+
+  kdebug("INTERRUPT", "Setting up IDT entries...");
+  for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
+    uint8_t multiple_ist_selector = (i % 7) + 1;
+    if (i < 32) { // Exceptions
+      set_gate(i, g_isr_stubs[i], GateType::InterruptGate, 0x08,
+               *ist_stacks[multiple_ist_selector]);
+    } else { // IRQs
+      set_gate(i, g_isr_stubs[i], GateType::TrapGate, 0x08,
+               *ist_stacks[multiple_ist_selector]);
     }
+    register_interrupt(default_handler, i);
+  }
 
-    register_interrupt(nmi_handler, 2);
-    register_interrupt(general_protection_handler, 13);
-    register_interrupt(page_fault_handler, 14);
-    register_interrupt(timer_handler, 32);
-    register_interrupt(keyboard_handler, 33);
+  // Handlers específicos
+  register_interrupt(nmi_handler, 2);
+  register_interrupt(general_protection_handler, 13);
+  register_interrupt(page_fault_handler, 14);
+  register_interrupt(timer_handler, 32);    // IRQ0 -> timer
+  register_interrupt(keyboard_handler, 33); // IRQ1 -> keyboard
 
-    load();
+  load();
 
-    PIC8259::initialize();
+  NMI::enable_nmi();
 
-    NMI::enable_nmi();
+  PIT::the().initialize(100);
 
-    PIT::the().initialize(100);
+  kdebug("Hardware Interrupt",
+         "Unmasking IRQ0 (timer) and IRQ1 (keyboard) via %s",
+         m_hardware_interrupt_controller->get_name().c_str());
+  m_hardware_interrupt_controller->unmask_interrupt(0); // Timer
+  m_hardware_interrupt_controller->unmask_interrupt(1); // Keyboard
 
-    kdebug("PIC", "Unmasking IRQ0 (timer) and IRQ1 (keyboard)");
-    PIC8259::unmask_irq(0);
-    PIC8259::unmask_irq(1);
-
-    enable_interrupt();
-    klog("INTERRUPT", "Interrupt descriptor table initialized");
+  enable_interrupt();
+  klog("INTERRUPT", "Interrupt descriptor table initialized using PIC8259");
 }
 
 void InterruptController::clear() {
-    kdebug("INTERRUPT", "Clearing all IDT entries and handlers");
-    for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
-        m_entries[i] = {};
-        m_handlers[i] = nullptr;
-    }
+  kdebug("INTERRUPT", "Clearing all IDT entries and handlers");
+  for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
+    m_entries[i] = {};
+    m_handlers[i] = nullptr;
+  }
 }
 
-
 void InterruptController::set_gate(uint8_t vector, void (*new_interrupt)(),
-                                   GateType type, uint16_t selector, uint8_t ist) {
-    const uint64_t handler = reinterpret_cast<uint64_t>(new_interrupt);
-    idt_entry &d = m_entries[vector];
-    d.offset_low = static_cast<uint16_t>(handler & 0xFFFFu);
-    d.selector = selector;
-    d.ist = static_cast<uint8_t>(ist & 0x7u);
-    d.type_attr = static_cast<uint8_t>(type);
-    d.offset_mid = static_cast<uint16_t>((handler >> 16) & 0xFFFFu);
-    d.offset_high = static_cast<uint32_t>((handler >> 32) & 0xFFFFFFFFu);
-    d.zero = 0;
+                                   GateType type, uint16_t selector,
+                                   uint8_t ist) {
+  const uint64_t handler = reinterpret_cast<uint64_t>(new_interrupt);
+  idt_entry &d = m_entries[vector];
+  d.offset_low = static_cast<uint16_t>(handler & 0xFFFFu);
+  d.selector = selector;
+  d.ist = static_cast<uint8_t>(ist & 0x7u);
+  d.type_attr = static_cast<uint8_t>(type);
+  d.offset_mid = static_cast<uint16_t>((handler >> 16) & 0xFFFFu);
+  d.offset_high = static_cast<uint32_t>((handler >> 32) & 0xFFFFFFFFu);
+  d.zero = 0;
 }
 
 void InterruptController::register_interrupt(interrupt new_interrupt,
@@ -79,12 +89,12 @@ void InterruptController::register_interrupt(interrupt new_interrupt,
 }
 
 void InterruptController::load() {
-    idt_ptr ptr;
-    ptr.limit = static_cast<uint16_t>(sizeof(m_entries) - 1);
-    ptr.base = reinterpret_cast<uint64_t>(&m_entries);
-    flush_idt(&ptr);
+  idt_ptr ptr;
+  ptr.limit = static_cast<uint16_t>(sizeof(m_entries) - 1);
+  ptr.base = reinterpret_cast<uint64_t>(&m_entries);
+  flush_idt(&ptr);
 
-    kdebug("INTERRUPT", "IDT loaded to CPU", ptr.base, ptr.limit);
+  kdebug("INTERRUPT", "IDT loaded to CPU", ptr.base, ptr.limit);
 }
 
 interrupt InterruptController::get_interrupt(uint8_t vector) {

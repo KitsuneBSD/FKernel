@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LibFK/Container/string.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
 #include <LibFK/Types/types.h>
 
@@ -10,21 +11,18 @@
  */
 class APIC : public HardwareInterrupt {
 private:
-  APIC() = default;
   uintptr_t lapic_base = 0;       ///< Mapped LAPIC base
   uint64_t apic_ticks_per_ms = 0; ///< Timer ticks per ms
 
   uint32_t read(uint32_t reg);
   void write(uint32_t reg, uint32_t value);
 
-public:
-  static APIC &the() {
-    static APIC inst;
-    return inst;
-  }
+  String m_name = "APIC";
 
+public:
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
 
+  String get_name() override { return m_name; }
   /**
    * @brief Initialize and enable the local APIC
    */
