@@ -119,4 +119,9 @@ if is_arch("x86_64", "x64") then
 	end)
 end
 
+on_clean(function(target)
+	os.execv("rm -rf Build")
+	os.execv("rm -rf build")
+end)
+
 target_end()
