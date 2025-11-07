@@ -54,8 +54,8 @@ public:
    * @param off Offset in the file.
    * @return Number of bytes read, or negative on error.
    */
-  inline int read(void *buf, size_t sz, size_t off) {
-    int ret = ops && ops->read ? ops->read(this, nullptr, buf, sz, off) : -1;
+  inline int read(FileDescriptor *fd, void *buf, size_t sz, size_t off) {
+    int ret = ops && ops->read ? ops->read(this, fd, buf, sz, off) : -1;
     if (ret >= 0)
       klog("VFS", "Read %d bytes from '%s' at offset %zu", ret, m_name.c_str(),
            off);
@@ -71,8 +71,8 @@ public:
    * @param off Offset in the file.
    * @return Number of bytes written, or negative on error.
    */
-  inline int write(const void *buf, size_t sz, size_t off) {
-    int ret = ops && ops->write ? ops->write(this, nullptr, buf, sz, off) : -1;
+  inline int write(FileDescriptor *fd, const void *buf, size_t sz, size_t off) {
+    int ret = ops && ops->write ? ops->write(this, fd, buf, sz, off) : -1;
     if (ret >= 0)
       klog("VFS", "Wrote %d bytes to '%s' at offset %zu", ret, m_name.c_str(),
            off);
@@ -86,8 +86,8 @@ public:
    * @param flags Open flags.
    * @return 0 on success or negative on error.
    */
-  inline int open(int flags) {
-    int ret = ops && ops->open ? ops->open(this, nullptr, flags) : 0;
+  inline int open(FileDescriptor *fd, int flags) {
+    int ret = ops && ops->open ? ops->open(this, fd, flags) : 0;
     if (ret == 0)
       klog("VFS", "Opened '%s' with flags 0x%x", m_name.c_str(), flags);
     else
@@ -100,8 +100,8 @@ public:
    * @brief Close the vnode.
    * @return 0 on success or negative on error.
    */
-  inline int close() {
-    int ret = ops && ops->close ? ops->close(this, nullptr) : 0;
+  inline int close(FileDescriptor *fd) {
+    int ret = ops && ops->close ? ops->close(this, fd) : 0;
     if (ret == 0)
       klog("VFS", "Closed '%s'", m_name.c_str());
     else

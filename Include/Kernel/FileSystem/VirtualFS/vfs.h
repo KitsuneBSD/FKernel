@@ -35,9 +35,9 @@ public:
     }
     int mount(const char *name, RetainPtr<VNode> root);
     int lookup(const char *path, RetainPtr<VNode> &out);
-    int open(const char *path, int flags, RetainPtr<VNode> &out);
-    int read(const char *path, void *buf, size_t sz, size_t off);
-    int write(const char *path, const void *buf, size_t sz, size_t off);
+    int open(const char *path, int flags);
+    int read(int file_descriptor, void *buf, size_t sz, size_t off);
+    int write(int file_descriptor, const void *buf, size_t sz, size_t off);
 
     RetainPtr<VNode> root() const;
     RetainPtr<VNode> cwd() const;
