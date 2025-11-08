@@ -34,5 +34,10 @@ void timer_handler([[maybe_unused]] uint8_t vector,
 void keyboard_handler([[maybe_unused]] uint8_t vector,
                       InterruptFrame *frame = nullptr);
 
+void ata_primary_handler([[maybe_unused]] uint8_t vector,
+                         InterruptFrame *frame = nullptr);
+void ata_secondary_handler([[maybe_unused]] uint8_t vector,
+                           InterruptFrame *frame = nullptr);
+
 void apic_timer_handler([[maybe_unused]] uint8_t vector,
                         InterruptFrame *frame = nullptr);

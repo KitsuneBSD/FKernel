@@ -56,6 +56,8 @@ void InterruptController::initialize() {
   register_interrupt(virtualization_exception_handler, 20);
   register_interrupt(timer_handler, 32);    // IRQ0 -> timer
   register_interrupt(keyboard_handler, 33); // IRQ1 -> keyboard
+  register_interrupt(ata_primary_handler, 46);   // IRQ14 -> primary ATA
+  register_interrupt(ata_secondary_handler, 47); // IRQ15 -> secondary ATA
 
   load();
 
@@ -68,7 +70,9 @@ void InterruptController::initialize() {
       HardwareInterruptManager::the().get_m_controller()->get_name().c_str());
 
   HardwareInterruptManager::the().unmask_interrupt(0); // Timer
-  HardwareInterruptManager::the().unmask_interrupt(1); // Keyboard
+  HardwareInterruptManager::the().unmask_interrupt(1);  // Keyboard
+  HardwareInterruptManager::the().unmask_interrupt(14); // Primary ATA
+  HardwareInterruptManager::the().unmask_interrupt(15); // Secondary ATA
 
   enable_interrupt();
   klog("INTERRUPT", "Interrupt descriptor table initialized using PIC8259");
