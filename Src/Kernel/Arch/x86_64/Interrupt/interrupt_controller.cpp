@@ -1,5 +1,5 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h"
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h"
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
@@ -34,7 +34,6 @@ void InterruptController::initialize() {
     register_interrupt(default_handler, i);
   }
 
-  // Handlers específicos
   register_interrupt(divide_by_zero_handler, 0);
   register_interrupt(debug_handler, 1);
   register_interrupt(nmi_handler, 2);
@@ -54,8 +53,8 @@ void InterruptController::initialize() {
   register_interrupt(machine_check_handler, 18);
   register_interrupt(simd_floating_point_exception_handler, 19);
   register_interrupt(virtualization_exception_handler, 20);
-  register_interrupt(timer_handler, 32);    // IRQ0 -> timer
-  register_interrupt(keyboard_handler, 33); // IRQ1 -> keyboard
+  register_interrupt(timer_handler, 32);         // IRQ0 -> timer
+  register_interrupt(keyboard_handler, 33);      // IRQ1 -> keyboard
   register_interrupt(ata_primary_handler, 46);   // IRQ14 -> primary ATA
   register_interrupt(ata_secondary_handler, 47); // IRQ15 -> secondary ATA
 
@@ -65,11 +64,7 @@ void InterruptController::initialize() {
 
   PIT::the().initialize(100);
 
-  kdebug(
-      "HW_INTERRUPT", "Unmasking IRQ0 (timer) and IRQ1 (keyboard) via %s",
-      HardwareInterruptManager::the().get_m_controller()->get_name().c_str());
-
-  HardwareInterruptManager::the().unmask_interrupt(0); // Timer
+  HardwareInterruptManager::the().unmask_interrupt(0);  // Timer
   HardwareInterruptManager::the().unmask_interrupt(1);  // Keyboard
   HardwareInterruptManager::the().unmask_interrupt(14); // Primary ATA
   HardwareInterruptManager::the().unmask_interrupt(15); // Secondary ATA
