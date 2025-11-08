@@ -51,12 +51,10 @@ void APIC::initialize() {
 
   lapic_base = apic_phys;
 
-  // Set spurious vector and enable APIC
   write(SPURIOUS, APIC_SPURIOUS_VECTOR | APIC_SVR_ENABLE);
   klog("APIC", "APIC initialized and spurious vector set to %u",
        APIC_SPURIOUS_VECTOR);
 
-  // Calibrate timer for Strategy-compatible usage
   calibrate_timer();
 }
 

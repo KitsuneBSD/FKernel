@@ -18,7 +18,7 @@ void IOAPIC::write(uint32_t reg, uint32_t value) {
 }
 
 void IOAPIC::initialize() {
-  klog("IOAPIC", "Initializing IOAPIC at 0x%lx", ioapic_base);
+  klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
 
   // Map I/O APIC registers
   VirtualMemoryManager::the().map_page(

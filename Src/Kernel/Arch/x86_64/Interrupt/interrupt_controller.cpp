@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h"
 #include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h"
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
@@ -18,12 +19,7 @@ void InterruptController::initialize() {
 
   clear();
 
-  if (!m_hardware_interrupt_controller) {
-    kdebug("Hardware Interrupt", "Initializing PIC8259...");
-    static PIC8259 pic;
-    pic.initialize();
-    m_hardware_interrupt_controller = &pic;
-  }
+  HardwareInterruptManager::the().initialize();
 
   kdebug("INTERRUPT", "Setting up IDT entries...");
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
@@ -51,11 +47,12 @@ void InterruptController::initialize() {
 
   PIT::the().initialize(100);
 
-  kdebug("Hardware Interrupt",
-         "Unmasking IRQ0 (timer) and IRQ1 (keyboard) via %s",
-         m_hardware_interrupt_controller->get_name().c_str());
-  m_hardware_interrupt_controller->unmask_interrupt(0); // Timer
-  m_hardware_interrupt_controller->unmask_interrupt(1); // Keyboard
+  kdebug(
+      "HW_INTERRUPT", "Unmasking IRQ0 (timer) and IRQ1 (keyboard) via %s",
+      HardwareInterruptManager::the().get_m_controller()->get_name().c_str());
+
+  HardwareInterruptManager::the().unmask_interrupt(0); // Timer
+  HardwareInterruptManager::the().unmask_interrupt(1); // Keyboard
 
   enable_interrupt();
   klog("INTERRUPT", "Interrupt descriptor table initialized using PIC8259");

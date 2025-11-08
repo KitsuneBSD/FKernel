@@ -1,5 +1,3 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/8259_pic.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/apic.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Hardware/Cpu.h>
