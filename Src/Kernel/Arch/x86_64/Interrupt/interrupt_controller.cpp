@@ -35,9 +35,25 @@ void InterruptController::initialize() {
   }
 
   // Handlers específicos
+  register_interrupt(divide_by_zero_handler, 0);
+  register_interrupt(debug_handler, 1);
   register_interrupt(nmi_handler, 2);
+  register_interrupt(breakpoint_handler, 3);
+  register_interrupt(overflow_handler, 4);
+  register_interrupt(bound_range_exceeded_handler, 5);
+  register_interrupt(invalid_opcode_handler, 6);
+  register_interrupt(device_not_available_handler, 7);
+  register_interrupt(double_fault_handler, 8);
+  register_interrupt(invalid_tss_handler, 10);
+  register_interrupt(segment_not_present_handler, 11);
+  register_interrupt(stack_segment_fault_handler, 12);
   register_interrupt(general_protection_handler, 13);
   register_interrupt(page_fault_handler, 14);
+  register_interrupt(x87_fpu_floating_point_error_handler, 16);
+  register_interrupt(alignment_check_handler, 17);
+  register_interrupt(machine_check_handler, 18);
+  register_interrupt(simd_floating_point_exception_handler, 19);
+  register_interrupt(virtualization_exception_handler, 20);
   register_interrupt(timer_handler, 32);    // IRQ0 -> timer
   register_interrupt(keyboard_handler, 33); // IRQ1 -> keyboard
 
