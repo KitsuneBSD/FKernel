@@ -18,6 +18,7 @@ void IOAPIC::write(uint32_t reg, uint32_t value) {
 }
 
 void IOAPIC::initialize() {
+  ioapic_base = IOAPIC_ADDRESS;
   klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
 
   // Map I/O APIC registers
