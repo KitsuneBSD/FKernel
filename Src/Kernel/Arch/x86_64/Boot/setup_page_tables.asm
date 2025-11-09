@@ -21,7 +21,7 @@ setup_page_tables:
 
 	mov eax, 0x200000 ; 2MiB
 	mul ecx
-	or eax, 0b10000011 ; present, writable, huge page
+	or eax, 0b10011011 ; present, writable, huge page, cache disable, write-through
 	mov [page_table_l2 + ecx * 8], eax
 
 	inc ecx ; increment counter
