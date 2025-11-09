@@ -1,8 +1,10 @@
 #include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
+#include <Kernel/Hardware/Cpu.h>
 
 // I/O APIC Redirection Table Entry bits
 constexpr uint64_t IOAPIC_REDIR_MASKED = 1ULL << 16;
@@ -60,9 +62,11 @@ void IOAPIC::unmask_interrupt(uint8_t irq) {
 }
 
 void IOAPIC::send_eoi([[maybe_unused]] uint8_t irq) {
-  static APIC value;
-  HardwareInterrupt *hw = &value;
-  hw->send_eoi(irq);
+  if (CPU::the().has_x2apic()) {
+    X2APIC::the().send_eoi(irq);
+  } else {
+    APIC::the().send_eoi(irq);
+  }
 }
 
 void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
