@@ -6,7 +6,7 @@
 
 void TimerManager::initialize(uint32_t freq) {
   if (CPU::the().has_apic() && m_has_memory_manager) {
-    klog("TIMER", "APIC timer detected - initialization not implemented yet");
+    klog("TIMER", "APIC timer selected");
     static APICTimer apic_timer;
     m_timer = &apic_timer;
   } else {
