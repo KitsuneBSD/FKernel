@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/Cpu.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
@@ -83,7 +83,7 @@ void APIC::calibrate_timer() {
   write(INITIAL_COUNT, 0xFFFFFFFF);
 
   constexpr uint64_t calib_ms = 10;
-  PIT::the().sleep(calib_ms);
+  TimerManager::the().sleep(calib_ms);
 
   uint32_t elapsed_ticks = 0xFFFFFFFF - read(CURRENT_COUNT);
   write(LVT_TIMER, APIC_LVT_MASK);

@@ -6,7 +6,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
 
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 
@@ -62,7 +62,7 @@ void InterruptController::initialize() {
 
   NMI::enable_nmi();
 
-  PIT::the().initialize(100);
+  TimerManager::the().initialize(100);
 
   HardwareInterruptManager::the().unmask_interrupt(0);  // Timer
   HardwareInterruptManager::the().unmask_interrupt(1);  // Keyboard

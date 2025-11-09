@@ -20,6 +20,11 @@ private:
   String m_name = "APIC";
 
 public:
+  static APIC &the() {
+    static APIC inst;
+    return inst;
+  }
+
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
 
   String get_name() override { return m_name; }

@@ -4,6 +4,7 @@
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 
@@ -142,5 +143,6 @@ void VirtualMemoryManager::initialize() {
 
   klog("VIRTUAL MEMORY", "Virtual Memory Manager initialized");
   HardwareInterruptManager::the().set_memory_manager(true);
+  TimerManager::the().set_memory_manager(true);
   m_is_initialized = true;
 }
