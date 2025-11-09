@@ -12,9 +12,12 @@ void APICTimer::initialize(uint32_t frequency) {
 }
 
 void APICTimer::sleep(uint64_t ms) {
-  uint64_t start = m_ticks;
-  uint64_t target_ticks = start + (ms * 100 / 1000);
+  uint64_t start_ticks = m_ticks;
+  uint64_t ticks_per_ms = APIC::the().get_ticks_per_ms();
+  uint64_t target_ticks = start_ticks + (ms * ticks_per_ms);
+
   while (m_ticks < target_ticks) {
-    asm volatile("hlt");
+    asm volatile("hlt"); // Busy-wait with HLT instruction
   }
+  // TODO: Replace busy-wait with a proper task scheduling mechanism.
 }

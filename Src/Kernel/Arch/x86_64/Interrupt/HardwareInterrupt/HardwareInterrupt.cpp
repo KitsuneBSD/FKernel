@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h"
 #include "Kernel/Hardware/Cpu.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
@@ -23,6 +24,8 @@ void HardwareInterruptManager::initialize() {
     pic.initialize();
     m_controller = &pic;
   }
+
+  TimerManager::the().initialize(100);
 }
 
 void HardwareInterruptManager::mask_interrupt(uint8_t irq) {
