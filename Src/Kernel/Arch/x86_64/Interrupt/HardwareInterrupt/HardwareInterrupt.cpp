@@ -4,10 +4,22 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 
 void HardwareInterruptManager::initialize() {
   static PIC8259 pic;
-  if (CPU::the().has_apic() && m_has_memory_manager) {
+  if (CPU::the().has_x2apic() && m_has_memory_manager) {
+    static X2APIC x2apic;
+    static IOAPIC ioapic;
+
+    klog("HW_INTERRUPT", "Enable x2APIC + IOAPIC");
+    x2apic.initialize();
+    x2apic.setup_timer(1);
+    pic.disable();
+
+    ioapic.initialize();
+    m_controller = &ioapic;
+  } else if (CPU::the().has_apic() && m_has_memory_manager) {
     static APIC apic;
     static IOAPIC ioapic;
 

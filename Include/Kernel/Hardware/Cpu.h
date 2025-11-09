@@ -14,6 +14,7 @@ class CPU {
 private:
   bool h_apic = false;       ///< True if CPU has local APIC
   bool h_hypervisor = false; ///< True if running under a hypervisor
+  bool h_x2apic = false;     ///< True if CPU has x2APIC support
 
   /**
    * @brief Private constructor for singleton
@@ -25,6 +26,7 @@ private:
     asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1));
     h_apic = d & (1 << 9);
     h_hypervisor = c & (1 << 31);
+    h_x2apic = c & (1 << 21);
   }
 
 public:
@@ -62,4 +64,10 @@ public:
    * @return true if hypervisor is present
    */
   bool has_hypervisor() { return this->h_hypervisor; }
+
+  /**
+   * @brief Check if the CPU has x2APIC support
+   * @return true if x2APIC is available
+   */
+  bool has_x2apic() { return this->h_x2apic; }
 };
