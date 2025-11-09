@@ -12,8 +12,8 @@
 
 - [ ] Create a Adapter class to `BlockDevice`
 
-- [ ] Create a base class **Hardware Interrupt** to be inherited by ([8259Pic](https://en.wikipedia.org/wiki/Intel_8259) / [APIC](https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller) ...)
-- [ ] Create a base class **Timer** to be inherited by ([PIT](https://en.wikipedia.org/wiki/Programmable_interval_timer), [APIC Timer](https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller#APIC_timer) ...)
+- [x] Create a base class **Hardware Interrupt** to be inherited by ([8259Pic](https://en.wikipedia.org/wiki/Intel_8259) / [APIC](https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller) ...)
+- [x] Create a base class **Timer** to be inherited by ([PIT](https://en.wikipedia.org/wiki/Programmable_interval_timer), [APIC Timer](https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller#APIC_timer) ...)
 
 Use OpTables to configure globally
 
@@ -24,8 +24,8 @@ Use OpTables to configure globally
 ### FKernel - Core Functionality
 
 - [ ] **Interrupt and Timer Management Refinement:**
-  - [ ] Implement `HardwareInterrupt` base class (Strategy pattern for PIC/APIC).
-  - [ ] Implement `Timer` base class (Strategy pattern for PIT/APIC Timer).
+  - [x] Implement `HardwareInterrupt` base class (Strategy pattern for PIC/APIC).
+  - [x] Implement `Timer` base class (Strategy pattern for PIT/APIC Timer).
   - [ ] Dynamically register/unregister interrupt handlers.
   - [ ] Support for multi-core interrupt distribution (using IOAPIC).
 
