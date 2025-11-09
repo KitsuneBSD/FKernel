@@ -11,6 +11,8 @@ public:
   virtual ~Timer() = default;
 };
 
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/rtc.h>
+
 class TimerManager {
 private:
   Timer *m_timer = nullptr;
