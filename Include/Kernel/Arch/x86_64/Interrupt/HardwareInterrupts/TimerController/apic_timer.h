@@ -19,6 +19,7 @@ private:
 public:
   void initialize(uint32_t frequency) override;
   uint64_t get_ticks() override { return m_ticks; }
+  void increment_ticks() override { m_ticks++; }
 
   void sleep(uint64_t ms) override;
 };

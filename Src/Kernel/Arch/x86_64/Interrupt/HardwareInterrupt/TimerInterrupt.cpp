@@ -25,3 +25,8 @@ void TimerManager::sleep(uint64_t ms) {
     kwarn("TIMER", "No timer available to sleep!");
   }
 }
+
+void TimerManager::increment_ticks() {
+  if (m_timer)
+    m_timer->increment_ticks();
+}

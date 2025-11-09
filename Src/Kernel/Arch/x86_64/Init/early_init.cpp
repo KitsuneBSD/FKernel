@@ -18,8 +18,6 @@
 void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   klog("EARLY_INIT", "Start early init (multiboot2)");
 
-  HardwareInterruptManager::the().initialize();
-
   GDTController::the().initialize();
   InterruptController::the().initialize();
   PhysicalMemoryManager::the().initialize(mmap);

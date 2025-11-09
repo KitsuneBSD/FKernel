@@ -6,11 +6,6 @@
 #include <LibFK/Types/types.h>
 
 /**
- * @brief Global tick counter incremented by the PIT interrupt
- */
-static inline uint64_t ticks = 0;
-
-/**
  * @brief PIT Channel 0 data port
  */
 constexpr uint16_t PIT_CHANNEL0 = 0x40;
@@ -34,9 +29,14 @@ constexpr uint8_t PIT_CMD_RATE_GEN = 0x34;
 
 // PIT Timer implementation
 class PITTimer : public Timer {
+private:
+  uint64_t m_ticks = 0;
+  uint32_t m_frequency = 0;
+
 public:
   void initialize(uint32_t frequency) override;
   void set_frequency(uint32_t frequency);
-  uint64_t get_ticks() override { return ticks; }
+  void increment_ticks() override { m_ticks++; }
+  uint64_t get_ticks() override { return m_ticks; }
   void sleep(uint64_t ms) override;
 };
