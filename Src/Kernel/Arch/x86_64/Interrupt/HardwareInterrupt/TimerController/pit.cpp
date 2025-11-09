@@ -1,7 +1,7 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/pit.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/pit.h>
 #include <LibFK/Algorithms/log.h>
 
-void PIT::set_frequency(uint32_t frequency) {
+void PITTimer::set_frequency(uint32_t frequency) {
   uint16_t divisor = 1193182 / frequency;
   outb(PIT_COMMAND, PIT_CMD_RATE_GEN);
   outb(PIT_CHANNEL0, static_cast<uint8_t>(divisor & 0xFF));        // LSB
@@ -9,12 +9,12 @@ void PIT::set_frequency(uint32_t frequency) {
   kdebug("PIT", "Set frequency: %u Hz (divisor=%u)", frequency, divisor);
 }
 
-void PIT::initialize(uint32_t frequency) {
+void PITTimer::initialize(uint32_t frequency) {
   set_frequency(frequency);
   klog("PIT", "PIT initialized at %u Hz", frequency);
 }
 
-void PIT::sleep(uint64_t ms) {
+void PITTimer::sleep(uint64_t ms) {
   const uint32_t pit_freq = 1193182;       // Hz base
   const uint32_t divisor = pit_freq / 100; // assume 100 Hz
   const uint64_t ticks_to_wait = (ms * pit_freq) / (divisor * 1000);
