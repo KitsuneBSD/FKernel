@@ -3,6 +3,10 @@
 #include <Kernel/Driver/Ata/AtaController.h>
 #include <LibFK/Algorithms/log.h>
 
+AtaBlockDevice::AtaBlockDevice(const AtaDeviceInfo& device_info) : m_device_info(device_info) {
+    // Constructor to initialize m_device_info
+}
+
 int AtaBlockDevice::open(VNode *vnode, FileDescriptor *fd, int flags) {
   (void)vnode;
   (void)fd;
@@ -18,11 +22,9 @@ int AtaBlockDevice::close(VNode *vnode, FileDescriptor *fd) {
 
 int AtaBlockDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer,
                          size_t size, size_t offset) {
+  (void)vnode; // Silence unused parameter warning
   (void)fd;
-  if (!vnode->fs_private)
-    return -1;
-  auto *info = reinterpret_cast<AtaDeviceInfo *>(vnode->fs_private);
-  if (!info->exists)
+  if (!this->m_device_info.exists)
     return -1;
 
   char *out = reinterpret_cast<char *>(buffer);
@@ -31,7 +33,7 @@ int AtaBlockDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer,
   size_t sector_offset = offset % 512;
 
   while (remaining > 0) {
-    uint8_t *data = AtaCache::the().get_sector(info, sector);
+    uint8_t *data = AtaCache::the().get_sector(&this->m_device_info, sector);
     size_t to_copy =
         (remaining < 512 - sector_offset) ? remaining : (512 - sector_offset);
     memcpy(out, data + sector_offset, to_copy);
@@ -46,11 +48,9 @@ int AtaBlockDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer,
 
 int AtaBlockDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer,
                           size_t size, size_t offset) {
+  (void)vnode; // Silence unused parameter warning
   (void)fd;
-  if (!vnode->fs_private)
-    return -1;
-  auto *info = reinterpret_cast<AtaDeviceInfo *>(vnode->fs_private);
-  if (!info->exists)
+  if (!this->m_device_info.exists)
     return -1;
 
   const char *in = reinterpret_cast<const char *>(buffer);
@@ -59,7 +59,7 @@ int AtaBlockDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer,
   size_t sector_offset = offset % 512;
 
   while (remaining > 0) {
-    uint8_t *data = AtaCache::the().get_sector(info, sector);
+    uint8_t *data = AtaCache::the().get_sector(&this->m_device_info, sector);
     size_t to_copy =
         (remaining < 512 - sector_offset) ? remaining : (512 - sector_offset);
     memcpy(data + sector_offset, in, to_copy);
@@ -72,12 +72,3 @@ int AtaBlockDevice::write(VNode *vnode, FileDescriptor *fd, const void *buffer,
 
   return static_cast<int>(size);
 }
-
-VNodeOps AtaBlockDevice::ops = {.read = &AtaBlockDevice::read,
-                                .write = &AtaBlockDevice::write,
-                                .open = &AtaBlockDevice::open,
-                                .close = &AtaBlockDevice::close,
-                                .lookup = nullptr,
-                                .create = nullptr,
-                                .readdir = nullptr,
-                                .unlink = nullptr};

@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Ata/AtaBlockCache.h>
+#include <Kernel/Driver/Ata/AtaController.h> // Missing include
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 

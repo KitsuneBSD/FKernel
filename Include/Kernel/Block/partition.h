@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Kernel/Driver/Ata/AtaController.h>
 #include <LibFK/Types/types.h>
 
 /**

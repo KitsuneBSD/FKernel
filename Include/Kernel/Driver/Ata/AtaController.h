@@ -1,67 +1,15 @@
 #pragma once
 
-#include <Kernel/Driver/Ata/AtaBlockDevice.h>
+#include <Kernel/Driver/Ata/AtaDefs.h>
+#include <LibFK/Types/types.h>
+
+#pragma once
+
+#include <Kernel/Driver/Ata/AtaDefs.h>
 #include <LibFK/Types/types.h>
 
 /**
- * @brief Base I/O addresses for ATA primary and secondary channels
- */
-#define ATA_PRIMARY_BASE 0x1F0
-#define ATA_SECONDARY_BASE 0x170
-#define ATA_PRIMARY_CTRL 0x3F6
-#define ATA_SECONDARY_CTRL 0x376
-
-/**
- * @brief ATA register offsets
- */
-#define ATA_REG_DATA 0x00
-#define ATA_REG_STATUS 0x07
-#define ATA_REG_COMMAND 0x07
-#define ATA_REG_SECCOUNT 0x02
-#define ATA_REG_LBA0 0x03
-#define ATA_REG_LBA1 0x04
-#define ATA_REG_LBA2 0x05
-#define ATA_REG_HDDEVSEL 0x06
-
-/**
- * @brief ATA commands and status flags
- */
-#define ATA_CMD_IDENTIFY 0xEC
-#define ATA_STATUS_ERR 0x01
-#define ATA_STATUS_DRQ 0x08
-#define ATA_STATUS_BUSY 0x80
-
-/**
- * @brief ATA bus/channel
- */
-enum class Bus {
-  Primary,  ///< Primary channel
-  Secondary ///< Secondary channel
-};
-
-/**
- * @brief Drive position on the bus
- */
-enum class Drive {
-  Master, ///< Master drive
-  Slave   ///< Slave drive
-};
-
-/**
- * @brief Information about an ATA device
- */
-struct AtaDeviceInfo {
-  Bus bus;        ///< ATA bus/channel
-  Drive drive;    ///< Drive position on the bus
-  bool exists;    ///< True if the device exists
-  char model[41]; ///< Device model string (null-terminated)
-};
-
-/**
- * @brief ATA controller for managing devices and performing PIO I/O
- *
- * Implements detection, identification, and reading/writing of ATA drives
- * using PIO mode. This class is a singleton.
+ * @brief ATA controller class
  */
 class AtaController {
   friend class AtaCache; ///< Grants cache access to private I/O methods

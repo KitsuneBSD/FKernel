@@ -1,8 +1,7 @@
 #include <Kernel/Block/BootSector/bsd_partition.h>
 #include <LibFK/Algorithms/log.h>
 
-int parse_bsd_label(const AtaDeviceInfo &device, const void *sector512, PartitionEntry *out, int max_out) {
-  (void) device;
+int parse_bsd_label(const void *sector512, PartitionEntry *out, int max_out) {
   (void) sector512;
   (void) out;
   (void) max_out;
