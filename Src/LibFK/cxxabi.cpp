@@ -26,6 +26,8 @@ int __cxa_atexit(atexit_fn_t func, void *arg, void *dso_handle) {
   return 0;
 }
 
+extern "C" void __cxa_pure_virtual() {}
+
 /**
  * __cxa_finalize stub
  */
