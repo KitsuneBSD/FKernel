@@ -20,4 +20,18 @@ function DirExists(path)
 	return ok == true or ok == 0
 end
 
-return FileExists, DirExists
+function CopyFile(src, dst)
+	local code = os.execute(string.format("cp -r %s %s", src, dst))
+	if code == 0 then
+		PrintMessage(false, "Copied " .. src)
+	else
+		PrintMessage(true, "Failed to copy " .. src)
+	end
+	return code == 0
+end
+
+function CommandExists(cmd)
+	return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == 0
+end
+
+return FileExists, DirExists, CopyFile, CommandExists

@@ -9,124 +9,68 @@ extern "C" uint64_t stack_bottom;
 extern "C" void flush_tss(uint16_t tss_selector);
 extern "C" void flush_gdt(void *gdtr);
 
-void GDTController::setupNull() { gdt[0] = 0; }
-
-void GDTController::setupKernelCode() {
-  gdt[1] = createSegment(SegmentAccess::Ring0Code,
-                         SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-}
-
-void GDTController::setupKernelData() {
-  gdt[2] = createSegment(SegmentAccess::Ring0Data, SegmentFlags::Granularity4K);
-}
-
-void GDTController::setupGDT() {
-  kdebug("GDT", "Setting up GDT entries...");
-  setupNull();
-  setupKernelCode();
-  setupKernelData();
-  setupTSS();
-  setupGDTR();
-  kdebug("GDT", "GDTR configured");
-}
-
 void GDTController::setupTSS() {
-  kdebug("TSS", "Initializing TSS stacks and IST entries...");
+  kdebug("TSS", "Initializing TSS and IST entries...");
 
-  tss.rsp0 = reinterpret_cast<uint64_t>(&stack_bottom) + 4096 * 4;
+  constexpr size_t KERNEL_STACK_SIZE = 4096 * 4;
 
-  if (tss.rsp0 == 0) {
-    kdebug("TSS", "Warning: RSP0 is 0");
+  // Configuração da pilha de ring 0
+  tss.rsp0 = reinterpret_cast<uint64_t>(&stack_bottom) + KERNEL_STACK_SIZE;
+  kdebug("TSS", "Ring 0 stack (RSP0) set to %p", tss.rsp0);
+
+  // Configuração das pilhas IST
+  uint64_t *ist_targets[7] = {&tss.ist1, &tss.ist2, &tss.ist3, &tss.ist4,
+                              &tss.ist5, &tss.ist6, &tss.ist7};
+
+  for (size_t i = 0; i < 7; ++i) {
+    *ist_targets[i] =
+        reinterpret_cast<uint64_t>(&ist_stacks[i][IST_STACK_SIZE - 1]);
+    kdebug("TSS", "IST[%zu] configured at %p", i + 1, *ist_targets[i]);
   }
 
-  kdebug("TSS", "RSP0 set on %p", tss.rsp0);
-
-  for (int i = 0; i < 7; i++) {
-    tss.ist1 = (i == 0)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[0][IST_STACK_SIZE])
-                   : tss.ist1;
-    tss.ist2 = (i == 1)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[1][IST_STACK_SIZE])
-                   : tss.ist2;
-    tss.ist3 = (i == 2)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[2][IST_STACK_SIZE])
-                   : tss.ist3;
-    tss.ist4 = (i == 3)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[3][IST_STACK_SIZE])
-                   : tss.ist4;
-    tss.ist5 = (i == 4)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[4][IST_STACK_SIZE])
-                   : tss.ist5;
-    tss.ist6 = (i == 5)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[5][IST_STACK_SIZE])
-                   : tss.ist6;
-    tss.ist7 = (i == 6)
-                   ? reinterpret_cast<uint64_t>(&ist_stacks[6][IST_STACK_SIZE])
-                   : tss.ist7;
-
-    uint64_t ist_val = 0;
-    switch (i) {
-    case 0:
-      ist_val = tss.ist1;
-      break;
-    case 1:
-      ist_val = tss.ist2;
-      break;
-    case 2:
-      ist_val = tss.ist3;
-      break;
-    case 3:
-      ist_val = tss.ist4;
-      break;
-    case 4:
-      ist_val = tss.ist5;
-      break;
-    case 5:
-      ist_val = tss.ist6;
-      break;
-    case 6:
-      ist_val = tss.ist7;
-      break;
-    }
-
-    if (ist_val == 0) {
-      kdebug("TSS", "Warning: IST stack is 0", i);
-    }
-
-    kdebug("TSS", "IST stack %d configured %p", i, ist_val);
-  }
-
-  tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack);
-  tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack);
-  kdebug("TSS", "RSP1 set on %p", tss.rsp1);
-  kdebug("TSS", "RSP2 set on %p", tss.rsp2);
+  tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack[IST_STACK_SIZE - 1]);
+  tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack[IST_STACK_SIZE - 1]);
+  kdebug("TSS", "RSP1 set to %p", tss.rsp1);
+  kdebug("TSS", "RSP2 set to %p", tss.rsp2);
 
   tss.io_map_base = sizeof(TSS64);
-  kdebug("TSS", "IO map base set on %p", tss.io_map_base);
+  kdebug("TSS", "IO map base offset set to %u bytes", tss.io_map_base);
 
-  uintptr_t addr = reinterpret_cast<uintptr_t>(&tss);
-  size_t size = sizeof(TSS64) - 1;
+  uintptr_t base = reinterpret_cast<uintptr_t>(&tss);
+  uint16_t limit = static_cast<uint16_t>(sizeof(TSS64) - 1);
 
-  uint64_t low = (size & 0xFFFFULL) | ((addr & 0xFFFFFFULL) << 16) |
-                 (static_cast<uint64_t>(SegmentAccess::TSS64) << 40) |
-                 (((size >> 16) & 0x0FULL) << 48) |
-                 (((addr >> 24) & 0xFFULL) << 56);
+  uint64_t low = ((limit & 0xFFFFULL)) | ((base & 0xFFFFFFULL) << 16) |
+                 (static_cast<uint64_t>(SegmentAccess::TSS64Type) << 40) |
+                 (((limit >> 16) & 0x0FULL) << 48) |
+                 ((base & 0xFF000000ULL) << 32);
 
-  uint64_t high = (addr >> 32) & 0xFFFFFFFFULL;
+  uint64_t high = (base >> 32) & 0xFFFFFFFFULL;
 
-  gdt[3] = low;
-  gdt[4] = high;
+  gdt[5] = low;
+  gdt[6] = high;
 
-  kdebug("TSS", "TSS descriptor added to GDT", low, high);
+  kdebug("TSS", "TSS descriptor created: low=%lx high=%lx", low, high);
 }
 
 void GDTController::setupGDTR() {
-  gdtr.limit = sizeof(gdt) - 1;
+  gdtr.limit = static_cast<uint16_t>(sizeof(gdt) - 1);
   gdtr.base = reinterpret_cast<uint64_t>(&gdt);
+
+  const uint16_t gdt_size = gdtr.limit + 1;
+  const size_t entry_count = gdt_size / sizeof(uint64_t);
+
+  kdebug("GDT",
+         "GDTR configured:\n"
+         "  Base address = %p\n"
+         "  Limit        = %u (raw)\n"
+         "  GDT size     = %u bytes\n"
+         "  Entries      = %zu",
+         gdtr.base, gdtr.limit, gdt_size, entry_count);
 }
 
 void GDTController::loadSegments() {
-  kdebug("GDT", "Loading segment registers...");
+  kdebug("GDT",
+         "Reloading segment registers (CS=0x08, DS=ES=FS=GS=SS=0x10)...");
   asm volatile("mov $0x10, %%ax\n"
                "mov %%ax, %%ds\n"
                "mov %%ax, %%es\n"
@@ -141,26 +85,39 @@ void GDTController::loadSegments() {
                :
                :
                : "rax");
-  kdebug("GDT", "Segment registers loaded");
+  kdebug("GDT", "Segment registers successfully reloaded");
+}
+
+void GDTController::setupGDT() {
+  kdebug("GDT", "Initializing GDT entries...");
+  setupNull();
+  setupKernelCode();
+  setupKernelData();
+  setupUserCode();
+  setupUserData();
+  setupTSS();
+  setupGDTR();
+  kdebug("GDT", "GDT setup completed (total entries: %zu)", sizeof(gdt) / 8);
 }
 
 void GDTController::initialize() {
-
   if (m_initialized) {
     kdebug("GDT", "GDT already initialized, skipping");
     return;
   }
 
-  kdebug("GDT", "Starting GDT initialization...");
+  kdebug("GDT", "Starting GDT and TSS initialization sequence...");
   setupGDT();
-  setupGDTR();
   flush_gdt(&gdtr);
+  kdebug("GDT", "GDT loaded into GDTR via lgdt");
+
   loadSegments();
-  kdebug("GDT", "Global descriptor table initialized");
+  kdebug("GDT", "Segment registers and selectors are live");
 
   flush_tss(TSS_SELECTOR);
-  kdebug("TSS", "Task state segment initialized");
+  kdebug("TSS", "TSS loaded via ltr (selector=%lx)", TSS_SELECTOR);
 
   m_initialized = true;
-  klog("GDT", "Initialization complete, TSS selector: 0x%lu", TSS_SELECTOR);
+  klog("GDT", "Initialization complete (TSS selector=%lx, base=%p)",
+       TSS_SELECTOR, gdtr.base);
 }

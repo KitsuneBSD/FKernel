@@ -6,20 +6,24 @@ require("Meta.Lib.run_command")
 
 local is_graphical_mode = true
 
-if not RunCommand("command -v qemu-system-x86_64 >/dev/null 2>&1") then
+if not CommandExists("qemu-system-x86_64") then
 	PrintMessage(true, "qemu-system-x86_64 not found. Please install it before running this script.")
 	os.exit(1)
 end
 
 if not FileExists("logs") then
-  RunCommand("mkdir -p logs/")
+	RunCommand("mkdir -p logs/")
 end
 
 local MockOS = "build/FKernel-MockOS.iso"
 local HDA = "build/FKernel-HDA.qcow2"
 
 if not FileExists(MockOS) or not FileExists(HDA) then
-	RunCommand("xmake")
+	local ok = RunCommand("xmake")
+	if not ok then
+		PrintMessage(true, "xmake build failed — aborting.")
+		os.exit(1)
+	end
 end
 
 local qemu_cmd = {
@@ -32,17 +36,14 @@ local qemu_cmd = {
 
 if is_graphical_mode then
 	table.insert(qemu_cmd, "-vga qxl")
-  	table.insert(qemu_cmd,"-serial file:logs/serial.log")
+	table.insert(qemu_cmd, "-serial file:logs/serial.log")
 else
 	table.insert(qemu_cmd, "-nographic")
 	table.insert(qemu_cmd, "-serial mon:stdio")
 end
 
-local file = io.open(HDA, "r")
-if file then
-	file:close()
-	table.insert(qemu_cmd, "-hda")
-	table.insert(qemu_cmd, HDA)
+if FileExists(HDA) then
+	table.insert(qemu_cmd, "-hda " .. HDA)
 	PrintMessage(false, "Starting QEMU with existing HDA disk")
 else
 	PrintMessage(false, "Starting QEMU with CD-ROM only")
