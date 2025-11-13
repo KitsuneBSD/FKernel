@@ -1,6 +1,8 @@
-#include "Kernel/Arch/x86_64/Interrupt/interrupt_controller.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/rtc.h>
 #include <Kernel/Arch/x86_64/io.h>
+#include <LibFK/Utilities/converter.h>
+
+uint64_t RTCClock::s_ticks = 0;
 
 uint8_t RTCClock::read_register(uint8_t reg) {
   outb(RTC_ADDRESS_PORT, (inb(RTC_ADDRESS_PORT) & 0x80) | reg);
@@ -65,4 +67,37 @@ void RTCClock::set_frequency(uint32_t frequency) {
   write_register(RTC_REG_A, (prev_a & 0xF0) | rate);
 
   asm volatile("sti");
+}
+
+DateTime RTCClock::datetime() {
+  DateTime dt;
+  uint8_t register_b = read_register(RTC_REG_B);
+
+  // Read RTC registers
+  uint8_t second = read_register(0x00);
+  uint8_t minute = read_register(0x02);
+  uint8_t hour = read_register(0x04);
+  uint8_t day = read_register(0x07);
+  uint8_t month = read_register(0x08);
+  uint8_t year = read_register(0x09);
+
+  // Convert BCD to binary if necessary
+  if (!(register_b &
+        0x04)) { // Check if BCD mode is enabled (bit 2 of Register B)
+    second = bcd_to_bin(second);
+    minute = bcd_to_bin(minute);
+    hour = bcd_to_bin(hour);
+    day = bcd_to_bin(day);
+    month = bcd_to_bin(month);
+    year = bcd_to_bin(year);
+  }
+
+  dt.second = second;
+  dt.minute = minute;
+  dt.hour = hour;
+  dt.day = day;
+  dt.month = month;
+  dt.year = year + 2000; // Assuming year is 2-digit and in 21st century. A more robust solution would involve reading the century from CMOS register 0x32 if available.
+
+  return dt;
 }

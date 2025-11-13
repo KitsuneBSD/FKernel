@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
@@ -23,19 +24,19 @@ constexpr uint8_t RTC_REG_B = 0x0B;
  * This class allows initializing the RTC as a timer, setting its frequency,
  * tracking system ticks, and providing simple delay functionality via sleep.
  */
-class RTCClock {
+class RTCClock : public Clock {
 private:
   uint32_t m_frequency = 0;
+  String name = "RTC";
 
   uint8_t read_register(uint8_t reg);
   void write_register(uint8_t reg, uint8_t value);
+  static uint64_t s_ticks;
 
 public:
-  static RTCClock &the() {
-    static RTCClock clock;
-    return clock;
-  }
-
-  void initialize(uint32_t frequency);
+  void initialize(uint32_t frequency) override;
   void set_frequency(uint32_t frequency);
+  String get_name() override { return name; }
+
+  DateTime datetime() override;
 };
