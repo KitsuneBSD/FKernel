@@ -2,23 +2,20 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/apic_timer.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/pit.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/rtc.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Hardware/Cpu.h>
 
 void TimerManager::initialize(uint32_t freq) {
+  /* NOTE: HPET is WIP
   if (CPU::the().has_hpet() && m_has_memory_manager) {
     klog("TIMER", "HPET timer selected");
     static HPETTimer hpet_timer;
     m_timer = &hpet_timer;
-  } else if (CPU::the().has_apic() && m_has_memory_manager) {
+  } else */
+  if (CPU::the().has_apic() && m_has_memory_manager) {
     klog("TIMER", "APIC timer selected");
     static APICTimer apic_timer;
     m_timer = &apic_timer;
-  } else if (m_has_memory_manager) { // Assuming RTC also needs memory manager
-    klog("TIMER", "RTC timer selected");
-    static RTCTimer rtc_timer;
-    m_timer = &rtc_timer;
   } else {
     klog("TIMER", "PIT timer selected");
     static PITTimer pit;

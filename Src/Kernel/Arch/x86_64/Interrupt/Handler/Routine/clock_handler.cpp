@@ -5,9 +5,11 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
 
-void timer_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
+void clock_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
   (void)frame;
-  TickManager::the().increment_ticks();
+
+  outb(0x70, 0x0C);
+  (void)inb(0x71);
 
   HardwareInterruptManager::the().send_eoi(vector);
 }

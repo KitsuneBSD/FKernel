@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TickManager.h"
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TickManager.h>
 #include <LibFK/Types/types.h>
 
 class Timer {
@@ -8,8 +8,6 @@ public:
   virtual void initialize(uint32_t frequency) = 0;
   virtual ~Timer() = default;
 };
-
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/rtc.h>
 
 class TimerManager {
 private:
