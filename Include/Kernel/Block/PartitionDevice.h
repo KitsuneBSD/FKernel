@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Block/BlockDevice.h>
-#include <Kernel/Block/partition.h>
+#include <Kernel/Block/PartitionEntry.h>
 #include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
 #include <Kernel/FileSystem/file_descriptor.h>
 #include <LibFK/Memory/retain_ptr.h> // Include RetainPtr
@@ -10,10 +10,10 @@
  * @brief Represents a logical partition on a physical ATA device
  */
 struct PartitionInfo {
-  RetainPtr<BlockDevice> device;  ///< Pointer to the underlying physical ATA device
-                          ///< (heap-allocated)
-  uint32_t lba_first;     ///< LBA of the first sector of the partition
-  uint32_t sectors_count; ///< Total number of sectors in the partition
+  RetainPtr<BlockDevice> device; ///< Pointer to the underlying physical ATA
+                                 ///< device (heap-allocated)
+  uint32_t lba_first;            ///< LBA of the first sector of the partition
+  uint32_t sectors_count;        ///< Total number of sectors in the partition
   uint8_t type; ///< Partition type identifier (e.g., MBR partition type)
 };
 
@@ -71,4 +71,3 @@ public:
   int write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size,
             size_t offset) override;
 };
-

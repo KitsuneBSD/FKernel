@@ -1,3 +1,4 @@
+#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h"
 #include <Kernel/Boot/init.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -30,4 +31,5 @@ void init() {
   vfs.lookup("/dev", dev);
 
   init_basic_device();
+  ClockManager::the().datetime().print();
 }

@@ -4,11 +4,11 @@
 #endif
 
 #include <Kernel/Block/BlockDevice.h> // Include the new BlockDevice header
-#include <Kernel/Block/partition.h>
-#include <Kernel/Block/partition_device.h>
+#include <Kernel/Block/PartitionEntry.h>
+#include <Kernel/Block/PartitionDevice.h>
 
-#include <Kernel/Block/BootSector/bsd_partition.h>
-#include <Kernel/Block/BootSector/mbr_partition.h>
+#include <Kernel/Block/Partition/BsdPartition.h>
+#include <Kernel/Block/Partition/MbrPartition.h>
 
 #include <Kernel/Driver/Ata/AtaBlockCache.h>
 #include <Kernel/Driver/Ata/AtaBlockDevice.h>

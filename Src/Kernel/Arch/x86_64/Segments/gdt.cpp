@@ -1,3 +1,4 @@
+#include "LibFK/Algorithms/log.h"
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Arch/x86_64/Segments/gdt_structures.h>
 #include <Kernel/Arch/x86_64/Segments/tss_stacks.h>
@@ -55,17 +56,6 @@ void GDTController::setupTSS() {
 void GDTController::setupGDTR() {
   gdtr.limit = static_cast<uint16_t>(sizeof(gdt) - 1);
   gdtr.base = reinterpret_cast<uint64_t>(&gdt);
-
-  const uint16_t gdt_size = gdtr.limit + 1;
-  const size_t entry_count = gdt_size / sizeof(uint64_t);
-
-  kdebug("GDT",
-         "GDTR configured:\n"
-         "  Base address = %p\n"
-         "  Limit        = %u (raw)\n"
-         "  GDT size     = %u bytes\n"
-         "  Entries      = %zu",
-         gdtr.base, gdtr.limit, gdt_size, entry_count);
 }
 
 void GDTController::loadSegments() {

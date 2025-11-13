@@ -100,7 +100,6 @@ int PhysicalMemoryManager::alloc_from_node(rb_node<PhysicalMemoryRange> *node,
 void *PhysicalMemoryManager::alloc_physical_page(size_t count,
                                                  uintptr_t addr_hint) {
   if (!is_initialized) {
-    kwarn("PHYSICAL MEMORY", "Not initialized!");
     return nullptr;
   }
 
@@ -120,7 +119,6 @@ void *PhysicalMemoryManager::alloc_physical_page(size_t count,
 
 void PhysicalMemoryManager::free_physical_page(void *page) {
   if (!is_initialized) {
-    kwarn("PHYSICAL MEMORY", "Not initialized!");
     return;
   }
 

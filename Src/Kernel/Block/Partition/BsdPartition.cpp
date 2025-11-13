@@ -1,7 +1,7 @@
-#include <Kernel/Block/BootSector/bsd_partition.h>
+#include <Kernel/Block/Partition/BsdPartition.h>
 #include <LibFK/Algorithms/log.h>
 
-int parse_bsd_label(const void *sector512, PartitionEntry *out, int max_out) {
+int BsdPartitionStrategy::parse(const void* sector512, PartitionEntry* out, int max_out) {
   (void) sector512;
   (void) out;
   (void) max_out;

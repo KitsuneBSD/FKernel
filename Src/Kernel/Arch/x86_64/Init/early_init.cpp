@@ -1,4 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/rtc.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
@@ -25,6 +26,7 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
 
   HardwareInterruptManager::the().initialize();
   TimerManager::the().initialize(100);
+  ClockManager::the().initialize();
 
   init();
 }

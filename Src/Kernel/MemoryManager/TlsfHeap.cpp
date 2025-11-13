@@ -14,7 +14,6 @@ void TLSFHeap::expand(size_t bytes) {
   if (m_heap_base == 0) {
     void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
     if (!phys) {
-      kwarn("TLSF", "Failed to allocate initial physical page");
       return;
     }
 
