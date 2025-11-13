@@ -70,8 +70,12 @@ void PIC8259::unmask_interrupt(uint8_t irq) {
 void PIC8259::send_eoi(uint8_t irq) {
   bool spurious = (irq == 7 && !(get_isr() & (1 << 7))) ||
                   (irq == 15 && !(get_isr() & (1 << 15)));
-  if (!spurious)
-    send_eoi(irq);
+  if (spurious)
+    return;
+
+  if (irq >= 8)
+    outb(PIC2_CMD, 0x20);
+  outb(PIC1_CMD, 0x20);
 }
 
 void PIC8259::disable() {
