@@ -27,16 +27,11 @@ void TimerManager::initialize(uint32_t freq) {
   m_timer->initialize(freq);
 }
 
-void TimerManager::sleep(uint64_t ms) {
+void TimerManager::sleep(uint64_t ticks) {
   if (m_timer) {
-    kdebug("TIMER", "Sleeping for %lu ms", ms);
-    m_timer->sleep(ms);
+    kdebug("TIMER", "Sleeping for %lu ticks", ticks);
+    m_tick.the().sleep(ticks);
   } else {
     kwarn("TIMER", "No timer available to sleep!");
   }
-}
-
-void TimerManager::increment_ticks() {
-  if (m_timer)
-    m_timer->increment_ticks();
 }
