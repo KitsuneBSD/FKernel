@@ -1,3 +1,5 @@
+/* FKernel linker script - Multiboot2 friendly */
+
 ENTRY(start)
 
 PHDRS
@@ -6,12 +8,20 @@ PHDRS
     data   PT_LOAD FLAGS(6); /* RW_ */
 }
 
+/* --- Layout of the binary --- */
 SECTIONS
 {
-    . = 1M;
+    /* --- Multiboot2 Header --- */
+    /* Must be located within the first 32 KiB of the final binary */
+    . = 0x400;  /* file start offset or 1 page offset */
+    .multiboot_header : {
+        KEEP(*(.multiboot_header))  /* ensure linker does not discard this section */
+    }
 
+    /* --- Kernel Text --- */
+    /* Kernel is loaded at 1MB virtual address (standard x86_64) */
+    . = 1M;
     .text : {
-        KEEP(*(.multiboot_header))
         __kernel_start = .;
         *(.text*)
     } :kernel
@@ -20,6 +30,7 @@ SECTIONS
         *(.rodata*)
     } :kernel
 
+    /* --- Read-Write Data --- */
     .data : {
         *(.data*)
     } :data
@@ -29,9 +40,10 @@ SECTIONS
         __kernel_end = .;
     } :data
 
+    /* --- Kernel Heap --- */
     .kernel_heap (NOLOAD) : {
         __heap_start = .;
-        . += 32M;
+        . += 32M;       /* reserve 32MB for kernel heap */
         __heap_end = .;
     }
 }
