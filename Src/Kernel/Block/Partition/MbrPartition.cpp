@@ -34,5 +34,7 @@ int MbrPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
     pe.has_chs = false;
   }
 
+  klog("MBR", "Mbr partition identified and parsed");
+
   return out_count;
 }

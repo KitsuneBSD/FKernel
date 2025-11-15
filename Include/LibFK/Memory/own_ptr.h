@@ -121,3 +121,17 @@ template <typename T, typename... Args>
 inline OwnPtr<T> make_own(Args &&...args) {
   return OwnPtr<T>(new T(static_cast<Args &&>(args)...));
 }
+
+/**
+ * @brief Adopt an existing raw pointer into an OwnPtr.
+ *
+ * Use this when you already have a dynamically allocated object
+ * and want to transfer ownership to an OwnPtr.
+ *
+ * @tparam T Type of object
+ * @param ptr Raw pointer to adopt
+ * @return OwnPtr<T> owning the object
+ */
+template <typename T> inline OwnPtr<T> adopt_own(T *ptr) {
+  return OwnPtr<T>(ptr);
+}

@@ -25,7 +25,11 @@ struct PartitionInfo {
  * read, and write.
  */
 class PartitionBlockDevice : public BlockDevice {
+private:
+  PartitionInfo m_info;
+
 public:
+  PartitionBlockDevice(PartitionInfo &&info);
   /**
    * @brief Open a partition
    *

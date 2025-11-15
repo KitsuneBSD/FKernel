@@ -3,11 +3,13 @@
 #include <Kernel/Posix/errno.h>
 #include <LibFK/Algorithms/log.h>
 
+PartitionBlockDevice::PartitionBlockDevice(PartitionInfo &&info)
+    : m_info(move(info)) {}
+
 int PartitionBlockDevice::open(VNode *vnode, FileDescriptor *fd, int flags) {
+  (void)vnode;
   (void)fd;
   (void)flags;
-  if (!vnode || !vnode->fs_private)
-    return -1;
   return 0;
 }
 
@@ -20,43 +22,40 @@ int PartitionBlockDevice::close(VNode *vnode, FileDescriptor *fd) {
 int PartitionBlockDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer,
                                size_t size, size_t offset) {
   (void)fd;
-  if (!vnode || !vnode->fs_private)
-    return -1;
-
-  auto *pinfo = reinterpret_cast<PartitionInfo *>(vnode->fs_private);
-  if (!pinfo || !pinfo->device) {
+  if (!m_info.device) {
     errno = EFAULT;
     return -1;
   }
 
-  // Translate offset to LBA
-  if (offset + size > (size_t)pinfo->sectors_count * 512)
-    return -1; // out of range
+  if (offset >= (size_t)m_info.sectors_count * 512) {
+    return 0;
+  }
 
-  // Read from the underlying block device, adjusting the offset for the
-  // partition
-  return pinfo->device->read(vnode, fd, buffer, size,
-                             pinfo->lba_first * 512 + offset);
+  if (offset + size > (size_t)m_info.sectors_count * 512) {
+    size = (size_t)m_info.sectors_count * 512 - offset;
+  }
+
+  return m_info.device->read(vnode, fd, buffer, size,
+                             (size_t)m_info.lba_first * 512 + offset);
 }
 
 int PartitionBlockDevice::write(VNode *vnode, FileDescriptor *fd,
                                 const void *buffer, size_t size,
                                 size_t offset) {
   (void)fd;
-  if (!vnode || !vnode->fs_private)
-    return -1;
-
-  auto *pinfo = reinterpret_cast<PartitionInfo *>(vnode->fs_private);
-  if (!pinfo || !pinfo->device) {
+  if (!m_info.device) {
     errno = EFAULT;
     return -1;
   }
 
-  if (offset + size > (size_t)pinfo->sectors_count * 512)
-    return -1; // out of range
+  if (offset >= (size_t)m_info.sectors_count * 512) {
+    return -1;
+  }
 
-  // Write to the underlying block device, adjusting the offset for the
-  // partition
-  return pinfo->device->write(vnode, fd, buffer, size,
-                              pinfo->lba_first * 512 + offset);
+  if (offset + size > (size_t)m_info.sectors_count * 512) {
+    size = (size_t)m_info.sectors_count * 512 - offset;
+  }
+
+  return m_info.device->write(vnode, fd, buffer, size,
+                              (size_t)m_info.lba_first * 512 + offset);
 }

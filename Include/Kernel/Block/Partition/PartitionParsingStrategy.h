@@ -5,6 +5,7 @@
 
 class PartitionParsingStrategy {
 public:
-    virtual ~PartitionParsingStrategy() = default;
-    virtual int parse(const void* sector512, PartitionEntry* out, int max_out) = 0;
+  virtual ~PartitionParsingStrategy() = default;
+  virtual int parse(const void *sector512, PartitionEntry *out,
+                    int max_out) = 0;
 };

@@ -21,19 +21,30 @@ DevFS &DevFS::the() {
 RetainPtr<VNode> DevFS::root() { return d_root; }
 
 int DevFS::register_device(const char *prefix, VNodeType type, VNodeOps *ops,
-                           void *driver_data, bool has_multiple) {
-  int index = 0;
-  for (auto &dev : d_devices) {
-    if (strncmp(dev.d_name.c_str(), prefix, strlen(prefix)) == 0)
-      ++index;
-  }
-
+                           void *driver_data, bool has_multiple,
+                           bool start_with_zero) {
+  int index = start_with_zero ? 0 : 1;
   char name_buf[64];
 
-  snprintf(name_buf, sizeof(name_buf), "%s", prefix);
+  while (true) {
+    if (has_multiple) {
+      snprintf(name_buf, sizeof(name_buf), "%s%d", prefix, index);
+    } else {
+      snprintf(name_buf, sizeof(name_buf), "%s", prefix);
+    }
 
-  if (has_multiple) {
-    snprintf(name_buf, sizeof(name_buf), "%s%d", prefix, index);
+    bool exists = false;
+    for (auto &dev : d_devices) {
+      if (strcmp(dev.d_name.c_str(), name_buf) == 0) {
+        exists = true;
+        break;
+      }
+    }
+
+    if (!exists)
+      break;
+
+    ++index;
   }
 
   return register_device_static(name_buf, type, ops, driver_data);

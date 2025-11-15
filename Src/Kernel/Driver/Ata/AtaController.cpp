@@ -1,28 +1,26 @@
+#include "LibFK/Traits/type_traits.h"
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/io.h>
 #endif
 
 #include <Kernel/Block/BlockDevice.h> // Include the new BlockDevice header
-#include <Kernel/Block/PartitionEntry.h>
 #include <Kernel/Block/PartitionDevice.h>
+#include <Kernel/Block/PartitionEntry.h>
 
-#include <Kernel/Block/Partition/BsdPartition.h>
 #include <Kernel/Block/Partition/MbrPartition.h>
+#include <Kernel/Block/PartitionManager.h>
 
 #include <Kernel/Driver/Ata/AtaBlockCache.h>
 #include <Kernel/Driver/Ata/AtaBlockDevice.h>
 #include <Kernel/Driver/Ata/AtaController.h>
-#include <Kernel/Driver/Ata/AtaDefs.h> // Missing include
+#include <Kernel/Driver/Ata/AtaDefs.h>
 
 #include <Kernel/FileSystem/DevFS/devfs.h>
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/retain_ptr.h> // For adopt_retain
-
-// TODO: Separe responsabilities between the controller driver and the block
-// bootsector
 
 void ata_irq_primary() {
   klog("ATA", "Primary channel IRQ fired!");
@@ -57,24 +55,46 @@ void AtaController::detect_devices() {
   const char *drive_str[] = {"Master", "Slave"};
 
   int device_index = 0;
+
   for (int b = 0; b < 2; ++b) {
     for (int d = 0; d < 2; ++d) {
-      AtaDeviceInfo device_info; // Create a temporary AtaDeviceInfo
-      if (identify_device(static_cast<Bus>(b), static_cast<Drive>(d), device_info)) {
-        klog("ATA", "Detected %s %s: Model '%s'", bus_str[b], drive_str[d],
-             device_info.model);
 
-        // Create an AtaBlockDevice instance using the detected info
-        RetainPtr<AtaBlockDevice> ata_block_dev = adopt_retain(new AtaBlockDevice(device_info));
+      AtaDeviceInfo device_info;
+      if (!identify_device(static_cast<Bus>(b), static_cast<Drive>(d),
+                           device_info))
+        continue;
 
-        char name[16];
-        snprintf(name, sizeof(name), "ada%d", device_index);
-
-        DevFS::the().register_device("ada", VNodeType::BlockDevice,
-                                     &g_block_device_ops, ata_block_dev.leakRef(), true); // Use global ops and instance
-
-        device_index++;
+      if (device_info.model[0] == '\0') {
+        klog("ATA", "%s %s: No device detected, skipping", bus_str[b],
+             drive_str[d]);
+        continue;
       }
+
+      klog("ATA", "Detected %s %s: Model '%s'", bus_str[b], drive_str[d],
+           device_info.model);
+
+      RetainPtr<AtaBlockDevice> ata_block_dev =
+          adopt_retain(new AtaBlockDevice(device_info));
+
+      char name[16];
+      snprintf(name, sizeof(name), "ada%d", device_index);
+
+      DevFS::the().register_device(name, VNodeType::BlockDevice,
+                                   &g_block_device_ops, ata_block_dev.get());
+
+      PartitionManager pm(RetainPtr<BlockDevice>(ata_block_dev.get()));
+      auto partitions = pm.detect_partitions();
+
+      for (auto &part_dev : partitions) {
+        char part_name[32];
+        snprintf(part_name, sizeof(part_name), "%sp", name);
+
+        DevFS::the().register_device(part_name, VNodeType::BlockDevice,
+                                     &g_block_device_ops, part_dev.get(), true,
+                                     false);
+      }
+
+      device_index++;
     }
   }
 }
