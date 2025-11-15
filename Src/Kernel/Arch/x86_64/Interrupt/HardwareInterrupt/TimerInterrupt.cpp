@@ -6,13 +6,11 @@
 #include <Kernel/Hardware/Cpu.h>
 
 void TimerManager::initialize(uint32_t freq) {
-  /* NOTE: HPET is WIP
   if (CPU::the().has_hpet() && m_has_memory_manager) {
     klog("TIMER", "HPET timer selected");
     static HPETTimer hpet_timer;
     m_timer = &hpet_timer;
-  } else */
-  if (CPU::the().has_apic() && m_has_memory_manager) {
+  } else if (CPU::the().has_apic() && m_has_memory_manager) {
     klog("TIMER", "APIC timer selected");
     static APICTimer apic_timer;
     m_timer = &apic_timer;

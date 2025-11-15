@@ -16,7 +16,6 @@ void init() {
   auto &devfs = DevFS::the();
   klog("INIT", "Start init");
 
-  // Monta RamFS em /
   vfs.mount("/", ramfs.root());
 
   RetainPtr<VNode> root;

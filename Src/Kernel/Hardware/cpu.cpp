@@ -1,5 +1,5 @@
+#include <Kernel/Hardware/Acpi.h>
 #include <Kernel/Hardware/Cpu.h>
-#include <Kernel/Hardware/ACPI/acpi.h>
 #include <LibFK/Algorithms/log.h>
 
 CPU::CPU() {
@@ -14,7 +14,6 @@ CPU::CPU() {
   vendor[12] = '\0';
   m_vendor = String(vendor);
 
-  // Get brand string
   cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
   if (eax >= 0x80000004) {
     char brand[49];
@@ -46,20 +45,22 @@ void CPU::detect_cpu_features() {
   // Check for APIC
   cpuid(1, 0, &eax, &ebx, &ecx, &edx);
   if (edx & (1 << 9)) {
+    kdebug("CPU", "Found APIC support");
     m_has_apic = true;
   }
 
   // Check for x2APIC
   if (ecx & (1 << 21)) {
+    kdebug("CPU", "Found x2APIC support");
     m_has_x2apic = true;
   }
 
-  // Check for HPET
-  if (ACPI::the().find_table("HPET")) {
+  // Check for hpet
+  if (ACPIManager::the().find_table("HPET")) {
+    kdebug("CPU", "Found Hpet support");
     m_has_hpet = true;
   }
 }
-
 
 void CPU::write_msr(uint32_t msr, uint64_t value) {
   uint32_t low = value & 0xFFFFFFFF;

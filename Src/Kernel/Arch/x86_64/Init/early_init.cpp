@@ -4,6 +4,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+#include <Kernel/Hardware/Acpi.h>
 
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/init.h>
@@ -25,6 +26,7 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   VirtualMemoryManager::the().initialize();
 
   HardwareInterruptManager::the().initialize();
+  ACPIManager::the().initialize();
   TimerManager::the().initialize(100);
   ClockManager::the().initialize();
 

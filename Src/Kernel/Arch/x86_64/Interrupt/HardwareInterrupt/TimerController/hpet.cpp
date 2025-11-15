@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
-#include <Kernel/Hardware/ACPI/acpi.h>
+#include <Kernel/Hardware/Acpi.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -12,9 +12,7 @@ void HPETTimer::write_reg(uint64_t reg, uint64_t value) {
 }
 
 void HPETTimer::initialize(uint32_t frequency) {
-  // FIXME: We need a proper ACPI parser to get the HPET address.
-  // For now, we assume it's at a known location if found.
-  auto hpet_table = ACPI::the().find_table("HPET");
+  auto hpet_table = ACPIManager::the().find_table("HPET");
   if (!hpet_table) {
     kerror("HPET", "HPET table not found!");
     return;
