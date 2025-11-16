@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
-#include <Kernel/Hardware/Acpi.h>
+#include <Kernel/Hardware/acpi.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 

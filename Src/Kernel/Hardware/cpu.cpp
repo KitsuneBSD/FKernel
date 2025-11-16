@@ -1,5 +1,5 @@
-#include <Kernel/Hardware/Acpi.h>
-#include <Kernel/Hardware/Cpu.h>
+#include <Kernel/Hardware/acpi.h>
+#include <Kernel/Hardware/cpu.h>
 #include <LibFK/Algorithms/log.h>
 
 CPU::CPU() {

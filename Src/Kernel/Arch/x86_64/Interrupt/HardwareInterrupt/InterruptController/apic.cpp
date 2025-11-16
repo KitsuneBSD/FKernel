@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <Kernel/Hardware/Cpu.h>
+#include <Kernel/Hardware/cpu.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 

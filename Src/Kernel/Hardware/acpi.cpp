@@ -1,5 +1,4 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h"
-#include <Kernel/Hardware/Acpi.h>
+#include <Kernel/Hardware/acpi.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>

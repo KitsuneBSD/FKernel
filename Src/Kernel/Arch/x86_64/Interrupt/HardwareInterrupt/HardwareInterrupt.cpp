@@ -1,10 +1,10 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h"
-#include "Kernel/Hardware/Cpu.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
+#include <Kernel/Hardware/cpu.h>
 
 void HardwareInterruptManager::initialize() {
   static PIC8259 pic;

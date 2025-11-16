@@ -1,10 +1,9 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
+#include <Kernel/Hardware/cpu.h>
 #include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
-#include <Kernel/Hardware/Cpu.h>
 
 // I/O APIC Redirection Table Entry bits
 constexpr uint64_t IOAPIC_REDIR_MASKED = 1ULL << 16;
