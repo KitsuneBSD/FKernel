@@ -125,3 +125,6 @@ on_clean(function(target)
 end)
 
 target_end()
+
+target("test")
+target_end()
