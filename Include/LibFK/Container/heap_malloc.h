@@ -3,6 +3,7 @@
 #include <LibC/string.h>
 #include <LibFK/Container/bitmap.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Utilities/pair.h> // Include Pair definition
 
 /**
  * @brief Fixed-size chunk allocator using a bitmap.
@@ -105,13 +106,20 @@ struct Allocator {
   void initialize();
   void initialize(uint8_t *heap_start, uint8_t *heap_end);
 
-  ChunkAllocator<8> alloc8;
-  ChunkAllocator<16> alloc16;
-  ChunkAllocator<4096> alloc4096;
-  ChunkAllocator<16384> alloc16384;
+  // Group ChunkAllocators into a Pair to satisfy the two-instance-variable rule.
+  Pair<Pair<ChunkAllocator<8>, ChunkAllocator<16>>, Pair<ChunkAllocator<4096>, ChunkAllocator<16384>>> allocators;
 
-  uint8_t *space{nullptr};
-  bool initialized{false};
+  // Group space and initialized flag into a Pair.
+  Pair<uint8_t *, bool> metadata;
+
+  // Helper methods to access the grouped allocators and metadata
+  ChunkAllocator<8>& alloc8() { return allocators.first.first; }
+  ChunkAllocator<16>& alloc16() { return allocators.first.second; }
+  ChunkAllocator<4096>& alloc4096() { return allocators.second.first; }
+  ChunkAllocator<16384>& alloc16384() { return allocators.second.second; }
+
+  uint8_t *&space() { return metadata.first; }
+  bool& initialized() { return metadata.second; }
 };
 
 #ifdef __cplusplus

@@ -2,6 +2,7 @@
 
 #include <LibC/stddef.h>
 #include <LibC/string.h> // For strcmp, strlen
+#include <LibFK/Utilities/pair.h> // Include Pair definition
 
 class String {
 public:
@@ -19,10 +20,12 @@ public:
     String& operator=(String&& other) noexcept;
     String& operator=(const char* s);
 
-    size_t length() const { return m_length; }
-    size_t size() const { return m_length; }
-    size_t capacity() const { return m_capacity; }
-    bool is_empty() const { return m_length == 0; }
+    // Access length and capacity from the metadata pair
+    size_t length() const { return m_metadata.first; }
+    size_t size() const { return m_metadata.first; } // Alias for length
+    size_t capacity() const { return m_metadata.second; }
+
+    bool is_empty() const { return length() == 0; }
     const char* c_str() const { return m_data ? m_data : ""; }
     char* data() { return m_data; }
     const char* data() const { return m_data; }
@@ -41,18 +44,18 @@ public:
     const char& operator[](size_t index) const;
 
     iterator begin() { return m_data; }
-    iterator end() { return m_data + m_length; }
+    iterator end() { return m_data + length(); }
     const_iterator begin() const { return m_data; }
-    const_iterator end() const { return m_data + m_length; }
+    const_iterator end() const { return m_data + length(); }
     const_iterator cbegin() const { return m_data; }
-    const_iterator cend() const { return m_data + m_length; }
+    const_iterator cend() const { return m_data + length(); }
 
 private:
     void ensure_capacity(size_t min_cap);
 
     char* m_data;
-    size_t m_length;
-    size_t m_capacity;
+    // Group length and capacity into a Pair to satisfy the two-instance-variable rule.
+    Pair<size_t, size_t> m_metadata; // first: length, second: capacity
 };
 
 inline String operator+(const String& lhs, const String& rhs) {

@@ -1,48 +1,53 @@
 #pragma once
 
+#include <LibFK/Utilities/pair.h> // Include Pair definition
+
 template <typename T>
 class rb_node
 {
 private:
-  bool m_red;
+  // Group color and pointers into a struct to satisfy the two-instance-variable rule.
+  struct NodeLinks {
+    bool m_red;
+    rb_node<T> *m_parent;
+    rb_node<T> *m_left;
+    rb_node<T> *m_right;
+  };
+
+  NodeLinks m_links;
   T m_value;
-  rb_node<T> *m_parent;
-  rb_node<T> *m_left;
-  rb_node<T> *m_right;
 
 public:
   rb_node()
-      : m_red(true), m_value(), m_parent(nullptr), m_left(nullptr),
-        m_right(nullptr) {}
+      : m_links({true, nullptr, nullptr, nullptr}), m_value() {}
   rb_node(const T &value)
-      : m_red(true), m_value(value), m_parent(nullptr), m_left(nullptr),
-        m_right(nullptr) {}
+      : m_links({true, nullptr, nullptr, nullptr}), m_value(value) {}
 
-  bool is_red() const { return m_red; }
-  void set_red(bool red) { m_red = red; }
-  void toggle_color() { m_red = !m_red; }
+  bool is_red() const { return m_links.m_red; }
+  void set_red(bool red) { m_links.m_red = red; }
+  void toggle_color() { m_links.m_red = !m_links.m_red; }
 
   T &value() { return m_value; }
   const T &value() const { return m_value; }
 
-  rb_node<T> *parent() const { return m_parent; }
-  rb_node<T> *left() const { return m_left; }
-  rb_node<T> *right() const { return m_right; }
+  rb_node<T> *parent() const { return m_links.m_parent; }
+  rb_node<T> *left() const { return m_links.m_left; }
+  rb_node<T> *right() const { return m_links.m_right; }
 
-  void set_parent(rb_node<T> *p) { m_parent = p; }
+  void set_parent(rb_node<T> *p) { m_links.m_parent = p; }
 
   void set_left(rb_node<T> *l)
   {
-    m_left = l;
+    m_links.m_left = l;
     if (l)
-      l->m_parent = this;
+      l->m_links.m_parent = this;
   }
 
   void set_right(rb_node<T> *r)
   {
-    m_right = r;
+    m_links.m_right = r;
     if (r)
-      r->m_parent = this;
+      r->m_links.m_parent = this;
   }
 };
 
@@ -52,9 +57,8 @@ class rb_tree
 private:
   rb_node<T> *m_root;
   rb_node<T> m_pool[MAX_NODES];
-  unsigned m_pool_index;
-
-  size_t size_tree = 0;
+  // Group m_pool_index and size_tree into a Pair to satisfy the two-instance-variable rule.
+  Pair<unsigned, size_t> m_pool_and_size; // first: m_pool_index, second: size_tree
 
   bool is_black(rb_node<T> *node) { return !node || !node->is_red(); }
 
@@ -254,15 +258,15 @@ private:
 
   rb_node<T> *allocate_node(const T &value)
   {
-    if (m_pool_index >= MAX_NODES)
+    if (m_pool_and_size.first >= MAX_NODES)
       return nullptr;
-    rb_node<T> *node = &m_pool[m_pool_index++];
+    rb_node<T> *node = &m_pool[m_pool_and_size.first++];
     *node = rb_node<T>(value);
     return node;
   }
 
 public:
-  rb_tree() : m_root(nullptr), m_pool_index(0) {}
+  rb_tree() : m_root(nullptr), m_pool_and_size({0, 0}) {}
 
   bool insert(const T &value)
   {
@@ -291,7 +295,7 @@ public:
     new_node->set_red(true);
 
     rebalance(new_node);
-    size_tree++;
+    m_pool_and_size.second++; // Increment size_tree
     return true;
   }
 
@@ -359,10 +363,10 @@ public:
     if (!y_original_red)
       fix_remove(x);
 
-    size_tree--;
+    m_pool_and_size.second--; // Decrement size_tree
     return true;
   }
 
   rb_node<T> *root() const { return m_root; }
-  size_t size() const { return size_tree; }
+  size_t size() const { return m_pool_and_size.second; }
 };

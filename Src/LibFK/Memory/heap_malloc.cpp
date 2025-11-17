@@ -11,7 +11,8 @@ Allocator s_allocator;
 Allocator &heap_allocator() { return s_allocator; }
 
 void Allocator::initialize() {
-  if (initialized) {
+  // Use the helper method to access the initialized flag
+  if (heap_allocator().initialized()) {
     kerror("HEAP MALLOC", "Allocator is already initialized!");
     return;
   }
@@ -36,24 +37,27 @@ void Allocator::initialize() {
   ASSERT(heap_size >= required);
   auto space = reinterpret_cast<uint64_t *>(heap_start);
 
-  alloc8.initialize(space);
-  alloc16.initialize(alloc8.addressAfterThisAllocator());
-  alloc4096.initialize(alloc16.addressAfterThisAllocator());
-  alloc16384.initialize(alloc4096.addressAfterThisAllocator());
-  initialized = true;
+  // Use helper methods to access allocators and their methods
+  heap_allocator().alloc8().initialize(space);
+  heap_allocator().alloc16().initialize(heap_allocator().alloc8().addressAfterThisAllocator());
+  heap_allocator().alloc4096().initialize(heap_allocator().alloc16().addressAfterThisAllocator());
+  heap_allocator().alloc16384().initialize(heap_allocator().alloc4096().addressAfterThisAllocator());
+  
+  // Use the helper method to set the initialized flag
+  heap_allocator().initialized() = true;
 }
 
 uint64_t *allocate(size_t size) {
   ASSERT(size > 0);
 
   if (size <= 8)
-    return heap_allocator().alloc8.allocate();
+    return heap_allocator().alloc8().allocate();
   if (size <= 16)
-    return heap_allocator().alloc16.allocate();
+    return heap_allocator().alloc16().allocate();
   if (size <= 4096)
-    return heap_allocator().alloc4096.allocate();
+    return heap_allocator().alloc4096().allocate();
   if (size <= 16384)
-    return heap_allocator().alloc16384.allocate();
+    return heap_allocator().alloc16384().allocate();
   return nullptr;
 }
 
@@ -70,20 +74,20 @@ uint64_t *allocateZeroed(size_t size) {
 void free(uint64_t *ptr) {
   ASSERT(ptr);
 
-  if (heap_allocator().alloc8.isInAllocator(ptr)) {
-    heap_allocator().alloc8.free(ptr);
+  if (heap_allocator().alloc8().isInAllocator(ptr)) {
+    heap_allocator().alloc8().free(ptr);
     return;
   }
-  if (heap_allocator().alloc16.isInAllocator(ptr)) {
-    heap_allocator().alloc16.free(ptr);
+  if (heap_allocator().alloc16().isInAllocator(ptr)) {
+    heap_allocator().alloc16().free(ptr);
     return;
   }
-  if (heap_allocator().alloc4096.isInAllocator(ptr)) {
-    heap_allocator().alloc4096.free(ptr);
+  if (heap_allocator().alloc4096().isInAllocator(ptr)) {
+    heap_allocator().alloc4096().free(ptr);
     return;
   }
-  if (heap_allocator().alloc16384.isInAllocator(ptr)) {
-    heap_allocator().alloc16384.free(ptr);
+  if (heap_allocator().alloc16384().isInAllocator(ptr)) {
+    heap_allocator().alloc16384().free(ptr);
     return;
   }
 }
@@ -106,13 +110,13 @@ uint64_t *reallocate(uint64_t *ptr, size_t size) {
     return nullptr;
   };
 
-  if (auto *p = try_move(heap_allocator().alloc8))
+  if (auto *p = try_move(heap_allocator().alloc8()))
     return p;
-  if (auto *p = try_move(heap_allocator().alloc16))
+  if (auto *p = try_move(heap_allocator().alloc16()))
     return p;
-  if (auto *p = try_move(heap_allocator().alloc4096))
+  if (auto *p = try_move(heap_allocator().alloc4096()))
     return p;
-  if (auto *p = try_move(heap_allocator().alloc16384))
+  if (auto *p = try_move(heap_allocator().alloc16384()))
     return p;
 
   return nullptr;

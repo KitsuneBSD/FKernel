@@ -18,3 +18,10 @@ constexpr uint64_t GB = 1000 * MB;
 constexpr uint64_t TB = 1000 * GB;
 constexpr uint64_t PB = 1000 * TB;
 constexpr uint64_t EB = 1000 * PB;
+
+namespace fk {
+template <typename T>
+constexpr T &&move(T &arg) {
+  return static_cast<T &&>(arg);
+}
+} // namespace fk
