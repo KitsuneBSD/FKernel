@@ -127,4 +127,5 @@ end)
 target_end()
 
 target("test")
+set_default(false)
 target_end()
