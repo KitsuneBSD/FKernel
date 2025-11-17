@@ -34,7 +34,7 @@ private:
   static uint64_t s_ticks;
 
 public:
-  void initialize(uint32_t frequency) override;
+  fk::core::Result<void> initialize(uint32_t frequency) override;
   void set_frequency(uint32_t frequency);
   String get_name() override { return name; }
 

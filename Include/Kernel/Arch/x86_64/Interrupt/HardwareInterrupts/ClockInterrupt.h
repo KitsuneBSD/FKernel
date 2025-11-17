@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LibFK/Container/string.h"
+#include <LibFK/Core/Result.h>
 #include <LibFK/Types/types.h>
 
 struct DateTime {
@@ -11,7 +12,6 @@ struct DateTime {
   uint8_t month;
   uint16_t year;
 
-  DateTime now(); // lê diretamente do RTC
   String to_string() const;
   void print();
 };
@@ -19,7 +19,8 @@ struct DateTime {
 class Clock {
 public:
   virtual ~Clock() = default;
-  virtual void initialize(uint32_t frequency) = 0;
+
+  virtual fk::core::Result<void> initialize(uint32_t frequency) = 0;
   virtual String get_name() = 0;
   virtual DateTime datetime() { return {}; }
 };

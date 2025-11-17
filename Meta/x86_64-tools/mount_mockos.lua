@@ -48,15 +48,6 @@ end
 if not FileExists("build/FKernel-HDA.qcow2") then
 	RunCommand("qemu-img create -f qcow2 build/FKernel-HDA.qcow2 4G >/dev/null 2>&1")
 	PrintMessage(false, "Disk image created")
-
-	if CommandExists("parted") then
-		local parted_cmd =
-			"parted -s build/FKernel-HDA.qcow2 mklabel gpt mkpart primary ext2 1MiB 100% >/dev/null 2>&1"
-		RunCommand(parted_cmd)
-		PrintMessage(false, "GPT partition table created on disk image")
-	else
-		PrintMessage(true, "parted command not found, skipping disk partitioning.")
-	end
 end
 
 PrintMessage(false, "FKernel build completed")

@@ -14,7 +14,7 @@ void RTCClock::write_register(uint8_t reg, uint8_t value) {
   outb(RTC_DATA_PORT, value);
 }
 
-void RTCClock::initialize(uint32_t frequency) {
+fk::core::Result<void> RTCClock::initialize(uint32_t frequency) {
   m_frequency = frequency;
 
   asm volatile("cli");
@@ -27,6 +27,7 @@ void RTCClock::initialize(uint32_t frequency) {
   asm volatile("sti");
 
   klog("RTC", "RTC timer initialized at ~%u Hz", m_frequency);
+  return fk::core::Result<void>();
 }
 
 void RTCClock::set_frequency(uint32_t frequency) {
