@@ -1,5 +1,6 @@
 #include <Kernel/Block/Partition/GptPartition.h>
-#include <LibFK/Algorithms/crc32.h> // Added include for CRC32
+#include <LibC/string.h>
+#include <LibFK/Algorithms/crc32.h>
 #include <LibFK/Algorithms/log.h>
 
 int GptPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
@@ -14,23 +15,24 @@ int GptPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
   const GptHeader *hdr = reinterpret_cast<const GptHeader *>(base);
 
   // --- GPT Header Size Check ---
-  // Ensure the header size reported in the header matches the struct size.
-  // This check is only meaningful if GptHeader is packed.
-  if (hdr->header_size != sizeof(GptHeader)) {
-    kwarn("GPT", "GPT Header size mismatch: expected %zu, got %u",
-          sizeof(GptHeader), hdr->header_size);
+  if (hdr->header_size < 92 || hdr->header_size > 512) {
+    kwarn("GPT", "GPT Header size invalid: %u", hdr->header_size);
     return 0;
   }
   // --- End Header Size Check ---
 
   // --- GPT Header CRC32 Verification ---
-  // Create a copy of the header and zero out the CRC field for calculation.
-  GptHeader header_copy = *hdr;
-  uint32_t original_header_crc32 = header_copy.header_crc32;
-  header_copy.header_crc32 = 0; // Zero out the CRC field for calculation
+  uint32_t original_header_crc32 = hdr->header_crc32;
+  uint32_t header_size = hdr->header_size;
+
+  uint8_t header_buffer[512];
+  memcpy(header_buffer, base, header_size);
+
+  // Zero out the CRC field for calculation. The offset of header_crc32 is 16.
+  *reinterpret_cast<uint32_t *>(header_buffer + 16) = 0;
 
   // Calculate CRC32 of the header data.
-  uint32_t calculated_header_crc32 = crc32(&header_copy, sizeof(GptHeader));
+  uint32_t calculated_header_crc32 = crc32(header_buffer, header_size);
 
   if (calculated_header_crc32 != original_header_crc32) {
     kwarn("GPT", "GPT Header CRC32 mismatch: expected %08x, got %08x",
@@ -49,16 +51,6 @@ int GptPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
     kwarn("GPT", "Unexpected GPT entry size: expected %zu, got %u",
           sizeof(GptEntry), hdr->partition_entry_size);
     return 0;
-  }
-
-  // Warning for partition_entries_lba mismatch, as the code assumes LBA 2 for
-  // entries.
-  if (hdr->partition_entries_lba != 2) {
-    kwarn("GPT",
-          "GPT Header indicates partition entries start at LBA %llu, but code "
-          "assumes LBA 2 (based on input sector being LBA 1). Proceeding with "
-          "assumption.",
-          hdr->partition_entries_lba);
   }
 
   // --- Partition Entry Array CRC32 Verification ---
@@ -92,11 +84,12 @@ int GptPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
     count = max_out;
 
   int written = 0;
-      for (int i = 0; i < count; i++) {
-        const GptEntry& e = *reinterpret_cast<const GptEntry*>(partition_entry_array_start + i * entry_size);
-  
-        // Entry vazia = ignore
-  
+  for (int i = 0; i < count; i++) {
+    const GptEntry &e = *reinterpret_cast<const GptEntry *>(
+        partition_entry_array_start + i * entry_size);
+
+    // Entry vazia = ignore
+
     bool empty = true;
     for (int j = 0; j < 16; j++) {
       if (e.type_guid[j] != 0) {

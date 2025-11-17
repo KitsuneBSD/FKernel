@@ -110,6 +110,95 @@ private:
 };
 
 /**
+ * @brief Specialization of OwnPtr for array types.
+ *
+ * This specialization ensures that `delete[]` is used for arrays,
+ * preventing memory leaks and undefined behavior.
+ *
+ * @tparam T Type of the elements in the array
+ */
+template <typename T> class OwnPtr<T[]> {
+public:
+  /** @brief Default constructor: no object owned */
+  OwnPtr() : m_ptr(nullptr) {}
+
+  /** @brief Construct OwnPtr from raw array pointer
+   *  @param ptr Raw pointer to array to own
+   */
+  explicit OwnPtr(T *ptr) : m_ptr(ptr) {}
+
+  /** @brief Move constructor */
+  OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {}
+
+  /** @brief Destructor: deletes owned array */
+  ~OwnPtr() { clear(); }
+
+  /** @brief Construct OwnPtr from nullptr */
+  OwnPtr(nullptr_t) : m_ptr(nullptr) {}
+
+  /** @brief Move assignment operator */
+  OwnPtr &operator=(OwnPtr &&other) {
+    if (this != &other) {
+      clear();
+      m_ptr = other.leakPtr();
+    }
+    return *this;
+  }
+
+  /** @brief Assign from raw array pointer */
+  OwnPtr &operator=(T *ptr) {
+    if (m_ptr != ptr)
+      clear();
+    m_ptr = ptr;
+    return *this;
+  }
+
+  /** @brief Assign nullptr, releasing owned array */
+  OwnPtr &operator=(nullptr_t) {
+    clear();
+    return *this;
+  }
+
+  /** @brief Releases ownership and deletes owned array */
+  void clear() {
+    if (m_ptr) {
+      delete[] m_ptr;
+      m_ptr = nullptr;
+    }
+  }
+
+  /** @brief Check if pointer is null
+   *  @return true if no object is owned
+   */
+  bool operator!() const { return !m_ptr; }
+
+  /** @brief Relinquish ownership without deleting
+   *  @return Pointer to array that was owned
+   */
+  T *leakPtr() {
+    T *leaked = m_ptr;
+    m_ptr = nullptr;
+    return leaked;
+  }
+
+  /** @brief Access owned array pointer */
+  T *ptr() { return m_ptr; }
+  const T *ptr() const { return m_ptr; }
+
+  /** @brief Array subscript operator */
+  T &operator[](size_t i) { return m_ptr[i]; }
+  const T &operator[](size_t i) const { return m_ptr[i]; }
+
+  /** @brief Check if pointer is non-null
+   *  @return true if an array is owned
+   */
+  operator bool() const { return m_ptr != nullptr; }
+
+private:
+  T *m_ptr; ///< Raw pointer to the owned array
+};
+
+/**
  * @brief Helper function to construct OwnPtr in-place
  *
  * @tparam T Type to construct
@@ -132,6 +221,22 @@ inline OwnPtr<T> make_own(Args &&...args) {
  * @param ptr Raw pointer to adopt
  * @return OwnPtr<T> owning the object
  */
-template <typename T> inline OwnPtr<T> adopt_own(T *ptr) {
+template <typename T, typename = enable_if_t<!is_array_v<T>>>
+inline OwnPtr<T> adopt_own(T *ptr) {
+  return OwnPtr<T>(ptr);
+}
+
+/**
+ * @brief Adopt an existing raw array pointer into an OwnPtr<T[]>.
+ *
+ * Use this when you already have a dynamically allocated array
+ * and want to transfer ownership to an OwnPtr<T[]>.
+ *
+ * @tparam T Type of array elements (e.g., `uint8_t[]`)
+ * @param ptr Raw pointer to array to adopt (e.g., `uint8_t*`)
+ * @return OwnPtr<T> owning the array
+ */
+template <typename T, typename = enable_if_t<is_array_v<T>>>
+inline OwnPtr<T> adopt_own(remove_extent_t<T> *ptr) {
   return OwnPtr<T>(ptr);
 }

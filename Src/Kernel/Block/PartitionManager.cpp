@@ -1,9 +1,9 @@
-#include "Kernel/Block/Partition/GptPartition.h"
-#include "Kernel/Block/Partition/MbrPartition.h"
-#include "LibFK/Memory/own_ptr.h"
+#include <Kernel/Block/Partition/GptPartition.h>
+#include <Kernel/Block/Partition/MbrPartition.h>
 #include <Kernel/Block/Partition/PartitionParsingStrategy.h>
 #include <Kernel/Block/PartitionManager.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Memory/own_ptr.h>
 #include <LibFK/new.h>
 
 PartitionManager::~PartitionManager() = default;
@@ -22,7 +22,16 @@ bool PartitionManager::is_gpt(const uint8_t *sector) const {
 }
 
 bool PartitionManager::is_mbr(const uint8_t *sector) const {
-  return sector[510] == 0x55 && sector[511] == 0xAA;
+  if (sector[510] != 0x55 || sector[511] != 0xAA)
+    return false;
+
+  const MbrEntry *entry = reinterpret_cast<const MbrEntry *>(sector + 446);
+  for (int i = 0; i < 4; ++i) {
+    if (entry[i].partition_type == 0xEE)
+      return false;
+  }
+
+  return true;
 }
 
 static_vector<RetainPtr<PartitionBlockDevice>, 16>
@@ -39,45 +48,63 @@ PartitionManager::detect_partitions() {
   }
 
   alignas(16) uint8_t sector1[512];
-  bool has_gpt = false;
-
-  if (m_device->read(nullptr, nullptr, sector1, 512, 1) == 512) {
+  bool has_gpt_header = false;
+  if (m_device->read(nullptr, nullptr, sector1, 512, 512) == 512) {
     static const uint8_t gpt_sig[8] = {'E', 'F', 'I', ' ', 'P', 'A', 'R', 'T'};
-    has_gpt = memcmp(sector1, gpt_sig, 8) == 0;
+    if (memcmp(sector1, gpt_sig, 8) == 0) {
+      has_gpt_header = true;
+    }
   }
 
   const void *sector_for_parse = nullptr;
+  OwnPtr<uint8_t[]> gpt_buffer;
 
-  if (has_gpt) {
-    klog("PARTITION MANAGER", "GPT partition table detected.");
+  if (has_gpt_header) {
+    if (is_gpt(sector0)) {
+      klog("PARTITION MANAGER",
+           "GPT partition table detected (protective MBR found).");
+    } else {
+      klog("PARTITION MANAGER",
+           "GPT partition table detected (via signature).");
+    }
+
     m_strategy = adopt_own(new GptPartitionStrategy());
+    const GptHeader *hdr = reinterpret_cast<const GptHeader *>(sector1);
 
-    sector_for_parse = sector1;
-  } else { // GPT signature not found in sector 1
-    bool sector0_has_mbr_sig = is_mbr(sector0);
-
-    if (!sector0_has_mbr_sig) {
-      // Neither GPT signature in sector 1 nor MBR signature in sector 0.
-      kwarn("PARTITION MANAGER", "Unknown partition table format (no GPT sig "
-                                 "in sector 1, no MBR sig in sector 0).");
+    size_t pe_array_size =
+        (size_t)hdr->num_partition_entries * hdr->partition_entry_size;
+    if (pe_array_size == 0) {
+      klog("GPT", "No partition entries found in header.");
       return partitions;
     }
 
-    // Sector 0 has MBR signature. Now, check if it's a GPT protective MBR.
-    if (is_gpt(sector0)) {
-      // Case 2a: Sector 0 has MBR signature AND is_gpt(sector0) is true.
-      // This means it's a GPT disk with a protective MBR.
-      klog("PARTITION MANAGER",
-           "GPT partition table detected (via protective MBR in sector 0).");
-      m_strategy = adopt_own(new GptPartitionStrategy());
-      sector_for_parse = sector1; // GPT header is in sector 1
-    } else {
-      // Case 2b: Sector 0 has MBR signature but is NOT a GPT protective MBR.
-      // This is a standard MBR disk.
-      klog("PARTITION MANAGER", "MBR partition table detected.");
-      m_strategy = adopt_own(new MbrPartitionStrategy());
-      sector_for_parse = sector0; // MBR entries are in sector 0
+    size_t buffer_size = 512 + pe_array_size;
+    gpt_buffer = adopt_own<uint8_t[]>(new uint8_t[buffer_size]);
+
+    memcpy(gpt_buffer.ptr(), sector1, 512);
+
+    int bytes_read = m_device->read(nullptr, nullptr, gpt_buffer.ptr() + 512, pe_array_size,
+                                      hdr->partition_entries_lba * 512);
+    if (bytes_read < 0 || (size_t)bytes_read != pe_array_size) {
+      kwarn("PARTITION MANAGER",
+            "Failed to read GPT partition entries from LBA %llu.",
+            hdr->partition_entries_lba);
+      return partitions;
     }
+
+    sector_for_parse = gpt_buffer.ptr();
+
+  } else if (is_mbr(sector0)) {
+    klog("PARTITION MANAGER", "MBR partition table detected.");
+    m_strategy = adopt_own(new MbrPartitionStrategy());
+    sector_for_parse = sector0;
+  } else {
+    kwarn("PARTITION MANAGER", "Unknown partition table format.");
+    return partitions;
+  }
+
+  if (!m_strategy) {
+    return partitions;
   }
 
   PartitionEntry entries[16];

@@ -13,6 +13,12 @@ FKernel is a modern kernel written in C++, inspired by SerenityOS, BSD systems, 
 
 ---
 
+## MANDATORY
+
+THE CODE IS EXPLICIT **FREESTANDING** and **BAREMETAL** resources like exceptions doesn't exists.
+
+The **Error Threatment** need to be make as C-Like code.
+
 ## Architecture Layers
 
 ```
