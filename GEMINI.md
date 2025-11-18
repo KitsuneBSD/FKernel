@@ -409,6 +409,8 @@ if (auto proc = find_process(pid); proc.has_value())
 
 ## Testing Requirements
 
+The test need be run on real runtime, so you need create mocks to internal functionalities
+
 ### All Public APIs Must Have Tests
 
 ```cpp
