@@ -24,11 +24,11 @@ constexpr uint16_t CMOS_DATA_PORT = 0x71;
  */
 class CMOSClock : public Clock {
 private:
-  String name = "CMOS";
+  fk::text::String name = "CMOS";
 
   uint8_t read_register(uint8_t reg);
 public:
   fk::core::Result<void> initialize(uint32_t frequency) override;
-  String get_name() override { return name; }
+  fk::text::String get_name() override { return name; }
   DateTime datetime() override;
 };

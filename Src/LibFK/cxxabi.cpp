@@ -8,6 +8,7 @@ typedef void (*atexit_fn_t)();
  *
  * Does nothing and always returns 0.
  */
+extern "C"
 int atexit(atexit_fn_t func) {
   (void)func; // ignorar o ponteiro
   return 0;

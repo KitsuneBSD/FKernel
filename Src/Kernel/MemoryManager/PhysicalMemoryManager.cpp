@@ -60,7 +60,7 @@ void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
 
     range.initialize();
 
-    if (!m_memory_ranges.insert(range)) {
+    if (m_memory_ranges.insert(range).is_error()) {
       fk::algorithms::kwarn("PHYSICAL MEMORY",
                             "We can't insert the new memory range [%p - %p]",
                             entry_start, entry_end);

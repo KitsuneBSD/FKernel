@@ -8,8 +8,9 @@
 
 PartitionManager::~PartitionManager() = default;
 
-void PartitionManager::set_strategy(OwnPtr<PartitionParsingStrategy> strategy) {
-  m_strategy = move(strategy);
+void PartitionManager::set_strategy(
+    fk::memory::OwnPtr<PartitionParsingStrategy> strategy) {
+  m_strategy = fk::types::move(strategy);
 }
 
 bool PartitionManager::is_gpt(const uint8_t *sector) const {
@@ -34,16 +35,17 @@ bool PartitionManager::is_mbr(const uint8_t *sector) const {
   return true;
 }
 
-static_vector<RetainPtr<PartitionBlockDevice>, 16>
+fk::containers::static_vector<fk::memory::RetainPtr<PartitionBlockDevice>, 16>
 PartitionManager::detect_partitions() {
-  static_vector<RetainPtr<PartitionBlockDevice>, 16> partitions;
+  fk::containers::static_vector<fk::memory::RetainPtr<PartitionBlockDevice>, 16>
+      partitions;
 
   if (!m_device)
     return partitions;
 
   alignas(16) uint8_t sector0[512];
   if (m_device->read(nullptr, nullptr, sector0, 512, 0) != 512) {
-    kwarn("PARTITION MANAGER", "Failed to read sector 0.");
+    fk::algorithms::kwarn("PARTITION MANAGER", "Failed to read sector 0.");
     return partitions;
   }
 
@@ -57,49 +59,53 @@ PartitionManager::detect_partitions() {
   }
 
   const void *sector_for_parse = nullptr;
-  OwnPtr<uint8_t[]> gpt_buffer;
+  fk::memory::OwnPtr<uint8_t[]> gpt_buffer;
 
   if (has_gpt_header) {
     if (is_gpt(sector0)) {
-      klog("PARTITION MANAGER",
-           "GPT partition table detected (protective MBR found).");
+      fk::algorithms::klog(
+          "PARTITION MANAGER",
+          "GPT partition table detected (protective MBR found).");
     } else {
-      klog("PARTITION MANAGER",
-           "GPT partition table detected (via signature).");
+      fk::algorithms::klog("PARTITION MANAGER",
+                           "GPT partition table detected (via signature).");
     }
 
-    m_strategy = adopt_own(new GptPartitionStrategy());
+    m_strategy = fk::memory::adopt_own(new GptPartitionStrategy());
     const GptHeader *hdr = reinterpret_cast<const GptHeader *>(sector1);
 
     size_t pe_array_size =
         (size_t)hdr->num_partition_entries * hdr->partition_entry_size;
     if (pe_array_size == 0) {
-      klog("GPT", "No partition entries found in header.");
+      fk::algorithms::klog("GPT", "No partition entries found in header.");
       return partitions;
     }
 
     size_t buffer_size = 512 + pe_array_size;
-    gpt_buffer = adopt_own<uint8_t[]>(new uint8_t[buffer_size]);
+    gpt_buffer = fk::memory::adopt_own<uint8_t[]>(new uint8_t[buffer_size]);
 
     memcpy(gpt_buffer.ptr(), sector1, 512);
 
-    int bytes_read = m_device->read(nullptr, nullptr, gpt_buffer.ptr() + 512, pe_array_size,
-                                      hdr->partition_entries_lba * 512);
+    int bytes_read =
+        m_device->read(nullptr, nullptr, gpt_buffer.ptr() + 512, pe_array_size,
+                       hdr->partition_entries_lba * 512);
     if (bytes_read < 0 || (size_t)bytes_read != pe_array_size) {
-      kwarn("PARTITION MANAGER",
-            "Failed to read GPT partition entries from LBA %llu.",
-            hdr->partition_entries_lba);
+      fk::algorithms::kwarn(
+          "PARTITION MANAGER",
+          "Failed to read GPT partition entries from LBA %llu.",
+          hdr->partition_entries_lba);
       return partitions;
     }
 
     sector_for_parse = gpt_buffer.ptr();
 
   } else if (is_mbr(sector0)) {
-    klog("PARTITION MANAGER", "MBR partition table detected.");
-    m_strategy = adopt_own(new MbrPartitionStrategy());
+    fk::algorithms::klog("PARTITION MANAGER", "MBR partition table detected.");
+    m_strategy = fk::memory::adopt_own(new MbrPartitionStrategy());
     sector_for_parse = sector0;
   } else {
-    kwarn("PARTITION MANAGER", "Unknown partition table format.");
+    fk::algorithms::kwarn("PARTITION MANAGER",
+                          "Unknown partition table format.");
     return partitions;
   }
 
@@ -120,7 +126,8 @@ PartitionManager::detect_partitions() {
     info.sectors_count = entries[i].lba_count;
     info.type = entries[i].type;
 
-    partitions.push_back(adopt_retain(new PartitionBlockDevice(move(info))));
+    partitions.push_back(fk::memory::adopt_retain(
+        new PartitionBlockDevice(fk::types::move(info))));
   }
 
   return partitions;

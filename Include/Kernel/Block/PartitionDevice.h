@@ -10,10 +10,11 @@
  * @brief Represents a logical partition on a physical ATA device
  */
 struct PartitionInfo {
-  RetainPtr<BlockDevice> device; ///< Pointer to the underlying physical ATA
-                                 ///< device (heap-allocated)
-  uint32_t lba_first;            ///< LBA of the first sector of the partition
-  uint32_t sectors_count;        ///< Total number of sectors in the partition
+  fk::memory::RetainPtr<BlockDevice>
+      device;             ///< Pointer to the underlying physical ATA
+                          ///< device (heap-allocated)
+  uint32_t lba_first;     ///< LBA of the first sector of the partition
+  uint32_t sectors_count; ///< Total number of sectors in the partition
   uint8_t type; ///< Partition type identifier (e.g., MBR partition type)
 };
 

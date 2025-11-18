@@ -6,5 +6,5 @@ void APICTimer::initialize(uint32_t frequency) {
   APIC::the().calibrate_timer();      // Descobre ticks/ms
   APIC::the().setup_timer(frequency); // Configura periodicidade
 
-  klog("TIMER", "Initializing APIC Timer at %u Hz", frequency);
+  fk::algorithms::klog("TIMER", "Initializing APIC Timer at %u Hz", frequency);
 }

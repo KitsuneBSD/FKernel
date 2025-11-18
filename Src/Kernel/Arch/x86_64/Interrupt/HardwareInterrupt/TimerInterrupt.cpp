@@ -7,15 +7,15 @@
 
 void TimerManager::initialize(uint32_t freq) {
   if (CPU::the().has_hpet() && m_has_memory_manager) {
-    klog("TIMER", "HPET timer selected");
+    fk::algorithms::klog("TIMER", "HPET timer selected");
     static HPETTimer hpet_timer;
     m_timer = &hpet_timer;
   } else if (CPU::the().has_apic() && m_has_memory_manager) {
-    klog("TIMER", "APIC timer selected");
+    fk::algorithms::klog("TIMER", "APIC timer selected");
     static APICTimer apic_timer;
     m_timer = &apic_timer;
   } else {
-    klog("TIMER", "PIT timer selected");
+    fk::algorithms::klog("TIMER", "PIT timer selected");
     static PITTimer pit;
     m_timer = &pit;
   }
@@ -24,9 +24,9 @@ void TimerManager::initialize(uint32_t freq) {
 
 void TimerManager::sleep(uint64_t ticks) {
   if (m_timer) {
-    kdebug("TIMER", "Sleeping for %lu ticks", ticks);
+    fk::algorithms::kdebug("TIMER", "Sleeping for %lu ticks", ticks);
     m_tick.the().sleep(ticks);
   } else {
-    kwarn("TIMER", "No timer available to sleep!");
+    fk::algorithms::kwarn("TIMER", "No timer available to sleep!");
   }
 }

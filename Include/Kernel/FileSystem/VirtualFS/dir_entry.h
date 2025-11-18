@@ -13,8 +13,8 @@ struct VNode;
  * A DirEntry associates a filename with an inode number.
  */
 struct DirEntry {
-  fixed_string<256> m_name; ///< Name of the file or directory
-  RetainPtr<VNode> m_vnode; ///< Vnode of directory
+  fk::text::fixed_string<256> m_name;   ///< Name of the file or directory
+  fk::memory::RetainPtr<VNode> m_vnode; ///< Vnode of directory
 
   /**
    * @brief Default constructor. Initializes name to empty and inode number to
@@ -28,6 +28,6 @@ struct DirEntry {
    * @param name Name of the file or directory
    * @param vnode pointer to equivalent vnode
    */
-  DirEntry(const char *name, RetainPtr<VNode> vnode)
+  DirEntry(const char *name, fk::memory::RetainPtr<VNode> vnode)
       : m_name(name), m_vnode(vnode) {}
 };

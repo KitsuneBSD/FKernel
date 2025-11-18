@@ -10,7 +10,7 @@ DevFS::DevFS() {
   root_node->type = VNodeType::Directory;
   root_node->inode = new Inode(2);
   root_node->ops = &ops;
-  d_root = adopt_retain(root_node);
+  d_root = fk::memory::adopt_retain(root_node);
 }
 
 DevFS &DevFS::the() {
@@ -18,7 +18,7 @@ DevFS &DevFS::the() {
   return instance;
 }
 
-RetainPtr<VNode> DevFS::root() { return d_root; }
+fk::memory::RetainPtr<VNode> DevFS::root() { return d_root; }
 
 int DevFS::register_device(const char *prefix, VNodeType type, VNodeOps *ops,
                            void *driver_data, bool has_multiple,
@@ -54,14 +54,15 @@ int DevFS::register_device_static(const char *name, VNodeType type,
                                   VNodeOps *ops, void *driver_data) {
   if ((type != VNodeType::CharacterDevice) &&
       (type != VNodeType::BlockDevice)) {
-    kwarn(
+    fk::algorithms::kwarn(
         "DEVFS",
         "To register in devfs we need VNode to be a character or block device");
     return -1;
   }
 
   if (d_devices.size() >= d_devices.capacity()) {
-    kwarn("DEVFS", "Device table full, cannot register '%s'", name);
+    fk::algorithms::kwarn("DEVFS", "Device table full, cannot register '%s'",
+                          name);
     return -1;
   }
 
@@ -72,7 +73,7 @@ int DevFS::register_device_static(const char *name, VNodeType type,
   dev.driver_data = driver_data;
   d_devices.push_back(dev);
 
-  auto dev_node = adopt_retain(new VNode());
+  auto dev_node = fk::memory::adopt_retain(new VNode());
   dev_node->m_name = name;
   dev_node->type = type;
   dev_node->parent = d_root.get();
@@ -83,7 +84,8 @@ int DevFS::register_device_static(const char *name, VNodeType type,
 
   d_root->dir_entries.push_back(DirEntry{name, dev_node});
 
-  kdebug("DEVFS", "Registered device '%s' (type=%d)", name, (int)type);
+  fk::algorithms::kdebug("DEVFS", "Registered device '%s' (type=%d)", name,
+                         (int)type);
   return 0;
 }
 
@@ -99,17 +101,17 @@ int DevFS::unregister_device(const char *name) {
         }
       }
 
-      kdebug("DEVFS", "Unregistered device '%s'", name);
+      fk::algorithms::kdebug("DEVFS", "Unregistered device '%s'", name);
       return 0;
     }
   }
 
-  kwarn("DEVFS", "Unregister_device: '%s' not found", name);
+  fk::algorithms::kwarn("DEVFS", "Unregister_device: '%s' not found", name);
   return -1;
 }
 
 int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
-                        RetainPtr<VNode> &out) {
+                        fk::memory::RetainPtr<VNode> &out) {
   (void)fd;
   if (!vnode || vnode->type != VNodeType::Directory)
     return -1;
@@ -121,7 +123,7 @@ int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
     }
   }
 
-  kwarn("DEVFS", "Lookup: device '%s' not found", name);
+  fk::algorithms::kwarn("DEVFS", "Lookup: device '%s' not found", name);
   return -1;
 }
 
@@ -173,12 +175,12 @@ int DevFS::devfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
 }
 
 int DevFS::devfs_create(VNode *dir, FileDescriptor *fd, const char *name,
-                        VNodeType type, RetainPtr<VNode> &out) {
+                        VNodeType type, fk::memory::RetainPtr<VNode> &out) {
   (void)fd;
   if (!dir || dir->type != VNodeType::Directory)
     return -1;
 
-  auto new_node = adopt_retain(new VNode());
+  auto new_node = fk::memory::adopt_retain(new VNode());
   new_node->m_name = name;
   new_node->type = type;
   new_node->parent = dir;
@@ -188,7 +190,8 @@ int DevFS::devfs_create(VNode *dir, FileDescriptor *fd, const char *name,
 
   out = new_node; // importante!
 
-  kdebug("DEVFS", "Created node '%s' in %s", name, dir->m_name.c_str());
+  fk::algorithms::kdebug("DEVFS", "Created node '%s' in %s", name,
+                         dir->m_name.c_str());
   return 0;
 }
 
@@ -200,12 +203,14 @@ int DevFS::devfs_unlink(VNode *dir, FileDescriptor *fd, const char *name) {
   for (size_t i = 0; i < dir->dir_entries.size(); ++i) {
     if (strcmp(dir->dir_entries[i].m_name.c_str(), name) == 0) {
       dir->dir_entries.erase(i);
-      kdebug("DEVFS", "Unlinked '%s' from %s", name, dir->m_name.c_str());
+      fk::algorithms::kdebug("DEVFS", "Unlinked '%s' from %s", name,
+                             dir->m_name.c_str());
       return 0;
     }
   }
 
-  kwarn("DEVFS", "Unlink: '%s' not found in %s", name, dir->m_name.c_str());
+  fk::algorithms::kwarn("DEVFS", "Unlink: '%s' not found in %s", name,
+                        dir->m_name.c_str());
   return -1;
 }
 

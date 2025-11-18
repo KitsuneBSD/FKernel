@@ -12,7 +12,7 @@ fk::core::Result<void> CMOSClock::initialize(uint32_t frequency) {
   // as a timer, but we honor the interface.
   (void)frequency; // Suppress unused parameter warning
 
-  klog("CMOS", "CMOS clock initialized.");
+  fk::algorithms::klog("CMOS", "CMOS clock initialized.");
   return fk::core::Result<void>();
 }
 
@@ -34,12 +34,12 @@ DateTime CMOSClock::datetime() {
   // Convert BCD to binary if necessary
   if (!(status_b &
         0x04)) { // Check if BCD mode is enabled (bit 2 of Register B)
-    second = bcd_to_bin(second);
-    minute = bcd_to_bin(minute);
-    hour = bcd_to_bin(hour);
-    day = bcd_to_bin(day);
-    month = bcd_to_bin(month);
-    year = bcd_to_bin(year);
+    second = fk::utilities::bcd_to_bin(second);
+    minute = fk::utilities::bcd_to_bin(minute);
+    hour = fk::utilities::bcd_to_bin(hour);
+    day = fk::utilities::bcd_to_bin(day);
+    month = fk::utilities::bcd_to_bin(month);
+    year = fk::utilities::bcd_to_bin(year);
   }
 
   dt.second = second;

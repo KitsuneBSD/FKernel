@@ -28,7 +28,7 @@ uint16_t PIC8259::get_irr() { return __get_irq_reg(PIC_READ_IRR); }
 uint16_t PIC8259::get_isr() { return __get_irq_reg(PIC_READ_ISR); }
 
 void PIC8259::initialize() {
-  kdebug("PIC", "Initializing PIC8259...");
+  fk::algorithms::kdebug("PIC", "Initializing PIC8259...");
 
   outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);
   io_wait();
@@ -50,7 +50,7 @@ void PIC8259::initialize() {
   outb(PIC1_DATA, 0xFF);
   outb(PIC2_DATA, 0xFF);
 
-  klog("PIC", "PIC initialized, all IRQs masked");
+  fk::algorithms::klog("PIC", "PIC initialized, all IRQs masked");
 }
 
 void PIC8259::mask_interrupt(uint8_t irq) {
@@ -81,5 +81,5 @@ void PIC8259::send_eoi(uint8_t irq) {
 void PIC8259::disable() {
   outb(PIC1_DATA, 0xFF);
   outb(PIC2_DATA, 0xFF);
-  klog("PIC", "PIC disabled by masking all IRQs");
+  fk::algorithms::klog("PIC", "PIC disabled by masking all IRQs");
 }

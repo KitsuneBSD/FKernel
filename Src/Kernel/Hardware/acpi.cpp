@@ -14,29 +14,29 @@ ACPIManager::~ACPIManager() {}
 void ACPIManager::initialize() {
   m_rsdp = find_rsdp();
   if (!m_rsdp) {
-    kwarn("ACPI", "RSDP not found!");
+    fk::algorithms::kwarn("ACPI", "RSDP not found!");
     return;
   }
 
-  kdebug("ACPI", "RSDP found at %p", m_rsdp);
+  fk::algorithms::kdebug("ACPI", "RSDP found at %p", m_rsdp);
 
   if (m_rsdp->revision >= 2 && m_rsdp->xsdt_address) {
     m_xsdt = (XSDT *)((uintptr_t)m_rsdp->xsdt_address);
     if (!validate_checksum(m_xsdt, m_xsdt->header.length)) {
-      kwarn("ACPI", "XSDT checksum failed!");
+      fk::algorithms::kwarn("ACPI", "XSDT checksum failed!");
       m_xsdt = nullptr;
     } else {
-      klog("ACPI", "XSDT found at %p", m_xsdt);
+      fk::algorithms::klog("ACPI", "XSDT found at %p", m_xsdt);
     }
   }
 
   if (!m_xsdt) {
     m_rsdt = (RSDT *)((uintptr_t)m_rsdp->rsdt_address);
     if (!validate_checksum(m_rsdt, m_rsdt->header.length)) {
-      kwarn("ACPI", "RSDT checksum failed!");
+      fk::algorithms::kwarn("ACPI", "RSDT checksum failed!");
       m_rsdt = nullptr;
     } else {
-      klog("ACPI", "RSDT found at %p", m_rsdt);
+      fk::algorithms::klog("ACPI", "RSDT found at %p", m_rsdt);
     }
   }
 }

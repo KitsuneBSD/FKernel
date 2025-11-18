@@ -21,7 +21,7 @@ void InterruptController::initialize() {
 
   HardwareInterruptManager::the().initialize();
 
-  kdebug("INTERRUPT", "Setting up IDT entries...");
+  fk::algorithms::kdebug("INTERRUPT", "Setting up IDT entries...");
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
     uint8_t multiple_ist_selector = (i % 7) + 1;
     if (i < 32) { // Exceptions
@@ -73,11 +73,11 @@ void InterruptController::initialize() {
   HardwareInterruptManager::the().unmask_interrupt(15); // Secondary ATA
 
   enable_interrupt();
-  klog("INTERRUPT", "Interrupt descriptor table initialized using PIC8259");
+  fk::algorithms::klog("INTERRUPT", "Interrupt descriptor table initialized using PIC8259");
 }
 
 void InterruptController::clear() {
-  kdebug("INTERRUPT", "Clearing all IDT entries and handlers");
+  fk::algorithms::kdebug("INTERRUPT", "Clearing all IDT entries and handlers");
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
     m_entries[i] = {};
     m_handlers[i] = nullptr;
@@ -109,7 +109,7 @@ void InterruptController::load() {
   ptr.base = reinterpret_cast<uint64_t>(&m_entries);
   flush_idt(&ptr);
 
-  kdebug("INTERRUPT", "IDT loaded to CPU", ptr.base, ptr.limit);
+  fk::algorithms::kdebug("INTERRUPT", "IDT loaded to CPU", ptr.base, ptr.limit);
 }
 
 interrupt InterruptController::get_interrupt(uint8_t vector) {

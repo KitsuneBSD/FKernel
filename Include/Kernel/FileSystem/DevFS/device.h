@@ -4,10 +4,9 @@
 
 #include <Kernel/FileSystem/VirtualFS/vfs.h>
 
-struct Device
-{
-    fixed_string<64> d_name;
-    VNodeType d_type;
-    void *driver_data;
-    VNodeOps *ops;
+struct Device {
+  fk::text::fixed_string<64> d_name;
+  VNodeType d_type;
+  void *driver_data;
+  VNodeOps *ops;
 };

@@ -23,12 +23,12 @@
 #include <LibFK/Memory/retain_ptr.h> // For adopt_retain
 
 void ata_irq_primary() {
-  klog("ATA", "Primary channel IRQ fired!");
+  fk::algorithms::klog("ATA", "Primary channel IRQ fired!");
   inb(ATA_PRIMARY_BASE + ATA_REG_STATUS);
 }
 
 void ata_irq_secondary() {
-  klog("ATA", "Secondary channel IRQ fired!");
+  fk::algorithms::klog("ATA", "Secondary channel IRQ fired!");
   inb(ATA_SECONDARY_BASE + ATA_REG_STATUS);
 }
 
@@ -46,7 +46,7 @@ uint16_t AtaController::ctrl_io(Bus bus) {
 }
 
 void AtaController::initialize() {
-  klog("ATA", "Initializing ATA controller...");
+  fk::algorithms::klog("ATA", "Initializing ATA controller...");
   detect_devices();
 }
 
@@ -65,16 +65,16 @@ void AtaController::detect_devices() {
         continue;
 
       if (device_info.model[0] == '\0') {
-        klog("ATA", "%s %s: No device detected, skipping", bus_str[b],
-             drive_str[d]);
+        fk::algorithms::klog("ATA", "%s %s: No device detected, skipping",
+                             bus_str[b], drive_str[d]);
         continue;
       }
 
-      klog("ATA", "Detected %s %s: Model '%s'", bus_str[b], drive_str[d],
-           device_info.model);
+      fk::algorithms::klog("ATA", "Detected %s %s: Model '%s'", bus_str[b],
+                           drive_str[d], device_info.model);
 
-      RetainPtr<AtaBlockDevice> ata_block_dev =
-          adopt_retain(new AtaBlockDevice(device_info));
+      fk::memory::RetainPtr<AtaBlockDevice> ata_block_dev =
+          fk::memory::adopt_retain(new AtaBlockDevice(device_info));
 
       char name[16];
       snprintf(name, sizeof(name), "ada%d", device_index);
@@ -82,7 +82,8 @@ void AtaController::detect_devices() {
       DevFS::the().register_device(name, VNodeType::BlockDevice,
                                    &g_block_device_ops, ata_block_dev.get());
 
-      PartitionManager pm(RetainPtr<BlockDevice>(ata_block_dev.get()));
+      PartitionManager pm(
+          fk::memory::RetainPtr<BlockDevice>(ata_block_dev.get()));
       auto partitions = pm.detect_partitions();
 
       for (auto &part_dev : partitions) {

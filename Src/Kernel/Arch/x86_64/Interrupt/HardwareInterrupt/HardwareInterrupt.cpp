@@ -12,7 +12,7 @@ void HardwareInterruptManager::initialize() {
     static X2APIC x2apic;
     static IOAPIC ioapic;
 
-    klog("HW_INTERRUPT", "Enable x2APIC + IOAPIC");
+    fk::algorithms::klog("HW_INTERRUPT", "Enable x2APIC + IOAPIC");
     x2apic.initialize();
     x2apic.setup_timer(1);
     pic.disable();
@@ -23,7 +23,7 @@ void HardwareInterruptManager::initialize() {
     static APIC apic;
     static IOAPIC ioapic;
 
-    klog("HW_INTERRUPT", "Enable APIC + IOAPIC");
+    fk::algorithms::klog("HW_INTERRUPT", "Enable APIC + IOAPIC");
     apic.initialize();
     apic.calibrate_timer();
     apic.setup_timer(1);
@@ -32,7 +32,7 @@ void HardwareInterruptManager::initialize() {
     ioapic.initialize();
     m_controller = &ioapic;
   } else {
-    klog("HW_INTERRUPT", "Enable PIC8259");
+    fk::algorithms::klog("HW_INTERRUPT", "Enable PIC8259");
     pic.initialize();
     m_controller = &pic;
   }

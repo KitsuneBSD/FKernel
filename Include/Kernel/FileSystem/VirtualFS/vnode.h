@@ -27,19 +27,19 @@ private:
   uint64_t m_refcount{1};
 
 public:
-  fixed_string<64> m_name;            ///< Node name
+  fk::text::fixed_string<64> m_name;  ///< Node name
   VNodeType type{VNodeType::Unknown}; ///< Node type
   uint32_t permission{0};             ///< Node permissions
   uint64_t size{0};                   ///< Node size in bytes
   uint64_t inode_number{0};           ///< INode number
 
-  RetainPtr<VNode> parent;   ///< Parent number
-  VNodeOps *ops{nullptr};    ///< Operations Table
-  void *fs_private{nullptr}; ///< FileSystem expecific private data
+  fk::memory::RetainPtr<VNode> parent; ///< Parent number
+  VNodeOps *ops{nullptr};              ///< Operations Table
+  void *fs_private{nullptr};           ///< FileSystem expecific private data
 
   Inode *inode;
   // TODO: Change static_vector to dynamic_vector
-  static_vector<DirEntry, 16> dir_entries;
+  fk::containers::static_vector<DirEntry, 16> dir_entries;
 
   void retain() { ++m_refcount; }
   void release() {
@@ -57,10 +57,10 @@ public:
   inline int read(FileDescriptor *fd, void *buf, size_t sz, size_t off) {
     int ret = ops && ops->read ? ops->read(this, fd, buf, sz, off) : -1;
     if (ret >= 0)
-      klog("VFS", "Read %d bytes from '%s' at offset %zu", ret, m_name.c_str(),
-           off);
+      fk::algorithms::klog("VFS", "Read %d bytes from '%s' at offset %zu", ret,
+                           m_name.c_str(), off);
     else
-      kwarn("VFS", "Failed to read from '%s'", m_name.c_str());
+      fk::algorithms::kwarn("VFS", "Failed to read from '%s'", m_name.c_str());
     return ret;
   }
 
@@ -74,10 +74,10 @@ public:
   inline int write(FileDescriptor *fd, const void *buf, size_t sz, size_t off) {
     int ret = ops && ops->write ? ops->write(this, fd, buf, sz, off) : -1;
     if (ret >= 0)
-      klog("VFS", "Wrote %d bytes to '%s' at offset %zu", ret, m_name.c_str(),
-           off);
+      fk::algorithms::klog("VFS", "Wrote %d bytes to '%s' at offset %zu", ret,
+                           m_name.c_str(), off);
     else
-      kwarn("VFS", "Failed to write to '%s'", m_name.c_str());
+      fk::algorithms::kwarn("VFS", "Failed to write to '%s'", m_name.c_str());
     return ret;
   }
 
@@ -89,10 +89,11 @@ public:
   inline int open(FileDescriptor *fd, int flags) {
     int ret = ops && ops->open ? ops->open(this, fd, flags) : 0;
     if (ret == 0)
-      klog("VFS", "Opened '%s' with flags 0x%x", m_name.c_str(), flags);
+      fk::algorithms::klog("VFS", "Opened '%s' with flags 0x%x", m_name.c_str(),
+                           flags);
     else
-      kwarn("VFS", "Failed to open '%s' with flags 0x%x", m_name.c_str(),
-            flags);
+      fk::algorithms::kwarn("VFS", "Failed to open '%s' with flags 0x%x",
+                            m_name.c_str(), flags);
     return ret;
   }
 
@@ -103,9 +104,9 @@ public:
   inline int close(FileDescriptor *fd) {
     int ret = ops && ops->close ? ops->close(this, fd) : 0;
     if (ret == 0)
-      klog("VFS", "Closed '%s'", m_name.c_str());
+      fk::algorithms::klog("VFS", "Closed '%s'", m_name.c_str());
     else
-      kwarn("VFS", "Failed to close '%s'", m_name.c_str());
+      fk::algorithms::kwarn("VFS", "Failed to close '%s'", m_name.c_str());
     return ret;
   }
 
@@ -115,23 +116,25 @@ public:
    * @param out Output vnode pointer.
    * @return 0 on success or negative on error.
    */
-  inline int lookup(const char *name, RetainPtr<VNode> &out) {
+  inline int lookup(const char *name, fk::memory::RetainPtr<VNode> &out) {
     if (type != VNodeType::Directory) {
-      kwarn("VFS", "Lookup failed on non-directory '%s'", m_name.c_str());
+      fk::algorithms::kwarn("VFS", "Lookup failed on non-directory '%s'",
+                            m_name.c_str());
       return -1;
     }
 
     for (size_t i = 0; i < dir_entries.size(); ++i) {
       if (strcmp(dir_entries[i].m_name.c_str(), name) == 0) {
         out = dir_entries[i].m_vnode;
-        klog("VFS", "Lookup: found '%s' in directory '%s'", name,
-             m_name.c_str());
+        fk::algorithms::klog("VFS", "Lookup: found '%s' in directory '%s'",
+                             name, m_name.c_str());
         return 0;
       }
     }
 
-    kwarn("VFS", "Lookup failed: '%s' not found in directory '%s'", name,
-          m_name.c_str());
+    fk::algorithms::kwarn("VFS",
+                          "Lookup failed: '%s' not found in directory '%s'",
+                          name, m_name.c_str());
     return -1;
   }
 
@@ -142,9 +145,11 @@ public:
    * @param out Output vnode pointer.
    * @return 0 on success or negative on error.
    */
-  inline int create(const char *name, VNodeType t, RetainPtr<VNode> &out) {
+  inline int create(const char *name, VNodeType t,
+                    fk::memory::RetainPtr<VNode> &out) {
     if (type != VNodeType::Directory) {
-      kwarn("VFS", "Create failed: '%s' is not a directory", m_name.c_str());
+      fk::algorithms::kwarn("VFS", "Create failed: '%s' is not a directory",
+                            m_name.c_str());
       return -1;
     }
 
@@ -156,10 +161,11 @@ public:
     child->inode = new_inode;
     child->inode_number = new_inode->i_number;
 
-    dir_entries.push_back(DirEntry{name, adopt_retain(child)});
-    out = adopt_retain(child);
+    dir_entries.push_back(DirEntry{name, fk::memory::adopt_retain(child)});
+    out = fk::memory::adopt_retain(child);
 
-    klog("VFS", "Created '%s' in directory '%s'", name, m_name.c_str());
+    fk::algorithms::klog("VFS", "Created '%s' in directory '%s'", name,
+                         m_name.c_str());
     return 0;
   }
 };

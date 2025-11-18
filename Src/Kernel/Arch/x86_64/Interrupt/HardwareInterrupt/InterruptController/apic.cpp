@@ -35,17 +35,18 @@ uint32_t APIC::read(uint32_t reg) {
 }
 
 void APIC::initialize() {
-  kdebug("APIC", "Initializing Local APIC...");
+  fk::algorithms::kdebug("APIC", "Initializing Local APIC...");
 
   if (!CPU::the().has_apic()) {
-    kerror("APIC", "Local APIC not detected");
+    fk::algorithms::kerror("APIC", "Local APIC not detected");
     return;
   }
 
   uint64_t apic_msr = CPU::the().read_msr(APIC_BASE_MSR);
   uintptr_t apic_phys = apic_msr & 0xFFFFF000;
 
-  kdebug("APIC", "APIC physical base detected at 0x%lx", apic_phys);
+  fk::algorithms::kdebug("APIC", "APIC physical base detected at 0x%lx",
+                         apic_phys);
 
   // Enable APIC via MSR
   apic_msr |= APIC_MSR_ENABLE;
@@ -63,8 +64,8 @@ void APIC::initialize() {
   // Enable LAPIC and set spurious interrupt vector
   write(REG_SPURIOUS, APIC_SPURIOUS_VECTOR | APIC_SVR_ENABLE);
 
-  klog("APIC", "Local APIC enabled with spurious vector 0x%X",
-       APIC_SPURIOUS_VECTOR);
+  fk::algorithms::klog("APIC", "Local APIC enabled with spurious vector 0x%X",
+                       APIC_SPURIOUS_VECTOR);
 }
 
 void APIC::send_eoi(uint8_t) {
@@ -73,14 +74,15 @@ void APIC::send_eoi(uint8_t) {
 }
 
 void APIC::mask_interrupt(uint8_t irq) {
-  kdebug("APIC",
-         "Mask request for IRQ %u ignored (LAPIC doesn't mask that way)", irq);
+  fk::algorithms::kdebug(
+      "APIC", "Mask request for IRQ %u ignored (LAPIC doesn't mask that way)",
+      irq);
 }
 
 void APIC::unmask_interrupt(uint8_t irq) {
-  kdebug("APIC",
-         "Unmask request for IRQ %u ignored (LAPIC doesn't unmask that way)",
-         irq);
+  fk::algorithms::kdebug(
+      "APIC",
+      "Unmask request for IRQ %u ignored (LAPIC doesn't unmask that way)", irq);
 }
 
 void APIC::calibrate_timer() {
@@ -100,7 +102,8 @@ void APIC::calibrate_timer() {
   write(REG_INITIAL_COUNT, 0);
   apic_ticks_per_ms = elapsed / calib_ms;
 
-  klog("APIC", "APIC timer calibrated: %u ticks/ms", apic_ticks_per_ms);
+  fk::algorithms::klog("APIC", "APIC timer calibrated: %u ticks/ms",
+                       apic_ticks_per_ms);
 }
 
 void APIC::setup_timer(uint64_t ms) {
@@ -117,6 +120,7 @@ void APIC::setup_timer(uint64_t ms) {
   write(REG_LVT_TIMER, APIC_TIMER_VECTOR | APIC_LVT_TIMER_MODE_PERIODIC);
   write(REG_INITIAL_COUNT, static_cast<uint32_t>(initial_ticks));
 
-  klog("APIC", "APIC timer armed at %u Hz (%u ticks per period)", ms,
-       (uint32_t)initial_ticks);
+  fk::algorithms::klog("APIC",
+                       "APIC timer armed at %u Hz (%u ticks per period)", ms,
+                       (uint32_t)initial_ticks);
 }

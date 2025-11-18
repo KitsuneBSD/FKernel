@@ -5,8 +5,8 @@
 
 struct DevFS {
 private:
-  RetainPtr<VNode> d_root;
-  static_vector<Device, 256> d_devices;
+  fk::memory::RetainPtr<VNode> d_root;
+  fk::containers::static_vector<Device, 256> d_devices;
 
 public:
   DevFS();
@@ -18,7 +18,7 @@ public:
     }
   }
 
-  RetainPtr<VNode> root();
+  fk::memory::RetainPtr<VNode> root();
 
   int register_device_static(const char *name, VNodeType type, VNodeOps *ops,
                              void *driver_data);
@@ -28,7 +28,7 @@ public:
   int unregister_device(const char *name);
 
   static int devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
-                          RetainPtr<VNode> &out);
+                          fk::memory::RetainPtr<VNode> &out);
   static int devfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer,
                            size_t max_entries);
   static int devfs_open(VNode *vnode, FileDescriptor *fd, int flags);
@@ -38,7 +38,7 @@ public:
   static int devfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
                          size_t size, size_t offset);
   static int devfs_create(VNode *dir, FileDescriptor *fd, const char *name,
-                          VNodeType type, RetainPtr<VNode> &out);
+                          VNodeType type, fk::memory::RetainPtr<VNode> &out);
   static int devfs_unlink(VNode *dir, FileDescriptor *fd, const char *name);
 
   static VNodeOps ops;

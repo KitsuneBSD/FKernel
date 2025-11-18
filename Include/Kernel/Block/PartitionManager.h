@@ -24,7 +24,8 @@ public:
    *
    * @param device The block device to manage.
    */
-  explicit PartitionManager(RetainPtr<BlockDevice> dev) : m_device(move(dev)) {}
+  explicit PartitionManager(fk::memory::RetainPtr<BlockDevice> dev)
+      : m_device(fk::types::move(dev)) {}
   ~PartitionManager();
 
   /**
@@ -32,7 +33,7 @@ public:
    *
    * @param strategy The strategy to use for parsing the partition table.
    */
-  void set_strategy(OwnPtr<PartitionParsingStrategy> strategy);
+  void set_strategy(fk::memory::OwnPtr<PartitionParsingStrategy> strategy);
 
   /**
    * @brief Detects partitions on the device using the current strategy.
@@ -44,12 +45,12 @@ public:
    *         Returns an empty vector if no strategy is set or no partitions
    *         are found.
    */
-  static_vector<RetainPtr<PartitionBlockDevice>, 16>
+  fk::containers::static_vector<fk::memory::RetainPtr<PartitionBlockDevice>, 16>
   detect_partitions(); // Changed from StaticVector and PartitionDevice
 
 private:
-  RetainPtr<BlockDevice> m_device;
-  OwnPtr<PartitionParsingStrategy> m_strategy;
+  fk::memory::RetainPtr<BlockDevice> m_device;
+  fk::memory::OwnPtr<PartitionParsingStrategy> m_strategy;
 
   bool is_mbr(const uint8_t *sector) const;
   bool is_gpt(const uint8_t *sector) const;

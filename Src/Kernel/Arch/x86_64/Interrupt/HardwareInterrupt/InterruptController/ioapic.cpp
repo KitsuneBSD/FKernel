@@ -20,7 +20,7 @@ void IOAPIC::write(uint32_t reg, uint32_t value) {
 
 void IOAPIC::initialize() {
   ioapic_base = IOAPIC_ADDRESS;
-  klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
+  fk::algorithms::klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
 
   // Map I/O APIC registers
   VirtualMemoryManager::the().map_page(
@@ -30,7 +30,8 @@ void IOAPIC::initialize() {
   uint32_t ver = read(IOAPIC_REG_VER);
   uint32_t max_entries = ((ver >> 16) & 0xFF) + 1;
 
-  klog("IOAPIC", "Version %u, %u redirection entries", ver & 0xFF, max_entries);
+  fk::algorithms::klog("IOAPIC", "Version %u, %u redirection entries",
+                       ver & 0xFF, max_entries);
 
   // Mask all IRQs initially
   for (uint32_t i = 0; i < max_entries; ++i) {

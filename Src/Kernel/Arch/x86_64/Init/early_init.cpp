@@ -18,7 +18,7 @@
 #include <LibFK/Algorithms/log.h>
 
 void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
-  klog("EARLY_INIT", "Start early init (multiboot2)");
+  fk::algorithms::klog("EARLY_INIT", "Start early init (multiboot2)");
 
   GDTController::the().initialize();
   InterruptController::the().initialize();

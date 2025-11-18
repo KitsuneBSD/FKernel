@@ -17,7 +17,7 @@ private:
   uint32_t read(uint32_t reg);
   void write(uint32_t reg, uint32_t value);
 
-  String m_name = "APIC";
+  fk::text::String m_name = "APIC";
 
 public:
   static APIC &the() {
@@ -27,7 +27,7 @@ public:
 
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
 
-  String get_name() override { return m_name; }
+  fk::text::String get_name() override { return m_name; }
   /**
    * @brief Initialize and enable the local APIC
    */

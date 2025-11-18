@@ -80,6 +80,10 @@ if is_mode("debug") then
 	set_optimize("fast")
 	add_defines("FKERNEL_DEBUG")
 
+	if is_arch("x86_64", "x64") then
+		add_cxflags(flags.x86_64.cxx, "-DFKERNEL_DEBUG")
+	end
+
 	--TODO: add tests load on the kernel if this mode is setted
 end
 
@@ -100,7 +104,7 @@ add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
 
 if is_arch("x86_64", "x64") then
-	add_cxflags(flags.x86_64.cxx)
+	add_cxflags(flags.x86_64.cxx, "-DFKERNEL_DEBUG")
 	add_asflags(flags.x86_64.asm)
 
 	add_files("Src/Kernel/Arch/x86_64/**.asm")
@@ -108,6 +112,7 @@ if is_arch("x86_64", "x64") then
 end
 
 add_files(kernel_non_architecture_related)
+add_defines("FKERNEL_DEBUG")
 
 if is_arch("x86_64", "x64") then
 	after_link(function(target)

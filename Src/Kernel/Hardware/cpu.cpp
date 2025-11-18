@@ -12,7 +12,7 @@ CPU::CPU() {
   *(uint32_t *)&vendor[4] = edx;
   *(uint32_t *)&vendor[8] = ecx;
   vendor[12] = '\0';
-  m_vendor = String(vendor);
+  m_vendor = fk::text::String(vendor);
 
   cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
   if (eax >= 0x80000004) {
@@ -24,9 +24,9 @@ CPU::CPU() {
     cpuid(0x80000004, 0, (uint32_t *)&brand[32], (uint32_t *)&brand[36],
           (uint32_t *)&brand[40], (uint32_t *)&brand[44]);
     brand[48] = '\0';
-    m_brand = String(brand);
+    m_brand = fk::text::String(brand);
   } else {
-    m_brand = String("Unknown");
+    m_brand = fk::text::String("Unknown");
   }
 
   detect_cpu_features();
@@ -45,19 +45,19 @@ void CPU::detect_cpu_features() {
   // Check for APIC
   cpuid(1, 0, &eax, &ebx, &ecx, &edx);
   if (edx & (1 << 9)) {
-    kdebug("CPU", "Found APIC support");
+    fk::algorithms::kdebug("CPU", "Found APIC support");
     m_has_apic = true;
   }
 
   // Check for x2APIC
   if (ecx & (1 << 21)) {
-    kdebug("CPU", "Found x2APIC support");
+    fk::algorithms::kdebug("CPU", "Found x2APIC support");
     m_has_x2apic = true;
   }
 
   // Check for hpet
   if (ACPIManager::the().find_table("HPET")) {
-    kdebug("CPU", "Found Hpet support");
+    fk::algorithms::kdebug("CPU", "Found Hpet support");
     m_has_hpet = true;
   }
 }
@@ -66,13 +66,13 @@ void CPU::write_msr(uint32_t msr, uint64_t value) {
   uint32_t low = value & 0xFFFFFFFF;
   uint32_t high = value >> 32;
   asm volatile("wrmsr" : : "c"(msr), "a"(low), "d"(high));
-  kdebug("CPU", "Wrote MSR %lx = %lx", msr, value);
+  fk::algorithms::kdebug("CPU", "Wrote MSR %lx = %lx", msr, value);
 }
 
 uint64_t CPU::read_msr(uint32_t msr) {
   uint32_t low, high;
   asm volatile("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
   uint64_t value = ((uint64_t)high << 32) | low;
-  kdebug("CPU", "Read MSR %lx = %lx", msr, value);
+  fk::algorithms::kdebug("CPU", "Read MSR %lx = %lx", msr, value);
   return value;
 }

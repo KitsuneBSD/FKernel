@@ -20,7 +20,7 @@ public:
    */
   static void enable_nmi() {
     outb(0x70, inb(0x70) & 0x7F);
-    klog("NMI", "Non maskable interrupt enabled");
+    fk::algorithms::klog("NMI", "Non maskable interrupt enabled");
   }
 
   /**
@@ -34,6 +34,6 @@ public:
   static void disable_nmi() {
     outb(0x70, inb(0x70) | 0x80);
     inb(0x71); // Flush CMOS
-    klog("NMI", "Non maskable interrupt disabled");
+    fk::algorithms::klog("NMI", "Non maskable interrupt disabled");
   }
 };

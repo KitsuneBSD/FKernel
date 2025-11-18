@@ -8,14 +8,14 @@ int ConsoleDevice::open(VNode *vnode, FileDescriptor *fd, int flags) {
   (void)vnode;
   (void)fd;
   (void)flags;
-  klog("CONSOLE", "Opened /dev/console");
+  fk::algorithms::klog("CONSOLE", "Opened /dev/console");
   return 0;
 }
 
 int ConsoleDevice::close(VNode *vnode, FileDescriptor *fd) {
   (void)vnode;
   (void)fd;
-  klog("CONSOLE", "Closed /dev/console");
+  fk::algorithms::klog("CONSOLE", "Closed /dev/console");
   return 0;
 }
 

@@ -13,14 +13,14 @@ private:
   static uint16_t get_irr();
   static uint16_t get_isr();
 
-  String m_name = "8259PIC";
+  fk::text::String m_name = "8259PIC";
 
 public:
   void initialize() override;
   void mask_interrupt(uint8_t irq) override;
   void unmask_interrupt(uint8_t irq) override;
   void send_eoi(uint8_t irq) override;
-  String get_name() override { return m_name; }
+  fk::text::String get_name() override { return m_name; }
 
   /**
    * @brief Disable 8259PIC

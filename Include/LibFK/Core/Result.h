@@ -13,7 +13,7 @@ public:
   // Constructors
   // When constructing with a value, initialize m_value and ensure m_error is default (no error).
   Result(const T &value) : m_value(value), m_error() {}
-  Result(T &&value) : m_value(fk::types::move(value)), m_error() {}
+  Result(T &&value) : m_value(static_cast<T&&>(value)), m_error() {}
   // When constructing with an error, initialize m_error and ensure m_value is empty.
   Result(E error) : m_value(), m_error(error) {}
 

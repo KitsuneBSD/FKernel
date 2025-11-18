@@ -10,11 +10,11 @@
 
 extern "C" void write_on_cr3(void *pml4);
 
-void map_ranges_iterative(rb_node<PhysicalMemoryRange> *root) {
+void map_ranges_iterative(fk::containers::rb_node<PhysicalMemoryRange> *root) {
   constexpr int MAX_STACK = 64;
-  rb_node<PhysicalMemoryRange> *stack[MAX_STACK];
+  fk::containers::rb_node<PhysicalMemoryRange> *stack[MAX_STACK];
   int sp = 0;
-  rb_node<PhysicalMemoryRange> *current = root;
+  fk::containers::rb_node<PhysicalMemoryRange> *current = root;
 
   while (current || sp > 0) {
     while (current) {
@@ -82,8 +82,9 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
   pt[pt_index] = phys | (flags & ~PAGE_MASK);
   asm volatile("invlpg (%0)" ::"r"((void *)virt) : "memory");
 
-  kdebug("VIRTUAL MEMORY", "Mapped page V:0x%lx -> P:0x%lx (flags 0x%lx)", virt,
-         phys, flags);
+  fk::algorithms::kdebug("VIRTUAL MEMORY",
+                         "Mapped page V:0x%lx -> P:0x%lx (flags 0x%lx)", virt,
+                         phys, flags);
 }
 
 void VirtualMemoryManager::map_range(uintptr_t virt_start, uintptr_t phys_start,
@@ -96,7 +97,8 @@ void VirtualMemoryManager::map_range(uintptr_t virt_start, uintptr_t phys_start,
 uint64_t *VirtualMemoryManager::alloc_table() {
   void *page = PhysicalMemoryManager::the().alloc_physical_page(PAGE_SIZE);
   if (!page) {
-    kwarn("VIRTUAL MEMORY", "Failed to allocate page for table.");
+    fk::algorithms::kwarn("VIRTUAL MEMORY",
+                          "Failed to allocate page for table.");
     return nullptr;
   }
 
@@ -107,14 +109,15 @@ uint64_t *VirtualMemoryManager::alloc_table() {
 
 void VirtualMemoryManager::initialize() {
   if (m_is_initialized) {
-    kwarn("VIRTUAL MEMORY", "Already initialized.");
+    fk::algorithms::kwarn("VIRTUAL MEMORY", "Already initialized.");
     return;
   }
 
   m_pml4 = alloc_table();
   uint64_t *pdpt = alloc_table();
   if (!m_pml4 || !pdpt) {
-    kerror("VIRTUAL MEMORY", "Failed to allocate PML4 or PDPT.");
+    fk::algorithms::kerror("VIRTUAL MEMORY",
+                           "Failed to allocate PML4 or PDPT.");
     return;
   }
 
@@ -124,7 +127,8 @@ void VirtualMemoryManager::initialize() {
   for (int i = 0; i < 4; i++) {
     uint64_t *pd = alloc_table();
     if (!pd) {
-      kerror("VIRTUAL MEMORY", "Failed to allocate Page Directory.");
+      fk::algorithms::kerror("VIRTUAL MEMORY",
+                             "Failed to allocate Page Directory.");
       return;
     }
 
@@ -141,7 +145,7 @@ void VirtualMemoryManager::initialize() {
 
   map_ranges_iterative(PhysicalMemoryManager::the().m_memory_ranges.root());
 
-  klog("VIRTUAL MEMORY", "Virtual Memory Manager initialized");
+  fk::algorithms::klog("VIRTUAL MEMORY", "Virtual Memory Manager initialized");
   HardwareInterruptManager::the().set_memory_manager(true);
   TimerManager::the().set_memory_manager(true);
   m_is_initialized = true;

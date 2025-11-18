@@ -254,9 +254,8 @@ private:
     // Re-initializing the node from the pool using placement new.
     new (node_ptr) rb_node<T>(value);
 
-    return fk::core::Result<fk::memory::OwnPtr<rb_node<T>>>(
-        fk::memory::OwnPtr<rb_node<T>>(
-            node_ptr)); // Return the allocated node wrapped in OwnPtr
+    fk::memory::OwnPtr<rb_node<T>> owned_node(node_ptr); // Construct OwnPtr
+    return fk::core::Result<fk::memory::OwnPtr<rb_node<T>>>(static_cast<fk::memory::OwnPtr<rb_node<T>>&&>(owned_node)); // Move it into Result
   }
 
 public:
@@ -271,8 +270,7 @@ public:
     }
     fk::memory::OwnPtr<rb_node<T>> new_node_ptr =
         fk::types::move(result.value()); // Get the OwnPtr from the Result
-    rb_node<T> *new_node =
-        new_node_ptr.get(); // Get the raw pointer for tree manipulation
+    rb_node<T> *new_node = new_node_ptr.operator->(); // Get the raw pointer for tree manipulation
 
     rb_node<T> *y = nullptr;
     rb_node<T> *x = m_root;

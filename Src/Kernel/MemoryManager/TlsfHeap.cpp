@@ -24,15 +24,20 @@ void TLSFHeap::expand(size_t bytes) {
     block->m_free = true;
     insert_block(block);
 
-    klog("TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base,
-         m_heap_size);
+        fk::algorithms::klog(
+
+            "TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base,
+
+            m_heap_size);
+
+    
     return;
   }
 
   for (size_t i = 0; i < pages; ++i) {
     void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
     if (!phys) {
-      kwarn("TLSF", "Failed to allocate physical page for heap expansion");
+      fk::algorithms::kwarn("TLSF", "Failed to allocate physical page for heap expansion");
       return;
     }
 
@@ -47,7 +52,7 @@ void TLSFHeap::expand(size_t bytes) {
   insert_block(block);
 
   m_heap_size += pages * PAGE_SIZE;
-  kdebug("TLSF", "Heap expanded by %zu pages, new size=%zu", pages,
+  fk::algorithms::kdebug("TLSF", "Heap expanded by %zu pages, new size=%zu", pages,
          m_heap_size);
 }
 

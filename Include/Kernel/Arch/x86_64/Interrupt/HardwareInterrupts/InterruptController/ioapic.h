@@ -19,7 +19,7 @@ private:
   uintptr_t ioapic_base = 0;
   // uint32_t global_interrupt_base = 0;
 
-  String m_name = "IOAPIC";
+  fk::text::String m_name = "IOAPIC";
 
   uint32_t read(uint32_t reg);
   void write(uint32_t reg, uint32_t value);
@@ -27,7 +27,7 @@ private:
 public:
   IOAPIC() = default;
 
-  String get_name() override { return m_name; }
+  fk::text::String get_name() override { return m_name; }
   void initialize() override;
   void mask_interrupt(uint8_t irq) override;
   void unmask_interrupt(uint8_t irq) override;

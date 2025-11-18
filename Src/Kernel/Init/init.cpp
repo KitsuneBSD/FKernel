@@ -14,19 +14,19 @@ void init() {
   auto &vfs = VirtualFS::the();
   auto &ramfs = RamFS::the();
   auto &devfs = DevFS::the();
-  klog("INIT", "Start init");
+  fk::algorithms::klog("INIT", "Start init");
 
   vfs.mount("/", ramfs.root());
 
-  RetainPtr<VNode> root;
+  fk::memory::RetainPtr<VNode> root;
   if (vfs.lookup("/", root) != 0) {
-    kwarn("VFS", "Root lookup failed");
+    fk::algorithms::kwarn("VFS", "Root lookup failed");
     return;
   }
 
   vfs.mount("dev", devfs.root());
 
-  RetainPtr<VNode> dev;
+  fk::memory::RetainPtr<VNode> dev;
   vfs.lookup("/dev", dev);
 
   init_basic_device();

@@ -7,6 +7,6 @@ int BsdPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
   (void)out;
   (void)max_out;
 
-  kwarn("BSD DISK LABEL", "We need implement this");
+  fk::algorithms::kwarn("BSD DISK LABEL", "We need implement this");
   return 0;
 }

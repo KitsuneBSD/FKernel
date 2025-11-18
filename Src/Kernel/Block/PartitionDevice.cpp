@@ -4,7 +4,7 @@
 #include <LibFK/Algorithms/log.h>
 
 PartitionBlockDevice::PartitionBlockDevice(PartitionInfo &&info)
-    : m_info(move(info)) {}
+    : m_info(fk::types::move(info)) {}
 
 int PartitionBlockDevice::open(VNode *vnode, FileDescriptor *fd, int flags) {
   (void)vnode;

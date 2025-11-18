@@ -26,7 +26,7 @@ fk::core::Result<void> RTCClock::initialize(uint32_t frequency) {
 
   asm volatile("sti");
 
-  klog("RTC", "RTC timer initialized at ~%u Hz", m_frequency);
+  fk::algorithms::klog("RTC", "RTC timer initialized at ~%u Hz", m_frequency);
   return fk::core::Result<void>();
 }
 
@@ -85,12 +85,12 @@ DateTime RTCClock::datetime() {
   // Convert BCD to binary if necessary
   if (!(register_b &
         0x04)) { // Check if BCD mode is enabled (bit 2 of Register B)
-    second = bcd_to_bin(second);
-    minute = bcd_to_bin(minute);
-    hour = bcd_to_bin(hour);
-    day = bcd_to_bin(day);
-    month = bcd_to_bin(month);
-    year = bcd_to_bin(year);
+    second = fk::utilities::bcd_to_bin(second);
+    minute = fk::utilities::bcd_to_bin(minute);
+    hour = fk::utilities::bcd_to_bin(hour);
+    day = fk::utilities::bcd_to_bin(day);
+    month = fk::utilities::bcd_to_bin(month);
+    year = fk::utilities::bcd_to_bin(year);
   }
 
   dt.second = second;
@@ -98,7 +98,9 @@ DateTime RTCClock::datetime() {
   dt.hour = hour;
   dt.day = day;
   dt.month = month;
-  dt.year = year + 2000; // Assuming year is 2-digit and in 21st century. A more robust solution would involve reading the century from CMOS register 0x32 if available.
+  dt.year = year + 2000; // Assuming year is 2-digit and in 21st century. A more
+                         // robust solution would involve reading the century
+                         // from CMOS register 0x32 if available.
 
   return dt;
 }

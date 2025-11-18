@@ -14,7 +14,7 @@ void HPETTimer::write_reg(uint64_t reg, uint64_t value) {
 void HPETTimer::initialize(uint32_t frequency) {
   auto hpet_table = ACPIManager::the().find_table("HPET");
   if (!hpet_table) {
-    kerror("HPET", "HPET table not found!");
+    fk::algorithms::kerror("HPET", "HPET table not found!");
     return;
   }
 
@@ -54,5 +54,5 @@ void HPETTimer::initialize(uint32_t frequency) {
   // 5. Enable HPET
   write_reg(GENERAL_CONFIGURATION, read_reg(GENERAL_CONFIGURATION) | 1ULL);
 
-  klog("TIMER", "Initializing HPET Timer at %u Hz", frequency);
+  fk::algorithms::klog("TIMER", "Initializing HPET Timer at %u Hz", frequency);
 }

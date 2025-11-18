@@ -36,11 +36,18 @@ public:
   /** @brief Default constructor: no value stored */
   constexpr optional() = default;
 
+
   /**
-   * @brief Construct optional with a value
+   * @brief Construct optional with a value (move semantics)
    * @param value Value to store
    */
-  optional(const T &value) : has_value_(true) { new (storage) T(value); }
+  optional(T &&value) : has_value_(true) { new (storage) T(static_cast<T&&>(value)); }
+
+  /**
+   * @brief Construct optional with a value (copy semantics)
+   * @param val Value to store
+   */
+  optional(const T& val) : has_value_(true) { new (storage) T(val); }
 
   /**
    * @brief Copy constructor
@@ -53,6 +60,17 @@ public:
 
   /** @brief Destructor: destroys stored value if present */
   ~optional() { reset(); }
+
+  /**
+   * @brief Move constructor
+   * @param other Other optional to move from
+   */
+  optional(optional &&other) : has_value_(other.has_value_) {
+    if (has_value_) {
+      new (storage) T(static_cast<T&&>(*other.ptr()));
+      other.reset(); // Ensure the other optional is empty
+    }
+  }
 
   /**
    * @brief Copy assignment

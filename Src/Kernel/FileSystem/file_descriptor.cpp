@@ -9,7 +9,8 @@ FileDescriptorTable &FileDescriptorTable::the() {
   return instance;
 }
 
-int FileDescriptorTable::allocate(RetainPtr<VNode> vnode, int flags) {
+int FileDescriptorTable::allocate(fk::memory::RetainPtr<VNode> vnode,
+                                  int flags) {
   if (m_file_descriptors.is_full())
     return -1;
 
@@ -26,8 +27,8 @@ int FileDescriptorTable::allocate(RetainPtr<VNode> vnode, int flags) {
   int idx = static_cast<int>(m_file_descriptors.size()) - 1;
   m_file_descriptors[idx].file_descriptor = idx;
 
-  kdebug("FD", "Allocated file_descriptor %d for vnode '%s'", idx,
-         vnode->m_name.c_str());
+  fk::algorithms::kdebug("FD", "Allocated file_descriptor %d for vnode '%s'",
+                         idx, vnode->m_name.c_str());
   return idx;
 }
 
@@ -39,7 +40,7 @@ int FileDescriptorTable::close(int file_descriptor) {
     f->vnode->close(f);
   f->used = false;
 
-  kdebug("FD", "Closed file_descriptor %d", file_descriptor);
+  fk::algorithms::kdebug("FD", "Closed file_descriptor %d", file_descriptor);
   return 0;
 }
 
@@ -87,14 +88,9 @@ int FileDescriptorTable::dup2(int old_fd, int new_fd) {
   FileDescriptor *old_f = FileDescriptorTable::the().get(old_fd);
 
   if (!old_f || !old_f->used) {
-
-    kerror("FD", "dup2: invalid old file descriptor %d", old_fd);
-
+    fk::algorithms::kwarn("FD", "dup2: invalid old file descriptor %d", old_fd);
     return -1;
-
   }
-
-
 
   // If new_fd is already open, close it first.
 
@@ -102,15 +98,13 @@ int FileDescriptorTable::dup2(int old_fd, int new_fd) {
 
     if (FileDescriptorTable::the().close(new_fd) < 0) {
 
-      kerror("FD", "dup2: failed to close existing new file descriptor %d", new_fd);
+      fk::algorithms::kwarn(
+          "FD", "dup2: failed to close existing new file descriptor %d",
+          new_fd);
 
       return -1;
-
     }
-
   }
-
-
 
   // Allocate a new file descriptor entry for new_fd, copying from old_fd.
 
@@ -120,15 +114,14 @@ int FileDescriptorTable::dup2(int old_fd, int new_fd) {
 
   // reuse the existing VNode and flags.
 
-  if (static_cast<size_t>(new_fd) >= FileDescriptorTable::MAX_file_descriptorS) {
+  if (static_cast<size_t>(new_fd) >=
+      FileDescriptorTable::MAX_file_descriptorS) {
 
-      kerror("FD", "dup2: new file descriptor %d is out of bounds", new_fd);
+    fk::algorithms::kwarn("FD", "dup2: new file descriptor %d is out of bounds",
+                          new_fd);
 
-      return -1;
-
+    return -1;
   }
-
-
 
   FileDescriptor new_file_descriptor;
 
@@ -142,38 +135,33 @@ int FileDescriptorTable::dup2(int old_fd, int new_fd) {
 
   new_file_descriptor.used = true;
 
+  // Ensure the static_vector has enough capacity if new_fd is larger than
+  // current size.
 
+  // This is a simplification; a real implementation might need more robust
+  // handling.
 
-  // Ensure the static_vector has enough capacity if new_fd is larger than current size.
+  while (static_cast<size_t>(new_fd) >=
+         FileDescriptorTable::the().m_file_descriptors.size()) {
 
-  // This is a simplification; a real implementation might need more robust handling.
+    FileDescriptor dummy_fd;
 
-  while (static_cast<size_t>(new_fd) >= FileDescriptorTable::the().m_file_descriptors.size()) {
+    dummy_fd.used = false; // Mark as unused
 
-      FileDescriptor dummy_fd;
+    if (!FileDescriptorTable::the().m_file_descriptors.push_back(dummy_fd)) {
 
-      dummy_fd.used = false; // Mark as unused
+      fk::algorithms::kwarn(
+          "FD", "dup2: failed to resize file descriptor table for %d", new_fd);
 
-      if (!FileDescriptorTable::the().m_file_descriptors.push_back(dummy_fd)) {
-
-          kerror("FD", "dup2: failed to resize file descriptor table for %d", new_fd);
-
-          return -1;
-
-      }
-
+      return -1;
+    }
   }
-
-
 
   // Place the new file descriptor at the correct index.
 
   FileDescriptorTable::the().m_file_descriptors[new_fd] = new_file_descriptor;
 
-
-
-  kdebug("FD", "dup2: duplicated fd %d to %d", old_fd, new_fd);
+  fk::algorithms::kdebug("FD", "dup2: duplicated fd %d to %d", old_fd, new_fd);
 
   return 0;
-
 }

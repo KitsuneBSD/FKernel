@@ -62,5 +62,5 @@ void PS2Keyboard::irq_handler() {
 }
 
 void PS2Keyboard::initialize() {
-  klog("Keyboard", "PS/2 keyboard initialized on IRQ1");
+  fk::algorithms::klog("Keyboard", "PS/2 keyboard initialized on IRQ1");
 }

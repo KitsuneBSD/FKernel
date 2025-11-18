@@ -26,9 +26,9 @@ struct VNodeOps {
   int (*open)(VNode *Vnode, FileDescriptor *fd, int flags);
   int (*close)(VNode *Vnode, FileDescriptor *fd);
   int (*lookup)(VNode *Vnode, FileDescriptor *fd, const char *name,
-                RetainPtr<VNode> &result);
+                fk::memory::RetainPtr<VNode> &result);
   int (*create)(VNode *Vnode, FileDescriptor *fd, const char *name,
-                VNodeType type, RetainPtr<VNode> &result);
+                VNodeType type, fk::memory::RetainPtr<VNode> &result);
   int (*readdir)(VNode *Vnode, FileDescriptor *fd, void *dirent_buffer,
                  size_t max_entries);
   int (*unlink)(VNode *vnode, FileDescriptor *fd, const char *name);

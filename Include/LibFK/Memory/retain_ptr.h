@@ -1,5 +1,7 @@
 #pragma once
 
+#include <LibFK/Core/Error.h>
+#include <LibFK/Core/Result.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/new.h>
 
@@ -214,14 +216,16 @@ template <typename T> inline RetainPtr<T> adopt_retain(T *ptr) {
  * @tparam T Type of object
  * @tparam Args Constructor argument types
  * @param args Constructor arguments
- * @return fk::core::Result containing RetainPtr<T> on success, or OutOfMemory on failure.
+ * @return fk::core::Result containing RetainPtr<T> on success, or OutOfMemory
+ * on failure.
  */
 template <typename T, typename... Args>
-inline fk::core::Result<RetainPtr<T>, fk::core::Error> make_retain(Args &&...args) {
+inline fk::core::Result<RetainPtr<T>, fk::core::Error>
+make_retain(Args &&...args) {
   // In a freestanding environment, 'new' might return nullptr on failure.
   T *obj = new T(static_cast<Args &&>(args)...);
   if (!obj) { // Check if new returned nullptr
-      return fk::core::Error::OutOfMemory;
+    return fk::core::Error::OutOfMemory;
   }
   return fk::core::Result<RetainPtr<T>>(adopt_retain(obj));
 }

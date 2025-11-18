@@ -117,12 +117,12 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
   kprintf("%s[%s]%s: %s\n", color, prefix, KLOG_COLOR_RESET, buf);
 }
 #else
-/// In release mode, kebug does nothing
-#define kdebug(...)
+/// In release mode, kdebug does nothing
+#define kdebug(...) ((void)0)
 /// In release mode, klog does nothing
-#define klog(...)
+#define klog(...) ((void)0)
 /// In release mode, klog_color does nothing
-#define klog_color(...)
+#define klog_color(...) ((void)0)
 #endif
 
 } // namespace algorithms

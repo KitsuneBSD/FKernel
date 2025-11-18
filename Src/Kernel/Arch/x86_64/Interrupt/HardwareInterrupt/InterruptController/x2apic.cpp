@@ -23,10 +23,10 @@ constexpr uint32_t APIC_LVT_TIMER_MODE_PERIODIC = 1 << 17;
 constexpr uint32_t APIC_TIMER_DIVISOR = 0x3;
 
 void X2APIC::initialize() {
-  kdebug("x2APIC", "Initializing Local x2APIC...");
+  fk::algorithms::kdebug("x2APIC", "Initializing Local x2APIC...");
 
   if (!CPU::the().has_x2apic()) {
-    kerror("x2APIC", "x2APIC not detected");
+    fk::algorithms::kerror("x2APIC", "x2APIC not detected");
     return;
   }
 
@@ -36,8 +36,9 @@ void X2APIC::initialize() {
 
   CPU::the().write_msr(X2APIC_SPURIOUS_MSR,
                        APIC_SPURIOUS_VECTOR | APIC_SVR_ENABLE);
-  klog("x2APIC", "x2APIC initialized and spurious vector set to %u",
-       APIC_SPURIOUS_VECTOR);
+  fk::algorithms::klog("x2APIC",
+                       "x2APIC initialized and spurious vector set to %u",
+                       APIC_SPURIOUS_VECTOR);
 
   calibrate_timer();
 }
@@ -47,12 +48,13 @@ void X2APIC::send_eoi(uint8_t /*irq*/) {
 }
 
 void X2APIC::mask_interrupt(uint8_t irq) {
-  kdebug("x2APIC", "Mask requested for IRQ %u (not supported on x2APIC)", irq);
+  fk::algorithms::kdebug(
+      "x2APIC", "Mask requested for IRQ %u (not supported on x2APIC)", irq);
 }
 
 void X2APIC::unmask_interrupt(uint8_t irq) {
-  kdebug("x2APIC", "Unmask requested for IRQ %u (not supported on x2APIC)",
-         irq);
+  fk::algorithms::kdebug(
+      "x2APIC", "Unmask requested for IRQ %u (not supported on x2APIC)", irq);
 }
 
 void X2APIC::calibrate_timer() {
@@ -69,7 +71,8 @@ void X2APIC::calibrate_timer() {
   CPU::the().write_msr(X2APIC_INITIAL_COUNT_MSR, 0);
 
   apic_ticks_per_ms = elapsed_ticks / calib_ms;
-  klog("x2APIC", "Timer calibrated: %lu ticks/ms", apic_ticks_per_ms);
+  fk::algorithms::klog("x2APIC", "Timer calibrated: %lu ticks/ms",
+                       apic_ticks_per_ms);
 }
 
 void X2APIC::setup_timer(uint64_t ms) {
@@ -83,5 +86,6 @@ void X2APIC::setup_timer(uint64_t ms) {
                        APIC_TIMER_VECTOR | APIC_LVT_TIMER_MODE_PERIODIC);
   CPU::the().write_msr(X2APIC_INITIAL_COUNT_MSR, initial);
 
-  klog("x2APIC", "Periodic timer set: %lu ms (%lu ticks)", ms, initial);
+  fk::algorithms::klog("x2APIC", "Periodic timer set: %lu ms (%lu ticks)", ms,
+                       initial);
 }

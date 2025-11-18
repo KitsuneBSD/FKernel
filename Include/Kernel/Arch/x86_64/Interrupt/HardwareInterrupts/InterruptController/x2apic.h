@@ -12,7 +12,7 @@
 class X2APIC : public HardwareInterrupt {
 private:
   uint64_t apic_ticks_per_ms = 0; ///< Timer ticks per ms
-  String m_name = "x2APIC";
+  fk::text::String m_name = "x2APIC";
 
 public:
   static X2APIC &the() {
@@ -22,7 +22,7 @@ public:
 
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
 
-  String get_name() override { return m_name; }
+  fk::text::String get_name() override { return m_name; }
   /**
    * @brief Initialize and enable the local x2APIC
    */
