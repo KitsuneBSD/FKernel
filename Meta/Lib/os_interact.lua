@@ -34,4 +34,11 @@ function CommandExists(cmd)
 	return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == 0
 end
 
-return FileExists, DirExists, CopyFile, CommandExists
+function CaptureCommand(cmd)
+	local f = io.popen(cmd .. " 2>&1")
+	local out = f:read("*a")
+	f:close()
+	return out
+end
+
+return FileExists, DirExists, CopyFile, CommandExists, CaptureCommand

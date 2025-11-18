@@ -15,13 +15,22 @@ local function InitDiskGPTFAT32(disk)
 	PrintMessage(false, "Initializing GPT + FAT32...")
 
 	RunCommand("parted -s " .. disk .. " mklabel gpt")
-
 	RunCommand("parted -s " .. disk .. " mkpart EFI fat32 1MiB 512MiB")
 	RunCommand("parted -s " .. disk .. " set 1 esp on")
 
-	RunCommand("mkfs.fat -F32 " .. disk)
+	local loop = CaptureCommand("losetup --find --show --partscan " .. disk):gsub("\n", "")
+	if loop == "" then
+		PrintMessage(true, "Failed to setup loop device")
+		os.exit(1)
+	end
 
-	PrintMessage(false, "RAW disk formatted with GPT + FAT32")
+	local part1 = loop .. "p1"
+
+	RunCommand("mkfs.fat -F32 " .. part1)
+
+	RunCommand("losetup -d " .. loop)
+
+	PrintMessage(false, "Disk initialized (GPT + FAT32 on partition 1)")
 end
 
 RunCommand("rm -rf build/mockos")
