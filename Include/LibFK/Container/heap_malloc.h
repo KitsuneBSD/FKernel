@@ -4,6 +4,11 @@
 #include <LibFK/Container/bitmap.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Utilities/pair.h> // Include Pair definition
+#include <LibFK/Core/Result.h>
+#include <LibFK/Core/Error.h>
+
+namespace fk {
+namespace containers {
 
 /**
  * @brief Fixed-size chunk allocator using a bitmap.
@@ -45,15 +50,16 @@ public:
     return (MaxChunks + 7) / 8;
   }
 
-  T *allocate() noexcept {
+  fk::core::Result<T*, fk::core::Error> allocate() noexcept {
     for (size_t i = 0; i < MaxChunks; ++i) {
       if (!m_bitmap.get(i)) {
         m_bitmap.set(i, true);
         --m_free;
-        return pointerToChunk(i);
+        return fk::core::Result<T*>(pointerToChunk(i));
       }
     }
-    return nullptr;
+    // Allocation failed
+    return fk::core::Error::OutOfMemory;
   }
 
   void free(T *ptr) noexcept {
@@ -107,10 +113,10 @@ struct Allocator {
   void initialize(uint8_t *heap_start, uint8_t *heap_end);
 
   // Group ChunkAllocators into a Pair to satisfy the two-instance-variable rule.
-  Pair<Pair<ChunkAllocator<8>, ChunkAllocator<16>>, Pair<ChunkAllocator<4096>, ChunkAllocator<16384>>> allocators;
+  fk::utilities::Pair<fk::utilities::Pair<ChunkAllocator<8>, ChunkAllocator<16>>, fk::utilities::Pair<ChunkAllocator<4096>, ChunkAllocator<16384>>> allocators;
 
   // Group space and initialized flag into a Pair.
-  Pair<uint8_t *, bool> metadata;
+  fk::utilities::Pair<uint8_t *, bool> metadata;
 
   // Helper methods to access the grouped allocators and metadata
   ChunkAllocator<8>& alloc8() { return allocators.first.first; }
@@ -122,9 +128,16 @@ struct Allocator {
   bool& initialized() { return metadata.second; }
 };
 
-#ifdef __cplusplus
+} // namespace containers
+} // namespace fk
+
 extern "C" {
-#endif
+
+/// @brief Allocate memory. Intended for global operator new.
+void *heap_malloc(size_t size);
+
+/// @brief Free memory. Intended for global operator delete.
+void heap_free(void *ptr);
 
 /// @brief Allocate zero-initialized memory.
 void *kcalloc(size_t nmemb, size_t size);
@@ -138,6 +151,4 @@ void kfree(void *ptr);
 /// @brief Reallocate memory.
 void *krealloc(void *ptr, size_t size);
 
-#ifdef __cplusplus
-}
-#endif
+} // extern "C"

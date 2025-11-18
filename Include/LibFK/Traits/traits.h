@@ -7,6 +7,9 @@
 #include <LibFK/Algorithms/crc32.h>
 #endif
 
+namespace fk {
+namespace traits {
+
 /**
  * @brief Template traits for generic types.
  *
@@ -68,3 +71,6 @@ template <> struct Traits<unsigned> {
    */
   static void dump(unsigned i) { kprintf("%u", i); }
 };
+
+} // namespace traits
+} // namespace fk

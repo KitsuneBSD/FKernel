@@ -2,6 +2,9 @@
 
 #include <LibC/stddef.h>
 
+namespace fk {
+namespace traits {
+
 /**
  * @brief Conditional enable_if.
  *
@@ -169,3 +172,6 @@ template <typename T, size_t N> struct remove_extent<T[N]> {
  */
 template <typename T>
 using remove_extent_t = typename remove_extent<T>::type;
+
+} // namespace traits
+} // namespace fk

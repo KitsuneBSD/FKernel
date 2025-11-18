@@ -41,19 +41,19 @@ class TLSFHeap
 {
 private:
     /**
-     * @brief Bitmap for the first-level blocks.
+     * @brief fk::containers::Bitmap for the first-level blocks.
      *
      * This bitmap tracks the availability of blocks in the first-level segregated list.
      */
-    Bitmap<uint64_t, FL_BITS> m_first_layer_bitmap;
+    fk::containers::Bitmap<uint64_t, FL_BITS> m_first_layer_bitmap;
 
     /**
-     * @brief Bitmap for the second-level blocks.
+     * @brief fk::containers::Bitmap for the second-level blocks.
      *
      * Each entry in this array corresponds to a first-level block and tracks the availability
      * of blocks in the second-level segregated list.
      */
-    Bitmap<uint64_t, SL_BITS> m_second_layer_bitmap[FL_BITS];
+    fk::containers::Bitmap<uint64_t, SL_BITS> m_second_layer_bitmap[FL_BITS];
 
     /**
      * @brief Array of free lists for memory blocks.
@@ -110,7 +110,7 @@ private:
             for (size_t j = 0; j < SL_BITS; j++)
                 m_free_lists[i][j] = nullptr;
 
-        auto initial_heap_size = 16 * MiB;
+        auto initial_heap_size = 16 * fk::types::MiB;
         size_t pages_needed = (initial_heap_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
         for (size_t i = 0; i < pages_needed; ++i)

@@ -26,8 +26,9 @@ struct PhysicalMemoryRange {
   uintptr_t m_end;   ///< End address (exclusive)
   MemoryType m_type; ///< Type of memory (usable or reserved)
 
-  Bitmap<uint64_t, 65535> m_bitmap; ///< Bitmap tracking allocated pages
-  size_t m_page_count;              ///< Total number of pages in this range
+  fk::containers::Bitmap<uint64_t, 65535>
+      m_bitmap;        ///< Bitmap tracking allocated pages
+  size_t m_page_count; ///< Total number of pages in this range
 
   /**
    * @brief Initialize the memory range and bitmap
@@ -48,9 +49,9 @@ struct PhysicalMemoryRange {
    */
   int alloc_page(size_t count = 1, uintptr_t addr_hint = 0) {
     if (m_type != MemoryType::Usable || count == 0 || count > m_page_count) {
-      kwarn("PHYSICAL MEMORY RANGE",
-            "Cannot allocate %zu pages in range [%p - %p]", count, m_start,
-            m_end);
+      fk::algorithms::kwarn("PHYSICAL MEMORY RANGE",
+                            "Cannot allocate %zu pages in range [%p - %p]",
+                            count, m_start, m_end);
       return -1;
     }
 
@@ -59,8 +60,9 @@ struct PhysicalMemoryRange {
       if (addr_hint >= m_start && addr_hint + count * PAGE_SIZE <= m_end) {
         start_index = (addr_hint - m_start) / PAGE_SIZE;
       } else {
-        kwarn("PHYSICAL MEMORY RANGE", "Address hint %p out of range [%p - %p]",
-              addr_hint, m_start, m_end);
+        fk::algorithms::kwarn("PHYSICAL MEMORY RANGE",
+                              "Address hint %p out of range [%p - %p]",
+                              addr_hint, m_start, m_end);
         addr_hint = 0;
       }
     }
@@ -87,9 +89,9 @@ struct PhysicalMemoryRange {
       }
     }
 
-    kwarn("PHYSICAL MEMORY RANGE",
-          "No available pages for %zu pages in range [%p - %p]", count, m_start,
-          m_end);
+    fk::algorithms::kwarn("PHYSICAL MEMORY RANGE",
+                          "No available pages for %zu pages in range [%p - %p]",
+                          count, m_start, m_end);
     return -1;
   }
 
@@ -100,14 +102,16 @@ struct PhysicalMemoryRange {
    */
   void free_page(uintptr_t addr, size_t count = 1) {
     if (m_type != MemoryType::Usable || count == 0) {
-      kwarn("PHYSICAL MEMORY RANGE",
-            "Cannot free pages in this range [%p - %p]", m_start, m_end);
+      fk::algorithms::kwarn("PHYSICAL MEMORY RANGE",
+                            "Cannot free pages in this range [%p - %p]",
+                            m_start, m_end);
       return;
     }
 
     if (addr < m_start || addr + count * PAGE_SIZE > m_end) {
-      kwarn("PHYSICAL MEMORY RANGE", "Address %p out of range [%p - %p]", addr,
-            m_start, m_end);
+      fk::algorithms::kwarn("PHYSICAL MEMORY RANGE",
+                            "Address %p out of range [%p - %p]", addr, m_start,
+                            m_end);
       return;
     }
 
@@ -115,8 +119,9 @@ struct PhysicalMemoryRange {
 
     for (size_t i = 0; i < count; ++i) {
       if (!m_bitmap.get(index + i)) {
-        kwarn("PHYSICAL MEMORY RANGE", "Page at 0x%lx already free",
-              addr + i * PAGE_SIZE);
+        fk::algorithms::kwarn("PHYSICAL MEMORY RANGE",
+                              "Page at 0x%lx already free",
+                              addr + i * PAGE_SIZE);
       } else {
         m_bitmap.clear(index + i);
       }

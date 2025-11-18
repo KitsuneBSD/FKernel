@@ -1,18 +1,36 @@
-#include <Kernel/MemoryManager/TlsfHeap.h>
-#include <LibFK/new.h>
+#include <LibC/stddef.h> // For size_t
+#include <LibFK/Container/heap_malloc.h> // For heap_malloc and heap_free
 
-void *heap_malloc(size_t size) { return TLSFHeap::the().alloc(size); }
+// Define global new and delete operators outside of any namespace.
+// These operators are typically defined at the global scope.
 
-void heap_free(void *ptr) { TLSFHeap::the().free(ptr); }
+// Global operator new
+void *operator new(size_t size) {
+    return heap_malloc(size);
+}
 
-void *operator new(size_t size) { return heap_malloc(size); }
+// Global operator new[]
+void *operator new[](size_t size) {
+    return heap_malloc(size);
+}
 
-void *operator new[](size_t size) { return heap_malloc(size); }
+// Global operator delete
+void operator delete(void *ptr) noexcept {
+    heap_free(ptr);
+}
 
-void operator delete(void *ptr) noexcept { heap_free(ptr); }
+// Global operator delete[]
+void operator delete[](void *ptr) noexcept {
+    heap_free(ptr);
+}
 
-void operator delete[](void *ptr) noexcept { heap_free(ptr); }
+// Global operator delete with size (for C++14 and later, or specific compiler extensions)
+// This overload is often provided for completeness, though not strictly required by all C++ standards for basic new/delete.
+void operator delete(void *ptr, size_t) noexcept {
+    heap_free(ptr);
+}
 
-void operator delete(void *ptr, size_t) noexcept { heap_free(ptr); }
-
-void operator delete[](void *ptr, size_t) noexcept { heap_free(ptr); }
+// Global operator delete[] with size
+void operator delete[](void *ptr, size_t) noexcept {
+    heap_free(ptr);
+}

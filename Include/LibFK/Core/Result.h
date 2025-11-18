@@ -13,7 +13,7 @@ public:
   // Constructors
   // When constructing with a value, initialize m_value and ensure m_error is default (no error).
   Result(const T &value) : m_value(value), m_error() {}
-  Result(T &&value) : m_value(fk::move(value)), m_error() {}
+  Result(T &&value) : m_value(fk::types::move(value)), m_error() {}
   // When constructing with an error, initialize m_error and ensure m_value is empty.
   Result(E error) : m_value(), m_error(error) {}
 
@@ -50,7 +50,7 @@ public:
 private:
   // m_value stores the actual value if the operation was successful.
   // Its internal has_value_ flag indicates success or failure.
-  optional<T> m_value;
+  fk::memory::optional<T> m_value;
   // m_error stores the error code if m_value is empty.
   E m_error;
 };

@@ -2,6 +2,9 @@
 
 #include <LibFK/Types/types.h>
 
+namespace fk {
+namespace containers {
+
 /**
  * @brief Fixed-capacity string container with null-termination.
  *
@@ -111,3 +114,6 @@ template <size_t N> struct fixed_string {
   /// @return Pointer to null-terminated string (const).
   constexpr const char *c_str() const noexcept { return buffer; }
 };
+
+} // namespace containers
+} // namespace fk

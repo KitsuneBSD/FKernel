@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <LibFK/Algorithms/log.h>
+#include "LibFK/Algorithms/log.h"
 #include <LibFK/Types/types.h>
 
 #define GENERIC_EXCEPTION_HANDLER(name, exception_message)                     \

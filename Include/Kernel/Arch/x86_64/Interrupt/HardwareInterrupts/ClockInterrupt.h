@@ -12,7 +12,7 @@ struct DateTime {
   uint8_t month;
   uint16_t year;
 
-  String to_string() const;
+  fk::text::String to_string() const;
   void print();
 };
 
@@ -21,7 +21,7 @@ public:
   virtual ~Clock() = default;
 
   virtual fk::core::Result<void> initialize(uint32_t frequency) = 0;
-  virtual String get_name() = 0;
+  virtual fk::text::String get_name() = 0;
   virtual DateTime datetime() { return {}; }
 };
 

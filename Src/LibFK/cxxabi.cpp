@@ -3,8 +3,6 @@
 
 typedef void (*atexit_fn_t)();
 
-extern "C" {
-
 /**
  * @brief Mock implementation of atexit for freestanding kernel.
  *
@@ -26,10 +24,15 @@ int __cxa_atexit(atexit_fn_t func, void *arg, void *dso_handle) {
   return 0;
 }
 
-extern "C" void __cxa_pure_virtual() {}
+extern "C" void __cxa_pure_virtual() {
+  // This should ideally not be called in a freestanding environment.
+  // If it is, it indicates a programming error.
+  while (true) {
+    asm("cli; hlt");
+  }
+}
 
 /**
  * __cxa_finalize stub
  */
 void __cxa_finalize(void *f) { (void)f; }
-}

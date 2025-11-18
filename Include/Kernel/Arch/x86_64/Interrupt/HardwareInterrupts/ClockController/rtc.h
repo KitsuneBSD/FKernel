@@ -27,7 +27,7 @@ constexpr uint8_t RTC_REG_B = 0x0B;
 class RTCClock : public Clock {
 private:
   uint32_t m_frequency = 0;
-  String name = "RTC";
+  fk::text::String name = "RTC";
 
   uint8_t read_register(uint8_t reg);
   void write_register(uint8_t reg, uint8_t value);
@@ -36,7 +36,7 @@ private:
 public:
   fk::core::Result<void> initialize(uint32_t frequency) override;
   void set_frequency(uint32_t frequency);
-  String get_name() override { return name; }
+  fk::text::String get_name() override { return name; }
 
   DateTime datetime() override;
 };

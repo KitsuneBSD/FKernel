@@ -13,7 +13,7 @@ private:
   class CallableBase {
   public:
     virtual ~CallableBase() = default;
-    virtual R invoke(Args...) = 0;
+    virtual R invoke(Args... args) = 0;
     virtual OwnPtr<CallableBase> clone() const = 0;
   };
 

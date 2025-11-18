@@ -1,5 +1,8 @@
 #include <LibFK/Algorithms/djb2.h>
 
+namespace fk {
+namespace algorithms {
+
 uint32_t djb2(const void *data, size_t length) {
   uint32_t hash = 5381;
   const uint8_t *bytes = reinterpret_cast<const uint8_t *>(data);
@@ -8,3 +11,6 @@ uint32_t djb2(const void *data, size_t length) {
   }
   return hash;
 }
+
+} // namespace algorithms
+} // namespace fk

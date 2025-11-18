@@ -1,5 +1,8 @@
 #pragma once
 
+namespace fk {
+namespace traits {
+
 /**
  * @brief Curiously Recurring Template Pattern (CRTP) base class.
  *
@@ -38,3 +41,6 @@ struct CRTP {
      */
     const Derived& as_derived() const { return static_cast<const Derived&>(*this); }
 };
+
+} // namespace traits
+} // namespace fk

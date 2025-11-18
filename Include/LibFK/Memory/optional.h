@@ -4,6 +4,9 @@
 #include <LibC/string.h>
 #include <LibFK/new.h>
 
+namespace fk {
+namespace memory {
+
 /**
  * @brief Minimal freestanding implementation of std::optional.
  *
@@ -95,3 +98,6 @@ public:
     }
   }
 };
+
+} // namespace memory
+} // namespace fk

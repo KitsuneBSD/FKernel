@@ -3,6 +3,9 @@
 #include <LibFK/Types/types.h>
 #include <LibFK/new.h>
 
+namespace fk {
+namespace memory {
+
 /**
  * @brief A smart pointer with retain/release semantics.
  *
@@ -197,7 +200,7 @@ private:
 };
 
 /**
- * @brief Adopt an existing reference without retaining it.
+ * @brief Adopt an existing raw pointer without retaining it.
  * @tparam T Type of pointer
  * @param ptr Pointer to adopt
  * @return RetainPtr managing the pointer
@@ -211,10 +214,17 @@ template <typename T> inline RetainPtr<T> adopt_retain(T *ptr) {
  * @tparam T Type of object
  * @tparam Args Constructor argument types
  * @param args Constructor arguments
- * @return RetainPtr managing the newly created object
+ * @return fk::core::Result containing RetainPtr<T> on success, or OutOfMemory on failure.
  */
 template <typename T, typename... Args>
-inline RetainPtr<T> make_retain(Args &&...args) {
+inline fk::core::Result<RetainPtr<T>, fk::core::Error> make_retain(Args &&...args) {
+  // In a freestanding environment, 'new' might return nullptr on failure.
   T *obj = new T(static_cast<Args &&>(args)...);
-  return adopt_retain(obj);
+  if (!obj) { // Check if new returned nullptr
+      return fk::core::Error::OutOfMemory;
+  }
+  return fk::core::Result<RetainPtr<T>>(adopt_retain(obj));
 }
+
+} // namespace memory
+} // namespace fk

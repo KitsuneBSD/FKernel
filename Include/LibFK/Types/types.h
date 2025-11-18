@@ -5,6 +5,9 @@
 #include <LibC/stdbool.h>
 #include <LibC/limits.h>
 
+namespace fk {
+namespace types {
+
 constexpr uint64_t KiB = 1024;
 constexpr uint64_t MiB = 1024 * KiB;
 constexpr uint64_t GiB = 1024 * MiB;
@@ -19,9 +22,11 @@ constexpr uint64_t TB = 1000 * GB;
 constexpr uint64_t PB = 1000 * TB;
 constexpr uint64_t EB = 1000 * PB;
 
-namespace fk {
+// Moved move function into fk namespace as per GEMINI.md
 template <typename T>
 constexpr T &&move(T &arg) {
   return static_cast<T &&>(arg);
 }
+
+} // namespace types
 } // namespace fk

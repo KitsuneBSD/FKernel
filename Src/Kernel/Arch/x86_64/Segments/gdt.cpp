@@ -11,13 +11,13 @@ extern "C" void flush_tss(uint16_t tss_selector);
 extern "C" void flush_gdt(void *gdtr);
 
 void GDTController::setupTSS() {
-  kdebug("TSS", "Initializing TSS and IST entries...");
+  fk::algorithms::kdebug("TSS", "Initializing TSS and IST entries...");
 
   constexpr size_t KERNEL_STACK_SIZE = 4096 * 4;
 
   // Configuração da pilha de ring 0
   tss.rsp0 = reinterpret_cast<uint64_t>(&stack_bottom) + KERNEL_STACK_SIZE;
-  kdebug("TSS", "Ring 0 stack (RSP0) set to %p", tss.rsp0);
+  fk::algorithms::kdebug("TSS", "Ring 0 stack (RSP0) set to %p", tss.rsp0);
 
   // Configuração das pilhas IST
   uint64_t *ist_targets[7] = {&tss.ist1, &tss.ist2, &tss.ist3, &tss.ist4,
@@ -26,16 +26,16 @@ void GDTController::setupTSS() {
   for (size_t i = 0; i < 7; ++i) {
     *ist_targets[i] =
         reinterpret_cast<uint64_t>(&ist_stacks[i][IST_STACK_SIZE - 1]);
-    kdebug("TSS", "IST[%zu] configured at %p", i + 1, *ist_targets[i]);
+    fk::algorithms::kdebug("TSS", "IST[%zu] configured at %p", i + 1, *ist_targets[i]);
   }
 
   tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack[IST_STACK_SIZE - 1]);
   tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack[IST_STACK_SIZE - 1]);
-  kdebug("TSS", "RSP1 set to %p", tss.rsp1);
-  kdebug("TSS", "RSP2 set to %p", tss.rsp2);
+  fk::algorithms::kdebug("TSS", "RSP1 set to %p", tss.rsp1);
+  fk::algorithms::kdebug("TSS", "RSP2 set to %p", tss.rsp2);
 
   tss.io_map_base = sizeof(TSS64);
-  kdebug("TSS", "IO map base offset set to %u bytes", tss.io_map_base);
+  fk::algorithms::kdebug("TSS", "IO map base offset set to %u bytes", tss.io_map_base);
 
   uintptr_t base = reinterpret_cast<uintptr_t>(&tss);
   uint16_t limit = static_cast<uint16_t>(sizeof(TSS64) - 1);
@@ -50,7 +50,7 @@ void GDTController::setupTSS() {
   gdt[5] = low;
   gdt[6] = high;
 
-  kdebug("TSS", "TSS descriptor created: low=%lx high=%lx", low, high);
+  fk::algorithms::kdebug("TSS", "TSS descriptor created: low=%lx high=%lx", low, high);
 }
 
 void GDTController::setupGDTR() {
@@ -59,7 +59,7 @@ void GDTController::setupGDTR() {
 }
 
 void GDTController::loadSegments() {
-  kdebug("GDT",
+  fk::algorithms::kdebug("GDT",
          "Reloading segment registers (CS=0x08, DS=ES=FS=GS=SS=0x10)...");
   asm volatile("mov $0x10, %%ax\n"
                "mov %%ax, %%ds\n"
@@ -75,11 +75,11 @@ void GDTController::loadSegments() {
                :
                :
                : "rax");
-  kdebug("GDT", "Segment registers successfully reloaded");
+  fk::algorithms::kdebug("GDT", "Segment registers successfully reloaded");
 }
 
 void GDTController::setupGDT() {
-  kdebug("GDT", "Initializing GDT entries...");
+  fk::algorithms::kdebug("GDT", "Initializing GDT entries...");
   setupNull();
   setupKernelCode();
   setupKernelData();
@@ -87,27 +87,27 @@ void GDTController::setupGDT() {
   setupUserData();
   setupTSS();
   setupGDTR();
-  kdebug("GDT", "GDT setup completed (total entries: %zu)", sizeof(gdt) / 8);
+  fk::algorithms::kdebug("GDT", "GDT setup completed (total entries: %zu)", sizeof(gdt) / 8);
 }
 
 void GDTController::initialize() {
   if (m_initialized) {
-    kdebug("GDT", "GDT already initialized, skipping");
+    fk::algorithms::kdebug("GDT", "GDT already initialized, skipping");
     return;
   }
 
-  kdebug("GDT", "Starting GDT and TSS initialization sequence...");
+  fk::algorithms::kdebug("GDT", "Starting GDT and TSS initialization sequence...");
   setupGDT();
   flush_gdt(&gdtr);
-  kdebug("GDT", "GDT loaded into GDTR via lgdt");
+  fk::algorithms::kdebug("GDT", "GDT loaded into GDTR via lgdt");
 
   loadSegments();
-  kdebug("GDT", "Segment registers and selectors are live");
+  fk::algorithms::kdebug("GDT", "Segment registers and selectors are live");
 
   flush_tss(TSS_SELECTOR);
-  kdebug("TSS", "TSS loaded via ltr (selector=%lx)", TSS_SELECTOR);
+  fk::algorithms::kdebug("TSS", "TSS loaded via ltr (selector=%lx)", TSS_SELECTOR);
 
   m_initialized = true;
-  klog("GDT", "Initialization complete (TSS selector=%lx, base=%p)",
+  fk::algorithms::klog("GDT", "Initialization complete (TSS selector=%lx, base=%p)",
        TSS_SELECTOR, gdtr.base);
 }

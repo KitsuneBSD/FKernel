@@ -13,8 +13,8 @@
  */
 class CPU {
 private:
-  String m_vendor;
-  String m_brand;
+  fk::text::String m_vendor;
+  fk::text::String m_brand;
   bool m_has_apic = false;
   bool m_has_x2apic = false;
   bool m_has_hpet = false;
@@ -31,8 +31,8 @@ public:
 
   CPU();
 
-  String get_vendor() const { return m_vendor; }
-  String get_brand() const { return m_brand; }
+  fk::text::String get_vendor() const { return m_vendor; }
+  fk::text::String get_brand() const { return m_brand; }
   bool has_apic() const { return m_has_apic; }
   bool has_x2apic() const { return m_has_x2apic; }
   bool has_hpet() const { return m_has_hpet; }

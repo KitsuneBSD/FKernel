@@ -5,6 +5,9 @@
 #include <LibFK/Types/types.h>
 #include <LibFK/new.h>
 
+namespace fk {
+namespace containers {
+
 template <typename T, size_t MaxBits> class Bitmap {
 private:
   size_t m_size;
@@ -58,3 +61,6 @@ public:
 
   bool is_empty() const noexcept { return m_size == 0; }
 };
+
+} // namespace containers
+} // namespace fk

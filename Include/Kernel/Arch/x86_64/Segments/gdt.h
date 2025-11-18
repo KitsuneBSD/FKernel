@@ -20,33 +20,33 @@ private:
   GDTR gdtr = {};        ///< GDTR structure
   void setupNull() {
     gdt[0] = 0;
-    kdebug("GDT", "Null descriptor initialized");
+    fk::algorithms::kdebug("GDT", "Null descriptor initialized");
   }
 
   void setupKernelCode() {
     gdt[1] =
         createSegment(SegmentAccess::Ring0Code,
                       SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-    kdebug("GDT", "Kernel code segment configured (selector=0x08)");
+    fk::algorithms::kdebug("GDT", "Kernel code segment configured (selector=0x08)");
   }
 
   void setupKernelData() {
     gdt[2] =
         createSegment(SegmentAccess::Ring0Data, SegmentFlags::Granularity4K);
-    kdebug("GDT", "Kernel data segment configured (selector=0x10)");
+    fk::algorithms::kdebug("GDT", "Kernel data segment configured (selector=0x10)");
   }
 
   void setupUserCode() {
     gdt[3] =
         createSegment(SegmentAccess::Ring3Code,
                       SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-    kdebug("GDT", "User code segment configured (selector=0x18)");
+    fk::algorithms::kdebug("GDT", "User code segment configured (selector=0x18)");
   }
 
   void setupUserData() {
     gdt[4] =
         createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
-    kdebug("GDT", "User data segment configured (selector=0x20)");
+    fk::algorithms::kdebug("GDT", "User data segment configured (selector=0x20)");
   }
   void setupTSS();     ///< Setup TSS descriptor
   void setupGDT();     ///< Setup all GDT entries

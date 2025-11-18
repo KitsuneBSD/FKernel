@@ -3,6 +3,7 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Container/string.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Container/string.h>
 
 class HardwareInterrupt {
 public:
@@ -10,7 +11,7 @@ public:
   virtual void mask_interrupt(uint8_t interrupt_number) = 0;
   virtual void unmask_interrupt(uint8_t interrupt_number) = 0;
   virtual void send_eoi(uint8_t interrupt_number) = 0;
-  virtual String get_name() = 0;
+  virtual fk::text::String get_name() = 0;
   virtual ~HardwareInterrupt() = default;
 };
 
@@ -42,6 +43,6 @@ public:
     m_has_memory_manager = is_memory_manager;
   }
 
-  String get_name() { return m_controller ? m_controller->get_name() : "None"; }
+  fk::text::String get_name() { return m_controller ? m_controller->get_name() : "None"; }
   HardwareInterrupt *get_m_controller() { return m_controller; }
 };

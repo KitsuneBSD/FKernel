@@ -3,6 +3,9 @@
 #include <LibC/stddef.h>
 #include <LibC/string.h> // For strlen, memcmp
 
+namespace fk {
+namespace text { // As per GEMINI.md
+
 /**
  * @brief Non-owning view over a constant character sequence.
  *
@@ -169,3 +172,6 @@ private:
     const char* m_data;
     size_type m_size;
 };
+
+} // namespace text
+} // namespace fk

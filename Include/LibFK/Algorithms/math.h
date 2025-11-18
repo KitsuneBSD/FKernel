@@ -2,6 +2,9 @@
 
 #include <LibFK/Traits/type_traits.h>
 
+namespace fk {
+namespace algorithms {
+
 template <typename T> T floor(T x, T y) {
   static_assert(is_integral<T>::value, "T must be a integral value");
 
@@ -12,3 +15,6 @@ template <typename T> T floor(T x, T y) {
 
   return q;
 }
+
+} // namespace algorithms
+} // namespace fk

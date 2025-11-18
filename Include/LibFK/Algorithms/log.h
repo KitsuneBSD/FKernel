@@ -3,6 +3,9 @@
 #include <LibC/stdarg.h>
 #include <LibC/stdio.h>
 
+namespace fk {
+namespace algorithms { // Or fk::logging if preferred
+
 /** ANSI color codes for kernel logging */
 #define KLOG_COLOR_RESET "\033[0m"
 #define KLOG_COLOR_RED "\033[31m"
@@ -121,3 +124,6 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
 /// In release mode, klog_color does nothing
 #define klog_color(...)
 #endif
+
+} // namespace algorithms
+} // namespace fk

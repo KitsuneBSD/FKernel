@@ -43,7 +43,7 @@ private:
    * deallocation of memory blocks. The template parameter 65536 specifies
    * the maximum number of nodes in the tree.
    */
-  rb_tree<PhysicalMemoryRange, 65536> m_memory_ranges;
+  fk::containers::rb_tree<PhysicalMemoryRange, 65536> m_memory_ranges;
 
   /**
    * @brief Indicates whether the memory manager has been initialized.
@@ -88,8 +88,8 @@ private:
    * @param addr_hint A hint for the desired memory address.
    * @return An integer indicating the success or failure of the allocation.
    */
-  int alloc_from_node(rb_node<PhysicalMemoryRange> *node, size_t count,
-                      uintptr_t addr_hint);
+  int alloc_from_node(fk::containers::rb_node<PhysicalMemoryRange> *node,
+                      size_t count, uintptr_t addr_hint);
 
 public:
   /**
