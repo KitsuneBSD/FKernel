@@ -16,7 +16,7 @@ if not FileExists("logs") then
 end
 
 local MockOS = "build/FKernel-MockOS.iso"
-local HDA = "build/FKernel-HDA.qcow2"
+local HDA = "build/FKernel-HDA.raw"
 
 if not FileExists(MockOS) or not FileExists(HDA) then
 	local ok = RunCommand("xmake")
