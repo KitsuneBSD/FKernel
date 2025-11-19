@@ -112,20 +112,41 @@ struct Allocator {
   void initialize();
   void initialize(uint8_t *heap_start, uint8_t *heap_end);
 
-  // Group ChunkAllocators into a Pair to satisfy the two-instance-variable rule.
-  fk::utilities::Pair<fk::utilities::Pair<ChunkAllocator<8>, ChunkAllocator<16>>, fk::utilities::Pair<ChunkAllocator<4096>, ChunkAllocator<16384>>> allocators;
+  // Explicit ChunkAllocator members for power-of-two progression 8 to 32768 bytes.
+  ChunkAllocator<8> m_alloc8;
+  ChunkAllocator<16> m_alloc16;
+  ChunkAllocator<32> m_alloc32;
+  ChunkAllocator<64> m_alloc64;
+  ChunkAllocator<128> m_alloc128;
+  ChunkAllocator<256> m_alloc256;
+  ChunkAllocator<512> m_alloc512;
+  ChunkAllocator<1024> m_alloc1024;
+  ChunkAllocator<2048> m_alloc2048;
+  ChunkAllocator<4096> m_alloc4096;
+  ChunkAllocator<8192> m_alloc8192;
+  ChunkAllocator<16384> m_alloc16384;
+  ChunkAllocator<32768> m_alloc32768;
 
   // Group space and initialized flag into a Pair.
   fk::utilities::Pair<uint8_t *, bool> metadata;
 
-  // Helper methods to access the grouped allocators and metadata
-  ChunkAllocator<8>& alloc8() { return allocators.first.first; }
-  ChunkAllocator<16>& alloc16() { return allocators.first.second; }
-  ChunkAllocator<4096>& alloc4096() { return allocators.second.first; }
-  ChunkAllocator<16384>& alloc16384() { return allocators.second.second; }
+  // Helper methods to access the allocators and metadata
+  ChunkAllocator<8> &alloc8() { return m_alloc8; }
+  ChunkAllocator<16> &alloc16() { return m_alloc16; }
+  ChunkAllocator<32> &alloc32() { return m_alloc32; }
+  ChunkAllocator<64> &alloc64() { return m_alloc64; }
+  ChunkAllocator<128> &alloc128() { return m_alloc128; }
+  ChunkAllocator<256> &alloc256() { return m_alloc256; }
+  ChunkAllocator<512> &alloc512() { return m_alloc512; }
+  ChunkAllocator<1024> &alloc1024() { return m_alloc1024; }
+  ChunkAllocator<2048> &alloc2048() { return m_alloc2048; }
+  ChunkAllocator<4096> &alloc4096() { return m_alloc4096; }
+  ChunkAllocator<8192> &alloc8192() { return m_alloc8192; }
+  ChunkAllocator<16384> &alloc16384() { return m_alloc16384; }
+  ChunkAllocator<32768> &alloc32768() { return m_alloc32768; }
 
   uint8_t *&space() { return metadata.first; }
-  bool& initialized() { return metadata.second; }
+  bool &initialized() { return metadata.second; }
 };
 
 } // namespace containers

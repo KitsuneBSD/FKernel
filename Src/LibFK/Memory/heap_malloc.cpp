@@ -32,10 +32,28 @@ void Allocator::initialize() {
               ChunkAllocator<8>::capacityInBytes();
   required += ChunkAllocator<16>::sizeOfAllocationBitmapInBytes() +
               ChunkAllocator<16>::capacityInBytes();
+  required += ChunkAllocator<32>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<32>::capacityInBytes();
+  required += ChunkAllocator<64>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<64>::capacityInBytes();
+  required += ChunkAllocator<128>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<128>::capacityInBytes();
+  required += ChunkAllocator<256>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<256>::capacityInBytes();
+  required += ChunkAllocator<512>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<512>::capacityInBytes();
+  required += ChunkAllocator<1024>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<1024>::capacityInBytes();
+  required += ChunkAllocator<2048>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<2048>::capacityInBytes();
   required += ChunkAllocator<4096>::sizeOfAllocationBitmapInBytes() +
               ChunkAllocator<4096>::capacityInBytes();
+  required += ChunkAllocator<8192>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<8192>::capacityInBytes();
   required += ChunkAllocator<16384>::sizeOfAllocationBitmapInBytes() +
               ChunkAllocator<16384>::capacityInBytes();
+  required += ChunkAllocator<32768>::sizeOfAllocationBitmapInBytes() +
+              ChunkAllocator<32768>::capacityInBytes();
 
   ASSERT(heap_size >= required);
   auto space = reinterpret_cast<uint64_t *>(heap_start);
@@ -43,10 +61,28 @@ void Allocator::initialize() {
   heap_allocator().alloc8().initialize(space);
   heap_allocator().alloc16().initialize(
       heap_allocator().alloc8().addressAfterThisAllocator());
-  heap_allocator().alloc4096().initialize(
+  heap_allocator().alloc32().initialize(
       heap_allocator().alloc16().addressAfterThisAllocator());
-  heap_allocator().alloc16384().initialize(
+  heap_allocator().alloc64().initialize(
+      heap_allocator().alloc32().addressAfterThisAllocator());
+  heap_allocator().alloc128().initialize(
+      heap_allocator().alloc64().addressAfterThisAllocator());
+  heap_allocator().alloc256().initialize(
+      heap_allocator().alloc128().addressAfterThisAllocator());
+  heap_allocator().alloc512().initialize(
+      heap_allocator().alloc256().addressAfterThisAllocator());
+  heap_allocator().alloc1024().initialize(
+      heap_allocator().alloc512().addressAfterThisAllocator());
+  heap_allocator().alloc2048().initialize(
+      heap_allocator().alloc1024().addressAfterThisAllocator());
+  heap_allocator().alloc4096().initialize(
+      heap_allocator().alloc2048().addressAfterThisAllocator());
+  heap_allocator().alloc8192().initialize(
       heap_allocator().alloc4096().addressAfterThisAllocator());
+  heap_allocator().alloc16384().initialize(
+      heap_allocator().alloc8192().addressAfterThisAllocator());
+  heap_allocator().alloc32768().initialize(
+      heap_allocator().alloc16384().addressAfterThisAllocator());
 
   heap_allocator().initialized() = true;
 }
@@ -59,15 +95,33 @@ fk::core::Result<uint64_t *, fk::core::Error> allocate(size_t size) {
     return heap_allocator().alloc8().allocate();
   if (size <= 16)
     return heap_allocator().alloc16().allocate();
+  if (size <= 32)
+    return heap_allocator().alloc32().allocate();
+  if (size <= 64)
+    return heap_allocator().alloc64().allocate();
+  if (size <= 128)
+    return heap_allocator().alloc128().allocate();
+  if (size <= 256)
+    return heap_allocator().alloc256().allocate();
+  if (size <= 512)
+    return heap_allocator().alloc512().allocate();
+  if (size <= 1024)
+    return heap_allocator().alloc1024().allocate();
+  if (size <= 2048)
+    return heap_allocator().alloc2048().allocate();
   if (size <= 4096)
     return heap_allocator().alloc4096().allocate();
+  if (size <= 8192)
+    return heap_allocator().alloc8192().allocate();
   if (size <= 16384)
     return heap_allocator().alloc16384().allocate();
+  if (size <= 32768)
+    return heap_allocator().alloc32768().allocate();
 
   fk::algorithms::kerror(
       "HEAP MALLOC",
       "Requested size %zu exceeds maximum supported allocation size.", size);
-  return fk::core::Error::OutOfMemory; // Or a more specific error if available
+  return fk::core::Error::OutOfMemory;
 }
 
 // Modified allocateZeroed to handle Result
@@ -94,12 +148,48 @@ void free(uint64_t *ptr) {
     heap_allocator().alloc16().free(ptr);
     return;
   }
+  if (heap_allocator().alloc32().isInAllocator(ptr)) {
+    heap_allocator().alloc32().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc64().isInAllocator(ptr)) {
+    heap_allocator().alloc64().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc128().isInAllocator(ptr)) {
+    heap_allocator().alloc128().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc256().isInAllocator(ptr)) {
+    heap_allocator().alloc256().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc512().isInAllocator(ptr)) {
+    heap_allocator().alloc512().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc1024().isInAllocator(ptr)) {
+    heap_allocator().alloc1024().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc2048().isInAllocator(ptr)) {
+    heap_allocator().alloc2048().free(ptr);
+    return;
+  }
   if (heap_allocator().alloc4096().isInAllocator(ptr)) {
     heap_allocator().alloc4096().free(ptr);
     return;
   }
+  if (heap_allocator().alloc8192().isInAllocator(ptr)) {
+    heap_allocator().alloc8192().free(ptr);
+    return;
+  }
   if (heap_allocator().alloc16384().isInAllocator(ptr)) {
     heap_allocator().alloc16384().free(ptr);
+    return;
+  }
+  if (heap_allocator().alloc32768().isInAllocator(ptr)) {
+    heap_allocator().alloc32768().free(ptr);
     return;
   }
 }
@@ -132,26 +222,46 @@ fk::core::Result<uint64_t *, fk::core::Error> reallocate(uint64_t *ptr,
     return fk::core::Error::NotFound; // Indicate pointer not found in this pool
   };
 
-  // Try reallocating in each pool
+  // Try reallocating in each pool (from smallest to largest)
   auto result8 = try_move(heap_allocator().alloc8());
-  if (!result8.is_error()) {
+  if (!result8.is_error())
     return result8;
-  }
-
   auto result16 = try_move(heap_allocator().alloc16());
-  if (!result16.is_error()) {
+  if (!result16.is_error())
     return result16;
-  }
-
+  auto result32 = try_move(heap_allocator().alloc32());
+  if (!result32.is_error())
+    return result32;
+  auto result64 = try_move(heap_allocator().alloc64());
+  if (!result64.is_error())
+    return result64;
+  auto result128 = try_move(heap_allocator().alloc128());
+  if (!result128.is_error())
+    return result128;
+  auto result256 = try_move(heap_allocator().alloc256());
+  if (!result256.is_error())
+    return result256;
+  auto result512 = try_move(heap_allocator().alloc512());
+  if (!result512.is_error())
+    return result512;
+  auto result1024 = try_move(heap_allocator().alloc1024());
+  if (!result1024.is_error())
+    return result1024;
+  auto result2048 = try_move(heap_allocator().alloc2048());
+  if (!result2048.is_error())
+    return result2048;
   auto result4096 = try_move(heap_allocator().alloc4096());
-  if (!result4096.is_error()) {
+  if (!result4096.is_error())
     return result4096;
-  }
-
+  auto result8192 = try_move(heap_allocator().alloc8192());
+  if (!result8192.is_error())
+    return result8192;
   auto result16384 = try_move(heap_allocator().alloc16384());
-  if (!result16384.is_error()) {
+  if (!result16384.is_error())
     return result16384;
-  }
+  auto result32768 = try_move(heap_allocator().alloc32768());
+  if (!result32768.is_error())
+    return result32768;
 
   // If pointer was not found in any of our managed pools, it's an error.
   fk::algorithms::kerror(
