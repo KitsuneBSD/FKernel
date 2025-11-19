@@ -2,10 +2,10 @@
 
 #include <LibC/string.h>
 #include <LibFK/Container/bitmap.h>
-#include <LibFK/Types/types.h>
-#include <LibFK/Utilities/pair.h> // Include Pair definition
-#include <LibFK/Core/Result.h>
 #include <LibFK/Core/Error.h>
+#include <LibFK/Core/Result.h>
+#include <LibFK/Types/types.h>
+#include <LibFK/Utilities/pair.h>
 
 namespace fk {
 namespace containers {
@@ -50,12 +50,12 @@ public:
     return (MaxChunks + 7) / 8;
   }
 
-  fk::core::Result<T*, fk::core::Error> allocate() noexcept {
+  fk::core::Result<T *, fk::core::Error> allocate() noexcept {
     for (size_t i = 0; i < MaxChunks; ++i) {
       if (!m_bitmap.get(i)) {
         m_bitmap.set(i, true);
         --m_free;
-        return fk::core::Result<T*>(pointerToChunk(i));
+        return fk::core::Result<T *>(pointerToChunk(i));
       }
     }
     // Allocation failed
@@ -112,7 +112,8 @@ struct Allocator {
   void initialize();
   void initialize(uint8_t *heap_start, uint8_t *heap_end);
 
-  // Explicit ChunkAllocator members for power-of-two progression 8 to 32768 bytes.
+  // Explicit ChunkAllocator members for power-of-two progression 8 to 32768
+  // bytes.
   ChunkAllocator<8> m_alloc8;
   ChunkAllocator<16> m_alloc16;
   ChunkAllocator<32> m_alloc32;

@@ -2,8 +2,8 @@
 
 #include <LibFK/Core/Error.h>
 #include <LibFK/Core/Result.h>
+#include <LibFK/Memory/new.h>
 #include <LibFK/Types/types.h>
-#include <LibFK/new.h>
 
 namespace fk {
 namespace memory {

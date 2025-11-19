@@ -2,7 +2,7 @@
 
 #include <LibC/stddef.h>
 #include <LibC/string.h>
-#include <LibFK/new.h>
+#include <LibFK/Memory/new.h>
 
 namespace fk {
 namespace memory {
@@ -36,18 +36,19 @@ public:
   /** @brief Default constructor: no value stored */
   constexpr optional() = default;
 
-
   /**
    * @brief Construct optional with a value (move semantics)
    * @param value Value to store
    */
-  optional(T &&value) : has_value_(true) { new (storage) T(static_cast<T&&>(value)); }
+  optional(T &&value) : has_value_(true) {
+    new (storage) T(static_cast<T &&>(value));
+  }
 
   /**
    * @brief Construct optional with a value (copy semantics)
    * @param val Value to store
    */
-  optional(const T& val) : has_value_(true) { new (storage) T(val); }
+  optional(const T &val) : has_value_(true) { new (storage) T(val); }
 
   /**
    * @brief Copy constructor
@@ -67,7 +68,7 @@ public:
    */
   optional(optional &&other) : has_value_(other.has_value_) {
     if (has_value_) {
-      new (storage) T(static_cast<T&&>(*other.ptr()));
+      new (storage) T(static_cast<T &&>(*other.ptr()));
       other.reset(); // Ensure the other optional is empty
     }
   }

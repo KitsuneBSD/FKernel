@@ -3,8 +3,8 @@
 #include <Kernel/Block/Partition/PartitionParsingStrategy.h>
 #include <Kernel/Block/PartitionManager.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Memory/new.h>
 #include <LibFK/Memory/own_ptr.h>
-#include <LibFK/new.h>
 
 PartitionManager::~PartitionManager() = default;
 

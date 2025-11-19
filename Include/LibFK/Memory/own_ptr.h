@@ -1,8 +1,8 @@
 #pragma once
 
-#include <LibFK/Types/types.h>
-#include <LibFK/new.h>
+#include <LibFK/Memory/new.h>
 #include <LibFK/Traits/type_traits.h>
+#include <LibFK/Types/types.h>
 
 namespace fk {
 namespace memory {
@@ -208,14 +208,15 @@ private:
  * @tparam T Type to construct
  * @tparam Args Constructor argument types
  * @param args Constructor arguments
- * @return fk::core::Result containing OwnPtr<T> on success, or OutOfMemory on failure.
+ * @return fk::core::Result containing OwnPtr<T> on success, or OutOfMemory on
+ * failure.
  */
 template <typename T, typename... Args>
 inline fk::core::Result<OwnPtr<T>, fk::core::Error> make_own(Args &&...args) {
   // In a freestanding environment, 'new' might return nullptr on failure.
-  T* ptr = new T(static_cast<Args &&>(args)...);
+  T *ptr = new T(static_cast<Args &&>(args)...);
   if (!ptr) { // Check if new returned nullptr
-      return fk::core::Error::OutOfMemory;
+    return fk::core::Error::OutOfMemory;
   }
   return fk::core::Result<OwnPtr<T>>(OwnPtr<T>(ptr));
 }
@@ -230,7 +231,8 @@ inline fk::core::Result<OwnPtr<T>, fk::core::Error> make_own(Args &&...args) {
  * @param ptr Raw pointer to adopt
  * @return OwnPtr<T> owning the object
  */
-template <typename T, typename = fk::traits::enable_if_t<!fk::traits::is_array_v<T>>>
+template <typename T,
+          typename = fk::traits::enable_if_t<!fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(T *ptr) {
   return OwnPtr<T>(ptr);
 }
@@ -245,7 +247,8 @@ inline OwnPtr<T> adopt_own(T *ptr) {
  * @param ptr Raw pointer to array to adopt (e.g., `uint8_t*`)
  * @return OwnPtr<T> owning the array
  */
-template <typename T, typename = fk::traits::enable_if_t<fk::traits::is_array_v<T>>>
+template <typename T,
+          typename = fk::traits::enable_if_t<fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(fk::traits::remove_extent_t<T> *ptr) {
   return OwnPtr<T>(ptr);
 }
