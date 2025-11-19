@@ -407,51 +407,6 @@ if (auto proc = find_process(pid); proc.has_value())
 
 ---
 
-## Testing Requirements
-
-The test need be run on real runtime, so you need create mocks to internal functionalities
-
-### All Public APIs Must Have Tests
-
-```cpp
-// For LibC: tests/libc/test_string.cpp
-TEST(memcpy, copies_data_correctly) {
-    char src[10] = "hello";
-    char dst[10];
-    memcpy(dst, src, 6);
-    EXPECT_STREQ(dst, "hello");
-}
-
-TEST(memcpy, handles_zero_size) {
-    char dst[10] = "world";
-    memcpy(dst, "hello", 0);
-    EXPECT_STREQ(dst, "world");  // Unchanged
-}
-
-// For LibFK: tests/libfk/test_vector.cpp
-TEST(Vector, push_back_increases_size) {
-    fk::Vector v;
-    v.push_back(42);
-    EXPECT_EQ(v.size(), 1);
-    EXPECT_EQ(v[0], 42);
-}
-
-// For Kernel: tests/kernel/test_pmm.cpp
-TEST(PhysicalMemory, allocates_pages) {
-    auto page = fkernel::memory::Physical::allocate_page();
-    EXPECT(page.is_ok());
-    EXPECT(page.value() != nullptr);
-}
-```
-
-### Test Coverage Goals
-
-- **LibC**: 90%+ coverage
-- **LibFK**: 85%+ coverage
-- **Kernel critical paths**: 75%+ coverage
-
----
-
 ## Performance Considerations
 
 ### Kernel Code Optimization

@@ -1,11 +1,9 @@
 #pragma once
 
+#include <Kernel/Block/BlockDevice.h>
 #include <Kernel/Driver/Ata/AtaDefs.h>
-#include <LibFK/Types/types.h>
-
-#pragma once
-
-#include <Kernel/Driver/Ata/AtaDefs.h>
+#include <LibFK/Container/static_vector.h>
+#include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Types/types.h>
 
 /**
@@ -64,6 +62,8 @@ private:
    */
   int write_sectors_pio(Bus bus, Drive drive, uint32_t lba,
                         uint8_t sector_count, const void *buffer);
+
+  fk::containers::static_vector<fk::memory::RetainPtr<BlockDevice>, 16> m_devices;
 
 public:
   /**

@@ -1,10 +1,9 @@
 #pragma once
 
 #include <Kernel/Block/BlockDevice.h>
-#include <Kernel/Block/PartitionDevice.h>
+#include <Kernel/Block/PartitionDeviceList.h>
 #include <Kernel/Block/PartitionEntry.h>
 
-#include <LibFK/Container/static_vector.h>
 #include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Memory/retain_ptr.h>
 
@@ -24,8 +23,7 @@ public:
    *
    * @param device The block device to manage.
    */
-  explicit PartitionManager(fk::memory::RetainPtr<BlockDevice> dev)
-      : m_device(fk::types::move(dev)) {}
+  explicit PartitionManager(fk::memory::RetainPtr<BlockDevice> device);
   ~PartitionManager();
 
   /**
@@ -41,17 +39,28 @@ public:
    * This method will parse the partition table of the block device and create
    * PartitionDevice instances for each valid partition found.
    *
-   * @return A vector of RetainPtrs to the created PartitionDevice objects.
-   *         Returns an empty vector if no strategy is set or no partitions
+   * @return A list of created PartitionDevice objects.
+   *         Returns an empty list if no strategy is set or no partitions
    *         are found.
    */
-  fk::containers::static_vector<fk::memory::RetainPtr<PartitionBlockDevice>, 16>
-  detect_partitions(); // Changed from StaticVector and PartitionDevice
+  PartitionDeviceList detect_partitions();
 
 private:
+  enum class PartitionScheme {
+      Unknown,
+      MBR,
+      GPT,
+  };
+
   fk::memory::RetainPtr<BlockDevice> m_device;
   fk::memory::OwnPtr<PartitionParsingStrategy> m_strategy;
 
   bool is_mbr(const uint8_t *sector) const;
   bool is_gpt(const uint8_t *sector) const;
+  
+  bool read_sector(uint8_t* buffer, uint64_t lba) const;
+  PartitionScheme detect_scheme(const uint8_t* sector0) const;
+  void set_strategy_for_scheme(PartitionScheme scheme);
+  fk::memory::OwnPtr<uint8_t[]> prepare_gpt_parsing_data(const uint8_t* sector1_header) const;
+  PartitionDeviceList create_devices_from_entries(const PartitionEntry* entries, int count);
 };

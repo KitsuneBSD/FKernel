@@ -21,7 +21,7 @@ int AtaBlockDevice::close(VNode *vnode, FileDescriptor *fd) {
 }
 
 int AtaBlockDevice::read(VNode *vnode, FileDescriptor *fd, void *buffer,
-                         size_t size, size_t offset) {
+                         size_t size, size_t offset) const {
   (void)vnode; // Silence unused parameter warning
   (void)fd;
   if (!this->m_device_info.exists)

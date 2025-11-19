@@ -33,7 +33,7 @@ public:
    * @return Number of bytes read on success, negative error code on failure.
    */
   virtual int read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size,
-                   size_t offset) = 0;
+                   size_t offset) const = 0;
 
   /**
    * @brief Writes data to the block device.

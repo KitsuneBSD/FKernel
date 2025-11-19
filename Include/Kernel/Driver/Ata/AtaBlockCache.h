@@ -38,7 +38,7 @@ public:
      * @param lba Logical Block Address of the sector
      * @return Pointer to the cached sector data
      */
-    uint8_t *get_sector(AtaDeviceInfo *device, uint32_t lba);
+    uint8_t *get_sector(const AtaDeviceInfo *device, uint32_t lba);
 
     /**
      * @brief Mark a cached sector as dirty
@@ -52,5 +52,5 @@ public:
      * 
      * @param device Pointer to the ATA device
      */
-    void flush(AtaDeviceInfo *device);
+    void flush(const AtaDeviceInfo *device);
 };

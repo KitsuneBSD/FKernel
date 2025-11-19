@@ -76,6 +76,10 @@ void AtaController::detect_devices() {
       fk::memory::RetainPtr<AtaBlockDevice> ata_block_dev =
           fk::memory::adopt_retain(new AtaBlockDevice(device_info));
 
+      // Store the retained device in the controller's list to manage its lifetime.
+      // Explicitly construct RetainPtr<BlockDevice> from RetainPtr<AtaBlockDevice> to handle the base-derived conversion.
+      m_devices.push_back(fk::memory::RetainPtr<BlockDevice>(fk::types::move(ata_block_dev)));
+
       char name[16];
       snprintf(name, sizeof(name), "ada%d", device_index);
 

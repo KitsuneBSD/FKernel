@@ -31,4 +31,12 @@ struct GptEntry {
 class GptPartitionStrategy : public PartitionParsingStrategy {
 public:
   int parse(const void *sector512, PartitionEntry *out, int max_out) override;
+
+private:
+    bool are_arguments_valid(const void* sector512, const PartitionEntry* out, int max_out) const;
+    bool is_header_valid(const GptHeader* header) const;
+    bool is_partition_array_valid(const GptHeader* header, const uint8_t* partition_array_start) const;
+    int populate_entries(const GptHeader* header, const uint8_t* partition_array_start, PartitionEntry* out, int max_out) const;
+    bool is_entry_empty(const GptEntry& entry) const;
+    void convert_gpt_entry(const GptEntry& gpt_entry, PartitionEntry& partition_entry) const;
 };

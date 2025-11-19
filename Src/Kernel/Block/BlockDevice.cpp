@@ -11,34 +11,34 @@ static inline BlockDevice *get_block_device(VNode *vnode) {
   return reinterpret_cast<BlockDevice *>(vnode->fs_private);
 }
 
-static int block_device_read(VNode *vnode, FileDescriptor *fd, void *buffer,
+static int block_device_read(VNode *vnode, FileDescriptor *file_descriptor, void *buffer,
                              size_t size, size_t offset) {
-  BlockDevice *dev = get_block_device(vnode);
-  if (!dev)
+  BlockDevice *device = get_block_device(vnode);
+  if (!device)
     return -1;
-  return dev->read(vnode, fd, buffer, size, offset);
+  return device->read(vnode, file_descriptor, buffer, size, offset);
 }
 
-static int block_device_write(VNode *vnode, FileDescriptor *fd,
+static int block_device_write(VNode *vnode, FileDescriptor *file_descriptor,
                               const void *buffer, size_t size, size_t offset) {
-  BlockDevice *dev = get_block_device(vnode);
-  if (!dev)
+  BlockDevice *device = get_block_device(vnode);
+  if (!device)
     return -1;
-  return dev->write(vnode, fd, buffer, size, offset);
+  return device->write(vnode, file_descriptor, buffer, size, offset);
 }
 
-static int block_device_open(VNode *vnode, FileDescriptor *fd, int flags) {
-  BlockDevice *dev = get_block_device(vnode);
-  if (!dev)
+static int block_device_open(VNode *vnode, FileDescriptor *file_descriptor, int flags) {
+  BlockDevice *device = get_block_device(vnode);
+  if (!device)
     return -1;
-  return dev->open(vnode, fd, flags);
+  return device->open(vnode, file_descriptor, flags);
 }
 
-static int block_device_close(VNode *vnode, FileDescriptor *fd) {
-  BlockDevice *dev = get_block_device(vnode);
-  if (!dev)
+static int block_device_close(VNode *vnode, FileDescriptor *file_descriptor) {
+  BlockDevice *device = get_block_device(vnode);
+  if (!device)
     return -1;
-  return dev->close(vnode, fd);
+  return device->close(vnode, file_descriptor);
 }
 
 // Initialize the global VNodeOps for block devices

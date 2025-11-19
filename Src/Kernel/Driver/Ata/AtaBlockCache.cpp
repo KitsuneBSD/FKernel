@@ -8,7 +8,7 @@ AtaCache &AtaCache::the() {
   return inst;
 }
 
-uint8_t *AtaCache::get_sector(AtaDeviceInfo *device, uint32_t lba) {
+uint8_t *AtaCache::get_sector(const AtaDeviceInfo *device, uint32_t lba) {
   for (auto &entry : cache) {
     if (entry.is_valid && entry.lba == lba) {
       return entry.data;
@@ -43,7 +43,7 @@ void AtaCache::mark_dirty(uint32_t lba) {
   }
 }
 
-void AtaCache::flush(AtaDeviceInfo *device) {
+void AtaCache::flush(const AtaDeviceInfo *device) {
   for (auto &entry : cache) {
     if (entry.is_valid && entry.is_dirty) {
       AtaController::the().write_sectors_pio(*device, entry.lba, 1, entry.data);

@@ -1,12 +1,12 @@
 #include <Kernel/Block/Partition/BsdPartition.h>
 #include <LibFK/Algorithms/log.h>
 
-int BsdPartitionStrategy::parse(const void *sector512, PartitionEntry *out,
-                                int max_out) {
+int BsdPartitionStrategy::parse(const void *sector512, PartitionEntry *output_partitions,
+                                int max_partitions) {
   (void)sector512;
-  (void)out;
-  (void)max_out;
+  (void)output_partitions;
+  (void)max_partitions;
 
-  fk::algorithms::kwarn("BSD DISK LABEL", "We need implement this");
+  fk::algorithms::klog("BSD", "BSD partition parsing is not yet implemented.");
   return 0;
 }

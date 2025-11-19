@@ -21,7 +21,7 @@ public:
   int close(VNode *vnode, FileDescriptor *fd) override;
 
   int read(VNode *vnode, FileDescriptor *fd, void *buffer, size_t size,
-           size_t offset) override;
+           size_t offset) const override;
 
   int write(VNode *vnode, FileDescriptor *fd, const void *buffer, size_t size,
             size_t offset) override;

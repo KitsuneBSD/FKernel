@@ -3,7 +3,7 @@ set_policy("check.auto_ignore_flags", false)
 set_targetdir("build")
 set_objectdir("build/objs")
 
-set_languages("cxx20")
+set_languages("cxx20", "c17")
 
 local flags = {
 	general = {
@@ -51,6 +51,8 @@ local flags = {
 
 local kernel_non_architecture_related = {
 	"Src/Kernel/Block/**.cpp",
+	"Src/Kernel/Block/PartitionDeviceList.cpp",
+	"Src/Kernel/Block/PartitionLocation.cpp",
 	"Src/Kernel/Driver/**.cpp",
 	"Src/Kernel/FileSystem/**.cpp",
 	"Src/Kernel/Hardware/**.cpp",
@@ -129,8 +131,4 @@ on_clean(function(target)
 	os.execv("rm -rf build")
 end)
 
-target_end()
-
-target("test")
-set_default(false)
 target_end()

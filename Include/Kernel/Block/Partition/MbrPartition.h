@@ -15,4 +15,10 @@ struct MbrEntry {
 class MbrPartitionStrategy : public PartitionParsingStrategy {
 public:
   int parse(const void *sector512, PartitionEntry *out, int max_out) override;
+private:
+    bool are_arguments_valid(const void* sector512, const PartitionEntry* out, int max_out) const;
+    bool has_valid_signature(const uint8_t* data) const;
+    int populate_entries(const MbrEntry* entries, PartitionEntry* out, int max_out) const;
+    bool is_entry_valid(const MbrEntry& entry) const;
+    void convert_mbr_entry(const MbrEntry& mbr_entry, PartitionEntry& partition_entry) const;
 };
