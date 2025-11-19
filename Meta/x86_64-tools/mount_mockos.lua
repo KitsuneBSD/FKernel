@@ -9,29 +9,7 @@ local grub_dir = "build/mockos/boot/grub"
 local grub_cfg = "Config/grub.cfg"
 local kernel_bin = "build/FKernel.bin"
 local fkernel_mockos = "build/FKernel-MockOS.iso"
-local hda_path = "build/FKernel-HDA.raw"
-
-local function InitDiskGPTFAT32(disk)
-	PrintMessage(false, "Initializing GPT + FAT32...")
-
-	RunCommand("parted -s " .. disk .. " mklabel gpt")
-	RunCommand("parted -s " .. disk .. " mkpart EFI fat32 1MiB 512MiB")
-	RunCommand("parted -s " .. disk .. " set 1 esp on")
-
-	local loop = CaptureCommand("losetup --find --show --partscan " .. disk):gsub("\n", "")
-	if loop == "" then
-		PrintMessage(true, "Failed to setup loop device")
-		os.exit(1)
-	end
-
-	local part1 = loop .. "p1"
-
-	RunCommand("mkfs.fat -F32 " .. part1)
-
-	RunCommand("losetup -d " .. loop)
-
-	PrintMessage(false, "Disk initialized (GPT + FAT32 on partition 1)")
-end
+local hda_path = "build/FKernel-HDA.qcow2"
 
 RunCommand("rm -rf build/mockos")
 RunCommand("mkdir -p " .. grub_dir)
@@ -69,9 +47,8 @@ else
 end
 
 if not FileExists(hda_path) then
-	RunCommand("qemu-img create -f raw " .. hda_path .. " 4G >/dev/null 2>&1")
-	PrintMessage(false, "Disk image (RAW) created")
-	InitDiskGPTFAT32(hda_path)
+	RunCommand("qemu-img create -f qcow2 " .. hda_path .. " 4G >/dev/null 2>&1")
+	PrintMessage(false, "Disk image (qcow2) created")
 end
 
 PrintMessage(false, "FKernel build completed")

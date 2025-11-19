@@ -5,6 +5,8 @@ require("Meta.Lib.print_message")
 require("Meta.Lib.run_command")
 
 local is_graphical_mode = true
+local MockOS = "build/FKernel-MockOS.iso"
+local HDA = "build/FKernel-HDA.qcow2"
 
 if not CommandExists("qemu-system-x86_64") then
 	PrintMessage(true, "qemu-system-x86_64 not found. Please install it before running this script.")
@@ -14,10 +16,6 @@ end
 if not FileExists("logs") then
 	RunCommand("mkdir -p logs/")
 end
-
-local MockOS = "build/FKernel-MockOS.iso"
-local HDA = "build/FKernel-HDA.raw"
-
 if not FileExists(MockOS) or not FileExists(HDA) then
 	local ok = RunCommand("xmake")
 	if not ok then
