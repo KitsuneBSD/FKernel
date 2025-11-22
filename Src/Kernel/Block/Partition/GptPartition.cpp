@@ -68,6 +68,7 @@ void GptPartitionStrategy::convert_gpt_entry(const GptEntry& gpt_entry, Partitio
     partition_entry.is_bootable = false; // GPT has different boot attributes
     partition_entry.has_chs = false;
     // CHS fields are not applicable for GPT, leave them uninitialized or zeroed if needed elsewhere.
+    fk::algorithms::kdebug("GPT", "Converted GPT entry. LBA Start: %lu, Sector Count: %lu.", partition_entry.lba_start, partition_entry.lba_count);
 }
 
 int GptPartitionStrategy::populate_entries(const GptHeader* hdr, const uint8_t* partition_array_start, PartitionEntry* output_partitions, int max_partitions) const {

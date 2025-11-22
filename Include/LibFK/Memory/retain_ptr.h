@@ -3,6 +3,7 @@
 #include <LibFK/Core/Error.h>
 #include <LibFK/Core/Result.h>
 #include <LibFK/Memory/new.h>
+#include <LibFK/Traits/type_traits.h> // Added missing include
 #include <LibFK/Types/types.h>
 
 namespace fk {
@@ -58,7 +59,7 @@ public:
    * @param other Another RetainPtr
    */
   template <typename U>
-  RetainPtr(const RetainPtr<U> &other) : m_ptr(static_cast<T *>(other.get())) {
+  RetainPtr(const RetainPtr<U> &other) : m_ptr(const_cast<T *>(static_cast<const T *>(other.get()))) {
     if (m_ptr)
       m_ptr->retain();
   }

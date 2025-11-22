@@ -4,6 +4,7 @@
 
 int EbrPartitionStrategy::parse(const void *sector512, PartitionEntry *output_partitions,
                                 int max_partitions) {
+  fk::algorithms::klog("EBR", "Attempting to parse EBR partition table.");
   (void)sector512;
   (void)output_partitions;
   (void)max_partitions;

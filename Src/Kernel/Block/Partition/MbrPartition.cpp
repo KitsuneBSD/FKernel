@@ -32,6 +32,7 @@ void MbrPartitionStrategy::convert_mbr_entry(const MbrEntry& mbr_entry, Partitio
     partition_entry.has_chs = true;
     memcpy(partition_entry.chs_start, mbr_entry.start_chs, sizeof(mbr_entry.start_chs));
     memcpy(partition_entry.chs_end, mbr_entry.end_chs, sizeof(mbr_entry.end_chs));
+    fk::algorithms::kdebug("MBR", "Converted MBR entry. Type: 0x%x, LBA Start: %u, Sector Count: %u.", static_cast<uint8_t>(partition_entry.type), partition_entry.lba_start, partition_entry.lba_count);
 }
 
 int MbrPartitionStrategy::populate_entries(const MbrEntry* entries, PartitionEntry* output_partitions, int max_partitions) const {
