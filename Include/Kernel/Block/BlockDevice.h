@@ -67,6 +67,26 @@ public:
    */
   virtual int close(VNode *vnode, FileDescriptor *fd) = 0;
 
+  /**
+   * @brief Reads raw sectors from the block device.
+   *
+   * @param lba Starting Logical Block Address.
+   * @param sector_count Number of sectors to read.
+   * @param buffer Destination buffer.
+   * @return Number of sectors read on success, negative error code on failure.
+   */
+  virtual int read_sectors(uint32_t lba, uint8_t sector_count, void* buffer) const = 0;
+
+  /**
+   * @brief Writes raw sectors to the block device.
+   *
+   * @param lba Starting Logical Block Address.
+   * @param sector_count Number of sectors to write.
+   * @param buffer Source buffer.
+   * @return Number of sectors written on success, negative error code on failure.
+   */
+  virtual int write_sectors(uint32_t lba, uint8_t sector_count, const void* buffer) = 0;
+
   virtual ~BlockDevice() = default;
 
   // Reference counting for RetainPtr

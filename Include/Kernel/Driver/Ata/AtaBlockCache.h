@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Block/BlockDevice.h> // Include BlockDevice
 #include <Kernel/Driver/Ata/AtaDefs.h>
 #include <LibFK/Types/types.h>
 
@@ -34,11 +35,11 @@ public:
     /**
      * @brief Retrieve a sector from the cache or read it from the device
      * 
-     * @param device Pointer to the ATA device
+     * @param device Pointer to the BlockDevice
      * @param lba Logical Block Address of the sector
      * @return Pointer to the cached sector data
      */
-    uint8_t *get_sector(const AtaDeviceInfo *device, uint32_t lba);
+    uint8_t *get_sector(const BlockDevice *device, uint32_t lba);
 
     /**
      * @brief Mark a cached sector as dirty
@@ -48,9 +49,9 @@ public:
     void mark_dirty(uint32_t lba);
 
     /**
-     * @brief Flush all dirty sectors to the physical ATA device
+     * @brief Flush all dirty sectors to the physical BlockDevice
      * 
-     * @param device Pointer to the ATA device
+     * @param device Pointer to the BlockDevice
      */
-    void flush(const AtaDeviceInfo *device);
+    void flush(BlockDevice *device);
 };

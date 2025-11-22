@@ -64,9 +64,10 @@ bool GptPartitionStrategy::is_entry_empty(const GptEntry& entry) const {
 void GptPartitionStrategy::convert_gpt_entry(const GptEntry& gpt_entry, PartitionEntry& partition_entry) const {
     partition_entry.lba_start = gpt_entry.first_lba;
     partition_entry.lba_count = (gpt_entry.last_lba - gpt_entry.first_lba) + 1;
-    partition_entry.type = 0;
-    partition_entry.is_bootable = false;
+    partition_entry.type = PartitionType::Unknown; // GPT uses GUIDs, not MBR-style types
+    partition_entry.is_bootable = false; // GPT has different boot attributes
     partition_entry.has_chs = false;
+    // CHS fields are not applicable for GPT, leave them uninitialized or zeroed if needed elsewhere.
 }
 
 int GptPartitionStrategy::populate_entries(const GptHeader* hdr, const uint8_t* partition_array_start, PartitionEntry* output_partitions, int max_partitions) const {

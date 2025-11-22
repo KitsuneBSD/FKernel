@@ -63,3 +63,17 @@ int PartitionBlockDevice::write(VNode *vnode, FileDescriptor *file_descriptor,
 
   return m_device->write(vnode, file_descriptor, buffer, size, final_offset);
 }
+
+int PartitionBlockDevice::read_sectors(uint32_t lba, uint8_t sector_count, void* buffer) const {
+    if (!m_device)
+        return -1;
+    // Adjust LBA by partition's starting LBA
+    return m_device->read_sectors(m_location.first_lba() + lba, sector_count, buffer);
+}
+
+int PartitionBlockDevice::write_sectors(uint32_t lba, uint8_t sector_count, const void* buffer) {
+    if (!m_device)
+        return -1;
+    // Adjust LBA by partition's starting LBA
+    return m_device->write_sectors(m_location.first_lba() + lba, sector_count, buffer);
+}

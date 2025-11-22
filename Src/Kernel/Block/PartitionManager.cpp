@@ -2,6 +2,7 @@
 #include <Kernel/Block/Partition/MbrPartition.h>
 #include <Kernel/Block/Partition/PartitionParsingStrategy.h>
 #include <Kernel/Block/PartitionManager.h>
+#include <LibC/stdio.h> // For snprintf
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Memory/own_ptr.h>
@@ -22,7 +23,7 @@ bool PartitionManager::is_gpt(const uint8_t *sector) const {
 
   const MbrEntry *entry = reinterpret_cast<const MbrEntry *>(sector + 446);
 
-  return entry->partition_type == 0xEE;
+  return static_cast<PartitionType>(entry->partition_type) == PartitionType::GPT_PROTECTIVE_MBR;
 }
 
 bool PartitionManager::is_mbr(const uint8_t *sector) const {
@@ -31,7 +32,7 @@ bool PartitionManager::is_mbr(const uint8_t *sector) const {
 
   const MbrEntry *entry = reinterpret_cast<const MbrEntry *>(sector + 446);
   for (int i = 0; i < 4; ++i) {
-    if (entry[i].partition_type == 0xEE)
+    if (static_cast<PartitionType>(entry[i].partition_type) == PartitionType::GPT_PROTECTIVE_MBR)
       return false;
   }
 
@@ -146,6 +147,22 @@ PartitionDeviceList PartitionManager::detect_partitions() {
     if (num_entries <= 0)
         return {};
 
-    return create_devices_from_entries(entries, num_entries);
+    PartitionDeviceList detected_partitions = create_devices_from_entries(entries, num_entries);
+
+    for (int i = 0; i < num_entries; ++i) {
+        const PartitionEntry& entry = entries[i];
+        char chs_info[32];
+        if (entry.has_chs) {
+            snprintf(chs_info, sizeof(chs_info), "CHS: %u/%u/%u - %u/%u/%u",
+                     entry.chs_start[0], entry.chs_start[1], entry.chs_start[2],
+                     entry.chs_end[0], entry.chs_end[1], entry.chs_end[2]);
+        } else {
+            snprintf(chs_info, sizeof(chs_info), "");
+        }
+        fk::algorithms::klog("PARTITION MANAGER", "  Partition %d: Type 0x%x, LBA Start %u, Count %u sectors. %s",
+                             i, static_cast<uint8_t>(entry.type), entry.lba_start, entry.lba_count, chs_info);
+    }
+
+    return detected_partitions;
 }
 

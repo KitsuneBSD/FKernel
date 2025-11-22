@@ -21,6 +21,7 @@
 
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/retain_ptr.h> // For adopt_retain
+#include <LibFK/Memory/own_ptr.h>   // For adopt_own
 
 void ata_irq_primary() {
   fk::algorithms::klog("ATA", "Primary channel IRQ fired!");
@@ -73,12 +74,17 @@ void AtaController::detect_devices() {
       fk::algorithms::klog("ATA", "Detected %s %s: Model '%s'", bus_str[b],
                            drive_str[d], device_info.model);
 
+      fkernel::drivers::ata::AtaDeviceIoInfo io_info(static_cast<Bus>(b), static_cast<Drive>(d),
+                                                    base_io(static_cast<Bus>(b)), ctrl_io(static_cast<Bus>(b)));
+      
+      fk::memory::OwnPtr<fkernel::drivers::ata::AtaIoStrategy> pio_strategy = fk::memory::adopt_own(new fkernel::drivers::ata::AtaPioStrategy());
+
       fk::memory::RetainPtr<AtaBlockDevice> ata_block_dev =
-          fk::memory::adopt_retain(new AtaBlockDevice(device_info));
+          fk::memory::adopt_retain(new AtaBlockDevice(fk::types::move(io_info), fk::types::move(pio_strategy)));
 
       // Store the retained device in the controller's list to manage its lifetime.
       // Explicitly construct RetainPtr<BlockDevice> from RetainPtr<AtaBlockDevice> to handle the base-derived conversion.
-      m_devices.push_back(fk::memory::RetainPtr<BlockDevice>(fk::types::move(ata_block_dev)));
+      m_devices.push_back(fk::memory::RetainPtr<BlockDevice>(ata_block_dev.leakRef()));
 
       char name[16];
       snprintf(name, sizeof(name), "ada%d", device_index);
@@ -149,8 +155,8 @@ bool AtaController::identify_device(Bus bus, Drive drive, AtaDeviceInfo &out) {
   return true;
 }
 
-int AtaController::read_sectors_pio(Bus bus, Drive drive, uint32_t lba,
-                                    uint8_t sector_count, void *buffer) {
+int AtaController::read_sectors_pio_impl(Bus bus, Drive drive, uint32_t lba,
+                                               uint8_t sector_count, void *buffer) {
   uint16_t base = (bus == Bus::Primary) ? 0x1F0 : 0x170;
   uint8_t head = 0xE0 | ((drive == Drive::Slave) << 4) | ((lba >> 24) & 0x0F);
   outb(base + 6, head);
@@ -171,18 +177,9 @@ int AtaController::read_sectors_pio(Bus bus, Drive drive, uint32_t lba,
   return sector_count;
 }
 
-int AtaController::read_sectors_pio(const AtaDeviceInfo &device, uint32_t lba,
-                                    uint8_t count, void *buffer) {
-  return read_sectors_pio(device.bus, device.drive, lba, count, buffer);
-}
 
-int AtaController::write_sectors_pio(const AtaDeviceInfo &device, uint32_t lba,
-                                     uint8_t count, const void *buffer) {
-  return write_sectors_pio(device.bus, device.drive, lba, count, buffer);
-}
-
-int AtaController::write_sectors_pio(Bus bus, Drive drive, uint32_t lba,
-                                     uint8_t sector_count, const void *buffer) {
+int AtaController::write_sectors_pio_impl(Bus bus, Drive drive, uint32_t lba,
+                                                uint8_t sector_count, const void *buffer) {
   uint16_t base = base_io(bus);
   uint8_t head = 0xE0 | ((drive == Drive::Slave) << 4) | ((lba >> 24) & 0x0F);
 

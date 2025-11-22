@@ -1,4 +1,5 @@
 #include <Kernel/Block/Partition/MbrPartition.h>
+#include <LibC/string.h> // For memcpy
 #include <LibFK/Algorithms/log.h>
 
 bool MbrPartitionStrategy::are_arguments_valid(const void* sector512, const PartitionEntry* output_partitions, int max_partitions) const {
@@ -22,11 +23,15 @@ bool MbrPartitionStrategy::is_entry_valid(const MbrEntry& entry) const {
 }
 
 void MbrPartitionStrategy::convert_mbr_entry(const MbrEntry& mbr_entry, PartitionEntry& partition_entry) const {
-    partition_entry.type = mbr_entry.partition_type;
+    partition_entry.type = static_cast<PartitionType>(mbr_entry.partition_type);
     partition_entry.lba_start = mbr_entry.start_lba;
     partition_entry.lba_count = mbr_entry.sectors_count;
     partition_entry.is_bootable = (mbr_entry.boot_indicator == 0x80);
-    partition_entry.has_chs = false;
+    
+    // MBR entries always have CHS, even if LBA is used primarily
+    partition_entry.has_chs = true;
+    memcpy(partition_entry.chs_start, mbr_entry.start_chs, sizeof(mbr_entry.start_chs));
+    memcpy(partition_entry.chs_end, mbr_entry.end_chs, sizeof(mbr_entry.end_chs));
 }
 
 int MbrPartitionStrategy::populate_entries(const MbrEntry* entries, PartitionEntry* output_partitions, int max_partitions) const {

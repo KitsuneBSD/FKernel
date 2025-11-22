@@ -1,5 +1,5 @@
+#include <Kernel/Block/BlockDevice.h>
 #include <Kernel/Driver/Ata/AtaBlockCache.h>
-#include <Kernel/Driver/Ata/AtaController.h> // Missing include
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -8,7 +8,7 @@ AtaCache &AtaCache::the() {
   return inst;
 }
 
-uint8_t *AtaCache::get_sector(const AtaDeviceInfo *device, uint32_t lba) {
+uint8_t *AtaCache::get_sector(const BlockDevice *device, uint32_t lba) {
   for (auto &entry : cache) {
     if (entry.is_valid && entry.lba == lba) {
       return entry.data;
@@ -23,16 +23,13 @@ uint8_t *AtaCache::get_sector(const AtaDeviceInfo *device, uint32_t lba) {
     }
   }
 
-  if (slot->is_valid && slot->is_dirty) {
-    AtaController::the().write_sectors_pio(*device, slot->lba, 1, slot->data);
-  }
-
-  AtaController::the().read_sectors_pio(*device, lba, 1, slot->data);
+  device->read_sectors(lba, 1, slot->data);
   slot->lba = lba;
   slot->is_valid = true;
   slot->is_dirty = false;
   return slot->data;
 }
+
 
 void AtaCache::mark_dirty(uint32_t lba) {
   for (auto &entry : cache) {
@@ -43,10 +40,10 @@ void AtaCache::mark_dirty(uint32_t lba) {
   }
 }
 
-void AtaCache::flush(const AtaDeviceInfo *device) {
+void AtaCache::flush(BlockDevice *device) {
   for (auto &entry : cache) {
     if (entry.is_valid && entry.is_dirty) {
-      AtaController::the().write_sectors_pio(*device, entry.lba, 1, entry.data);
+      device->write_sectors(entry.lba, 1, entry.data);
       entry.is_dirty = false;
     }
   }
