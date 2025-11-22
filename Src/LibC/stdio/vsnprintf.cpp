@@ -32,11 +32,17 @@ extern "C" int vsnprintf(char *buf, size_t size, const char *fmt,
     }
 
     bool is_long = false;
+    bool is_long_long = false;
     bool is_size_t = false;
 
     if (fmt[i] == 'l') {
-      is_long = true;
-      i++;
+      if (fmt[i + 1] == 'l') {
+        is_long_long = true;
+        i += 2;
+      } else {
+        is_long = true;
+        i++;
+      }
     } else if (fmt[i] == 'z') {
       is_size_t = true;
       i++;
@@ -60,13 +66,21 @@ extern "C" int vsnprintf(char *buf, size_t size, const char *fmt,
       break;
     }
     case 'd': {
-      long val = is_long ? va_arg(args, long) : va_arg(args, int);
+      long long val;
+      if (is_long_long)
+        val = va_arg(args, long long);
+      else if (is_long)
+        val = va_arg(args, long);
+      else
+        val = va_arg(args, int);
       itoa_signed(val, temp, 10);
       break;
     }
     case 'u': {
-      unsigned long val;
-      if (is_long)
+      unsigned long long val;
+      if (is_long_long)
+        val = va_arg(args, unsigned long long);
+      else if (is_long)
         val = va_arg(args, unsigned long);
       else if (is_size_t)
         val = va_arg(args, size_t);
@@ -76,8 +90,10 @@ extern "C" int vsnprintf(char *buf, size_t size, const char *fmt,
       break;
     }
     case 'x': {
-      unsigned long val;
-      if (is_long)
+      unsigned long long val;
+      if (is_long_long)
+        val = va_arg(args, unsigned long long);
+      else if (is_long)
         val = va_arg(args, unsigned long);
       else if (is_size_t)
         val = va_arg(args, size_t);
