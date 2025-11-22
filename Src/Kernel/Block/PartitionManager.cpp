@@ -137,7 +137,7 @@ fk::memory::OwnPtr<uint8_t[]> PartitionManager::prepare_gpt_parsing_data(
     return nullptr;
   }
   fk::algorithms::klog("PARTITION MANAGER",
-                       "GPT Partition Entry Array Size: %zu bytes "
+                       "GPT Partition Entry Array Size: %llu bytes "
                        "(num_entries: %u, entry_size: %u).",
                        pe_array_size, hdr->num_partition_entries,
                        hdr->partition_entry_size);
@@ -147,7 +147,7 @@ fk::memory::OwnPtr<uint8_t[]> PartitionManager::prepare_gpt_parsing_data(
   if (!gpt_buffer) {
     fk::algorithms::kerror(
         "PARTITION MANAGER",
-        "Failed to allocate buffer for GPT parsing data (size: %zu).",
+        "Failed to allocate buffer for GPT parsing data (size: %llu).",
         buffer_size);
     return nullptr;
   }
@@ -162,10 +162,10 @@ fk::memory::OwnPtr<uint8_t[]> PartitionManager::prepare_gpt_parsing_data(
   // careful handling. For now, assuming hdr->partition_entries_lba is LBA 2 (so
   // it starts right after LBA 1 header).
 
-  fk::algorithms::klog(
-      "PARTITION MANAGER",
-      "Attempting to read GPT partition entries from LBA %llu, size %zu bytes.",
-      hdr->partition_entries_lba, pe_array_size);
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "Attempting to read GPT partition entries from LBA "
+                       "%llu, size %llu bytes.",
+                       hdr->partition_entries_lba, pe_array_size);
   int bytes_read =
       m_device->read(nullptr, nullptr, gpt_buffer.ptr() + 512, pe_array_size,
                      hdr->partition_entries_lba * 512);
@@ -173,7 +173,7 @@ fk::memory::OwnPtr<uint8_t[]> PartitionManager::prepare_gpt_parsing_data(
   if (bytes_read < 0 || (size_t)bytes_read != pe_array_size) {
     fk::algorithms::kwarn("PARTITION MANAGER",
                           "Failed to read GPT partition entries from LBA %llu. "
-                          "Expected %zu bytes, read %d bytes.",
+                          "Expected %llu bytes, read %d bytes.",
                           hdr->partition_entries_lba, pe_array_size,
                           bytes_read);
     return nullptr;
@@ -309,7 +309,7 @@ PartitionDeviceList PartitionManager::detect_partitions() {
   }
 
   fk::algorithms::klog("PARTITION MANAGER",
-                       "Finished partition detection. %zu partitions found.",
+                       "Finished partition detection. %llu partitions found.",
                        detected_partitions.count());
   return detected_partitions;
 }
