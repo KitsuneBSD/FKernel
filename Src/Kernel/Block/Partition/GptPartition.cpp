@@ -41,9 +41,14 @@ bool GptPartitionStrategy::is_header_valid(const GptHeader* hdr) const {
 }
 
 bool GptPartitionStrategy::is_partition_array_valid(const GptHeader* hdr, const uint8_t* partition_array_start) const {
+    if (!hdr->num_partition_entries || !hdr->partition_entry_size) {
+        fk::algorithms::kwarn("GPT", "Partition entry array has zero length/entries.");
+        return false;
+    }
+
     size_t array_size = (size_t)hdr->num_partition_entries * hdr->partition_entry_size;
-    fk::algorithms::klog("GPT", "Partition entry array size: %u bytes.", array_size);
-    
+    fk::algorithms::klog("GPT", "Partition entry array size: %zu bytes.", array_size);
+
     uint32_t calculated_crc32 = fk::algorithms::crc32(partition_array_start, array_size);
 
     if (calculated_crc32 != hdr->pe_crc32) {
@@ -68,24 +73,30 @@ void GptPartitionStrategy::convert_gpt_entry(const GptEntry& gpt_entry, Partitio
     partition_entry.is_bootable = false; // GPT has different boot attributes
     partition_entry.has_chs = false;
     // CHS fields are not applicable for GPT, leave them uninitialized or zeroed if needed elsewhere.
-    fk::algorithms::kdebug("GPT", "Converted GPT entry. LBA Start: %lu, Sector Count: %lu.", partition_entry.lba_start, partition_entry.lba_count);
+    fk::algorithms::kdebug("GPT", "Converted GPT entry. LBA Start: %llu, Sector Count: %llu.", (unsigned long long)partition_entry.lba_start, (unsigned long long)partition_entry.lba_count);
 }
 
 int GptPartitionStrategy::populate_entries(const GptHeader* hdr, const uint8_t* partition_array_start, PartitionEntry* output_partitions, int max_partitions) const {
     int written = 0;
     size_t entry_size = hdr->partition_entry_size;
-    int entries_to_read = hdr->num_partition_entries < (uint32_t)max_partitions ? hdr->num_partition_entries : (uint32_t)max_partitions;
+    int entries_to_read = (hdr->num_partition_entries > (uint32_t)max_partitions) ? max_partitions : (int)hdr->num_partition_entries;
     fk::algorithms::klog("GPT", "Parsing %d GPT partition entries.", entries_to_read);
 
     for (int i = 0; i < entries_to_read; i++) {
-        const GptEntry& entry = *reinterpret_cast<const GptEntry*>(partition_array_start + i * entry_size);
+        const GptEntry& entry = *reinterpret_cast<const GptEntry*>(partition_array_start + (size_t)i * entry_size);
         if (is_entry_empty(entry)) {
             fk::algorithms::klog("GPT", "Skipping empty entry %d.", i);
             continue;
         }
         
-        fk::algorithms::klog("GPT", "Found partition at entry %d. LBA start: %lu, Size: %lu sectors.", i, entry.first_lba, (entry.last_lba - entry.first_lba) + 1);
-        convert_gpt_entry(entry, output_partitions[written++]);
+        fk::algorithms::klog("GPT", "Found partition at entry %d. LBA start: %llu, Size: %llu sectors.", i, (unsigned long long)entry.first_lba, (unsigned long long)((entry.last_lba - entry.first_lba) + 1));
+        if (written < max_partitions) {
+            convert_gpt_entry(entry, output_partitions[written]);
+            written++;
+        } else {
+            fk::algorithms::kwarn("GPT", "Output partition buffer full; skipping remaining entries.");
+            break;
+        }
     }
 
     return written;
@@ -103,7 +114,7 @@ int GptPartitionStrategy::parse(const void *sector512, PartitionEntry *output_pa
     if (!is_header_valid(hdr))
         return 0;
 
-    fk::algorithms::klog("GPT", "GPT header is valid. LBA of partition entries: %lu", hdr->partition_entries_lba);
+    fk::algorithms::klog("GPT", "GPT header is valid. LBA of partition entries: %llu", (unsigned long long)hdr->partition_entries_lba);
 
     // This implementation assumes that the buffer 'sector512' contains not only the GPT header (from LBA 1)
     // but also the partition entry array that follows it. The partition entries should start at the LBA

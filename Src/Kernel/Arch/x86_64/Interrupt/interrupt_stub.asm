@@ -23,11 +23,10 @@ isr%1:
     push rcx
     push rbx
     push rax
+
     mov rdi, %1
     lea rsi, [rsp]    ; frame_ptr
-    sub rsp, 8
     call interrupt_dispatch
-    add rsp, 8
 
     pop rax
     pop rbx
