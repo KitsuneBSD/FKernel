@@ -93,7 +93,8 @@ void AtaController::detect_devices() {
 
       // Store the retained device in the controller's list to manage its
       // lifetime.
-      m_devices.push_back(ata_block_dev);
+      m_devices.push_back(
+          fk::memory::RetainPtr<BlockDevice>(ata_block_dev.get()));
 
       // Get a new RetainPtr to the BlockDevice just added to the vector.
       // This ensures PartitionManager gets a valid, reference-counted pointer,

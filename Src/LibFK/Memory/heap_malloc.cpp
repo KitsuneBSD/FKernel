@@ -5,7 +5,7 @@
 #include <LibFK/Memory/heap_malloc.h>
 
 namespace fk {
-namespace containers {
+namespace memory {
 
 extern "C" uint64_t __heap_start[];
 extern "C" uint64_t __heap_end[];
@@ -270,7 +270,7 @@ fk::core::Result<uint64_t *, fk::core::Error> reallocate(uint64_t *ptr,
   return fk::core::Error::NotFound;
 }
 
-} // namespace containers
+} // namespace memory
 } // namespace fk
 
 extern "C" {
@@ -279,7 +279,7 @@ void *kcalloc(size_t nmemb, size_t size) {
   if (!nmemb || !size)
     return nullptr;
   size_t total = nmemb * size;
-  auto result = fk::containers::allocate(static_cast<size_t>(total));
+  auto result = fk::memory::allocate(static_cast<size_t>(total));
   if (result.is_error()) {
     // Error already logged by allocate, just return nullptr
     return nullptr;
@@ -292,7 +292,7 @@ void *kcalloc(size_t nmemb, size_t size) {
 void *heap_malloc(size_t size) {
   if (!size)
     return nullptr;
-  auto result = fk::containers::allocate(static_cast<size_t>(size));
+  auto result = fk::memory::allocate(static_cast<size_t>(size));
   if (result.is_error()) {
     // Error already logged by allocate, just return nullptr
     return nullptr;
@@ -303,15 +303,15 @@ void *heap_malloc(size_t size) {
 void heap_free(void *ptr) {
   if (!ptr)
     return;
-  fk::containers::free(reinterpret_cast<uint64_t *>(ptr));
+  fk::memory::free(reinterpret_cast<uint64_t *>(ptr));
 }
 
 void *heap_realloc(void *ptr, size_t size) {
   if (!ptr)
     return heap_malloc(size);
 
-  auto result = fk::containers::reallocate(reinterpret_cast<uint64_t *>(ptr),
-                                           static_cast<size_t>(size));
+  auto result = fk::memory::reallocate(reinterpret_cast<uint64_t *>(ptr),
+                                       static_cast<size_t>(size));
   if (result.is_error()) {
     fk::algorithms::kerror("HEAP MALLOC", "Reallocation failed with error: %d",
                            static_cast<int>(result.error()));
@@ -323,7 +323,7 @@ void *heap_realloc(void *ptr, size_t size) {
 void *kmalloc(size_t size) {
   if (!size)
     return nullptr;
-  auto result = fk::containers::allocate(static_cast<size_t>(size));
+  auto result = fk::memory::allocate(static_cast<size_t>(size));
   if (result.is_error()) {
     // Error already logged by allocate, just return nullptr
     return nullptr;
@@ -334,7 +334,7 @@ void *kmalloc(size_t size) {
 void kfree(void *ptr) {
   if (!ptr)
     return;
-  fk::containers::free(reinterpret_cast<uint64_t *>(ptr));
+  fk::memory::free(reinterpret_cast<uint64_t *>(ptr));
 }
 
 void *krealloc(void *ptr, size_t size) {
@@ -342,8 +342,8 @@ void *krealloc(void *ptr, size_t size) {
     return kmalloc(size);
 
   // krealloc needs to handle the Result from reallocate
-  auto result = fk::containers::reallocate(reinterpret_cast<uint64_t *>(ptr),
-                                           static_cast<size_t>(size));
+  auto result = fk::memory::reallocate(reinterpret_cast<uint64_t *>(ptr),
+                                       static_cast<size_t>(size));
   if (result.is_error()) {
     // Log the error and return nullptr
     fk::algorithms::kerror("KREALLOC", "Reallocation failed with error: %d",

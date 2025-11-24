@@ -143,8 +143,7 @@ template <typename T, size_t N> struct is_array<T[N]> {
 /**
  * @brief Alias to directly obtain the boolean value for is_array.
  */
-template <typename T>
-inline constexpr bool is_array_v = is_array<T>::value;
+template <typename T> inline constexpr bool is_array_v = is_array<T>::value;
 
 /**
  * @brief Removes the outermost array extent from a type.
@@ -170,8 +169,30 @@ template <typename T, size_t N> struct remove_extent<T[N]> {
 /**
  * @brief Alias to simplify remove_extent usage.
  */
-template <typename T>
-using remove_extent_t = typename remove_extent<T>::type;
+template <typename T> using remove_extent_t = typename remove_extent<T>::type;
+
+/**
+ * @brief Checks whether Base is a base class of Derived.
+ *
+ * Uses SFINAE with pointer conversion to detect inheritance.
+ */
+template <typename Base, typename Derived> struct is_base_of {
+private:
+  // This overload is chosen if Derived* can be converted to Base*
+  static constexpr char test(const Base *);
+  // This overload is chosen otherwise
+  static constexpr int test(...);
+
+public:
+  static constexpr bool value =
+      sizeof(test(static_cast<Derived *>(nullptr))) == sizeof(char);
+};
+
+/**
+ * @brief Alias to directly obtain the boolean value for is_base_of.
+ */
+template <typename Base, typename Derived>
+inline constexpr bool is_base_of_v = is_base_of<Base, Derived>::value;
 
 } // namespace traits
 } // namespace fk

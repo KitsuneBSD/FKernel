@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibC/string.h>
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Container/bitmap.h>
 #include <LibFK/Core/Error.h>
 #include <LibFK/Core/Result.h>
@@ -8,7 +9,7 @@
 #include <LibFK/Utilities/pair.h>
 
 namespace fk {
-namespace containers {
+namespace memory {
 
 /**
  * @brief Fixed-size chunk allocator using a bitmap.
@@ -24,10 +25,12 @@ private:
   static constexpr size_t MaxChunks = PoolSizeInBytes / ChunkSize;
 
   size_t m_free{MaxChunks};
-  Bitmap<T, MaxChunks> m_bitmap;
+  fk::containers::Bitmap<T, MaxChunks> m_bitmap;
 
-  const Bitmap<T, MaxChunks> &bitmap() const noexcept { return m_bitmap; }
-  Bitmap<T, MaxChunks> &bitmap() noexcept { return m_bitmap; }
+  const fk::containers::Bitmap<T, MaxChunks> &bitmap() const noexcept {
+    return m_bitmap;
+  }
+  fk::containers::Bitmap<T, MaxChunks> &bitmap() noexcept { return m_bitmap; }
 
   ChunkAllocator(const ChunkAllocator &) = delete;
   ChunkAllocator &operator=(const ChunkAllocator &) = delete;
@@ -150,7 +153,7 @@ struct Allocator {
   bool &initialized() { return metadata.second; }
 };
 
-} // namespace containers
+} // namespace memory
 } // namespace fk
 
 extern "C" {
@@ -174,3 +177,34 @@ void kfree(void *ptr);
 void *krealloc(void *ptr, size_t size);
 
 } // extern "C"
+
+namespace fk {
+namespace memory {
+
+/**
+ * @brief Freestanding allocation function.
+ * @tparam T Type to allocate
+ * @return Pointer to allocated memory, or nullptr if allocation fails
+ */
+template <typename T> inline T *allocate() {
+  // Replace this with your actual freestanding allocator
+  void *ptr = kmalloc(sizeof(T));
+  if (!ptr) {
+    fk::algorithms::kwarn("allocate", "OutOfMemory for size ", sizeof(T));
+    return nullptr;
+  }
+  return reinterpret_cast<T *>(ptr);
+}
+
+/**
+ * @brief Freestanding deallocation function.
+ * @tparam T Type to deallocate
+ * @param ptr Pointer to memory to free
+ */
+template <typename T> inline void deallocate(T *ptr) {
+  if (ptr)
+    kfree(ptr);
+}
+
+} // namespace memory
+} // namespace fk
