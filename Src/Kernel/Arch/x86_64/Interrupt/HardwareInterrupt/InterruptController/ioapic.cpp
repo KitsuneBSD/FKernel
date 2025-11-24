@@ -9,16 +9,19 @@
 constexpr uint64_t IOAPIC_REDIR_MASKED = 1ULL << 16;
 
 uint32_t IOAPIC::read(uint32_t reg) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   *reinterpret_cast<volatile uint32_t *>(ioapic_base) = reg;
   return *reinterpret_cast<volatile uint32_t *>(ioapic_base + 0x10);
 }
 
 void IOAPIC::write(uint32_t reg, uint32_t value) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   *reinterpret_cast<volatile uint32_t *>(ioapic_base) = reg;
   *reinterpret_cast<volatile uint32_t *>(ioapic_base + 0x10) = value;
 }
 
 void IOAPIC::initialize() {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   ioapic_base = IOAPIC_ADDRESS;
   fk::algorithms::klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
 
@@ -40,6 +43,7 @@ void IOAPIC::initialize() {
 }
 
 void IOAPIC::mask_interrupt(uint8_t irq) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   uint32_t reg_low = IOAPIC_REG_TABLE_BASE + irq * 2;
   uint32_t reg_high = reg_low + 1;
 
@@ -51,6 +55,7 @@ void IOAPIC::mask_interrupt(uint8_t irq) {
 }
 
 void IOAPIC::unmask_interrupt(uint8_t irq) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   uint32_t reg_low = IOAPIC_REG_TABLE_BASE + irq * 2;
   uint32_t reg_high = reg_low + 1;
 
@@ -62,6 +67,7 @@ void IOAPIC::unmask_interrupt(uint8_t irq) {
 }
 
 void IOAPIC::send_eoi([[maybe_unused]] uint8_t irq) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   if (CPU::the().has_x2apic()) {
     X2APIC::the().send_eoi(irq);
   } else {
@@ -71,6 +77,7 @@ void IOAPIC::send_eoi([[maybe_unused]] uint8_t irq) {
 
 void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
                        uint32_t flags) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   uint64_t entry = vector | ((uint64_t)lapic_id << 56) | flags;
 
   uint32_t reg_low = IOAPIC_REG_TABLE_BASE + irq * 2;

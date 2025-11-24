@@ -6,6 +6,8 @@
 #include <LibFK/Algorithms/log.h>
 
 void clock_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
+  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s",
+                         __PRETTY_FUNCTION__);
   (void)frame;
 
   outb(0x70, 0x0C);
