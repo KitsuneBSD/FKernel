@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Traits/type_traits.h>
 #include <LibFK/Types/types.h>
@@ -8,92 +9,111 @@ namespace fk {
 namespace memory {
 
 /**
- * @brief A simple ownership smart pointer similar to std::unique_ptr.
+ * @brief OwnPtr: exclusive ownership smart pointer, similar to std::unique_ptr.
  *
  * OwnPtr exclusively owns a dynamically allocated object and deletes it
- * when the pointer goes out of scope. Supports move semantics and
- * pointer access, but not copy semantics.
+ * when the pointer goes out of scope. Supports move semantics but not copy
+ * semantics.
  *
- * @tparam T Type of the object being owned
+ * @tparam T Type of object being owned.
  */
 template <typename T> class OwnPtr {
 public:
   /** @brief Default constructor: no object owned */
-  OwnPtr() : m_ptr(nullptr) {}
+  OwnPtr() : m_ptr(nullptr) {
+    fk::algorithms::kdebug("OwnPtr", " default constructed with nullptr");
+  }
 
-  /** @brief Construct OwnPtr from raw pointer
-   *  @param ptr Raw pointer to own
-   */
-  explicit OwnPtr(T *ptr) : m_ptr(ptr) {}
+  /** @brief Construct OwnPtr from raw pointer */
+  explicit OwnPtr(T *ptr) : m_ptr(ptr) {
+    if (m_ptr)
+      fk::algorithms::kdebug("OwnPtr", " constructed, ptr=%p", m_ptr);
+    else
+      fk::algorithms::kwarn("OwnPtr", " constructed with nullptr");
+  }
 
   /** @brief Move constructor */
-  OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {}
+  OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
+    fk::algorithms::kdebug("OwnPtr", " move constructed, ptr=%p", m_ptr);
+  }
 
-  /** @brief Templated move constructor for convertible types */
+  /** @brief Move constructor for convertible types */
   template <typename U>
-  OwnPtr(OwnPtr<U> &&other) : m_ptr(static_cast<T *>(other.leakPtr())) {}
+  OwnPtr(OwnPtr<U> &&other) : m_ptr(static_cast<T *>(other.leakPtr())) {
+    fk::algorithms::kdebug("OwnPtr", " templated move constructed, ptr=%p",
+                           m_ptr);
+  }
 
-  /** @brief Destructor: deletes owned object */
-  ~OwnPtr() { clear(); }
+  /** @brief Destructor */
+  ~OwnPtr() {
+    if (m_ptr)
+      fk::algorithms::kdebug("OwnPtr", " destroying ptr=%p", m_ptr);
+    clear();
+  }
 
   /** @brief Construct OwnPtr from nullptr */
-  OwnPtr(nullptr_t) : m_ptr(nullptr) {}
+  OwnPtr(nullptr_t) : m_ptr(nullptr) {
+    fk::algorithms::kdebug("OwnPtr", " constructed from nullptr literal");
+  }
 
-  /** @brief Move assignment operator */
+  /** @brief Move assignment */
   OwnPtr &operator=(OwnPtr &&other) {
     if (this != &other) {
       clear();
       m_ptr = other.leakPtr();
+      fk::algorithms::kdebug("OwnPtr", " move assigned, ptr=%p", m_ptr);
     }
     return *this;
   }
 
-  /** @brief Templated move assignment operator for convertible types */
+  /** @brief Move assignment for convertible types */
   template <typename U> OwnPtr &operator=(OwnPtr<U> &&other) {
     if (reinterpret_cast<void *>(this) != reinterpret_cast<void *>(&other)) {
       clear();
       m_ptr = static_cast<T *>(other.leakPtr());
+      fk::algorithms::kdebug("OwnPtr", " templated move assigned, ptr=%p",
+                             m_ptr);
     }
     return *this;
   }
 
   /** @brief Assign from raw pointer */
   OwnPtr &operator=(T *ptr) {
-    if (m_ptr != ptr)
+    if (m_ptr != ptr) {
       clear();
-    m_ptr = ptr;
+      m_ptr = ptr;
+      fk::algorithms::kdebug("OwnPtr", " assigned raw pointer ptr=%p", m_ptr);
+    }
     return *this;
   }
 
-  /** @brief Assign nullptr, releasing owned object */
+  /** @brief Assign nullptr */
   OwnPtr &operator=(nullptr_t) {
     clear();
+    fk::algorithms::kdebug("OwnPtr", " assigned nullptr");
     return *this;
   }
 
-  /** @brief Releases ownership and deletes owned object */
+  /** @brief Clear owned pointer */
   void clear() {
     if (m_ptr) {
+      fk::algorithms::kdebug("OwnPtr", " clearing ptr=%p", m_ptr);
       delete m_ptr;
       m_ptr = nullptr;
+    } else {
+      fk::algorithms::kdebug("OwnPtr", " clear called on nullptr");
     }
   }
 
-  /** @brief Check if pointer is null
-   *  @return true if no object is owned
-   */
-  bool operator!() const { return !m_ptr; }
-
-  /** @brief Relinquish ownership without deleting
-   *  @return Pointer that was owned
-   */
+  /** @brief Relinquish ownership without deleting */
   T *leakPtr() {
     T *leaked = m_ptr;
     m_ptr = nullptr;
+    fk::algorithms::kdebug("OwnPtr", " leaked ptr=%p", leaked);
     return leaked;
   }
 
-  /** @brief Access owned pointer */
+  /** @brief Access pointer */
   T *ptr() { return m_ptr; }
   const T *ptr() const { return m_ptr; }
 
@@ -104,152 +124,129 @@ public:
   T &operator*() { return *m_ptr; }
   const T &operator*() const { return *m_ptr; }
 
-  /** @brief Check if pointer is non-null
-   *  @return true if an object is owned
-   */
+  /** @brief Boolean check */
   operator bool() const { return m_ptr != nullptr; }
+  bool operator!() const { return !m_ptr; }
 
 private:
-  T *m_ptr; ///< Raw pointer to the owned object
+  T *m_ptr; ///< Raw pointer to owned object
 };
 
 /**
  * @brief Specialization of OwnPtr for array types.
  *
- * This specialization ensures that `delete[]` is used for arrays,
- * preventing memory leaks and undefined behavior.
+ * Ensures delete[] is used instead of delete.
  *
- * @tparam T Type of the elements in the array
+ * @tparam T Type of elements in array.
  */
 template <typename T> class OwnPtr<T[]> {
 public:
-  /** @brief Default constructor: no object owned */
-  OwnPtr() : m_ptr(nullptr) {}
+  OwnPtr() : m_ptr(nullptr) {
+    fk::algorithms::kdebug("OwnPtr", "<T[]> default constructed with nullptr");
+  }
 
-  /** @brief Construct OwnPtr from raw array pointer
-   *  @param ptr Raw pointer to array to own
-   */
-  explicit OwnPtr(T *ptr) : m_ptr(ptr) {}
+  explicit OwnPtr(T *ptr) : m_ptr(ptr) {
+    if (m_ptr)
+      fk::algorithms::kdebug("OwnPtr", "<T[]> constructed, ptr=%p", m_ptr);
+    else
+      fk::algorithms::kwarn("OwnPtr", "<T[]> constructed with nullptr");
+  }
 
-  /** @brief Move constructor */
-  OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {}
+  OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
+    fk::algorithms::kdebug("OwnPtr", "<T[]> move constructed, ptr=%p", m_ptr);
+  }
 
-  /** @brief Destructor: deletes owned array */
   ~OwnPtr() { clear(); }
 
-  /** @brief Construct OwnPtr from nullptr */
-  OwnPtr(nullptr_t) : m_ptr(nullptr) {}
+  OwnPtr(nullptr_t) : m_ptr(nullptr) {
+    fk::algorithms::kdebug("OwnPtr", "<T[]> constructed from nullptr literal");
+  }
 
-  /** @brief Move assignment operator */
   OwnPtr &operator=(OwnPtr &&other) {
     if (this != &other) {
       clear();
       m_ptr = other.leakPtr();
+      fk::algorithms::kdebug("OwnPtr", "<T[]> move assigned, ptr=%p", m_ptr);
     }
     return *this;
   }
 
-  /** @brief Assign from raw array pointer */
   OwnPtr &operator=(T *ptr) {
-    if (m_ptr != ptr)
+    if (m_ptr != ptr) {
       clear();
-    m_ptr = ptr;
+      m_ptr = ptr;
+      fk::algorithms::kdebug("OwnPtr", "<T[]> assigned raw pointer ptr=%p",
+                             m_ptr);
+    }
     return *this;
   }
 
-  /** @brief Assign nullptr, releasing owned array */
   OwnPtr &operator=(nullptr_t) {
     clear();
+    fk::algorithms::kdebug("OwnPtr", "<T[]> assigned nullptr");
     return *this;
   }
 
-  /** @brief Releases ownership and deletes owned array */
   void clear() {
     if (m_ptr) {
+      fk::algorithms::kdebug("OwnPtr", "<T[]> clearing ptr=%p", m_ptr);
       delete[] m_ptr;
       m_ptr = nullptr;
+    } else {
+      fk::algorithms::kdebug("OwnPtr", "<T[]> clear called on nullptr");
     }
   }
 
-  /** @brief Check if pointer is null
-   *  @return true if no object is owned
-   */
-  bool operator!() const { return !m_ptr; }
-
-  /** @brief Relinquish ownership without deleting
-   *  @return Pointer to array that was owned
-   */
   T *leakPtr() {
     T *leaked = m_ptr;
     m_ptr = nullptr;
+    fk::algorithms::kdebug("OwnPtr", "<T[]> leaked ptr=%p", leaked);
     return leaked;
   }
 
-  /** @brief Access owned array pointer */
   T *ptr() { return m_ptr; }
   const T *ptr() const { return m_ptr; }
 
-  /** @brief Array subscript operator */
   T &operator[](size_t i) { return m_ptr[i]; }
   const T &operator[](size_t i) const { return m_ptr[i]; }
 
-  /** @brief Check if pointer is non-null
-   *  @return true if an array is owned
-   */
   operator bool() const { return m_ptr != nullptr; }
+  bool operator!() const { return !m_ptr; }
 
 private:
-  T *m_ptr; ///< Raw pointer to the owned array
+  T *m_ptr; ///< Raw pointer to owned array
 };
-
-/**
- * @brief Helper function to construct OwnPtr in-place
- *
- * @tparam T Type to construct
- * @tparam Args Constructor argument types
- * @param args Constructor arguments
- * @return fk::core::Result containing OwnPtr<T> on success, or OutOfMemory on
- * failure.
- */
-template <typename T, typename... Args>
-inline fk::core::Result<OwnPtr<T>, fk::core::Error> make_own(Args &&...args) {
-  // In a freestanding environment, 'new' might return nullptr on failure.
-  T *ptr = new T(static_cast<Args &&>(args)...);
-  if (!ptr) { // Check if new returned nullptr
-    return fk::core::Error::OutOfMemory;
-  }
-  return fk::core::Result<OwnPtr<T>>(OwnPtr<T>(ptr));
-}
 
 /**
  * @brief Adopt an existing raw pointer into an OwnPtr.
  *
- * Use this when you already have a dynamically allocated object
- * and want to transfer ownership to an OwnPtr.
+ * Transfers ownership of a dynamically allocated object or array
+ * to an OwnPtr. No RTTI or typeid is used.
  *
- * @tparam T Type of object
+ * @tparam T Type of the object or array element
  * @param ptr Raw pointer to adopt
  * @return OwnPtr<T> owning the object
  */
 template <typename T,
           typename = fk::traits::enable_if_t<!fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(T *ptr) {
+  if (!ptr) {
+    fk::algorithms::kwarn("Adopt Own", " received nullptr for non-array type");
+    return OwnPtr<T>(nullptr);
+  }
+  fk::algorithms::kdebug("Adopt Own",
+                         " ownership transferred for non-array type");
   return OwnPtr<T>(ptr);
 }
 
-/**
- * @brief Adopt an existing raw array pointer into an OwnPtr<T[]>.
- *
- * Use this when you already have a dynamically allocated array
- * and want to transfer ownership to an OwnPtr<T[]>.
- *
- * @tparam T Type of array elements (e.g., `uint8_t[]`)
- * @param ptr Raw pointer to array to adopt (e.g., `uint8_t*`)
- * @return OwnPtr<T> owning the array
- */
 template <typename T,
           typename = fk::traits::enable_if_t<fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(fk::traits::remove_extent_t<T> *ptr) {
+  if (!ptr) {
+    fk::algorithms::kwarn("Adopt Own", " received nullptr for array type");
+    return OwnPtr<T>(nullptr);
+  }
+  fk::algorithms::kdebug("Adopt Own", " ownership transferred for array type");
   return OwnPtr<T>(ptr);
 }
 
