@@ -83,7 +83,7 @@ if is_mode("debug") then
 	add_defines("FKERNEL_DEBUG")
 
 	if is_arch("x86_64", "x64") then
-		add_cxflags(flags.x86_64.cxx, "-DFKERNEL_DEBUG")
+		add_cxflags(flags.x86_64.cxx)
 	end
 
 	--TODO: add tests load on the kernel if this mode is setted
@@ -106,7 +106,7 @@ add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
 
 if is_arch("x86_64", "x64") then
-	add_cxflags(flags.x86_64.cxx, "-DFKERNEL_DEBUG")
+	add_cxflags(flags.x86_64.cxx)
 	add_asflags(flags.x86_64.asm)
 
 	add_files("Src/Kernel/Arch/x86_64/**.asm")

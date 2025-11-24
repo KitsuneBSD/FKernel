@@ -11,15 +11,14 @@
 #define ATA_REG_STATUS 0x07
 
 void ata_primary_handler(uint8_t vector, InterruptFrame *frame) {
+  fk::algorithms::kdebug("INTERRUPT ROUTINE", "Triggering ATA PRIMARY PORT");
   (void)frame;
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s",
-                         __PRETTY_FUNCTION__);
   inb(ATA_PRIMARY_BASE + ATA_REG_STATUS);
   HardwareInterruptManager::the().send_eoi(vector);
 }
 
 void ata_secondary_handler(uint8_t vector, InterruptFrame *frame) {
-  (void)vector;
+  fk::algorithms::kdebug("INTERRUPT ROUTINE", "Triggering ATA SECONDARY PORT");
   (void)frame;
   fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s",
                          __PRETTY_FUNCTION__);

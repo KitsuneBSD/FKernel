@@ -35,7 +35,6 @@ uint32_t APIC::read(uint32_t reg) {
 }
 
 void APIC::initialize() {
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   fk::algorithms::kdebug("APIC", "Initializing Local APIC...");
 
   if (!CPU::the().has_apic()) {
@@ -70,27 +69,23 @@ void APIC::initialize() {
 }
 
 void APIC::send_eoi(uint8_t) {
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   if (lapic_base)
     write(REG_EOI, 0);
 }
 
 void APIC::mask_interrupt(uint8_t irq) {
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   fk::algorithms::kdebug(
       "APIC", "Mask request for IRQ %u ignored (LAPIC doesn't mask that way)",
       irq);
 }
 
 void APIC::unmask_interrupt(uint8_t irq) {
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   fk::algorithms::kdebug(
       "APIC",
       "Unmask request for IRQ %u ignored (LAPIC doesn't unmask that way)", irq);
 }
 
 void APIC::calibrate_timer() {
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   if (!lapic_base)
     return;
 
@@ -112,7 +107,6 @@ void APIC::calibrate_timer() {
 }
 
 void APIC::setup_timer(uint64_t ms) {
-  fk::algorithms::kdebug("INTERRUPT", "Interrupt triggered: %s", __PRETTY_FUNCTION__);
   if (!lapic_base)
     initialize();
 

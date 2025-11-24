@@ -32,3 +32,6 @@ constexpr size_t IST_STACK_SIZE = 16 * fk::types::KiB;
  * @brief Selector for the 64-bit Task State Segment (TSS)
  */
 constexpr uint16_t TSS_SELECTOR = 0x28;
+
+constexpr size_t TSS_INDEX = TSS_SELECTOR >> 3; // 0x28 >> 3 = 5
+constexpr size_t KERNEL_STACK_SIZE = 4096 * 4;

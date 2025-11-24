@@ -101,8 +101,10 @@ constexpr SegmentAccess operator|(SegmentAccess a, SegmentAccess b) {
 static constexpr uint64_t createSegment(SegmentAccess access,
                                         SegmentFlags flags) {
   uint64_t entry = 0;
-  entry |= 0xFFFFULL; // Limit (ignored in 64-bit mode)
-  entry |= static_cast<uint64_t>(access) << 40; // Access byte
-  entry |= static_cast<uint64_t>(flags) << 48;  // Flags
+
+  entry |= 0xFFFFULL;              // limite
+  entry |= (uint64_t)access << 40; // access byte
+  entry |= (uint64_t)flags << 48;  // flags+granularity
+
   return entry;
 }
