@@ -4,7 +4,7 @@ require("Meta.Lib.os_interact")
 require("Meta.Lib.print_message")
 require("Meta.Lib.run_command")
 
-local is_graphical_mode = true
+local is_graphical_mode = false
 local MockOS = "build/FKernel-MockOS.iso"
 local HDA = "build/FKernel-HDA.qcow2"
 
