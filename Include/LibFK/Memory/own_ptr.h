@@ -21,39 +21,39 @@ template <typename T> class OwnPtr {
 public:
   /** @brief Default constructor: no object owned */
   OwnPtr() : m_ptr(nullptr) {
-    fk::algorithms::kdebug("OwnPtr", " default constructed with nullptr");
+    fk::algorithms::kdebug("OWN PTR", " default constructed with nullptr");
   }
 
   /** @brief Construct OwnPtr from raw pointer */
   explicit OwnPtr(T *ptr) : m_ptr(ptr) {
     if (m_ptr)
-      fk::algorithms::kdebug("OwnPtr", " constructed, ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", " constructed, ptr=%p", m_ptr);
     else
-      fk::algorithms::kwarn("OwnPtr", " constructed with nullptr");
+      fk::algorithms::kwarn("OWN PTR", " constructed with nullptr");
   }
 
   /** @brief Move constructor */
   OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
-    fk::algorithms::kdebug("OwnPtr", " move constructed, ptr=%p", m_ptr);
+    fk::algorithms::kdebug("OWN PTR", " move constructed, ptr=%p", m_ptr);
   }
 
   /** @brief Move constructor for convertible types */
   template <typename U>
   OwnPtr(OwnPtr<U> &&other) : m_ptr(static_cast<T *>(other.leakPtr())) {
-    fk::algorithms::kdebug("OwnPtr", " templated move constructed, ptr=%p",
+    fk::algorithms::kdebug("OWN PTR", " templated move constructed, ptr=%p",
                            m_ptr);
   }
 
   /** @brief Destructor */
   ~OwnPtr() {
     if (m_ptr)
-      fk::algorithms::kdebug("OwnPtr", " destroying ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", " destroying ptr=%p", m_ptr);
     clear();
   }
 
   /** @brief Construct OwnPtr from nullptr */
   OwnPtr(nullptr_t) : m_ptr(nullptr) {
-    fk::algorithms::kdebug("OwnPtr", " constructed from nullptr literal");
+    fk::algorithms::kdebug("OWN PTR", " constructed from nullptr literal");
   }
 
   /** @brief Move assignment */
@@ -61,7 +61,7 @@ public:
     if (this != &other) {
       clear();
       m_ptr = other.leakPtr();
-      fk::algorithms::kdebug("OwnPtr", " move assigned, ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", " move assigned, ptr=%p", m_ptr);
     }
     return *this;
   }
@@ -71,7 +71,7 @@ public:
     if (reinterpret_cast<void *>(this) != reinterpret_cast<void *>(&other)) {
       clear();
       m_ptr = static_cast<T *>(other.leakPtr());
-      fk::algorithms::kdebug("OwnPtr", " templated move assigned, ptr=%p",
+      fk::algorithms::kdebug("OWN PTR", " templated move assigned, ptr=%p",
                              m_ptr);
     }
     return *this;
@@ -82,7 +82,7 @@ public:
     if (m_ptr != ptr) {
       clear();
       m_ptr = ptr;
-      fk::algorithms::kdebug("OwnPtr", " assigned raw pointer ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", " assigned raw pointer ptr=%p", m_ptr);
     }
     return *this;
   }
@@ -90,18 +90,18 @@ public:
   /** @brief Assign nullptr */
   OwnPtr &operator=(nullptr_t) {
     clear();
-    fk::algorithms::kdebug("OwnPtr", " assigned nullptr");
+    fk::algorithms::kdebug("OWN PTR", " assigned nullptr");
     return *this;
   }
 
   /** @brief Clear owned pointer */
   void clear() {
     if (m_ptr) {
-      fk::algorithms::kdebug("OwnPtr", " clearing ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", " clearing ptr=%p", m_ptr);
       delete m_ptr;
       m_ptr = nullptr;
     } else {
-      fk::algorithms::kdebug("OwnPtr", " clear called on nullptr");
+      fk::algorithms::kdebug("OWN PTR", " clear called on nullptr");
     }
   }
 
@@ -109,7 +109,7 @@ public:
   T *leakPtr() {
     T *leaked = m_ptr;
     m_ptr = nullptr;
-    fk::algorithms::kdebug("OwnPtr", " leaked ptr=%p", leaked);
+    fk::algorithms::kdebug("OWN PTR", " leaked ptr=%p", leaked);
     return leaked;
   }
 
@@ -142,31 +142,31 @@ private:
 template <typename T> class OwnPtr<T[]> {
 public:
   OwnPtr() : m_ptr(nullptr) {
-    fk::algorithms::kdebug("OwnPtr", "<T[]> default constructed with nullptr");
+    fk::algorithms::kdebug("OWN PTR", "<T[]> default constructed with nullptr");
   }
 
   explicit OwnPtr(T *ptr) : m_ptr(ptr) {
     if (m_ptr)
-      fk::algorithms::kdebug("OwnPtr", "<T[]> constructed, ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", "<T[]> constructed, ptr=%p", m_ptr);
     else
-      fk::algorithms::kwarn("OwnPtr", "<T[]> constructed with nullptr");
+      fk::algorithms::kwarn("OWN PTR", "<T[]> constructed with nullptr");
   }
 
   OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
-    fk::algorithms::kdebug("OwnPtr", "<T[]> move constructed, ptr=%p", m_ptr);
+    fk::algorithms::kdebug("OWN PTR", "<T[]> move constructed, ptr=%p", m_ptr);
   }
 
   ~OwnPtr() { clear(); }
 
   OwnPtr(nullptr_t) : m_ptr(nullptr) {
-    fk::algorithms::kdebug("OwnPtr", "<T[]> constructed from nullptr literal");
+    fk::algorithms::kdebug("OWN PTR", "<T[]> constructed from nullptr literal");
   }
 
   OwnPtr &operator=(OwnPtr &&other) {
     if (this != &other) {
       clear();
       m_ptr = other.leakPtr();
-      fk::algorithms::kdebug("OwnPtr", "<T[]> move assigned, ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", "<T[]> move assigned, ptr=%p", m_ptr);
     }
     return *this;
   }
@@ -175,7 +175,7 @@ public:
     if (m_ptr != ptr) {
       clear();
       m_ptr = ptr;
-      fk::algorithms::kdebug("OwnPtr", "<T[]> assigned raw pointer ptr=%p",
+      fk::algorithms::kdebug("OWN PTR", "<T[]> assigned raw pointer ptr=%p",
                              m_ptr);
     }
     return *this;
@@ -183,24 +183,24 @@ public:
 
   OwnPtr &operator=(nullptr_t) {
     clear();
-    fk::algorithms::kdebug("OwnPtr", "<T[]> assigned nullptr");
+    fk::algorithms::kdebug("OWN PTR", "<T[]> assigned nullptr");
     return *this;
   }
 
   void clear() {
     if (m_ptr) {
-      fk::algorithms::kdebug("OwnPtr", "<T[]> clearing ptr=%p", m_ptr);
+      fk::algorithms::kdebug("OWN PTR", "<T[]> clearing ptr=%p", m_ptr);
       delete[] m_ptr;
       m_ptr = nullptr;
     } else {
-      fk::algorithms::kdebug("OwnPtr", "<T[]> clear called on nullptr");
+      fk::algorithms::kdebug("OWN PTR", "<T[]> clear called on nullptr");
     }
   }
 
   T *leakPtr() {
     T *leaked = m_ptr;
     m_ptr = nullptr;
-    fk::algorithms::kdebug("OwnPtr", "<T[]> leaked ptr=%p", leaked);
+    fk::algorithms::kdebug("OWN PTR", "<T[]> leaked ptr=%p", leaked);
     return leaked;
   }
 
