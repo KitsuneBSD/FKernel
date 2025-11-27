@@ -231,11 +231,11 @@ template <typename T,
           typename = fk::traits::enable_if_t<!fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(T *ptr) {
   if (!ptr) {
-    fk::algorithms::kwarn("Adopt Own", " received nullptr for non-array type");
+    fk::algorithms::kwarn("ADOPT OWN", "Received nullptr for non-array type");
     return OwnPtr<T>(nullptr);
   }
-  fk::algorithms::kdebug("Adopt Own",
-                         " ownership transferred for non-array type");
+  fk::algorithms::kdebug("ADOPT OWN",
+                         "Ownership transferred for non-array type");
   return OwnPtr<T>(ptr);
 }
 
@@ -243,10 +243,10 @@ template <typename T,
           typename = fk::traits::enable_if_t<fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(fk::traits::remove_extent_t<T> *ptr) {
   if (!ptr) {
-    fk::algorithms::kwarn("Adopt Own", " received nullptr for array type");
+    fk::algorithms::kwarn("ADOPT OWN", "Received nullptr for array type");
     return OwnPtr<T>(nullptr);
   }
-  fk::algorithms::kdebug("Adopt Own", " ownership transferred for array type");
+  fk::algorithms::kdebug("ADOPT OWN", "Ownership transferred for array type");
   return OwnPtr<T>(ptr);
 }
 
