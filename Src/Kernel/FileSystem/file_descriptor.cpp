@@ -53,38 +53,56 @@ FileDescriptor *FileDescriptorTable::get(int file_descriptor) {
 }
 
 int file_descriptor_open_path(const char *path, int flags) {
+  fk::algorithms::kdebug("FD_UTIL", "Opening path '%s' with flags 0x%x", path, flags);
   int fd = VirtualFS::the().open(path, flags);
-  if (fd < 0)
+  if (fd < 0) {
+    fk::algorithms::kwarn("FD_UTIL", "Failed to open path '%s', error %d", path, fd);
     return fd;
+  }
+  fk::algorithms::kdebug("FD_UTIL", "Path '%s' opened, assigned fd %d", path, fd);
   return fd;
 }
 
 int file_descriptor_read(int file_descriptor, void *buf, size_t sz) {
+  fk::algorithms::kdebug("FD_UTIL", "Reading from fd %d, size %zu", file_descriptor, sz);
   FileDescriptor *f = FileDescriptorTable::the().get(file_descriptor);
-  if (!f || !f->vnode)
+  if (!f || !f->vnode) {
+    fk::algorithms::kwarn("FD_UTIL", "Read failed: invalid file descriptor %d", file_descriptor);
     return -1;
+  }
   int ret = f->vnode->read(f, buf, sz, f->offset);
   if (ret > 0)
     f->offset += static_cast<uint64_t>(ret);
+  fk::algorithms::kdebug("FD_UTIL", "Read %d bytes from fd %d", ret, file_descriptor);
   return ret;
 }
 
 int file_descriptor_write(int file_descriptor, const void *buf, size_t sz) {
+  fk::algorithms::kdebug("FD_UTIL", "Writing to fd %d, size %zu", file_descriptor, sz);
   FileDescriptor *f = FileDescriptorTable::the().get(file_descriptor);
-  if (!f || !f->vnode)
+  if (!f || !f->vnode) {
+    fk::algorithms::kwarn("FD_UTIL", "Write failed: invalid file descriptor %d", file_descriptor);
     return -1;
+  }
   int ret = f->vnode->write(f, buf, sz, f->offset);
   if (ret > 0)
     f->offset += static_cast<uint64_t>(ret);
+  fk::algorithms::kdebug("FD_UTIL", "Wrote %d bytes to fd %d", ret, file_descriptor);
   return ret;
 }
 
 int file_descriptor_close(int file_descriptor) {
-  return FileDescriptorTable::the().close(file_descriptor);
+  fk::algorithms::kdebug("FD_UTIL", "Closing fd %d", file_descriptor);
+  int ret = FileDescriptorTable::the().close(file_descriptor);
+  if (ret < 0) {
+    fk::algorithms::kwarn("FD_UTIL", "Failed to close fd %d, error %d", file_descriptor, ret);
+  }
+  return ret;
 }
 
 int FileDescriptorTable::dup2(int old_fd, int new_fd) {
 
+  fk::algorithms::kdebug("FD", "dup2: duplicating fd %d to %d", old_fd, new_fd);
   FileDescriptor *old_f = FileDescriptorTable::the().get(old_fd);
 
   if (!old_f || !old_f->used) {
@@ -96,6 +114,7 @@ int FileDescriptorTable::dup2(int old_fd, int new_fd) {
 
   if (FileDescriptorTable::the().get(new_fd)) {
 
+    fk::algorithms::kdebug("FD", "dup2: closing existing fd %d before duplication", new_fd);
     if (FileDescriptorTable::the().close(new_fd) < 0) {
 
       fk::algorithms::kwarn(
@@ -161,7 +180,6 @@ int FileDescriptorTable::dup2(int old_fd, int new_fd) {
 
   FileDescriptorTable::the().m_file_descriptors[new_fd] = new_file_descriptor;
 
-  fk::algorithms::kdebug("FD", "dup2: duplicated fd %d to %d", old_fd, new_fd);
-
+  fk::algorithms::klog("FD", "dup2: duplicated fd %d to %d successfully", old_fd, new_fd);
   return 0;
 }

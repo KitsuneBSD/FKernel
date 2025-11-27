@@ -3,6 +3,8 @@
 #include <Kernel/Posix/errno.h>
 #include <LibFK/Algorithms/log.h>
 
+namespace fkernel::block {
+
 PartitionBlockDevice::PartitionBlockDevice(
     fk::memory::RetainPtr<BlockDevice> device, PartitionLocation &&location)
     : m_device(fk::types::move(device)), m_location(fk::types::move(location)) {
@@ -189,3 +191,5 @@ int PartitionBlockDevice::write_sectors(uint32_t lba, uint8_t sector_count,
   }
   return sectors_written;
 }
+
+} // namespace fkernel::block

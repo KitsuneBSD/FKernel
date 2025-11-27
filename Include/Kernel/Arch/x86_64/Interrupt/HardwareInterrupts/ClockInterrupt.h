@@ -41,4 +41,12 @@ public:
 
   void set_clock(Clock *clock);
   DateTime datetime();
+
+  void set_memory_manager(bool has_memory_manager) { 
+    // Currently no clocks depend on memory manager, but this is for future proofing
+    (void)has_memory_manager; 
+  }
+
+private:
+  void select_and_configure_clock();
 };

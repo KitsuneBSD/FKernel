@@ -35,6 +35,11 @@ uint32_t APIC::read(uint32_t reg) {
 }
 
 void APIC::initialize() {
+  if (lapic_base != 0) {
+    fk::algorithms::kdebug("APIC", "APIC already initialized.");
+    return;
+  }
+
   fk::algorithms::kdebug("APIC", "Initializing Local APIC...");
 
   if (!CPU::the().has_apic()) {

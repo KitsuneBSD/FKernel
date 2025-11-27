@@ -23,6 +23,11 @@ constexpr uint32_t APIC_LVT_TIMER_MODE_PERIODIC = 1 << 17;
 constexpr uint32_t APIC_TIMER_DIVISOR = 0x3;
 
 void X2APIC::initialize() {
+  if (m_is_initialized) {
+    fk::algorithms::kdebug("x2APIC", "x2APIC already initialized.");
+    return;
+  }
+
   fk::algorithms::kdebug("x2APIC", "Initializing Local x2APIC...");
 
   if (!CPU::the().has_x2apic()) {
@@ -39,6 +44,7 @@ void X2APIC::initialize() {
   fk::algorithms::klog("x2APIC",
                        "x2APIC initialized and spurious vector set to %u",
                        APIC_SPURIOUS_VECTOR);
+  m_is_initialized = true;
 
   calibrate_timer();
 }

@@ -13,6 +13,7 @@ class X2APIC : public HardwareInterrupt {
 private:
   uint64_t apic_ticks_per_ms = 0; ///< Timer ticks per ms
   fk::text::String m_name = "x2APIC";
+  bool m_is_initialized = false;
 
 public:
   static X2APIC &the() {

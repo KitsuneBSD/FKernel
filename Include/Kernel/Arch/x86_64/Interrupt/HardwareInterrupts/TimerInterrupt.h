@@ -26,7 +26,9 @@ public:
   void initialize(uint32_t freq);
   void sleep(uint64_t awaited_ticks);
 
-  void set_memory_manager(bool has_memory_manager) {
-    m_has_memory_manager = has_memory_manager;
-  }
+  void set_timer(Timer *timer);
+  void set_memory_manager(bool has_memory_manager);
+
+private:
+  void select_and_configure_timer(uint32_t freq);
 };

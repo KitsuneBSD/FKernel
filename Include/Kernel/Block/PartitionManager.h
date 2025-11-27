@@ -3,6 +3,7 @@
 #include <Kernel/Block/BlockDevice.h>
 #include <Kernel/Block/PartitionDeviceList.h>
 #include <Kernel/Block/PartitionEntry.h>
+#include <Kernel/FileSystem/VirtualFS/filesystem.h> // Include the new base class
 
 #include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Memory/retain_ptr.h>
@@ -63,4 +64,8 @@ private:
   void set_strategy_for_scheme(PartitionScheme scheme);
   fk::memory::OwnPtr<uint8_t[]> prepare_gpt_parsing_data(const uint8_t* sector1_header) const;
   PartitionDeviceList create_devices_from_entries(const PartitionEntry* entries, int count);
+  
+  // Modified to accept the base Filesystem class
+  void mount_filesystem(fk::memory::OwnPtr<fkernel::fs::Filesystem> filesystem, int partition_index);
 };
+

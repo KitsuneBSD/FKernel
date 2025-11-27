@@ -39,9 +39,11 @@ public:
   void unmask_interrupt(uint8_t irq);
   void send_eoi(uint8_t irq);
 
-  void set_memory_manager(bool is_memory_manager) {
-    m_has_memory_manager = is_memory_manager;
-  }
+  void set_controller(HardwareInterrupt *controller);
+  void set_memory_manager(bool is_memory_manager);
+
+private:
+  void select_and_configure_controller();
 
   fk::text::String get_name() { return m_controller ? m_controller->get_name() : "None"; }
   HardwareInterrupt *get_m_controller() { return m_controller; }

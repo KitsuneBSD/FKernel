@@ -2,199 +2,243 @@
 #include <Kernel/Block/Partition/MbrPartition.h>
 #include <Kernel/Block/Partition/PartitionParsingStrategy.h>
 #include <Kernel/Block/PartitionManager.h>
+#include <Kernel/FileSystem/Fat/fat_fs.h> // Keep for FAT-specific includes if needed elsewhere, but logic moves
+#include <Kernel/FileSystem/VirtualFS/filesystem.h>
+#include <Kernel/FileSystem/VirtualFS/vfs.h>
 #include <LibC/stdio.h> // For snprintf
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Memory/own_ptr.h>
+#include <LibFK/Memory/retain_ptr.h>
+
+namespace fkernel::block {
+class PartitionBlockDevice;
+}
+
+using fkernel::block::PartitionBlockDevice;
 
 PartitionManager::PartitionManager(fk::memory::RetainPtr<BlockDevice> device)
-    : m_device(fk::types::move(device)) {
-  fk::algorithms::klog("PARTITION MANAGER", "PartitionManager initialized.");
+    : m_device(device) {
+  fk::algorithms::klog("PARTITION MANAGER", "PartitionManager created.");
 }
 
-PartitionManager::~PartitionManager() = default;
+PartitionManager::~PartitionManager() {
+  fk::algorithms::klog("PARTITION MANAGER", "PartitionManager destroyed.");
+}
 
-void PartitionManager::set_strategy(
-    fk::memory::OwnPtr<PartitionParsingStrategy> strategy) {
-  m_strategy = fk::types::move(strategy);
-  if (m_strategy) {
-    fk::algorithms::klog("PARTITION MANAGER",
-                         "Partition parsing strategy set.");
-  } else {
-    fk::algorithms::kwarn("PARTITION MANAGER",
-                          "Partition parsing strategy set to null.");
+void PartitionManager::mount_filesystem(
+    fk::memory::OwnPtr<fkernel::fs::Filesystem> filesystem,
+    int partition_index) {
+  if (!filesystem) {
+    fk::algorithms::kerror(
+        "PARTITION MANAGER",
+        "Cannot mount filesystem: filesystem object is null.");
+    return;
   }
+
+  int init_result = filesystem->initialize();
+  if (init_result < 0) {
+    fk::algorithms::kerror(
+        "PARTITION MANAGER",
+        "Failed to initialize filesystem for partition %d, error: %d.",
+        partition_index, init_result);
+    return;
+  }
+
+  auto root_vnode = filesystem->root_vnode();
+  if (!root_vnode) {
+    fk::algorithms::kerror(
+        "PARTITION MANAGER",
+        "Filesystem for partition %d returned a null root VNode.",
+        partition_index);
+    return;
+  }
+
+  char mount_name[16];
+  const char *fs_type_str = "unknown";
+  switch (filesystem->type()) {
+  case fkernel::fs::Filesystem::Type::FAT:
+    fs_type_str = "fat";
+    break;
+  case fkernel::fs::Filesystem::Type::Ext2:
+    fs_type_str = "ext2";
+    break;
+  case fkernel::fs::Filesystem::Type::RamFS:
+    fs_type_str = "ramfs";
+    break;
+  case fkernel::fs::Filesystem::Type::DevFS:
+    fs_type_str = "devfs";
+    break;
+  case fkernel::fs::Filesystem::Type::Unknown:
+    // Fallthrough
+    break;
+  }
+  snprintf(mount_name, sizeof(mount_name), "%s%d", fs_type_str,
+           partition_index);
+
+  // The root VNode from the filesystem already has its fs_private set to the
+  // filesystem instance itself. We just need to update its name for the
+  // mountpoint.
+  root_vnode->m_name = mount_name;
+
+  int mount_result = VirtualFS::the().mount(mount_name, root_vnode);
+  if (mount_result < 0) {
+    fk::algorithms::kerror("PARTITION MANAGER",
+                           "Failed to mount %s filesystem at /%s.", fs_type_str,
+                           mount_name);
+    return;
+  }
+  // The filesystem is now owned by the VFS (via the VNode's fs_private). Leak
+  // the pointer from OwnPtr.
+  filesystem.leakPtr();
+
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "Successfully mounted %s filesystem as /%s.",
+                       fs_type_str, mount_name);
 }
 
-bool PartitionManager::is_gpt(const uint8_t *sector) const {
-  if (sector[510] != 0x55 || sector[511] != 0xAA) {
-    fk::algorithms::kdebug("PARTITION MANAGER",
-                           "is_gpt: MBR signature 0x55AA not found.");
+bool PartitionManager::read_sector(uint8_t *buffer, uint64_t sector) const {
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "read_sector called for sector %llu.", sector);
+  if (!m_device) {
+    fk::algorithms::kerror("PARTITION MANAGER",
+                           "read_sector: Block device is null.");
     return false;
   }
-
-  const MbrEntry *entry = reinterpret_cast<const MbrEntry *>(sector + 446);
-
-  if (static_cast<PartitionType>(entry->partition_type) ==
-      PartitionType::GPT_PROTECTIVE_MBR) {
-    fk::algorithms::kdebug("PARTITION MANAGER",
-                           "is_gpt: Found GPT Protective MBR entry.");
-    return true;
-  }
-  fk::algorithms::kdebug("PARTITION MANAGER",
-                         "is_gpt: No GPT Protective MBR entry found.");
-  return false;
-}
-
-bool PartitionManager::is_mbr(const uint8_t *sector) const {
-  if (sector[510] != 0x55 || sector[511] != 0xAA) {
-    fk::algorithms::kdebug("PARTITION MANAGER",
-                           "is_mbr: MBR signature 0x55AA not found.");
-    return false;
-  }
-
-  const MbrEntry *entry = reinterpret_cast<const MbrEntry *>(sector + 446);
-  for (int i = 0; i < 4; ++i) {
-    if (static_cast<PartitionType>(entry[i].partition_type) ==
-        PartitionType::GPT_PROTECTIVE_MBR) {
-      fk::algorithms::kdebug(
-          "PARTITION MANAGER",
-          "is_mbr: Found GPT Protective MBR entry. Not an MBR scheme.");
-      return false;
-    }
-  }
-  fk::algorithms::kdebug(
-      "PARTITION MANAGER",
-      "is_mbr: No GPT Protective MBR entry found. Likely an MBR scheme.");
-  return true;
-}
-
-bool PartitionManager::read_sector(uint8_t *buffer, uint64_t lba) const {
-  if (m_device->read(nullptr, nullptr, buffer, 512, lba * 512) != 512) {
-    fk::algorithms::kwarn("PARTITION MANAGER", "Failed to read sector %llu.",
-                          lba);
-    return false;
-  }
-  return true;
+  // BlockDevice::read_sectors expects uint32_t lba and uint8_t sector_count.
+  // Assuming 'sector' can fit in uint32_t and we read 1 sector.
+  return m_device->read_sectors(static_cast<uint32_t>(sector), 1, buffer) >= 0;
 }
 
 PartitionManager::PartitionScheme
 PartitionManager::detect_scheme(const uint8_t *sector0) const {
-  alignas(16) uint8_t sector1[512];
-  if (read_sector(sector1, 1)) {
-    static const uint8_t gpt_sig[8] = {'E', 'F', 'I', ' ', 'P', 'A', 'R', 'T'};
-    if (memcmp(sector1, gpt_sig, 8) == 0) {
-      fk::algorithms::klog("PARTITION MANAGER",
-                           "GPT partition table detected (via signature).");
-      return PartitionScheme::GPT;
-    }
-  }
-
+  (void)sector0; // Suppress unused parameter warning
+  fk::algorithms::klog("PARTITION MANAGER", "detect_scheme called.");
   if (is_gpt(sector0)) {
-    fk::algorithms::klog(
-        "PARTITION MANAGER",
-        "GPT partition table detected (protective MBR found).");
+    fk::algorithms::klog("PARTITION MANAGER", "Detected GPT scheme.");
     return PartitionScheme::GPT;
   }
-
   if (is_mbr(sector0)) {
-    fk::algorithms::klog("PARTITION MANAGER", "MBR partition table detected.");
+    fk::algorithms::klog("PARTITION MANAGER", "Detected MBR scheme.");
     return PartitionScheme::MBR;
   }
-
-  fk::algorithms::kwarn("PARTITION MANAGER", "Unknown partition table format.");
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "Detected Unknown partition scheme.");
   return PartitionScheme::Unknown;
 }
 
+bool PartitionManager::is_mbr(const uint8_t *sector) const {
+  // MBR signature is 0xAA55 at offset 510
+  return sector[510] == 0x55 && sector[511] == 0xAA;
+}
+
+bool PartitionManager::is_gpt(const uint8_t *sector) const {
+  // GPT Protective MBR has partition type 0xEE at offset 450 (MBR entry 1, type
+  // field) This is a heuristic, a full GPT check requires reading LBA1
+  const MbrEntry *entry = reinterpret_cast<const MbrEntry *>(sector + 446);
+  return entry[0].partition_type == 0xEE && is_mbr(sector);
+}
+
 void PartitionManager::set_strategy_for_scheme(PartitionScheme scheme) {
-  if (scheme == PartitionScheme::GPT) {
-    m_strategy = fk::memory::adopt_own(new GptPartitionStrategy());
-    fk::algorithms::klog("PARTITION MANAGER",
-                         "Set strategy to GPTPartitionStrategy.");
-    return;
-  }
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "set_strategy_for_scheme called for scheme %d.",
+                       static_cast<int>(scheme));
   if (scheme == PartitionScheme::MBR) {
     m_strategy = fk::memory::adopt_own(new MbrPartitionStrategy());
-    fk::algorithms::klog("PARTITION MANAGER",
-                         "Set strategy to MbrPartitionStrategy.");
-    return;
+  } else if (scheme == PartitionScheme::GPT) {
+    m_strategy = fk::memory::adopt_own(new GptPartitionStrategy());
+  } else {
+    m_strategy = nullptr;
   }
-  fk::algorithms::kwarn("PARTITION MANAGER",
-                        "Attempted to set strategy for unknown scheme.");
 }
 
 fk::memory::OwnPtr<uint8_t[]> PartitionManager::prepare_gpt_parsing_data(
     const uint8_t *sector1_header) const {
-  fk::algorithms::klog("PARTITION MANAGER", "Preparing GPT parsing data.");
-  const GptHeader *hdr = reinterpret_cast<const GptHeader *>(sector1_header);
-  size_t pe_array_size =
-      (size_t)hdr->num_partition_entries * hdr->partition_entry_size;
+  fk::algorithms::klog("PARTITION MANAGER", "prepare_gpt_parsing_data called.");
+  const GptHeader *gpt_header =
+      reinterpret_cast<const GptHeader *>(sector1_header);
 
-  if (pe_array_size == 0) {
-    fk::algorithms::klog(
-        "PARTITION MANAGER",
-        "No partition entries found in header, pe_array_size is 0.");
-    return nullptr;
-  }
-  fk::algorithms::klog("PARTITION MANAGER",
-                       "GPT Partition Entry Array Size: %llu bytes "
-                       "(num_entries: %u, entry_size: %u).",
-                       pe_array_size, hdr->num_partition_entries,
-                       hdr->partition_entry_size);
-
-  size_t buffer_size = 512 + pe_array_size; // Header sector + partition entries
-  auto gpt_buffer = fk::memory::adopt_own<uint8_t[]>(new uint8_t[buffer_size]);
-  if (!gpt_buffer) {
+  if (gpt_header->signature != 0x5452415020494645ULL) { // "EFI PART"
     fk::algorithms::kerror(
         "PARTITION MANAGER",
-        "Failed to allocate buffer for GPT parsing data (size: %llu).",
-        buffer_size);
+        "GPT header signature invalid in prepare_gpt_parsing_data.");
     return nullptr;
   }
-  memcpy(gpt_buffer.ptr(), sector1_header, 512);
-  fk::algorithms::klog("PARTITION MANAGER",
-                       "Copied GPT header (sector 1) into buffer.");
 
-  // Read the partition entry array that starts at hdr->partition_entries_lba
-  // The current implementation of GptPartitionStrategy::parse assumes it
-  // follows sector 1 (base + 512) for simplicity in the input buffer. However,
-  // the spec says partition_entries_lba, which could be different. This needs
-  // careful handling. For now, assuming hdr->partition_entries_lba is LBA 2 (so
-  // it starts right after LBA 1 header).
+  // Calculate size needed for header + all partition entries
+  size_t partition_array_bytes = (size_t)gpt_header->num_partition_entries *
+                                 gpt_header->partition_entry_size;
+  size_t total_buffer_size = 512 + partition_array_bytes; // Header + entries
 
-  fk::algorithms::klog("PARTITION MANAGER",
-                       "Attempting to read GPT partition entries from LBA "
-                       "%llu, size %llu bytes.",
-                       hdr->partition_entries_lba, pe_array_size);
-  int bytes_read =
-      m_device->read(nullptr, nullptr, gpt_buffer.ptr() + 512, pe_array_size,
-                     hdr->partition_entries_lba * 512);
-
-  if (bytes_read < 0 || (size_t)bytes_read != pe_array_size) {
-    fk::algorithms::kwarn("PARTITION MANAGER",
-                          "Failed to read GPT partition entries from LBA %llu. "
-                          "Expected %llu bytes, read %d bytes.",
-                          hdr->partition_entries_lba, pe_array_size,
-                          bytes_read);
+  fk::memory::OwnPtr<uint8_t[]> buffer =
+      fk::memory::adopt_own<uint8_t[]>(new uint8_t[total_buffer_size]);
+  if (!buffer) {
+    fk::algorithms::kerror("PARTITION MANAGER",
+                           "Failed to allocate buffer for GPT parsing data.");
     return nullptr;
   }
-  fk::algorithms::klog("PARTITION MANAGER",
-                       "Successfully read %d bytes for GPT partition entries.",
-                       bytes_read);
 
-  return gpt_buffer;
+  // Copy LBA 1 (GPT Header) into the beginning of the buffer
+  memcpy(buffer.ptr(), sector1_header, 512);
+
+  // Read partition entry array (starts at LBA specified by
+  // gpt_header->partition_entries_lba) Assuming partition_entries_lba is
+  // typically 2, so the array starts right after the header. We need to read
+  // from the underlying device at that LBA.
+  uint64_t lba_start_of_entries = gpt_header->partition_entries_lba;
+  size_t sectors_to_read =
+      (partition_array_bytes + 511) / 512; // Round up to nearest sector
+
+  for (size_t i = 0; i < sectors_to_read; ++i) {
+    if (!read_sector(buffer.ptr() + 512 + (i * 512),
+                     lba_start_of_entries + i)) {
+      fk::algorithms::kerror("PARTITION MANAGER",
+                             "Failed to read GPT partition entry sector %llu.",
+                             lba_start_of_entries + i);
+      return nullptr;
+    }
+  }
+
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "Prepared GPT parsing data. Total size: %zu bytes.",
+                       total_buffer_size);
+  return buffer;
 }
 
 PartitionDeviceList
 PartitionManager::create_devices_from_entries(const PartitionEntry *entries,
-                                              int count) {
-  PartitionDeviceList partitions;
-  for (int i = 0; i < count; ++i) {
-    PartitionLocation location(entries[i].lba_start, entries[i].lba_count);
-    partitions.add(fk::memory::adopt_retain(
-        new PartitionBlockDevice(m_device, fk::types::move(location))));
+                                              int num_entries) {
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "create_devices_from_entries called with %d entries.",
+                       num_entries);
+  PartitionDeviceList devices;
+  for (int i = 0; i < num_entries; ++i) {
+    const PartitionEntry &entry = entries[i];
+    if (entry.lba_count == 0) {
+      fk::algorithms::kdebug("PARTITION MANAGER",
+                             "Skipping empty partition entry %d.", i);
+      continue;
+    }
+
+    PartitionLocation location(entry.lba_start, entry.lba_count);
+    fk::memory::RetainPtr<PartitionBlockDevice> partition_dev =
+        fk::memory::adopt_retain(
+            new PartitionBlockDevice(m_device, fk::types::move(location)));
+
+    // Register partition device with DevFS.
+    // The name should be based on the parent device name (e.g., ada0p1, ada0p2)
+    // This part of registration is already handled in AtaController, but
+    // conceptually, if PartitionManager were standalone, it would register
+    // here. For now, just add to the list.
+    devices.add(fk::types::move(partition_dev));
+    fk::algorithms::klog("PARTITION MANAGER",
+                         "Created PartitionBlockDevice for LBA %u, Count %u.",
+                         entry.lba_start, entry.lba_count);
   }
-  return partitions;
+  fk::algorithms::klog("PARTITION MANAGER",
+                       "Finished creating %zu partition devices.",
+                       devices.count());
+  return devices;
 }
 
 PartitionDeviceList PartitionManager::detect_partitions() {
@@ -258,54 +302,37 @@ PartitionDeviceList PartitionManager::detect_partitions() {
   PartitionDeviceList detected_partitions =
       create_devices_from_entries(entries, num_entries);
 
-  for (int i = 0; i < num_entries; ++i) {
-    const PartitionEntry &entry = entries[i];
-    char chs_info[64]; // Increased buffer size for safety
-    if (entry.has_chs) {
-      snprintf(chs_info, sizeof(chs_info), "CHS: %u/%u/%u - %u/%u/%u",
-               entry.chs_start[0], entry.chs_start[1], entry.chs_start[2],
-               entry.chs_end[0], entry.chs_end[1], entry.chs_end[2]);
+  for (size_t i = 0; i < detected_partitions.count(); ++i) {
+    fk::memory::OwnPtr<fkernel::fs::Filesystem> filesystem_to_mount = nullptr;
+    fk::memory::RetainPtr<fkernel::block::PartitionBlockDevice>
+        partition_device = detected_partitions.begin()[i];
+
+    // Iterate through registered filesystem drivers to probe the partition
+    for (auto probe_func : fkernel::fs::Filesystem::s_filesystem_drivers) {
+      if (probe_func) {
+        fk::algorithms::klog("PARTITION MANAGER",
+                             "Attempting to probe partition %zu with a "
+                             "registered filesystem driver.",
+                             i);
+        fk::memory::optional<fk::memory::OwnPtr<fkernel::fs::Filesystem>>
+            probed_fs = probe_func(
+                partition_device,
+                0); // Pass 0 as first_sector for now, adjust if needed
+        if (probed_fs.has_value()) {
+          filesystem_to_mount = fk::types::move(probed_fs.value());
+          break; // Found and created a filesystem, stop probing with other
+                 // drivers
+        }
+      }
+    }
+
+    if (filesystem_to_mount) {
+      mount_filesystem(fk::types::move(filesystem_to_mount), i);
     } else {
-      snprintf(chs_info, sizeof(chs_info), "(LBA mode)");
+      fk::algorithms::kwarn(
+          "PARTITION MANAGER",
+          "No supported filesystem detected for partition %zu.", i);
     }
-    const char *type_str = "Unknown";
-    // A more comprehensive mapping of PartitionType to string would be ideal,
-    // but for now, generic.
-    switch (entry.type) {
-    case PartitionType::FAT12:
-      type_str = "FAT12";
-      break;
-    case PartitionType::FAT16:
-      type_str = "FAT16";
-      break;
-    case PartitionType::Extended:
-      type_str = "Extended";
-      break;
-    case PartitionType::FAT32:
-      type_str = "FAT32";
-      break;
-    case PartitionType::LINUX_SWAP:
-      type_str = "Linux Swap";
-      break;
-    case PartitionType::LINUX_FILESYSTEM:
-      type_str = "Linux Filesystem";
-      break;
-    case PartitionType::GPT_PROTECTIVE_MBR:
-      type_str = "GPT Protective MBR";
-      break;
-    case PartitionType::EFI_SYSTEM:
-      type_str = "EFI System";
-      break;
-    default:
-      type_str = "Unknown";
-      break;
-    }
-    fk::algorithms::klog("PARTITION MANAGER",
-                         "  Partition %d: Type 0x%x (%s), Bootable: %s, LBA "
-                         "Start %u, Count %u sectors. %s",
-                         i, static_cast<uint8_t>(entry.type), type_str,
-                         entry.is_bootable ? "Yes" : "No", entry.lba_start,
-                         entry.lba_count, chs_info);
   }
 
   fk::algorithms::klog("PARTITION MANAGER",

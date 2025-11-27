@@ -11,6 +11,7 @@ DevFS::DevFS() {
   root_node->inode = new Inode(2);
   root_node->ops = &ops;
   d_root = fk::memory::adopt_retain(root_node);
+  fk::algorithms::klog("DEVFS", "DevFS initialized, root node '/dev' created.");
 }
 
 DevFS &DevFS::the() {
@@ -44,6 +45,7 @@ int DevFS::register_device(const char *prefix, VNodeType type, VNodeOps *ops,
     if (!exists)
       break;
 
+    fk::algorithms::kdebug("DEVFS", "Device name '%s' already exists, trying next index.", name_buf);
     ++index;
   }
 
@@ -90,6 +92,7 @@ int DevFS::register_device_static(const char *name, VNodeType type,
 }
 
 int DevFS::unregister_device(const char *name) {
+  fk::algorithms::kdebug("DEVFS", "Attempting to unregister device '%s'", name);
   for (size_t i = 0; i < d_devices.size(); ++i) {
     if (strcmp(d_devices[i].d_name.c_str(), name) == 0) {
       d_devices.erase(i);
@@ -112,6 +115,7 @@ int DevFS::unregister_device(const char *name) {
 
 int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
                         fk::memory::RetainPtr<VNode> &out) {
+  fk::algorithms::kdebug("DEVFS", "Lookup for '%s' in vnode '%s'", name, vnode->m_name.c_str());
   (void)fd;
   if (!vnode || vnode->type != VNodeType::Directory)
     return -1;
@@ -119,6 +123,7 @@ int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
   for (auto &entry : vnode->dir_entries) {
     if (strcmp(entry.m_name.c_str(), name) == 0) {
       out = entry.m_vnode;
+      fk::algorithms::kdebug("DEVFS", "Lookup: found device '%s'", name);
       return 0;
     }
   }
@@ -129,6 +134,7 @@ int DevFS::devfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
 
 int DevFS::devfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer,
                          size_t max_entries) {
+  fk::algorithms::kdebug("DEVFS", "Readdir for vnode '%s', max_entries %zu", vnode->m_name.c_str(), max_entries);
   (void)fd;
   if (!vnode || vnode->type != VNodeType::Directory)
     return -1;
@@ -141,10 +147,12 @@ int DevFS::devfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer,
   for (size_t i = 0; i < n; ++i)
     buf[i] = vnode->dir_entries[i];
 
+  fk::algorithms::kdebug("DEVFS", "Readdir: returned %zu entries.", n);
   return static_cast<int>(n);
 }
 
 int DevFS::devfs_open(VNode *vnode, FileDescriptor *fd, int flags) {
+  fk::algorithms::kdebug("DEVFS", "Opening device '%s' with flags 0x%x", vnode->m_name.c_str(), flags);
   (void)fd;
   if (vnode->ops && vnode->ops->open)
     return vnode->ops->open(vnode, fd, flags);
@@ -152,6 +160,7 @@ int DevFS::devfs_open(VNode *vnode, FileDescriptor *fd, int flags) {
 }
 
 int DevFS::devfs_close(VNode *vnode, FileDescriptor *fd) {
+  fk::algorithms::kdebug("DEVFS", "Closing device '%s'", vnode->m_name.c_str());
   (void)fd;
   if (vnode->ops && vnode->ops->close)
     return vnode->ops->close(vnode, fd);
@@ -160,6 +169,7 @@ int DevFS::devfs_close(VNode *vnode, FileDescriptor *fd) {
 
 int DevFS::devfs_read(VNode *vnode, FileDescriptor *fd, void *buffer,
                       size_t size, size_t offset) {
+  fk::algorithms::kdebug("DEVFS", "Reading from device '%s', size %zu, offset %zu", vnode->m_name.c_str(), size, offset);
   (void)fd;
   if (vnode->ops && vnode->ops->read)
     return vnode->ops->read(vnode, fd, buffer, size, offset);
@@ -168,6 +178,7 @@ int DevFS::devfs_read(VNode *vnode, FileDescriptor *fd, void *buffer,
 
 int DevFS::devfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
                        size_t size, size_t offset) {
+  fk::algorithms::kdebug("DEVFS", "Writing to device '%s', size %zu, offset %zu", vnode->m_name.c_str(), size, offset);
   (void)fd;
   if (vnode->ops && vnode->ops->write)
     return vnode->ops->write(vnode, fd, buffer, size, offset);
@@ -176,6 +187,7 @@ int DevFS::devfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
 
 int DevFS::devfs_create(VNode *dir, FileDescriptor *fd, const char *name,
                         VNodeType type, fk::memory::RetainPtr<VNode> &out) {
+  fk::algorithms::kdebug("DEVFS", "Creating node '%s' (type %d) in directory '%s'", name, static_cast<int>(type), dir->m_name.c_str());
   (void)fd;
   if (!dir || dir->type != VNodeType::Directory)
     return -1;
@@ -196,6 +208,7 @@ int DevFS::devfs_create(VNode *dir, FileDescriptor *fd, const char *name,
 }
 
 int DevFS::devfs_unlink(VNode *dir, FileDescriptor *fd, const char *name) {
+  fk::algorithms::kdebug("DEVFS", "Unlinking '%s' from directory '%s'", name, dir->m_name.c_str());
   (void)fd;
   if (!dir || dir->type != VNodeType::Directory)
     return -1;

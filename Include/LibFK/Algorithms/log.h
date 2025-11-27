@@ -75,7 +75,7 @@ inline void kdebug(const char *prefix, const char *fmt, ...) {
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_WHITE, prefix, KLOG_COLOR_RESET, buf);
 }
 
-#ifdef FKERNEL_DEBUG
+// #ifdef FKERNEL_DEBUG
 
 /**
  * @brief Print a formatted kernel log message in green by default.
@@ -116,14 +116,14 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
 
   kprintf("%s[%s]%s: %s\n", color, prefix, KLOG_COLOR_RESET, buf);
 }
-#else
-/// In release mode, kdebug does nothing
-#define kdebug(...) ((void)0)
-/// In release mode, klog does nothing
-#define klog(...) ((void)0)
-/// In release mode, klog_color does nothing
-#define klog_color(...) ((void)0)
-#endif
+// #else
+// /// In release mode, kdebug does nothing
+// #define kdebug(...) ((void)0)
+// /// In release mode, klog does nothing
+// #define klog(...) ((void)0)
+// /// In release mode, klog_color does nothing
+// #define klog_color(...) ((void)0)
+// #endif
 
 } // namespace algorithms
 } // namespace fk

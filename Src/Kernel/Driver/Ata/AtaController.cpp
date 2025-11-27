@@ -1,4 +1,3 @@
-#include "LibFK/Traits/type_traits.h"
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/io.h>
@@ -117,7 +116,7 @@ void AtaController::detect_devices() {
       auto partitions = pm.detect_partitions();
 
       for (size_t i = 0; i < partitions.count(); ++i) {
-        fk::memory::RetainPtr<PartitionBlockDevice> &part_dev =
+        fk::memory::RetainPtr<fkernel::block::PartitionBlockDevice> &part_dev =
             partitions.begin()[i];
         char part_name[32];
         snprintf(part_name, sizeof(part_name), "%sp", name);
@@ -151,7 +150,7 @@ bool AtaController::identify_device(Bus bus, Drive drive, AtaDeviceInfo &out) {
   outb(io_base + ATA_REG_HDDEVSEL,
        0xA0 | ((drive == Drive::Slave) ? 0x10 : 0x00));
   io_wait();
-  fk::algorithms::kdebug("ATA", "Selected drive 0x%x.",
+  fk::algorithms::kdebug("ATA", "Selected drive 0x%lx.",
                          0xA0 | ((drive == Drive::Slave) ? 0x10 : 0x00));
 
   // Clear LBA registers
@@ -175,12 +174,13 @@ bool AtaController::identify_device(Bus bus, Drive drive, AtaDeviceInfo &out) {
     status = inb(io_base + ATA_REG_STATUS);
     io_wait();
   }
-  fk::algorithms::kdebug("ATA", "Device status after BSY clear: 0x%x.", status);
+  fk::algorithms::kdebug("ATA", "Device status after BSY clear: 0x%lx.",
+                         status);
 
   if (status & ATA_STATUS_ERR) {
     fk::algorithms::kwarn(
         "ATA",
-        "Error during IDENTIFY command on Bus: %d, Drive: %d. Status: 0x%x.",
+        "Error during IDENTIFY command on Bus: %d, Drive: %d. Status: 0x%lx.",
         static_cast<int>(bus), static_cast<int>(drive), status);
     return false;
   }
@@ -190,7 +190,7 @@ bool AtaController::identify_device(Bus bus, Drive drive, AtaDeviceInfo &out) {
     status = inb(io_base + ATA_REG_STATUS);
     io_wait();
   }
-  fk::algorithms::kdebug("ATA", "Device status after DRQ set: 0x%x.", status);
+  fk::algorithms::kdebug("ATA", "Device status after DRQ set: 0x%lx.", status);
 
   uint16_t id_data[256];
   for (int i = 0; i < 256; ++i)
@@ -240,7 +240,7 @@ int AtaController::read_sectors_pio_impl(Bus bus, Drive drive, uint32_t lba,
 
   if (status & ATA_STATUS_ERR) {
     fk::algorithms::kerror(
-        "ATA PIO", "Error status 0x%x during PIO read for LBA %u, count %u.",
+        "ATA PIO", "Error status 0x%lx during PIO read for LBA %u, count %u.",
         status, lba, sector_count);
     return -1;
   }
@@ -286,7 +286,7 @@ int AtaController::write_sectors_pio_impl(Bus bus, Drive drive, uint32_t lba,
   if (status & ATA_STATUS_ERR) {
     fk::algorithms::kerror(
         "ATA PIO",
-        "Error status 0x%x during PIO write (DRQ wait) for LBA %u, count %u.",
+        "Error status 0x%lx during PIO write (DRQ wait) for LBA %u, count %u.",
         status, lba, sector_count);
     return -1;
   }
@@ -307,7 +307,7 @@ int AtaController::write_sectors_pio_impl(Bus bus, Drive drive, uint32_t lba,
   status = inb(base + ATA_REG_STATUS);
   if (status & ATA_STATUS_ERR) {
     fk::algorithms::kerror(
-        "ATA PIO", "Error status 0x%x after PIO write for LBA %u, count %u.",
+        "ATA PIO", "Error status 0x%lx after PIO write for LBA %u, count %u.",
         status, lba, sector_count);
     return -1;
   }

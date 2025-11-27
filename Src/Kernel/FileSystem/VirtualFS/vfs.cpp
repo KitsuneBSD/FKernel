@@ -91,8 +91,12 @@ VirtualFS::resolve_path(const char *path, fk::memory::RetainPtr<VNode> cwd) {
 fk::memory::RetainPtr<VNode> VirtualFS::cwd() const { return v_cwd; }
 
 void VirtualFS::set_cwd(fk::memory::RetainPtr<VNode> vnode) {
-  if (vnode)
+  if (vnode) {
     v_cwd = vnode;
+    fk::algorithms::klog("VFS", "Changed current working directory to '%s'", vnode->m_name.c_str());
+  } else {
+    fk::algorithms::kwarn("VFS", "Attempted to set_cwd to a null vnode.");
+  }
 }
 
 int VirtualFS::lookup(const char *path, fk::memory::RetainPtr<VNode> &out) {

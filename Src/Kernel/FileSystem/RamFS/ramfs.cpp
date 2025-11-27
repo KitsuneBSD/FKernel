@@ -10,6 +10,7 @@ RamFS::RamFS() {
   root_node->inode = new Inode(1);
   root_node->ops = &ops;
   r_root = fk::memory::adopt_retain(root_node);
+  fk::algorithms::klog("RAMFS", "RamFS initialized, root node '/' created.");
 }
 
 RamFS &RamFS::the() {
@@ -23,19 +24,19 @@ int RamFS::ramfs_read(VNode *vnode, FileDescriptor *fd, void *buffer,
                       size_t size, size_t offset) {
   (void)fd;
   if (!vnode) {
-    fk::algorithms::kwarn("RamFS", "Read failed: vnode is nullptr");
+    fk::algorithms::kwarn("RAMFS", "Read failed: vnode is nullptr");
     return -1;
   }
 
   if (vnode->type != VNodeType::Regular) {
-    fk::algorithms::kwarn("RamFS",
+    fk::algorithms::kwarn("RAMFS",
                           "Read failed: vnode '%s' is not a regular file",
                           vnode->m_name.c_str());
     return -1;
   }
 
   if (!vnode->fs_private) {
-    fk::algorithms::kwarn("RamFS",
+    fk::algorithms::kwarn("RAMFS",
                           "Read failed: vnode '%s' has no fs_private data",
                           vnode->m_name.c_str());
     return -1;
@@ -45,7 +46,7 @@ int RamFS::ramfs_read(VNode *vnode, FileDescriptor *fd, void *buffer,
 
   if (offset >= file->r_size) {
     fk::algorithms::klog(
-        "RamFS", "Read request at offset %zu exceeds file size %zu in '%s'",
+        "RAMFS", "Read request at offset %zu exceeds file size %zu in '%s'",
         offset, file->r_size, vnode->m_name.c_str());
     return 0;
   }
@@ -54,14 +55,14 @@ int RamFS::ramfs_read(VNode *vnode, FileDescriptor *fd, void *buffer,
   size_t to_read = (size < available) ? size : available;
 
   if (!buffer) {
-    fk::algorithms::kwarn("RamFS", "Read failed: buffer is nullptr");
+    fk::algorithms::kwarn("RAMFS", "Read failed: buffer is nullptr");
     return -1;
   }
 
   memcpy(buffer, file->r_data + offset, to_read);
 
   fk::algorithms::klog(
-      "RamFS", "Read %zu bytes from '%s' at offset %zu (file size: %zu)",
+      "RAMFS", "Read %zu bytes from '%s' at offset %zu (file size: %zu)",
       to_read, vnode->m_name.c_str(), offset, file->r_size);
   return static_cast<int>(to_read);
 }
@@ -70,26 +71,26 @@ int RamFS::ramfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
                        size_t size, size_t offset) {
   (void)fd;
   if (!vnode) {
-    fk::algorithms::kwarn("RamFS", "Write failed: vnode is nullptr");
+    fk::algorithms::kwarn("RAMFS", "Write failed: vnode is nullptr");
     return -1;
   }
 
   if (vnode->type != VNodeType::Regular) {
-    fk::algorithms::kwarn("RamFS",
+    fk::algorithms::kwarn("RAMFS",
                           "Write failed: vnode '%s' is not a regular file",
                           vnode->m_name.c_str());
     return -1;
   }
 
   if (!vnode->fs_private) {
-    fk::algorithms::kwarn("RamFS",
+    fk::algorithms::kwarn("RAMFS",
                           "Write failed: vnode '%s' has no fs_private data",
                           vnode->m_name.c_str());
     return -1;
   }
 
   if (!buffer) {
-    fk::algorithms::kwarn("RamFS", "Write failed: buffer is nullptr");
+    fk::algorithms::kwarn("RAMFS", "Write failed: buffer is nullptr");
     return -1;
   }
 
@@ -98,7 +99,7 @@ int RamFS::ramfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
 
   if (offset >= MAX_SIZE) {
     fk::algorithms::kwarn(
-        "RamFS",
+        "RAMFS",
         "Write failed: offset %zu exceeds maximum file size %zu in '%s'",
         offset, MAX_SIZE, vnode->m_name.c_str());
     return -1;
@@ -115,12 +116,14 @@ int RamFS::ramfs_write(VNode *vnode, FileDescriptor *fd, const void *buffer,
   vnode->size = file->r_size;
 
   fk::algorithms::klog(
-      "RamFS", "Wrote %zu bytes to '%s' at offset %zu (new file size: %zu)",
+      "RAMFS", "Wrote %zu bytes to '%s' at offset %zu (new file size: %zu)",
       to_write, vnode->m_name.c_str(), offset, vnode->size);
   return static_cast<int>(to_write);
 }
 
 int RamFS::ramfs_open(VNode *vnode, FileDescriptor *fd, int flags) {
+  fk::algorithms::kdebug("RAMFS", "Opening vnode '%s' with flags 0x%x",
+                         vnode->m_name.c_str(), flags);
   (void)fd;
   (void)vnode;
   (void)flags;
@@ -128,6 +131,7 @@ int RamFS::ramfs_open(VNode *vnode, FileDescriptor *fd, int flags) {
 }
 
 int RamFS::ramfs_close(VNode *vnode, FileDescriptor *fd) {
+  fk::algorithms::kdebug("RAMFS", "Closing vnode '%s'", vnode->m_name.c_str());
   (void)fd;
   (void)vnode;
   return 0;
@@ -135,6 +139,8 @@ int RamFS::ramfs_close(VNode *vnode, FileDescriptor *fd) {
 
 int RamFS::ramfs_lookup(VNode *vnode, FileDescriptor *fd, const char *name,
                         fk::memory::RetainPtr<VNode> &out) {
+  fk::algorithms::kdebug("RAMFS", "Lookup for '%s' in directory '%s'", name,
+                         vnode->m_name.c_str());
   (void)fd;
   return vnode->lookup(name, out);
 }
@@ -159,20 +165,22 @@ int RamFS::ramfs_create(VNode *vnode, FileDescriptor *fd, const char *name,
     strncpy(file->r_name, name, sizeof(file->r_name) - 1);
     new_node->fs_private = file;
 
-    fk::algorithms::klog("RamFS", "Allocated RamFile for vnode '%s' at %p",
+    fk::algorithms::klog("RAMFS", "Allocated RamFile for vnode '%s' at %p",
                          name, file);
   }
 
   vnode->dir_entries.push_back(DirEntry{name, new_node});
   out = new_node;
 
-  fk::algorithms::klog("RamFS", "Created '%s' in directory '%s'", name,
+  fk::algorithms::klog("RAMFS", "Created '%s' in directory '%s'", name,
                        vnode->m_name.c_str());
   return 0;
 }
 
 int RamFS::ramfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer,
                          size_t max_entries) {
+  fk::algorithms::kdebug("RAMFS", "Readdir for vnode '%s', max_entries %zu",
+                         vnode->m_name.c_str(), max_entries);
   (void)fd;
   if (!vnode || vnode->type != VNodeType::Directory)
     return -1;
@@ -185,10 +193,13 @@ int RamFS::ramfs_readdir(VNode *vnode, FileDescriptor *fd, void *buffer,
   for (size_t i = 0; i < n; ++i)
     buf[i] = vnode->dir_entries[i];
 
+  fk::algorithms::kdebug("RAMFS", "Readdir: returned %zu entries.", n);
   return static_cast<int>(n);
 }
 
 int RamFS::ramfs_unlink(VNode *vnode, FileDescriptor *fd, const char *name) {
+  fk::algorithms::kdebug("RAMFS", "Unlinking '%s' from directory '%s'", name,
+                         vnode->m_name.c_str());
   (void)fd;
   if (!vnode || vnode->type != VNodeType::Directory)
     return -1;
@@ -196,12 +207,15 @@ int RamFS::ramfs_unlink(VNode *vnode, FileDescriptor *fd, const char *name) {
   for (size_t i = 0; i < vnode->dir_entries.size(); ++i) {
     if (strcmp(vnode->dir_entries[i].m_name.c_str(), name) == 0) {
       vnode->dir_entries.erase(i);
-      fk::algorithms::klog("RamFS", "Unlinked '%s' from directory '%s'", name,
+      fk::algorithms::klog("RAMFS", "Unlinked '%s' from directory '%s'", name,
                            vnode->m_name.c_str());
       return 0;
     }
   }
 
+  fk::algorithms::kwarn("RAMFS",
+                        "Unlink failed: '%s' not found in directory '%s'", name,
+                        vnode->m_name.c_str());
   return -1; // não encontrado
 }
 

@@ -6,38 +6,60 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Hardware/cpu.h>
 
-void HardwareInterruptManager::initialize() {
-  static PIC8259 pic;
+void HardwareInterruptManager::select_and_configure_controller() {
+  static PIC8259 pic_controller_instance;
+  static APIC apic_controller_instance;
+  static IOAPIC ioapic_controller_instance;
+  static X2APIC x2apic_controller_instance;
+
+  HardwareInterrupt *new_controller = nullptr;
+  fk::text::String controller_name = "None";
+
   if (CPU::the().has_x2apic() && m_has_memory_manager) {
-    static X2APIC x2apic;
-    static IOAPIC ioapic;
-
-    fk::algorithms::klog("HW_INTERRUPT", "Enable x2APIC + IOAPIC");
-    x2apic.initialize();
-    x2apic.setup_timer(1);
-    pic.disable();
-
-    ioapic.initialize();
-    m_controller = &ioapic;
+    fk::algorithms::klog("HW_INTERRUPT", "Enabling x2APIC + IOAPIC");
+    x2apic_controller_instance.initialize();
+    pic_controller_instance.disable();
+    ioapic_controller_instance.initialize();
+    new_controller = &ioapic_controller_instance;
+    controller_name = "IOAPIC (via x2APIC)";
   } else if (CPU::the().has_apic() && m_has_memory_manager) {
-    static APIC apic;
-    static IOAPIC ioapic;
-
-    fk::algorithms::klog("HW_INTERRUPT", "Enable APIC + IOAPIC");
-    apic.initialize();
-    apic.calibrate_timer();
-    apic.setup_timer(1);
-    pic.disable();
-
-    ioapic.initialize();
-    m_controller = &ioapic;
+    fk::algorithms::klog("HW_INTERRUPT", "Enabling APIC + IOAPIC");
+    apic_controller_instance.initialize();
+    pic_controller_instance.disable();
+    ioapic_controller_instance.initialize();
+    new_controller = &ioapic_controller_instance;
+    controller_name = "IOAPIC (via APIC)";
   } else {
-    fk::algorithms::klog("HW_INTERRUPT", "Enable PIC8259");
-    pic.initialize();
-    m_controller = &pic;
+    fk::algorithms::klog("HW_INTERRUPT", "Enabling PIC8259");
+    pic_controller_instance.initialize();
+    new_controller = &pic_controller_instance;
+    controller_name = "PIC8259";
   }
 
-  TimerManager::the().initialize(100);
+  if (new_controller != m_controller) {
+    set_controller(new_controller);
+    fk::algorithms::klog("HW_INTERRUPT", "Hardware interrupt controller set to: %s", controller_name.c_str());
+  } else {
+    fk::algorithms::kdebug("HW_INTERRUPT", "Hardware interrupt controller remains: %s", controller_name.c_str());
+  }
+}
+
+void HardwareInterruptManager::set_controller(HardwareInterrupt *controller) {
+  m_controller = controller;
+}
+
+void HardwareInterruptManager::initialize() {
+  select_and_configure_controller();
+  TimerManager::the().initialize(1000);
+}
+
+void HardwareInterruptManager::set_memory_manager(bool is_memory_manager) {
+  bool old_has_memory_manager = m_has_memory_manager;
+  m_has_memory_manager = is_memory_manager;
+  if (!old_has_memory_manager && m_has_memory_manager) {
+    fk::algorithms::klog("HW_INTERRUPT", "Memory manager enabled, re-evaluating interrupt controller.");
+    select_and_configure_controller();
+  }
 }
 
 void HardwareInterruptManager::mask_interrupt(uint8_t irq) {
