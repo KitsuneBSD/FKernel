@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-if command -v nproc >/dev/null 2>&1; then
-	CORES=$(nproc)
-elif command -v sysctl >/dev/null 2>&1; then
-	CORES=$(sysctl -n hw.ncpu)
-else
-	CORES=1
+if [ -z "$1" ]; then
+    echo "Usage: $0 <number_of_cores>"
+    exit 1
 fi
-echo "Detected $CORES cores"
+CORES=$1
+echo "Using $CORES cores"
 
 mkdir -p Toolchain
 mkdir -p build

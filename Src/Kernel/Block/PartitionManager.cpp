@@ -60,14 +60,14 @@ void PartitionManager::mount_filesystem(
   case fkernel::fs::Filesystem::Type::FAT:
     fs_type_str = "fat";
     break;
-  case fkernel::fs::Filesystem::Type::Ext2:
-    fs_type_str = "ext2";
-    break;
   case fkernel::fs::Filesystem::Type::RamFS:
     fs_type_str = "ramfs";
     break;
   case fkernel::fs::Filesystem::Type::DevFS:
     fs_type_str = "devfs";
+    break;
+  case fkernel::fs::Filesystem::Type::AtaRaw:
+    fs_type_str = "ataraw";
     break;
   case fkernel::fs::Filesystem::Type::Unknown:
     // Fallthrough
@@ -81,16 +81,16 @@ void PartitionManager::mount_filesystem(
   // mountpoint.
   root_vnode->m_name = mount_name;
 
-  int mount_result = VirtualFS::the().mount(mount_name, root_vnode);
+  int mount_result = VirtualFS::the().mount(mount_name, root_vnode,
+                                            fk::types::move(filesystem));
   if (mount_result < 0) {
     fk::algorithms::kerror("PARTITION MANAGER",
                            "Failed to mount %s filesystem at /%s.", fs_type_str,
                            mount_name);
     return;
   }
-  // The filesystem is now owned by the VFS (via the VNode's fs_private). Leak
-  // the pointer from OwnPtr.
-  filesystem.leakPtr();
+  // The filesystem is now owned by VirtualFS (via the Mountpoint's
+  // m_fs_instance).
 
   fk::algorithms::klog("PARTITION MANAGER",
                        "Successfully mounted %s filesystem as /%s.",
@@ -99,10 +99,10 @@ void PartitionManager::mount_filesystem(
 
 bool PartitionManager::read_sector(uint8_t *buffer, uint64_t sector) const {
   fk::algorithms::klog("PARTITION MANAGER",
-                       "read_sector called for sector %llu.", sector);
+                       "Read sector called for sector %llu.", sector);
   if (!m_device) {
     fk::algorithms::kerror("PARTITION MANAGER",
-                           "read_sector: Block device is null.");
+                           "Read sector: Block device is null.");
     return false;
   }
   // BlockDevice::read_sectors expects uint32_t lba and uint8_t sector_count.
@@ -113,7 +113,7 @@ bool PartitionManager::read_sector(uint8_t *buffer, uint64_t sector) const {
 PartitionManager::PartitionScheme
 PartitionManager::detect_scheme(const uint8_t *sector0) const {
   (void)sector0; // Suppress unused parameter warning
-  fk::algorithms::klog("PARTITION MANAGER", "detect_scheme called.");
+  fk::algorithms::klog("PARTITION MANAGER", "Detect scheme called.");
   if (is_gpt(sector0)) {
     fk::algorithms::klog("PARTITION MANAGER", "Detected GPT scheme.");
     return PartitionScheme::GPT;
@@ -141,7 +141,7 @@ bool PartitionManager::is_gpt(const uint8_t *sector) const {
 
 void PartitionManager::set_strategy_for_scheme(PartitionScheme scheme) {
   fk::algorithms::klog("PARTITION MANAGER",
-                       "set_strategy_for_scheme called for scheme %d.",
+                       "Set strategy for scheme called for scheme %d.",
                        static_cast<int>(scheme));
   if (scheme == PartitionScheme::MBR) {
     m_strategy = fk::memory::adopt_own(new MbrPartitionStrategy());

@@ -25,6 +25,20 @@ public:
   int write_sectors(uint32_t lba, uint8_t sector_count,
                     const void *buffer) override;
 
+  /**
+   * @brief Returns the size of the partition in bytes.
+   *
+   * @return The total size of the partition in bytes.
+   */
+  size_t size() const { return m_location.size_in_bytes(); }
+
+  /**
+   * @brief Returns the starting sector (LBA) of the partition.
+   *
+   * @return The first LBA of the partition.
+   */
+  uint32_t first_sector() const { return m_location.first_lba(); }
+
 private:
   size_t adjust_and_get_final_offset(size_t &size, size_t offset) const;
 

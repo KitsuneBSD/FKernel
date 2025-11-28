@@ -120,7 +120,7 @@ public:
       fk::memory::RetainPtr<fkernel::block::PartitionBlockDevice> device,
       uint32_t first_sector);
 
-  // VNodeOps implementations
+  static void early_register();
   static int fat_read(VNode *vnode, FileDescriptor *fd, void *buffer,
                       size_t size, size_t offset);
   static int fat_write(VNode *vnode, FileDescriptor *fd, const void *buffer,

@@ -3,9 +3,9 @@
 #include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Types/types.h>
 
+#include <Kernel/Block/PartitionDevice.h>
 #include <Kernel/FileSystem/VirtualFS/vnode.h>
 #include <Kernel/FileSystem/VirtualFS/vnode_ops.h>
-#include <Kernel/Block/PartitionDevice.h>
 
 struct FileDescriptor;
 
@@ -26,9 +26,9 @@ public:
   enum class Type {
     Unknown,
     FAT,
-    Ext2,
     RamFS,
     DevFS,
+    AtaRaw, // Added for raw ATA partition access
   };
 
   virtual ~Filesystem() = default;
@@ -71,9 +71,13 @@ public:
   static void register_filesystem_driver(ProbeFunction probe_func) {
     if (s_filesystem_drivers.size() < s_filesystem_drivers.capacity()) {
       s_filesystem_drivers.push_back(probe_func);
-      fk::algorithms::kdebug("FS_MANAGER", "Registered new filesystem driver. Total: %zu", s_filesystem_drivers.size());
+      fk::algorithms::kdebug("FS_MANAGER",
+                             "Registered new filesystem driver. Total: %zu",
+                             s_filesystem_drivers.size());
     } else {
-      fk::algorithms::kwarn("FS_MANAGER", "Filesystem driver registration failed: capacity full.");
+      fk::algorithms::kwarn(
+          "FS_MANAGER",
+          "Filesystem driver registration failed: capacity full.");
     }
   }
 };

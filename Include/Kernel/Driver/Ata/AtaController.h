@@ -78,4 +78,6 @@ public:
    * @brief Initialize the ATA controller and detect devices
    */
   void initialize();
+
+  const fk::containers::static_vector<fk::memory::RetainPtr<BlockDevice>, 16>& devices() const { return m_devices; }
 };

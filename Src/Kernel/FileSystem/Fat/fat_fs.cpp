@@ -824,15 +824,23 @@ fk::memory::optional<fk::memory::OwnPtr<Filesystem>> FatFileSystem::probe(
     return fk::memory::optional<fk::memory::OwnPtr<Filesystem>>();
   }
 
-  fk::algorithms::kdebug("FAT FS", "--- Boot Sector Details (LBA %u) ---", first_sector);
-  fk::algorithms::kdebug("FAT FS", "Signature: 0x%x", boot_sector.boot_sector_signature);
-  fk::algorithms::kdebug("FAT FS", "Root Dir Entries: %u", boot_sector.root_dir_entries);
-  fk::algorithms::kdebug("FAT FS", "Sectors per FAT32: %u", boot_sector.sectors_per_fat_32);
-  fk::algorithms::kdebug("FAT FS", "FS Type (FAT32 field): '%.8s'", boot_sector.fs_type_32);
-  fk::algorithms::kdebug("FAT FS", "FS Type (FAT16 field): '%.8s'", boot_sector.fs_type_16);
-  fk::algorithms::kdebug("FAT FS", "Bytes per sector: %u", boot_sector.bytes_per_sector);
-  fk::algorithms::kdebug("FAT FS", "FAT Count: %u", boot_sector.fat_count);
-  fk::algorithms::kdebug("FAT FS", "-------------------------------------");
+
+
+  fk::algorithms::klog("FAT FS", "--- Boot Sector Details (LBA %u) ---", first_sector);
+  fk::algorithms::klog("FAT FS", "Signature: 0x%x", boot_sector.boot_sector_signature);
+  fk::algorithms::klog("FAT FS", "Bytes per sector: %u", boot_sector.bytes_per_sector);
+  fk::algorithms::klog("FAT FS", "Sectors per cluster: %u", boot_sector.sectors_per_cluster);
+  fk::algorithms::klog("FAT FS", "Reserved sectors: %u", boot_sector.reserved_sectors);
+  fk::algorithms::klog("FAT FS", "FAT Count: %u", boot_sector.fat_count);
+  fk::algorithms::klog("FAT FS", "Root Dir Entries (FAT12/16): %u", boot_sector.root_dir_entries);
+  fk::algorithms::klog("FAT FS", "Sectors per FAT (FAT12/16): %u", boot_sector.sectors_per_fat_16);
+  fk::algorithms::klog("FAT FS", "FS Type (FAT12/16 field): '%.8s'", boot_sector.fs_type_16);
+  fk::algorithms::klog("FAT FS", "Total Sectors 16: %u", boot_sector.total_sectors_16);
+  fk::algorithms::klog("FAT FS", "Total Sectors 32: %u", boot_sector.total_sectors_32);
+  fk::algorithms::klog("FAT FS", "Sectors per FAT (FAT32): %u", boot_sector.sectors_per_fat_32);
+  fk::algorithms::klog("FAT FS", "Root Cluster (FAT32): %u", boot_sector.root_cluster);
+  fk::algorithms::klog("FAT FS", "FS Type (FAT32 field): '%.8s'", boot_sector.fs_type_32);
+  fk::algorithms::klog("FAT FS", "-------------------------------------");
 
   // Basic FAT signature check
   if (boot_sector.boot_sector_signature != 0xAA55) {
@@ -851,17 +859,13 @@ fk::memory::optional<fk::memory::OwnPtr<Filesystem>> FatFileSystem::probe(
   }
 
   // If not FAT32, try to detect FAT12/16
-  if (boot_sector.root_dir_entries >= 512 && boot_sector.root_dir_entries <= 5120) { // Assuming "Root entries <= 512-5120" means within this range
-    // The FAT size check for FAT12/16 is implicit in determining the FAT type from total_clusters,
-    // but a direct check for sectors_per_fat_16 can also be used.
-    // Here we'll rely on the original determine_fat_type for the size aspect after a successful probe.
-    if (memcmp(boot_sector.fs_type_16, "FAT12   ", 8) == 0) {
-      fk::algorithms::klog("FAT FS", "Detected FAT12 filesystem at LBA %u. Creating instance.", first_sector);
-      return fk::memory::optional<fk::memory::OwnPtr<Filesystem>>(
-          fk::memory::adopt_own<Filesystem>(
-              new FatFileSystem(fk::types::move(device), first_sector)));
-    } else if (memcmp(boot_sector.fs_type_16, "FAT16   ", 8) == 0) {
-      fk::algorithms::klog("FAT FS", "Detected FAT16 filesystem at LBA %u. Creating instance.", first_sector);
+  // Note: For FAT12/16, root_dir_entries is usually non-zero and sectors_per_fat_16 is used.
+  // The 'total_clusters' calculation is used in determine_fat_type() to differentiate 12/16.
+  // We can refine this logic later, but for now, rely on fs_type_16 string for primary detection.
+  if (boot_sector.root_dir_entries > 0) { // Indicates FAT12/16 type
+    if (memcmp(boot_sector.fs_type_16, "FAT12   ", 8) == 0 ||
+        memcmp(boot_sector.fs_type_16, "FAT16   ", 8) == 0) {
+      fk::algorithms::klog("FAT FS", "Detected FAT12/16 filesystem at LBA %u. Creating instance.", first_sector);
       return fk::memory::optional<fk::memory::OwnPtr<Filesystem>>(
           fk::memory::adopt_own<Filesystem>(
               new FatFileSystem(fk::types::move(device), first_sector)));
@@ -873,16 +877,12 @@ fk::memory::optional<fk::memory::OwnPtr<Filesystem>> FatFileSystem::probe(
   return fk::memory::optional<fk::memory::OwnPtr<Filesystem>>();
 }
 
-// Static object to register the FAT filesystem driver
-struct FatFilesystemRegistrar {
-  FatFilesystemRegistrar() {
-    fk::algorithms::klog("FAT FS", "Registering FAT filesystem driver.");
-    Filesystem::register_filesystem_driver(FatFileSystem::probe);
-  }
-};
-static FatFilesystemRegistrar s_fat_registrar; // This global object's
-                                               // constructor will be called
-                                               // during static initialization
+void FatFileSystem::early_register() {
+  fk::algorithms::klog("FAT FS", "Registering FAT filesystem driver (early).");
+  Filesystem::register_filesystem_driver(FatFileSystem::probe);
+}
+
+
 
 int FatFileSystem::fat_open(VNode *vnode, FileDescriptor *fd, int flags) {
   fk::algorithms::klog("FAT FS VNODE", "fat_open for '%s', flags 0x%x",

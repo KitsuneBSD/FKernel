@@ -46,7 +46,7 @@ void GDTController::setupTSS() {
   uint64_t base = reinterpret_cast<uint64_t>(&tss);
   uint32_t limit = static_cast<uint32_t>(sizeof(TSS64) - 1);
 
-  fk::algorithms::kdebug("TSS", "&tss = %p (base=0x%016lx) limit=0x%x", &tss,
+  fk::algorithms::kdebug("TSS", "TSS: %p (base=0x%016lx) limit=0x%x", &tss,
                          base, limit);
 
   uint64_t low = (limit & 0xFFFFULL) | ((base & 0xFFFFFFULL) << 16) |

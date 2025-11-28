@@ -6,14 +6,14 @@
 
 fk::memory::RetainPtr<VNode> VirtualFS::root() const { return v_root; }
 
-int VirtualFS::mount(const char *name, fk::memory::RetainPtr<VNode> root) {
+int VirtualFS::mount(const char *name, fk::memory::RetainPtr<VNode> root, fk::memory::OwnPtr<fkernel::fs::Filesystem> fs_instance /* = nullptr */) {
   if (v_mounts.is_full()) {
     fk::algorithms::kwarn("VFS", "Failed to mount '%s': mount table full",
                           name);
     return -1;
   }
 
-  Mountpoint m(name, root);
+  Mountpoint m(name, root, fk::types::move(fs_instance));
 
   if (!v_root) {
     v_root = root;  // primeiro mount se torna '/'
@@ -25,7 +25,7 @@ int VirtualFS::mount(const char *name, fk::memory::RetainPtr<VNode> root) {
                          name);
   }
 
-  v_mounts.push_back(m);
+  v_mounts.push_back(fk::types::move(m));
   fk::algorithms::klog("VFS", "Mounted '%s' successfully", name);
   return 0;
 }

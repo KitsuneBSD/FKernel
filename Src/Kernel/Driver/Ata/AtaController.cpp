@@ -92,41 +92,10 @@ void AtaController::detect_devices() {
 
       // Store the retained device in the controller's list to manage its
       // lifetime.
-      m_devices.push_back(
-          fk::memory::RetainPtr<BlockDevice>(ata_block_dev.get()));
+      m_devices.push_back(fk::memory::RetainPtr<BlockDevice>(ata_block_dev.get()));
 
-      // Get a new RetainPtr to the BlockDevice just added to the vector.
-      // This ensures PartitionManager gets a valid, reference-counted pointer,
-      // as the local 'ata_block_dev' would have been moved-from and is now
-      // null.
-      fk::memory::RetainPtr<BlockDevice> registered_block_device =
-          m_devices.back();
-
-      char name[16];
-      snprintf(name, sizeof(name), "ada%d", device_index);
-      fk::algorithms::klog("ATA", "Registering block device /dev/%s.", name);
-
-      // Use the valid retained pointer from the vector for DevFS registration.
-      DevFS::the().register_device(name, VNodeType::BlockDevice,
-                                   &g_block_device_ops,
-                                   registered_block_device.get());
-
-      // Construct PartitionManager with the valid retained pointer.
-      PartitionManager pm(registered_block_device);
-      auto partitions = pm.detect_partitions();
-
-      for (size_t i = 0; i < partitions.count(); ++i) {
-        fk::memory::RetainPtr<fkernel::block::PartitionBlockDevice> &part_dev =
-            partitions.begin()[i];
-        char part_name[32];
-        snprintf(part_name, sizeof(part_name), "%sp", name);
-        fk::algorithms::klog("ATA", "Registering partition device /dev/%s%d.",
-                             part_name, i + 1);
-
-        DevFS::the().register_device(part_name, VNodeType::BlockDevice,
-                                     &g_block_device_ops, part_dev.get(), true,
-                                     false);
-      }
+      // DevFS registration for the raw ATA device is now handled by FilesystemManager
+      // Partition detection and filesystem mounting are also handled by FilesystemManager
 
       device_index++;
     }
@@ -245,9 +214,27 @@ int AtaController::read_sectors_pio_impl(Bus bus, Drive drive, uint32_t lba,
     return -1;
   }
 
-  for (int i = 0; i < 256 * sector_count; ++i) {
-    ((uint16_t *)buffer)[i] = inw(base + ATA_REG_DATA);
+  // Use a temporary byte buffer for reading to avoid alignment issues with the
+  // destination buffer.
+  size_t total_bytes = sector_count * 512;
+  fk::memory::OwnPtr<uint8_t[]> temp_buffer_own_ptr =
+      fk::memory::adopt_own<uint8_t[]>(new uint8_t[total_bytes]);
+  uint16_t *temp_word_buffer =
+      reinterpret_cast<uint16_t *>(temp_buffer_own_ptr.ptr());
+
+  if (!temp_word_buffer) {
+    fk::algorithms::kerror("ATA PIO",
+                           "Failed to allocate temporary buffer for PIO read.");
+    return -1;
   }
+
+  for (size_t i = 0; i < total_bytes / 2; ++i) { // Read words
+    temp_word_buffer[i] = inw(base + ATA_REG_DATA);
+  }
+
+  // Copy data from temporary buffer to the user-provided buffer
+  memcpy(buffer, temp_buffer_own_ptr.ptr(), total_bytes);
+
   fk::algorithms::klog("ATA PIO", "Successfully read %u sectors from LBA %u.",
                        sector_count, lba);
 
