@@ -7,7 +7,6 @@
 #include <Kernel/Hardware/acpi.h>
 
 #include <Kernel/Boot/early_init.h>
-#include <Kernel/Boot/init.h>
 #include <Kernel/Boot/multiboot2.h>
 
 #include <Kernel/Hardware/cpu.h>
@@ -29,6 +28,4 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   ACPIManager::the().initialize();
   TimerManager::the().initialize(100);
   ClockManager::the().initialize();
-
-  init();
 }

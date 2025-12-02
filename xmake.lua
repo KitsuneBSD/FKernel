@@ -50,11 +50,7 @@ local flags = {
 }
 
 local kernel_non_architecture_related = {
-	"Src/Kernel/Block/**.cpp",
-	"Src/Kernel/Block/PartitionDeviceList.cpp",
-	"Src/Kernel/Block/PartitionLocation.cpp",
 	"Src/Kernel/Driver/**.cpp",
-	"Src/Kernel/FileSystem/**.cpp",
 	"Src/Kernel/Hardware/**.cpp",
 	"Src/Kernel/Init/**.cpp",
 	"Src/Kernel/MemoryManager/**.cpp",
