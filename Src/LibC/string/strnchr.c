@@ -2,11 +2,11 @@
 #include <LibC/stddef.h>
 #include <LibC/string.h>
 
-char *strchr(const char *s, int c, size_t maxlen) {
+char *strnchr(const char *s, int c, size_t n) {
   ASSERT(s != NULL);
-  ASSERT(maxlen > 0);
+  ASSERT(n >= 0); // n is size_t, so it's always >= 0. But good for clarity.
   unsigned char target = (unsigned char)c;
-  for (size_t i = 0; i < maxlen; i++) {
+  for (size_t i = 0; i < n; i++) {
     if (s[i] == target) {
       return (char *)&s[i];
     }
@@ -14,5 +14,5 @@ char *strchr(const char *s, int c, size_t maxlen) {
       return NULL;
     }
   }
-  return NULL; // Not found within maxlen
+  return NULL;
 }

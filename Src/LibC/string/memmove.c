@@ -1,7 +1,10 @@
+#include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibC/string.h>
 
 void *memmove(void *dest, const void *src, size_t n) {
+  ASSERT(dest != NULL);
+  ASSERT(src != NULL);
   if ((n == 0) || (dest == src))
     return dest;
 

@@ -1,15 +1,15 @@
 #pragma once
 
-#include <Kernel/Driver/SerialPort/serial_port.h>
-#include <Kernel/Driver/Vga/vga_buffer.h>
-
 #include <LibC/stdarg.h>
+#include <LibC/stdbool.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+void libc_puts(char *c);
 
 /**
  * @brief Write formatted data to a string using a variable argument list.
