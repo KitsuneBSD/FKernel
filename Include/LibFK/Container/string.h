@@ -59,6 +59,10 @@ public:
 private:
   // Changed return type to Result
   fk::core::Result<void, fk::core::Error> ensure_capacity(size_t min_cap);
+  fk::core::Result<void, fk::core::Error> _initialize_buffer(size_t initial_cap);
+  fk::core::Result<void, fk::core::Error> _copy_from_cstring(const char* s, size_t len);
+  fk::core::Result<void, fk::core::Error> _copy_from_string(const String& other);
+  fk::core::Result<void, fk::core::Error> _append_data(const char* data, size_t len);
 
   // Changed m_data to OwnPtr for automatic memory management
   fk::memory::OwnPtr<char[]> m_data;

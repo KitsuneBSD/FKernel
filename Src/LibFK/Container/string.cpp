@@ -8,62 +8,68 @@
 namespace fk {
 namespace text {
 
-String::String()
-    : m_data(nullptr),
-      m_metadata(
-          {0, 0}) { // Initialize metadata pair with 0 length and 0 capacity
-  auto res = ensure_capacity(16);
+fk::core::Result<void, fk::core::Error> String::_initialize_buffer(size_t initial_cap) {
+  auto res = ensure_capacity(initial_cap);
   if (res.is_error()) {
-    fk::algorithms::kerror("String",
-                           "Failed to allocate memory for empty string.");
-    // m_data is already nullptr by default for OwnPtr
+    fk::algorithms::kerror("String", "Failed to allocate initial buffer.");
     m_metadata = {0, 0};
-    return;
+    return res.error();
   }
-  // If ensure_capacity succeeded, m_data is now valid.
-  m_data.ptr()[0] = '\0'; // Use ptr() to access the raw pointer
+  m_data.ptr()[0] = '\0';
+  return fk::core::Result<void>();
+}
+
+String::String()
+    : m_data(nullptr), m_metadata({0, 0}) { // Initialize metadata pair with 0 length and 0 capacity
+  _initialize_buffer(16);
+}
+
+fk::core::Result<void, fk::core::Error> String::_copy_from_cstring(const char* s, size_t len) {
+  if (!s) {
+    m_metadata.first = 0;
+    if (m_metadata.second > 0) {
+      m_data.ptr()[0] = '\0';
+    } else {
+      return _initialize_buffer(1);
+    }
+    return fk::core::Result<void>();
+  }
+  m_metadata.first = len;
+  auto res = ensure_capacity(m_metadata.first + 1);
+  if (res.is_error()) {
+    fk::algorithms::kerror("String", "Failed to allocate memory for string copy from cstring.");
+    m_data = nullptr;
+    m_metadata = {0, 0};
+    return res.error();
+  }
+  memcpy(m_data.ptr(), s, m_metadata.first);
+  m_data.ptr()[m_metadata.first] = '\0';
+  return fk::core::Result<void>();
 }
 
 String::String(const char *s)
     : m_data(nullptr), m_metadata({0, 0}) { // Initialize metadata pair
-  if (!s) {
-    auto res = ensure_capacity(16);
-    if (res.is_error()) {
-      fk::algorithms::kerror("String",
-                             "Failed to allocate memory for empty string.");
-      m_metadata = {0, 0};
-      return;
-    }
-    m_data.ptr()[0] = '\0'; // Use ptr()
-    return;
-  }
-  m_metadata.first = strlen(s); // Use m_metadata.first for length
-  auto res = ensure_capacity(m_metadata.first + 1);
-  if (res.is_error()) {
-    fk::algorithms::kerror(
-        "String", "Failed to allocate memory for string initialization.");
-    m_metadata = {0, 0};
-    return;
-  }
-  memcpy(m_data.ptr(), s, m_metadata.first); // Use ptr()
-  m_data.ptr()[m_metadata.first] = '\0';     // Use ptr()
+  _copy_from_cstring(s, strlen(s));
 }
 
 String::String(const String &other)
     : m_data(nullptr),
-      m_metadata({other.m_metadata.first,
-                  0}) { // Initialize metadata pair with other's length
+      m_metadata({0, 0}) { // Initialize metadata pair (length set by copy_from_string)
+  _copy_from_string(other);
+}
+
+fk::core::Result<void, fk::core::Error> String::_copy_from_string(const String& other) {
+  m_metadata.first = other.m_metadata.first;
   auto res = ensure_capacity(m_metadata.first + 1);
   if (res.is_error()) {
-    fk::algorithms::kerror("String",
-                           "Failed to allocate memory for string copy.");
+    fk::algorithms::kerror("String", "Failed to allocate memory for string copy from String.");
+    m_data = nullptr;
     m_metadata = {0, 0};
-    return;
+    return res.error();
   }
-  // If ensure_capacity succeeded, m_data is now valid.
-  memcpy(m_data.ptr(), other.m_data.ptr(),
-         m_metadata.first);              // Use ptr() for both
-  m_data.ptr()[m_metadata.first] = '\0'; // Use ptr()
+  memcpy(m_data.ptr(), other.m_data.ptr(), m_metadata.first);
+  m_data.ptr()[m_metadata.first] = '\0';
+  return fk::core::Result<void>();
 }
 
 String::String(String &&other) noexcept
@@ -81,19 +87,7 @@ String &String::operator=(const String &other) {
   if (this == &other) {
     return *this;
   }
-  m_metadata.first = other.m_metadata.first; // Update length
-  auto res = ensure_capacity(m_metadata.first + 1);
-  if (res.is_error()) {
-    fk::algorithms::kerror("String",
-                           "Failed to allocate memory for string assignment.");
-    m_data = nullptr; // Reset OwnPtr on error
-    m_metadata = {0, 0};
-    return *this;
-  }
-  // If ensure_capacity succeeded, m_data is now valid.
-  memcpy(m_data.ptr(), other.m_data.ptr(),
-         m_metadata.first);              // Use ptr() for both
-  m_data.ptr()[m_metadata.first] = '\0'; // Use ptr()
+  _copy_from_string(other);
   return *this;
 }
 
@@ -109,36 +103,7 @@ String &String::operator=(String &&other) noexcept {
 }
 
 String &String::operator=(const char *s) {
-  if (!s) {
-    m_metadata.first = 0;        // Reset length
-    if (m_metadata.second > 0) { // Use m_metadata.second for capacity
-      m_data.ptr()[0] = '\0';    // Use ptr()
-    } else {
-      // If capacity is 0, ensure at least 1 byte for null terminator
-      auto res = ensure_capacity(1);
-      if (res.is_error()) {
-        fk::algorithms::kerror(
-            "String", "Failed to allocate memory for empty string assignment.");
-        m_data = nullptr; // Reset OwnPtr on error
-        m_metadata = {0, 0};
-      } else {
-        m_data.ptr()[0] = '\0'; // Use ptr()
-      }
-    }
-    return *this;
-  }
-  m_metadata.first = strlen(s); // Update length
-  auto res = ensure_capacity(m_metadata.first + 1);
-  if (res.is_error()) {
-    fk::algorithms::kerror("String",
-                           "Failed to allocate memory for string assignment.");
-    m_data = nullptr; // Reset OwnPtr on error
-    m_metadata = {0, 0};
-    return *this;
-  }
-  // If ensure_capacity succeeded, m_data is now valid.
-  memcpy(m_data.ptr(), s, m_metadata.first); // Use ptr()
-  m_data.ptr()[m_metadata.first] = '\0';     // Use ptr()
+  _copy_from_cstring(s, strlen(s));
   return *this;
 }
 
@@ -156,41 +121,28 @@ fk::core::Result<void, fk::core::Error> String::reserve(size_t new_cap) {
   return fk::core::Result<void>(); // Already has enough capacity, success
 }
 
-String &String::append(const char *s) {
-  if (!s)
-    return *this;
-  size_t s_len = strlen(s);
-  if (s_len == 0)
-    return *this;
-  auto res = ensure_capacity(m_metadata.first + s_len + 1);
-  if (res.is_error()) {
-    fk::algorithms::kerror("String",
-                           "Failed to allocate memory during append.");
-    // String remains in its current state, but append failed.
-    return *this;
+fk::core::Result<void, fk::core::Error> String::_append_data(const char* data, size_t len) {
+  if (!data || len == 0) {
+    return fk::core::Result<void>();
   }
-  // If ensure_capacity succeeded, m_data is now valid.
-  memcpy(m_data.ptr() + m_metadata.first, s, s_len); // Use ptr()
-  m_metadata.first += s_len;                         // Update length
-  m_data.ptr()[m_metadata.first] = '\0';             // Use ptr()
+  auto res = ensure_capacity(m_metadata.first + len + 1);
+  if (res.is_error()) {
+    fk::algorithms::kerror("String", "Failed to allocate memory during append data.");
+    return res.error();
+  }
+  memcpy(m_data.ptr() + m_metadata.first, data, len);
+  m_metadata.first += len;
+  m_data.ptr()[m_metadata.first] = '\0';
+  return fk::core::Result<void>();
+}
+
+String &String::append(const char *s) {
+  _append_data(s, strlen(s));
   return *this;
 }
 
 String &String::append(const String &str) {
-  if (str.is_empty())
-    return *this;
-  auto res = ensure_capacity(m_metadata.first + str.m_metadata.first + 1);
-  if (res.is_error()) {
-    fk::algorithms::kerror("String",
-                           "Failed to allocate memory during append.");
-    // String remains in its current state, but append failed.
-    return *this;
-  }
-  // If ensure_capacity succeeded, m_data is now valid.
-  memcpy(m_data.ptr() + m_metadata.first, str.m_data.ptr(),
-         str.m_metadata.first);             // Use ptr() for both
-  m_metadata.first += str.m_metadata.first; // Update length
-  m_data.ptr()[m_metadata.first] = '\0';    // Use ptr()
+  _append_data(str.m_data.ptr(), str.m_metadata.first);
   return *this;
 }
 

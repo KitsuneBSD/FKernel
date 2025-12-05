@@ -44,7 +44,7 @@ public:
         fk::algorithms::kdebug("RETAIN PTR", "New object retained %p",
                                (void *)m_ptr);
       } else {
-        fk::algorithms::kwarn("RETAIN PTR", "Failed to allocate refcount");
+        fk::algorithms::kdebug("RETAIN PTR", "Failed to allocate refcount");
         m_ptr = nullptr;
       }
     } else {
@@ -64,7 +64,7 @@ public:
         *m_refcount = 1;
         fk::algorithms::kdebug("RETAIN PTR", "Adopted pointer %p", (void *)ptr);
       } else {
-        fk::algorithms::kwarn("RETAIN PTR",
+        fk::algorithms::kdebug("RETAIN PTR",
                               "Failed to allocate refcount for adopt");
         m_ptr = nullptr;
       }
@@ -164,9 +164,8 @@ public:
           fk::algorithms::kdebug("RETAIN PTR", "raw pointer assigned ",
                                  (void *)ptr);
         } else {
-          fk::algorithms::kwarn("RETAIN PTR",
-                                "failed to allocate refcount for raw ptr");
-          m_ptr = nullptr;
+                  fk::algorithms::kdebug("RETAIN PTR",
+                                         "Failed to allocate refcount for raw ptr");          m_ptr = nullptr;
         }
       }
     }
@@ -188,8 +187,8 @@ public:
         *m_refcount = 1;
         fk::algorithms::kdebug("RETAIN PTR", "adopt called %p", (void *)ptr);
       } else {
-        fk::algorithms::kwarn("RETAIN PTR",
-                              "failed to allocate refcount for adopt()");
+        fk::algorithms::kdebug("RETAIN PTR",
+                              "Failed to allocate refcount for adopt()");
         m_ptr = nullptr;
       }
     } else {
@@ -211,8 +210,8 @@ public:
         fk::algorithms::kdebug("RETAIN PTR", "reset to new pointer %p",
                                (void *)ptr);
       } else {
-        fk::algorithms::kwarn("RETAIN PTR",
-                              "failed to allocate refcount for reset()");
+        fk::algorithms::kdebug("RETAIN PTR",
+                              "Failed to allocate refcount for reset()");
         m_ptr = nullptr;
       }
     } else {
@@ -338,7 +337,7 @@ inline fk::core::Result<RetainPtr<T>, fk::core::Error>
 make_retain(Args &&...args) {
   T *obj = fk::memory::allocate<T>();
   if (!obj) {
-    fk::algorithms::kwarn("RETAIN PTR", "Make retain failed: Out of Memory");
+    fk::algorithms::kdebug("RETAIN PTR", "Make retain failed: Out of Memory");
     return fk::core::Error::OutOfMemory;
   }
   new (obj) T(static_cast<Args &&>(args)...); // placement new freestanding

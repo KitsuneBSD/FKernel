@@ -115,6 +115,13 @@ struct Allocator {
   void initialize();
   void initialize(uint8_t *heap_start, uint8_t *heap_end);
 
+  // Private helper methods for initialization
+  size_t _calculate_required_heap_size() const;
+  void _initialize_chunk_allocators(uint64_t* space);
+
+  template <typename ChunkAllocatorType>
+  fk::core::Result<uint64_t *, fk::core::Error> _try_reallocate_in_pool(ChunkAllocatorType& pool, uint64_t* ptr, size_t size);
+
   // Explicit ChunkAllocator members for power-of-two progression 8 to 32768
   // bytes.
   ChunkAllocator<8> m_alloc8;
@@ -190,7 +197,7 @@ template <typename T> inline T *allocate() {
   // Replace this with your actual freestanding allocator
   void *ptr = kmalloc(sizeof(T));
   if (!ptr) {
-    fk::algorithms::kwarn("allocate", "OutOfMemory for size ", sizeof(T));
+    fk::algorithms::kdebug("HEAP_ALLOCATE", "OutOfMemory for size %zu", sizeof(T));
     return nullptr;
   }
   return reinterpret_cast<T *>(ptr);

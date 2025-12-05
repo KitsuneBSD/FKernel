@@ -1,45 +1,53 @@
-
 #pragma once
 
 #include <LibC/stddef.h> // For size_t
 #include <LibFK/Types/types.h> // For fk::types::move
-#include <LibFK/Container/intrusive_list.h> // Include IntrusiveList
 
 namespace fk {
 namespace containers {
 
+template <typename T>
+struct IntrusiveListNode {
+    T* prev = nullptr;
+    T* next = nullptr;
+};
+
 /**
- * @brief A doubly-linked intrusive list, replacing the previous List implementation.
+ * @brief An intrusive doubly-linked list.
  *
- * In this intrusive list, the list nodes are part of the objects themselves.
- * This means:
- * - T must contain a public member `IntrusiveListNode<T> m_list_node;`.
- * - No dynamic memory allocation is performed by the list itself for nodes.
+ * In an intrusive list, the list nodes are part of the objects themselves,
+ * rather than separate allocations. This means:
+ * - T must contain an `IntrusiveListNode<T> m_list_node;` member.
+ * - No dynamic memory allocation is performed by the list itself.
  * - Objects added to the list must be heap-allocated (or have static/global storage)
  *   and their lifetime is managed externally.
  * - The list only manages pointers, not object ownership.
+ *
+ * This design is common in kernel development to avoid overheads of dynamic
+ * node allocation and to allow objects to be part of multiple lists
+ * (with multiple `IntrusiveListNode` members).
  *
  * @tparam T The type of object to be stored in the list.
  *           T must have a public member `IntrusiveListNode<T> m_list_node;`.
  */
 template <typename T>
-class List {
+class IntrusiveList {
 public:
-    List() = default;
+    IntrusiveList() = default;
 
     // Not copyable or assignable, as it manages raw pointers to nodes embedded in objects.
-    List(const List&) = delete;
-    List& operator=(const List&) = delete;
+    IntrusiveList(const IntrusiveList&) = delete;
+    IntrusiveList& operator=(const IntrusiveList&) = delete;
 
     // Move constructor and assignment are fine, as they just transfer pointers.
-    List(List&& other) noexcept
+    IntrusiveList(IntrusiveList&& other) noexcept
         : m_metadata(other.m_metadata) {
         other.m_metadata.m_head = nullptr;
         other.m_metadata.m_tail = nullptr;
         other.m_metadata.m_size = 0;
     }
 
-    List& operator=(List&& other) noexcept {
+    IntrusiveList& operator=(IntrusiveList&& other) noexcept {
         if (this != &other) {
             clear(); // Clear existing nodes, if any (does not delete objects)
             m_metadata = other.m_metadata;
@@ -57,8 +65,7 @@ public:
      */
     void push_back(T* obj) {
         if (!obj) {
-            // Consider an ASSERT or kerror here for debug builds, or a Result for release
-            return;
+            return; // Or assert, depending on desired error handling
         }
 
         IntrusiveListNode<T>& node = obj->m_list_node;
@@ -86,49 +93,53 @@ public:
 
         IntrusiveListNode<T>& node = obj->m_list_node;
         node.prev = nullptr;
-        node.next = m_head;
+        node.next = m_metadata.m_head;
 
         if (empty()) {
-            m_head = obj;
-            m_tail = obj;
+            m_metadata.m_head = obj;
+            m_metadata.m_tail = obj;
         } else {
-            m_head->m_list_node.prev = obj;
-            m_head = obj;
+            m_metadata.m_head->m_list_node.prev = obj;
+            m_metadata.m_head = obj;
         }
-        m_size++;
+        m_metadata.m_size++;
     }
 
     /**
      * @brief Removes an object from the list.
+     *
      * @param obj A pointer to the object to remove. The object must currently
      *            be in this list.
      */
+  void _remove_node_from_prev(IntrusiveListNode<T>& node) {
+    if (node.prev) {
+      node.prev->m_list_node.next = node.next;
+    } else {
+      m_metadata.m_head = node.next;
+    }
+  }
+
+  void _remove_node_from_next(IntrusiveListNode<T>& node) {
+    if (node.next) {
+      node.next->m_list_node.prev = node.prev;
+    } else {
+      m_metadata.m_tail = node.prev;
+    }
+  }
+
     void remove(T* obj) {
-        // For an intrusive list, we assume 'obj' is valid and part of *this* list.
-        // Adding a 'contains' check here would make 'remove' O(N) which defeats the purpose
-        // of efficient intrusive list removal. Callers are responsible for validity.
-        if (!obj) {
+        if (!obj || !contains(obj)) { // Ensure obj is not null and is in this list
             return;
         }
 
         IntrusiveListNode<T>& node = obj->m_list_node;
 
-        if (node.prev) {
-            node.prev->m_list_node.next = node.next;
-        } else {
-            m_head = node.next; // obj was the head
-        }
+        _remove_node_from_prev(node);
+        _remove_node_from_next(node);
 
-        if (node.next) {
-            node.next->m_list_node.prev = node.prev;
-        } else {
-            m_tail = node.prev; // obj was the tail
-        }
-
-        // Reset pointers in the removed node to indicate it's no longer in a list
-        node.prev = nullptr;
+        node.prev = nullptr; // Clear pointers in the removed node
         node.next = nullptr;
-        m_size--;
+        m_metadata.m_size--;
     }
 
     /**
@@ -139,7 +150,7 @@ public:
         if (empty()) {
             return nullptr;
         }
-        T* obj = m_head;
+        T* obj = m_metadata.m_head;
         remove(obj); // Reuse remove logic
         return obj;
     }
@@ -152,9 +163,27 @@ public:
         if (empty()) {
             return nullptr;
         }
-        T* obj = m_tail;
+        T* obj = m_metadata.m_tail;
         remove(obj); // Reuse remove logic
         return obj;
+    }
+
+    /**
+     * @brief Checks if the list contains a specific object.
+     * This is an O(N) operation. For frequent lookups, consider other data structures.
+     * @param obj A pointer to the object to check.
+     * @return True if the object is in the list, false otherwise.
+     */
+    bool contains(T* obj) const {
+        if (!obj) {
+            return false;
+        }
+        for (T* current = m_metadata.m_head; current != nullptr; current = current->m_list_node.next) {
+            if (current == obj) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -163,16 +192,16 @@ public:
      * pointers are reset and the list's internal pointers are cleared.
      */
     void clear() {
-        T* current = m_head;
+        T* current = m_metadata.m_head;
         while (current) {
             T* next_obj = current->m_list_node.next;
             current->m_list_node.prev = nullptr;
             current->m_list_node.next = nullptr;
             current = next_obj;
         }
-        m_head = nullptr;
-        m_tail = nullptr;
-        m_size = 0;
+        m_metadata.m_head = nullptr;
+        m_metadata.m_tail = nullptr;
+        m_metadata.m_size = 0;
     }
 
     /**
@@ -180,15 +209,11 @@ public:
      * @return A pointer to the front object, or nullptr if the list is empty.
      */
     T* front() {
-        return m_head;
+        return m_metadata.m_head;
     }
 
-    /**
-     * @brief Returns the object at the front of the list without removing it (const version).
-     * @return A const pointer to the front object, or nullptr if the list is empty.
-     */
     const T* front() const {
-        return m_head;
+        return m_metadata.m_head;
     }
 
     /**
@@ -196,15 +221,11 @@ public:
      * @return A pointer to the back object, or nullptr if the list is empty.
      */
     T* back() {
-        return m_tail;
+        return m_metadata.m_tail;
     }
 
-    /**
-     * @brief Returns the object at the back of the list without removing it (const version).
-     * @return A const pointer to the back object, or nullptr if the list is empty.
-     */
     const T* back() const {
-        return m_tail;
+        return m_metadata.m_tail;
     }
 
     /**
@@ -212,7 +233,7 @@ public:
      * @return The current size of the list.
      */
     size_t size() const {
-        return m_size;
+        return m_metadata.m_size;
     }
 
     /**
@@ -220,7 +241,7 @@ public:
      * @return True if the list contains no elements, false otherwise.
      */
     bool empty() const {
-        return m_size == 0;
+        return m_metadata.m_size == 0;
     }
 
     // --- Iterator support ---
@@ -294,13 +315,13 @@ public:
         bool operator!=(const const_iterator& other) const { return m_current != other.m_current; }
     };
 
-    iterator begin() { return iterator(m_head); }
+    iterator begin() { return iterator(m_metadata.m_head); }
     iterator end() { return iterator(nullptr); } // Sentinel for end
 
-    const_iterator begin() const { return const_iterator(m_head); }
+    const_iterator begin() const { return const_iterator(m_metadata.m_head); }
     const_iterator end() const { return const_iterator(nullptr); } // Sentinel for end
 
-    const_iterator cbegin() const { return const_iterator(m_head); }
+    const_iterator cbegin() const { return const_iterator(m_metadata.m_head); }
     const_iterator cend() const { return const_iterator(nullptr); } // Sentinel for end
 
 private:

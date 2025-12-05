@@ -29,7 +29,7 @@ public:
     if (m_ptr)
       fk::algorithms::kdebug("OWN PTR", " constructed, ptr=%p", m_ptr);
     else
-      fk::algorithms::kwarn("OWN PTR", " constructed with nullptr");
+      fk::algorithms::kdebug("OWN PTR", " constructed with nullptr");
   }
 
   /** @brief Move constructor */
@@ -149,7 +149,7 @@ public:
     if (m_ptr)
       fk::algorithms::kdebug("OWN PTR", "<T[]> constructed, ptr=%p", m_ptr);
     else
-      fk::algorithms::kwarn("OWN PTR", "<T[]> constructed with nullptr");
+      fk::algorithms::kdebug("OWN PTR", "<T[]> constructed with nullptr");
   }
 
   OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
@@ -231,7 +231,7 @@ template <typename T,
           typename = fk::traits::enable_if_t<!fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(T *ptr) {
   if (!ptr) {
-    fk::algorithms::kwarn("ADOPT OWN", "Received nullptr for non-array type");
+    fk::algorithms::kdebug("ADOPT OWN", "Received nullptr for non-array type");
     return OwnPtr<T>(nullptr);
   }
   fk::algorithms::kdebug("ADOPT OWN",
@@ -243,7 +243,7 @@ template <typename T,
           typename = fk::traits::enable_if_t<fk::traits::is_array_v<T>>>
 inline OwnPtr<T> adopt_own(fk::traits::remove_extent_t<T> *ptr) {
   if (!ptr) {
-    fk::algorithms::kwarn("ADOPT OWN", "Received nullptr for array type");
+    fk::algorithms::kdebug("ADOPT OWN", "Received nullptr for array type");
     return OwnPtr<T>(nullptr);
   }
   fk::algorithms::kdebug("ADOPT OWN", "Ownership transferred for array type");

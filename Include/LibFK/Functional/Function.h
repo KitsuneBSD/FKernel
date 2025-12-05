@@ -14,16 +14,18 @@ private:
   public:
     virtual ~CallableBase() = default;
     virtual R invoke(Args... args) = 0;
-    virtual OwnPtr<CallableBase> clone() const = 0;
+    virtual memory::OwnPtr<CallableBase> clone() const = 0;
   };
 
   template <typename F> class Callable : public CallableBase {
   public:
-    Callable(F f) : m_callable(fk::move(f)) {}
+    Callable(F f) : m_callable(fk::types::move(f)) {}
 
-    R invoke(Args... args) override { return m_callable(fk::move(args)...); }
+    R invoke(Args... args) override {
+      return m_callable(fk::types::move(args)...);
+    }
 
-    OwnPtr<CallableBase> clone() const override {
+    memory::OwnPtr<CallableBase> clone() const override {
       return make_own<Callable<F>>(m_callable);
     }
 
@@ -31,13 +33,13 @@ private:
     F m_callable;
   };
 
-  OwnPtr<CallableBase> m_callable;
+  memory::OwnPtr<CallableBase> m_callable;
 
 public:
   Function() = default;
 
   template <typename F>
-  Function(F f) : m_callable(make_own<Callable<F>>(fk::move(f))) {}
+  Function(F f) : m_callable(make_own<Callable<F>>(fk::types::move(f))) {}
 
   Function(const Function &other) {
     if (other.m_callable) {
@@ -61,7 +63,7 @@ public:
   Function &operator=(Function &&other) noexcept = default;
 
   R operator()(Args... args) const {
-    return m_callable->invoke(fk::move(args)...);
+    return m_callable->invoke(fk::types::move(args)...);
   }
 
   explicit operator bool() const { return m_callable != nullptr; }

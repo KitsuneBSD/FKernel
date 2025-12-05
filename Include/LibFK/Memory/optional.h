@@ -114,8 +114,7 @@ public:
    */
   T &value() {
     if (!has_value_) {
-      fk::algorithms::kwarn(
-          "OPTIONAL",
+      fk::algorithms::kdebug("OPTIONAL",
           "Attempted to access value of empty optional (non-const).");
     }
     return *ptr();
@@ -127,8 +126,7 @@ public:
    */
   const T &value() const {
     if (!has_value_) {
-      fk::algorithms::kwarn(
-          "OPTIONAL", "Attempted to access value of empty optional (const).");
+      fk::algorithms::kdebug("OPTIONAL", "Attempted to access value of empty optional (const).");
     }
     return *ptr();
   }

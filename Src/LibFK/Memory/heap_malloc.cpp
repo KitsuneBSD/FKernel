@@ -14,19 +14,7 @@ Allocator s_allocator;
 
 Allocator &heap_allocator() { return s_allocator; }
 
-void Allocator::initialize() {
-  if (heap_allocator().initialized()) {
-    fk::algorithms::kerror("HEAP MALLOC", "Allocator is already initialized!");
-    return;
-  }
-
-  uint64_t *heap_start = __heap_start;
-  uint64_t *heap_end = __heap_end;
-
-  ASSERT(heap_start && heap_end && heap_end > heap_start);
-
-  const size_t heap_size = static_cast<size_t>(heap_end - heap_start);
-
+size_t Allocator::_calculate_required_heap_size() const {
   size_t required = 0;
   required += ChunkAllocator<8>::sizeOfAllocationBitmapInBytes() +
               ChunkAllocator<8>::capacityInBytes();
@@ -54,10 +42,33 @@ void Allocator::initialize() {
               ChunkAllocator<16384>::capacityInBytes();
   required += ChunkAllocator<32768>::sizeOfAllocationBitmapInBytes() +
               ChunkAllocator<32768>::capacityInBytes();
+  return required;
+}
+
+void Allocator::initialize() {
+  if (heap_allocator().initialized()) {
+    fk::algorithms::kerror("HEAP MALLOC", "Allocator is already initialized!");
+    return;
+  }
+
+  uint64_t *heap_start = __heap_start;
+  uint64_t *heap_end = __heap_end;
+
+  ASSERT(heap_start && heap_end && heap_end > heap_start);
+
+  const size_t heap_size = static_cast<size_t>(heap_end - heap_start);
+
+  size_t required = _calculate_required_heap_size();
 
   ASSERT(heap_size >= required);
   auto space = reinterpret_cast<uint64_t *>(heap_start);
 
+  _initialize_chunk_allocators(space);
+
+  heap_allocator().initialized() = true;
+}
+
+void Allocator::_initialize_chunk_allocators(uint64_t* space) {
   heap_allocator().alloc8().initialize(space);
   heap_allocator().alloc16().initialize(
       heap_allocator().alloc8().addressAfterThisAllocator());
@@ -83,8 +94,6 @@ void Allocator::initialize() {
       heap_allocator().alloc8192().addressAfterThisAllocator());
   heap_allocator().alloc32768().initialize(
       heap_allocator().alloc16384().addressAfterThisAllocator());
-
-  heap_allocator().initialized() = true;
 }
 
 // Modified allocate function to return Result
@@ -194,74 +203,57 @@ void free(uint64_t *ptr) {
   }
 }
 
+template <typename ChunkAllocatorType>
+fk::core::Result<uint64_t *, fk::core::Error>
+Allocator::_try_reallocate_in_pool(ChunkAllocatorType& pool, uint64_t* ptr, size_t size) {
+  if (pool.isInAllocator(ptr)) {
+    size_t old = pool.chunk_size();
+    if (size <= old) {
+      return ptr; // New size is smaller or equal, return original pointer
+    }
+    auto new_ptr_result = allocate(size);
+    if (new_ptr_result.is_error()) {
+      return new_ptr_result; // Return error if new allocation fails
+    }
+    uint64_t *new_ptr = new_ptr_result.value();
+    memcpy(new_ptr, ptr, old);
+    pool.free(ptr);
+    return new_ptr;
+  }
+  return fk::core::Error::NotFound; // Indicate pointer not found in this pool
+}
+
 // Modified reallocate to handle Result
 fk::core::Result<uint64_t *, fk::core::Error> reallocate(uint64_t *ptr,
                                                          size_t size) {
   ASSERT(ptr || size > 0);
 
-  // Helper lambda to try moving allocation within a specific pool
-  auto try_move =
-      [&](auto &pool) -> fk::core::Result<uint64_t *, fk::core::Error> {
-    if (pool.isInAllocator(ptr)) {
-      size_t old = pool.chunk_size();
-      if (size <= old) {
-        // New size is smaller or equal, no need to reallocate, just return
-        // original pointer
-        return ptr;
-      }
-      // Need to reallocate to a larger size
-      auto new_ptr_result = allocate(size);
-      if (new_ptr_result.is_error()) {
-        return new_ptr_result; // Return error if new allocation fails
-      }
-      uint64_t *new_ptr = new_ptr_result.value();
-      memcpy(new_ptr, ptr, old); // Copy old data
-      pool.free(ptr);            // Free old pointer
-      return new_ptr;            // Return new pointer
-    }
-    return fk::core::Error::NotFound; // Indicate pointer not found in this pool
-  };
-
-  // Try reallocating in each pool (from smallest to largest)
-  auto result8 = try_move(heap_allocator().alloc8());
-  if (!result8.is_error())
-    return result8;
-  auto result16 = try_move(heap_allocator().alloc16());
-  if (!result16.is_error())
-    return result16;
-  auto result32 = try_move(heap_allocator().alloc32());
-  if (!result32.is_error())
-    return result32;
-  auto result64 = try_move(heap_allocator().alloc64());
-  if (!result64.is_error())
-    return result64;
-  auto result128 = try_move(heap_allocator().alloc128());
-  if (!result128.is_error())
-    return result128;
-  auto result256 = try_move(heap_allocator().alloc256());
-  if (!result256.is_error())
-    return result256;
-  auto result512 = try_move(heap_allocator().alloc512());
-  if (!result512.is_error())
-    return result512;
-  auto result1024 = try_move(heap_allocator().alloc1024());
-  if (!result1024.is_error())
-    return result1024;
-  auto result2048 = try_move(heap_allocator().alloc2048());
-  if (!result2048.is_error())
-    return result2048;
-  auto result4096 = try_move(heap_allocator().alloc4096());
-  if (!result4096.is_error())
-    return result4096;
-  auto result8192 = try_move(heap_allocator().alloc8192());
-  if (!result8192.is_error())
-    return result8192;
-  auto result16384 = try_move(heap_allocator().alloc16384());
-  if (!result16384.is_error())
-    return result16384;
-  auto result32768 = try_move(heap_allocator().alloc32768());
-  if (!result32768.is_error())
-    return result32768;
+  auto result8 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc8(), ptr, size);
+  if (result8.is_ok()) return result8;
+  auto result16 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc16(), ptr, size);
+  if (result16.is_ok()) return result16;
+  auto result32 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc32(), ptr, size);
+  if (result32.is_ok()) return result32;
+  auto result64 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc64(), ptr, size);
+  if (result64.is_ok()) return result64;
+  auto result128 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc128(), ptr, size);
+  if (result128.is_ok()) return result128;
+  auto result256 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc256(), ptr, size);
+  if (result256.is_ok()) return result256;
+  auto result512 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc512(), ptr, size);
+  if (result512.is_ok()) return result512;
+  auto result1024 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc1024(), ptr, size);
+  if (result1024.is_ok()) return result1024;
+  auto result2048 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc2048(), ptr, size);
+  if (result2048.is_ok()) return result2048;
+  auto result4096 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc4096(), ptr, size);
+  if (result4096.is_ok()) return result4096;
+  auto result8192 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc8192(), ptr, size);
+  if (result8192.is_ok()) return result8192;
+  auto result16384 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc16384(), ptr, size);
+  if (result16384.is_ok()) return result16384;
+  auto result32768 = heap_allocator()._try_reallocate_in_pool(heap_allocator().alloc32768(), ptr, size);
+  if (result32768.is_ok()) return result32768;
 
   // If pointer was not found in any of our managed pools, it's an error.
   fk::algorithms::kerror(

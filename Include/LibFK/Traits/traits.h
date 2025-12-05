@@ -43,7 +43,7 @@ template <> struct Traits<int> {
    *
    * @param i Integer value to print
    */
-  static void dump(int i) { kprintf("%d", i); }
+  static void dump(int i) { kdebug("TRAITS", "dump(int): %d", i); }
 };
 
 /**
@@ -69,7 +69,7 @@ template <> struct Traits<unsigned> {
    *
    * @param i Unsigned integer value to print
    */
-  static void dump(unsigned i) { kprintf("%u", i); }
+  static void dump(unsigned i) { kdebug("TRAITS", "dump(unsigned): %u", i); }
 };
 
 } // namespace traits

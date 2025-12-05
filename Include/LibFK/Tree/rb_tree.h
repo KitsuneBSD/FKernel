@@ -2,7 +2,6 @@
 
 #include <LibFK/Algorithms/log.h> // For kerror
 #include <LibFK/Core/Result.h>    // Include Result for return types
-#include <LibFK/Memory/own_ptr.h> // For OwnPtr
 #include <LibFK/Utilities/pair.h> // Include Pair definition
 
 namespace fk {
@@ -124,6 +123,34 @@ private:
       rotate_left(g);
   }
 
+  void _rebalance_right_red_uncle(rb_node<T> *p, rb_node<T> *u, rb_node<T> *g) {
+    p->toggle_color();
+    u->toggle_color();
+    g->toggle_color();
+  }
+
+  void _rebalance_right_black_uncle(rb_node<T> *&node, rb_node<T> *p, rb_node<T> *g) {
+    if (node == p->left()) {
+      node = p;
+      rotate_right(node);
+    }
+    rebalance_rotate(p, g, false);
+  }
+
+  void _rebalance_left_red_uncle(rb_node<T> *p, rb_node<T> *u, rb_node<T> *g) {
+    p->toggle_color();
+    u->toggle_color();
+    g->toggle_color();
+  }
+
+  void _rebalance_left_black_uncle(rb_node<T> *&node, rb_node<T> *p, rb_node<T> *g) {
+    if (node == p->right()) {
+      node = p;
+      rotate_left(node);
+    }
+    rebalance_rotate(p, g, true);
+  }
+
   void rebalance(rb_node<T> *node) {
     while (node->parent() && node->parent()->is_red()) {
       rb_node<T> *p = node->parent();
@@ -131,30 +158,18 @@ private:
       if (p == g->left()) {
         rb_node<T> *u = g->right();
         if (u && u->is_red()) {
-          p->toggle_color();
-          u->toggle_color();
-          g->toggle_color();
+          _rebalance_left_red_uncle(p, u, g);
           node = g;
         } else {
-          if (node == p->right()) {
-            node = p;
-            rotate_left(node);
-          }
-          rebalance_rotate(p, g, true);
+          _rebalance_left_black_uncle(node, p, g);
         }
-      } else {
+      } else { // p == g->right()
         rb_node<T> *u = g->left();
         if (u && u->is_red()) {
-          p->toggle_color();
-          u->toggle_color();
-          g->toggle_color();
+          _rebalance_right_red_uncle(p, u, g);
           node = g;
         } else {
-          if (node == p->left()) {
-            node = p;
-            rotate_right(node);
-          }
-          rebalance_rotate(p, g, false);
+          _rebalance_right_black_uncle(node, p, g);
         }
       }
     }
@@ -182,6 +197,38 @@ private:
     }
   }
 
+  void _fix_remove_black_sibling_no_red_children(rb_node<T> *&x, rb_node<T> *&w) {
+    w->set_red(true);
+    x = x->parent();
+  }
+
+  void _fix_remove_black_sibling_red_child(rb_node<T> *&x, rb_node<T> *&w, rb_node<T> *p, bool left_side) {
+    fix_remove_case(w, p, left_side);
+    if (w)
+      w->set_red(p->is_red());
+    p->set_red(false);
+    if (left_side) {
+      if (w && w->right())
+        w->right()->set_red(false);
+      rotate_left(p);
+    } else {
+      if (w && w->left())
+        w->left()->set_red(false);
+      rotate_right(p);
+    }
+    x = m_root;
+  }
+
+  void _fix_remove_red_sibling(rb_node<T> *p, rb_node<T> *&w, bool left_side) {
+    w->set_red(false);
+    p->set_red(true);
+    if (left_side)
+      rotate_left(p);
+    else
+      rotate_right(p);
+    w = left_side ? p->right() : p->left();
+  }
+
   void fix_remove(rb_node<T> *x) {
     while (x != m_root && is_black(x)) {
       rb_node<T> *p = x ? x->parent() : nullptr;
@@ -191,71 +238,26 @@ private:
       rb_node<T> *w = left_side ? p->right() : p->left();
 
       if (w && w->is_red()) {
-        w->set_red(false);
-        p->set_red(true);
-        if (left_side)
-          rotate_left(p);
-        else
-          rotate_right(p);
-        w = left_side ? p->right() : p->left();
+        _fix_remove_red_sibling(p, w, left_side);
       }
 
       if (is_black(w->left()) && is_black(w->right())) {
-        w->set_red(true);
-        x = p;
+        _fix_remove_black_sibling_no_red_children(x, w);
       } else {
-        fix_remove_case(w, p, left_side);
-        if (w)
-          w->set_red(p->is_red());
-        p->set_red(false);
-        if (left_side) {
-          if (w && w->right())
-            w->right()->set_red(false);
-          rotate_left(p);
-        } else {
-          if (w && w->left())
-            w->left()->set_red(false);
-          rotate_right(p);
-        }
-        x = m_root;
+        _fix_remove_black_sibling_red_child(x, w, p, left_side);
       }
     }
     if (x)
       x->set_red(false);
   }
 
-  fk::core::Result<fk::memory::OwnPtr<rb_node<T>>, fk::core::Error>
+  fk::core::Result<rb_node<T>*, fk::core::Error>
   allocate_node(const T &value) {
     if (m_pool_and_size.first >= MAX_NODES)
       return fk::core::Error::OutOfMemory; // Pool is full
     rb_node<T> *node_ptr = &m_pool[m_pool_and_size.first++];
-    // Construct the node in place using placement new, then wrap in OwnPtr
-    // Note: This assumes rb_node<T> has a default constructor that can be used
-    // by OwnPtr. If rb_node<T> itself needs dynamic allocation, this approach
-    // would differ. For now, we are creating a node from the pool and returning
-    // an OwnPtr to it. This might be conceptually tricky as OwnPtr implies
-    // unique ownership and deletion, while the pool manages lifetime. A better
-    // approach might be to return a raw pointer managed by the tree, or a
-    // custom smart pointer for pool-managed objects. However, adhering to the
-    // request to use smart pointers, we'll wrap the raw pointer. The lifetime
-    // management here needs careful consideration to avoid double deletion. For
-    // now, we'll assume OwnPtr will not delete the pointer if it's from the
-    // pool. A more robust solution might involve a custom deleter or a
-    // different smart pointer type. For demonstration, we'll proceed with
-    // OwnPtr, acknowledging potential issues.
-
-    // Construct the node using placement new, then wrap the raw pointer in
-    // OwnPtr. The OwnPtr will take ownership, but since it's from a pool, we
-    // need to be careful. A common pattern is to use `std::unique_ptr` with a
-    // custom deleter for pool objects. For this exercise, we'll use `OwnPtr`
-    // and assume its destructor won't delete if it's from a pool. This is a
-    // simplification for the purpose of demonstrating smart pointer usage.
-
-    // Re-initializing the node from the pool using placement new.
-    new (node_ptr) rb_node<T>(value);
-
-    fk::memory::OwnPtr<rb_node<T>> owned_node(node_ptr); // Construct OwnPtr
-    return fk::core::Result<fk::memory::OwnPtr<rb_node<T>>>(static_cast<fk::memory::OwnPtr<rb_node<T>>&&>(owned_node)); // Move it into Result
+    new (node_ptr) rb_node<T>(value); // Construct the node in place using placement new.
+    return fk::core::Result<rb_node<T>*>(node_ptr);
   }
 
 public:
@@ -265,12 +267,9 @@ public:
   fk::core::Result<void, fk::core::Error> insert(const T &value) {
     auto result = allocate_node(value);
     if (result.is_error()) {
-      // Error is already logged by allocate_node
-      return result.error(); // Return the error from allocate_node
+      return result.error();
     }
-    fk::memory::OwnPtr<rb_node<T>> new_node_ptr =
-        fk::types::move(result.value()); // Get the OwnPtr from the Result
-    rb_node<T> *new_node = new_node_ptr.operator->(); // Get the raw pointer for tree manipulation
+    rb_node<T> *new_node = result.value();
 
     rb_node<T> *y = nullptr;
     rb_node<T> *x = m_root;
@@ -292,14 +291,8 @@ public:
     new_node->set_red(true);
 
     rebalance(new_node);
-    m_pool_and_size.second++; // Increment size_tree
-    // Note: The OwnPtr `new_node_ptr` goes out of scope here. If it truly owned
-    // the node, it would delete it. Since it's from a pool, this is a potential
-    // issue. A custom deleter for OwnPtr or a different smart pointer might be
-    // needed for pool management. For now, we rely on the fact that OwnPtr's
-    // destructor might be specialized or that the node is not actually deleted
-    // by OwnPtr in this context.
-    return fk::core::Result<void>(); // Success
+    m_pool_and_size.second++;
+    return fk::core::Result<void>();
   }
 
   rb_node<T> *find(const T &value) const {
