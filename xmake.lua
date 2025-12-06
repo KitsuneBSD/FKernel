@@ -72,6 +72,7 @@ set_filename("FKernel.bin")
 
 set_license("BSD-3-Clause")
 set_warnings("allextra", "error")
+add_includedirs("Include")
 
 if is_mode("debug") then
 	set_symbols("debug")
@@ -90,8 +91,6 @@ if is_mode("release") then
 	set_optimize("faster")
 	set_strip("all")
 end
-
-add_includedirs("Include")
 
 add_cxflags(flags.general.cxx, { force = true })
 add_asflags(flags.general.asm, { force = true })

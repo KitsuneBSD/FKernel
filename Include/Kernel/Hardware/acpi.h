@@ -3,10 +3,10 @@
 #include <LibFK/Container/fixed_string.h>
 #include <LibFK/Types/types.h>
 
-#include <Kernel/Hardware/ACPI/rsdp.h>
-#include <Kernel/Hardware/ACPI/rsdt.h>
-#include <Kernel/Hardware/ACPI/xsdt.h>
-#include <Kernel/Hardware/ACPI/sdt_header.h>
+#include <Kernel/Hardware/Acpi/rsdp.h>
+#include <Kernel/Hardware/Acpi/rsdt.h>
+#include <Kernel/Hardware/Acpi/xsdt.h>
+#include <Kernel/Hardware/Acpi/sdt_header.h>
 
 /**
  *  @brief ACPI Manager

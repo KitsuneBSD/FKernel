@@ -1,7 +1,7 @@
 #pragma once 
 
 #include <LibFK/Types/types.h>
-#include <Kernel/Hardware/ACPI/sdt_header.h>
+#include <Kernel/Hardware/Acpi/sdt_header.h>
 
 struct XSDT {
   SDTHeader header;

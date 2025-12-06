@@ -1,6 +1,6 @@
 #pragma once 
 
-#include <Kernel/Hardware/ACPI/sdt_header.h>
+#include <Kernel/Hardware/Acpi/sdt_header.h>
 #include <LibFK/Types/types.h>
 
 struct RSDT {
