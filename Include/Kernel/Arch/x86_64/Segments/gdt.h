@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Arch/x86_64/Segments/gdt_structures.h>
-#include <Kernel/Arch/x86_64/Segments/tss_stacks.h>
+#include <Kernel/Arch/x86_64/Segments/Gdt/gdt_structures.h>
+#include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
 
@@ -18,36 +18,13 @@ private:
   uint64_t gdt[8] = {0}; ///< Array of GDT entries
   struct TSS64 tss = {}; ///< TSS structure
   GDTR gdtr = {};        ///< GDTR structure
-  void setupNull() {
-    gdt[0] = 0;
-    fk::algorithms::kdebug("GDT", "Null descriptor initialized");
-  }
 
-  void setupKernelCode() {
-    gdt[1] =
-        createSegment(SegmentAccess::Ring0Code,
-                      SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-    fk::algorithms::kdebug("GDT", "Kernel code segment configured (selector=0x08)");
-  }
+  void setupNull(); ///< Setup null descriptor
+  void setupKernelCode(); ///< Setup kernel code segment
+  void setupKernelData(); ///< Setup kernel data segment
+  void setupUserCode(); ///< Setup user code segment
+  void setupUserData(); ///< Setup user data segment
 
-  void setupKernelData() {
-    gdt[2] =
-        createSegment(SegmentAccess::Ring0Data, SegmentFlags::Granularity4K);
-    fk::algorithms::kdebug("GDT", "Kernel data segment configured (selector=0x10)");
-  }
-
-  void setupUserCode() {
-    gdt[3] =
-        createSegment(SegmentAccess::Ring3Code,
-                      SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-    fk::algorithms::kdebug("GDT", "User code segment configured (selector=0x18)");
-  }
-
-  void setupUserData() {
-    gdt[4] =
-        createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
-    fk::algorithms::kdebug("GDT", "User data segment configured (selector=0x20)");
-  }
   void setupTSS();     ///< Setup TSS descriptor
   void setupGDT();     ///< Setup all GDT entries
   void setupGDTR();    ///< Setup GDTR structure

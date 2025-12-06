@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
-#include <Kernel/Arch/x86_64/Segments/gdt_structures.h>
-#include <Kernel/Arch/x86_64/Segments/tss_stacks.h>
+#include <Kernel/Arch/x86_64/Segments/Gdt/gdt_structures.h>
+#include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
@@ -13,6 +13,35 @@ extern "C" void flush_gdt(void *gdtr);
 static constexpr size_t EXPECTED_TSS_SIZE = sizeof(TSS64);
 static_assert(EXPECTED_TSS_SIZE == 112,
               "TSS64 size unexpected; check structure packing/alignment");
+
+void GDTController::setupNull() {
+  gdt[0] = 0;
+  fk::algorithms::kdebug("GDT", "Null descriptor initialized");
+}
+
+void GDTController::setupKernelCode() {
+  gdt[1] = createSegment(SegmentAccess::Ring0Code,
+                         SegmentFlags::LongMode | SegmentFlags::Granularity4K);
+  fk::algorithms::kdebug("GDT",
+                         "Kernel code segment configured (selector=0x08)");
+}
+
+void GDTController::setupKernelData() {
+  gdt[2] = createSegment(SegmentAccess::Ring0Data, SegmentFlags::Granularity4K);
+  fk::algorithms::kdebug("GDT",
+                         "Kernel data segment configured (selector=0x10)");
+}
+
+void GDTController::setupUserCode() {
+  gdt[3] = createSegment(SegmentAccess::Ring3Code,
+                         SegmentFlags::LongMode | SegmentFlags::Granularity4K);
+  fk::algorithms::kdebug("GDT", "User code segment configured (selector=0x18)");
+}
+
+void GDTController::setupUserData() {
+  gdt[4] = createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
+  fk::algorithms::kdebug("GDT", "User data segment configured (selector=0x20)");
+}
 
 void GDTController::setupTSS() {
   fk::algorithms::kdebug("TSS",
