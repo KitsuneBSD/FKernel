@@ -49,14 +49,19 @@ void GDTController::setupTSS() {
   fk::algorithms::kdebug("TSS", "TSS: %p (base=0x%016lx) limit=0x%x", &tss,
                          base, limit);
 
-  uint64_t low = (limit & 0xFFFFULL) | ((base & 0xFFFFFFULL) << 16) |
-                 ((uint64_t)9 << 40)   // type = 9 (available TSS)
-                 | ((uint64_t)1 << 47) // present
-                 | ((limit & 0xF0000ULL) << 32) |
-                 (((base >> 24) & 0xFFULL) << 56);
+  uint16_t limit16 = limit & 0xFFFF;
 
-  // Garantir casts 64-bit antes de shift
-  uint64_t high = (static_cast<uint64_t>(base) >> 32) & 0xFFFFFFFFULL;
+  uint64_t base0 = base & 0xFFFF;
+  uint64_t base1 = (base >> 16) & 0xFF;
+  uint64_t base2 = (base >> 24) & 0xFF;
+  uint64_t base3 = (base >> 32) & 0xFFFFFFFF;
+
+  uint64_t low = (limit16) | (base0 << 16) |
+                 ((uint64_t)0x9 << 40) | // type = 9 (available TSS)
+                 ((uint64_t)1 << 47) |   // present
+                 (base1 << 32) | (base2 << 56);
+
+  uint64_t high = base3;
 
   if (TSS_INDEX + 1 >= (sizeof(gdt) / sizeof(gdt[0]))) {
     fk::algorithms::kerror("TSS", "TSS_INDEX out of range");
@@ -151,12 +156,10 @@ void GDTController::initialize() {
   loadSegments();
   fk::algorithms::kdebug("GDT", "Segment registers and selectors are live");
 
-  // Carrega TSS via assembly externo (ltr)
   fk::algorithms::kdebug("TSS", "Loading TSS with selector 0x%04x",
                          TSS_SELECTOR);
   flush_tss(TSS_SELECTOR);
 
-  // Verifica TR (str)
   uint16_t tr_val = 0;
   asm volatile("str %0" : "=r"(tr_val));
   fk::algorithms::kdebug("TSS", "STR returned 0x%04x", tr_val);

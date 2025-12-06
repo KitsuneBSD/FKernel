@@ -76,7 +76,6 @@ bool ACPIManager::validate_checksum(const void *table, size_t length) {
 }
 
 RSDP *ACPIManager::find_rsdp() {
-  // Search in main BIOS area (0xE0000 to 0xFFFFF)
   for (char *p = (char *)0xE0000; p < (char *)0xFFFFF; p += 16) {
     if (strncmp(p, "RSD PTR ", 8) == 0) {
       RSDP *rsdp = (RSDP *)p;
