@@ -128,3 +128,16 @@ on_clean(function(target)
 end)
 
 target_end()
+
+task("analyze")
+set_category("plugin")
+
+set_menu({
+	usage = "xmake analyze",
+	description = "Run the script to analyze the kernel runtime",
+})
+
+on_run(function()
+	os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
+end)
+task_end()
