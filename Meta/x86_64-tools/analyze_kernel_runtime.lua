@@ -1,5 +1,9 @@
 #!/usr/bin/env lua
 
+require("Meta.Lib.os_interact")
+require("Meta.Lib.print_message")
+require("Meta.Lib.run_command")
+
 local LogAnalyzer = {}
 
 function LogAnalyzer.ensure_directory(path)
@@ -792,6 +796,10 @@ function Main()
 
 	local filename = arg[1] or "logs/interrupt_logs.log"
 	local output_dir = arg[2] or "logs/analysis"
+
+	if not FileExists(filename) then
+		RunCommand("xmake && xmake run")
+	end
 
 	local success = LogAnalyzer.analyze_all(filename, output_dir)
 
