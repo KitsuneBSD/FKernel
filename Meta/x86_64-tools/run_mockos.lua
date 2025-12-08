@@ -34,11 +34,11 @@ local qemu_cmd = {
 
 if is_graphical_mode then
 	table.insert(qemu_cmd, "-vga qxl")
-	table.insert(qemu_cmd, "-d int")
+	table.insert(qemu_cmd, "-d int,mmu")
 	table.insert(qemu_cmd, "-serial file:logs/serial.log")
 else
 	table.insert(qemu_cmd, "-nographic")
-	table.insert(qemu_cmd, "-d int")
+	table.insert(qemu_cmd, "-d int,mmu")
 	table.insert(qemu_cmd, "-D logs/interrupt_logs.log")
 	table.insert(qemu_cmd, "-serial mon:stdio")
 end
