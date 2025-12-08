@@ -124,6 +124,7 @@ end
 on_clean(function(target)
 	os.execv("rm -rf Build")
 	os.execv("rm -rf build")
+	os.execv("rm -rf logs/")
 end)
 
 target_end()
