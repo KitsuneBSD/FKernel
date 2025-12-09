@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
 #include <Kernel/Hardware/acpi.h>
-#include <Kernel/MemoryManager/MemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 uint64_t HPETTimer::read_reg(uint64_t reg) {

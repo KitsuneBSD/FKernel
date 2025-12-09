@@ -2,7 +2,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Hardware/cpu.h>
-#include <Kernel/MemoryManager/MemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 // I/O APIC Redirection Table Entry bits

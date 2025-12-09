@@ -2,7 +2,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/cpu.h>
-#include <Kernel/MemoryManager/MemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 constexpr uint8_t APIC_SPURIOUS_VECTOR = 0xFF;

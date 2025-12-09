@@ -1,6 +1,6 @@
-#include <Kernel/MemoryManager/MemoryManager.h>
-#include <Kernel/MemoryManager/Pages/PageFlags.h>
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
+#include <Kernel/Memory/Pages/PageFlags.h>
+#include <Kernel/Memory/PhysicalMemoryManager.h>
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>

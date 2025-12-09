@@ -4,8 +4,8 @@
 #include <LibFK/Container/bitmap.h>
 #include <LibFK/Types/types.h>
 
-#include <Kernel/MemoryManager/MemoryManager.h>
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
+#include <Kernel/Memory/PhysicalMemoryManager.h>
 
 struct BlockHeader {
   BlockHeader *m_next{nullptr};

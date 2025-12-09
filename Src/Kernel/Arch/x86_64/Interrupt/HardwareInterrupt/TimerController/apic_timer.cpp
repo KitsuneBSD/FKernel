@@ -1,5 +1,5 @@
-#include "Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h"
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/apic_timer.h>
 
 void APICTimer::initialize(uint32_t frequency) {

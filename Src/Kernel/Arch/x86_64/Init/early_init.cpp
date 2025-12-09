@@ -10,7 +10,7 @@
 #include <Kernel/Boot/multiboot2.h>
 
 #include <Kernel/Hardware/cpu.h>
-#include <Kernel/MemoryManager/MemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
 
 #include <LibFK/Algorithms/log.h>
 

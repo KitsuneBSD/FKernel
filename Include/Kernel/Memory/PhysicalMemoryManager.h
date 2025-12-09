@@ -15,7 +15,7 @@ extern "C" uintptr_t __kernel_end;
 extern "C" uintptr_t __heap_start;
 extern "C" uintptr_t __heap_end;
 
-#include <Kernel/MemoryManager/MemoryRange.h>
+#include <Kernel/Memory/MemoryRange.h>
 
 /**
  * @class PhysicalMemoryManager

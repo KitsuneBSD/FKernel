@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <Kernel/MemoryManager/TlsfHeap.h>
+#include <Kernel/Memory/TlsfHeap.h>
 
-#include <Kernel/MemoryManager/MemoryManager.h>
+#include <Kernel/Memory/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
 

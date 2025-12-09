@@ -1,7 +1,7 @@
 #include <Kernel/Boot/multiboot_interpreter.h>
-#include <Kernel/MemoryManager/MemoryRange.h>
+#include <Kernel/Memory/MemoryRange.h>
 
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
+#include <Kernel/Memory/PhysicalMemoryManager.h>
 
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
