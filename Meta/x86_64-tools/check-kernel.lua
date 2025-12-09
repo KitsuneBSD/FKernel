@@ -19,7 +19,7 @@ local function check_command(cmd)
 	end
 end
 
-if not FileExists(kernel_bin) then
+if not OSInteract.FileExists(kernel_bin) then
 	PrintMessage(true, string.format("Can't find the binary %s", kernel_bin))
 	os.exit(1)
 end
