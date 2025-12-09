@@ -10,9 +10,7 @@
 #include <Kernel/Boot/multiboot2.h>
 
 #include <Kernel/Hardware/cpu.h>
-
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
+#include <Kernel/MemoryManager/MemoryManager.h>
 
 #include <LibFK/Algorithms/log.h>
 
@@ -21,8 +19,7 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
 
   GDTController::the().initialize();
   InterruptController::the().initialize();
-  PhysicalMemoryManager::the().initialize(mmap);
-  VirtualMemoryManager::the().initialize();
+  MemoryManager::the().initialize(mmap);
 
   HardwareInterruptManager::the().initialize();
   ACPIManager::the().initialize();

@@ -1,11 +1,9 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/MemoryManager/TlsfHeap.h>
 
+#include <Kernel/MemoryManager/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
-
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
 
 void TLSFHeap::expand(size_t bytes) {
   size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -24,26 +22,25 @@ void TLSFHeap::expand(size_t bytes) {
     block->m_free = true;
     insert_block(block);
 
-        fk::algorithms::klog(
+    fk::algorithms::klog(
 
-            "TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base,
+        "TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base,
 
-            m_heap_size);
+        m_heap_size);
 
-    
     return;
   }
 
   for (size_t i = 0; i < pages; ++i) {
     void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
     if (!phys) {
-      fk::algorithms::kwarn("TLSF", "Failed to allocate physical page for heap expansion");
+      fk::algorithms::kwarn(
+          "TLSF", "Failed to allocate physical page for heap expansion");
       return;
     }
 
-    VirtualMemoryManager::the().map_page(base + i * PAGE_SIZE, (uintptr_t)phys,
-                                         PageFlags::Present |
-                                             PageFlags::Writable);
+    MemoryManager::the().map_page(base + i * PAGE_SIZE, (uintptr_t)phys,
+                                  PageFlags::Present | PageFlags::Writable);
   }
 
   auto *block = reinterpret_cast<BlockHeader *>(base);
@@ -52,8 +49,8 @@ void TLSFHeap::expand(size_t bytes) {
   insert_block(block);
 
   m_heap_size += pages * PAGE_SIZE;
-  fk::algorithms::kdebug("TLSF", "Heap expanded by %zu pages, new size=%zu", pages,
-         m_heap_size);
+  fk::algorithms::kdebug("TLSF", "Heap expanded by %zu pages, new size=%zu",
+                         pages, m_heap_size);
 }
 
 void TLSFHeap::insert_block(BlockHeader *block) {

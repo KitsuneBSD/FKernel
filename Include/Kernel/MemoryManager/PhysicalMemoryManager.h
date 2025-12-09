@@ -31,9 +31,9 @@ extern "C" uintptr_t __heap_end;
  */
 class PhysicalMemoryManager {
   /**
-   * @brief Grants access to VirtualMemoryManager as a friend class.
+   * @brief Grants access to MemoryManager as a friend class.
    */
-  friend class VirtualMemoryManager;
+  friend class MemoryManager;
 
 private:
   /**

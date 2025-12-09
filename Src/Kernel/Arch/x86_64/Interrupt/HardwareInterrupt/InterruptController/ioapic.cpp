@@ -2,7 +2,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Hardware/cpu.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
+#include <Kernel/MemoryManager/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 // I/O APIC Redirection Table Entry bits
@@ -23,9 +23,9 @@ void IOAPIC::initialize() {
   fk::algorithms::klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
 
   // Map I/O APIC registers
-  VirtualMemoryManager::the().map_page(
-      ioapic_base, ioapic_base,
-      PageFlags::Present | PageFlags::Writable | PageFlags::WriteThrough);
+  MemoryManager::the().map_page(ioapic_base, ioapic_base,
+                                PageFlags::Present | PageFlags::Writable |
+                                    PageFlags::WriteThrough);
 
   uint32_t ver = read(IOAPIC_REG_VER);
   uint32_t max_entries = ((ver >> 16) & 0xFF) + 1;

@@ -2,7 +2,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/cpu.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
+#include <Kernel/MemoryManager/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 constexpr uint8_t APIC_SPURIOUS_VECTOR = 0xFF;
@@ -59,9 +59,9 @@ void APIC::initialize() {
 
   // Map LAPIC region (1 page)
   for (uintptr_t offset = 0; offset < APIC_RANGE_SIZE; offset += PAGE_SIZE) {
-    VirtualMemoryManager::the().map_page(
-        apic_phys + offset, apic_phys + offset,
-        PageFlags::Present | PageFlags::Writable | PageFlags::WriteThrough);
+    MemoryManager::the().map_page(apic_phys + offset, apic_phys + offset,
+                                  PageFlags::Present | PageFlags::Writable |
+                                      PageFlags::WriteThrough);
   }
 
   lapic_base = apic_phys;

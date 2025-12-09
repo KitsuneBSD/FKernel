@@ -3,9 +3,9 @@
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
-
-#include <LibFK/Types/types.h>
+#include <Kernel/Boot/multiboot2.h>
 #include <Kernel/MemoryManager/Pages/PageFlags.h>
+#include <LibFK/Types/types.h>
 
 constexpr uintptr_t align_down(uintptr_t addr, size_t size) {
   return addr & ~(size - 1);
@@ -20,28 +20,28 @@ constexpr bool is_aligned(uintptr_t addr, size_t size) {
 }
 
 /**
- * @class VirtualMemoryManager
+ * @class MemoryManager
  * @brief Manages the system's virtual memory, including page mapping and
  * virtual-to-physical address translation.
  */
-class VirtualMemoryManager {
+class MemoryManager {
 private:
   /**
    * @brief Private constructor to implement the Singleton pattern.
    */
-  VirtualMemoryManager() = default;
+  MemoryManager() = default;
 
   /**
    * @brief Deleted copy constructor to prevent copying of the Singleton
    * instance.
    */
-  VirtualMemoryManager(const VirtualMemoryManager &) = delete;
+  MemoryManager(const MemoryManager &) = delete;
 
   /**
    * @brief Deleted assignment operator to prevent copying of the Singleton
    * instance.
    */
-  VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
+  MemoryManager &operator=(const MemoryManager &) = delete;
 
   /**
    * @brief Indicates whether the virtual memory manager has been initialized.
@@ -61,18 +61,18 @@ private:
 
 public:
   /**
-   * @brief Retrieves the Singleton instance of the VirtualMemoryManager.
+   * @brief Retrieves the Singleton instance of the MemoryManager.
    * @return Reference to the Singleton instance.
    */
-  static VirtualMemoryManager &the() {
-    static VirtualMemoryManager instance;
+  static MemoryManager &the() {
+    static MemoryManager instance;
     return instance;
   };
 
   /**
    * @brief Initializes the virtual memory manager.
    */
-  void initialize();
+  void initialize(const multiboot2::TagMemoryMap *mmap);
 
   /**
    * @brief Maps a virtual page to a physical address with the specified flags.

@@ -1,5 +1,4 @@
 #include <Kernel/Hardware/acpi.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 

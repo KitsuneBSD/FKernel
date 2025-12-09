@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
 #include <Kernel/Hardware/acpi.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
+#include <Kernel/MemoryManager/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 uint64_t HPETTimer::read_reg(uint64_t reg) {
@@ -24,9 +24,9 @@ void HPETTimer::initialize(uint32_t frequency) {
   // For now, let's assume a common address for QEMU for demonstration
   hpet_phys_addr = 0xFED00000;
 
-  VirtualMemoryManager::the().map_page(
-      hpet_phys_addr, hpet_phys_addr,
-      PageFlags::Present | PageFlags::Writable | PageFlags::WriteThrough);
+  MemoryManager::the().map_page(hpet_phys_addr, hpet_phys_addr,
+                                PageFlags::Present | PageFlags::Writable |
+                                    PageFlags::WriteThrough);
   m_hpet_regs = reinterpret_cast<volatile uint64_t *>(hpet_phys_addr);
 
   m_counter_period = read_reg(GENERAL_CAPABILITIES_ID) >> 32;
