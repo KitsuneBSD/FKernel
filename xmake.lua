@@ -53,7 +53,7 @@ local kernel_non_architecture_related = {
 	"Src/Kernel/Driver/**.cpp",
 	"Src/Kernel/Hardware/**.cpp",
 	"Src/Kernel/Init/**.cpp",
-	"Src/Kernel/MemoryManager/**.cpp",
+	"Src/Kernel/Memory/**.cpp",
 	"Src/Kernel/Posix/**.cpp",
 }
 
