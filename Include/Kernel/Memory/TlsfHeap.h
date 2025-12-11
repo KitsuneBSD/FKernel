@@ -116,7 +116,7 @@ private:
     size_t pages_needed = (initial_heap_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     for (size_t i = 0; i < pages_needed; ++i) {
-      void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
+      void *phys = reinterpret_cast<void*>(PhysicalMemoryManager::the().alloc_page());
       if (!phys)
         break;
       uintptr_t addr = reinterpret_cast<uintptr_t>(phys);

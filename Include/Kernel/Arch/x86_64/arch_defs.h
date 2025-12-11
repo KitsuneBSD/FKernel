@@ -48,3 +48,9 @@ constexpr size_t PAGE_SIZE_2M = 2 * fk::types::MiB;
  * @brief Define a Page Mask
  */
 constexpr uintptr_t PAGE_MASK = ~(PAGE_SIZE - 1);
+
+/**
+ * @brief Max number of Zones
+ */
+
+constexpr size_t MAX_ZONES = 16;

@@ -6,11 +6,10 @@
 #include <LibFK/Types/types.h>
 
 void TLSFHeap::expand(size_t bytes) {
-  size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
   uintptr_t base = m_heap_base + m_heap_size;
 
   if (m_heap_base == 0) {
-    void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
+    void *phys = reinterpret_cast<void*>(PhysicalMemoryManager::the().alloc_page());
     if (!phys) {
       return;
     }
@@ -22,17 +21,14 @@ void TLSFHeap::expand(size_t bytes) {
     block->m_free = true;
     insert_block(block);
 
-    fk::algorithms::klog(
-
-        "TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base,
-
-        m_heap_size);
+    fk::algorithms::klog("TLSF", "Heap initialized at 0x%lx, size=%zu", m_heap_base, m_heap_size);
 
     return;
   }
 
+  size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
   for (size_t i = 0; i < pages; ++i) {
-    void *phys = PhysicalMemoryManager::the().alloc_physical_page(1);
+    void *phys = reinterpret_cast<void*>(PhysicalMemoryManager::the().alloc_page());
     if (!phys) {
       fk::algorithms::kwarn(
           "TLSF", "Failed to allocate physical page for heap expansion");
@@ -90,23 +86,18 @@ void *TLSFHeap::alloc(size_t size, size_t align) {
   if (!size || !align || (align & (align - 1)) != 0)
     return nullptr;
 
-  // Ajusta tamanho mínimo e espaço para header
   size_t adjusted_size = size + sizeof(BlockHeader);
   if (adjusted_size < MinBlockSize)
     adjusted_size = MinBlockSize;
 
-  // Tenta localizar um bloco livre
   BlockHeader *block = locate_free_block(adjusted_size);
 
-  // Se não encontrou, expande o heap e tenta novamente
   if (!block) {
     expand(adjusted_size);
     block = locate_free_block(adjusted_size);
 
-    // Fallback: aloca diretamente da PMM
     if (!block) {
-      size_t pages = (adjusted_size + PAGE_SIZE - 1) / PAGE_SIZE;
-      void *phys = PhysicalMemoryManager::the().alloc_physical_page(pages);
+      void *phys = reinterpret_cast<void*>(PhysicalMemoryManager::the().alloc_page());
       if (!phys)
         return nullptr;
       block = reinterpret_cast<BlockHeader *>(phys);
@@ -119,7 +110,6 @@ void *TLSFHeap::alloc(size_t size, size_t align) {
 
   remove_block(block);
 
-  // Split se o bloco for grande demais
   size_t total_size = block->m_size + sizeof(BlockHeader);
   size_t remainder = total_size - adjusted_size;
   if (remainder >= MinBlockSize) {

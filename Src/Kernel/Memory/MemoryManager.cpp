@@ -10,41 +10,8 @@
 
 extern "C" void write_on_cr3(void *pml4);
 
-void map_ranges_iterative(fk::containers::rb_node<PhysicalMemoryRange> *root) {
-  constexpr int MAX_STACK = 64;
-  fk::containers::rb_node<PhysicalMemoryRange> *stack[MAX_STACK];
-  int sp = 0;
-  fk::containers::rb_node<PhysicalMemoryRange> *current = root;
-
-  while (current || sp > 0) {
-    while (current) {
-      if (sp >= MAX_STACK) {
-        return;
-      }
-      stack[sp++] = current;
-      current = current->left();
-    }
-
-    current = stack[--sp];
-
-    auto &range = current->value();
-    /**
-    kprintf("Mapping physical memory range [ %p - %p]\n", range.m_start,
-            range.m_end);
-**/
-    MemoryManager::the().map_range(
-        range.m_start, range.m_start, range.m_end - range.m_start,
-        PageFlags::Present | PageFlags::Writable | PageFlags::HugePage);
-
-    current = current->right();
-  }
-}
-
 void MemoryManager::map_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
                              [[maybe_unused]] uint64_t page_size) {
-  if (PhysicalMemoryManager::the().virt_to_phys(virt) == phys) {
-    return;
-  }
 
   uint64_t pml4_index = (virt >> 39) & 0x1FF;
   uint64_t pdpt_index = (virt >> 30) & 0x1FF;
@@ -94,7 +61,8 @@ void MemoryManager::map_range(uintptr_t virt_start, uintptr_t phys_start,
 }
 
 uint64_t *MemoryManager::alloc_table() {
-  void *page = PhysicalMemoryManager::the().alloc_physical_page(PAGE_SIZE);
+  void *page =
+      reinterpret_cast<void *>(PhysicalMemoryManager::the().alloc_page());
   if (!page) {
     fk::algorithms::kwarn("MEMORY MANAGER",
                           "Failed to allocate page for table.");
@@ -114,40 +82,6 @@ void MemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
 
   PhysicalMemoryManager::the().initialize(mmap);
 
-  m_pml4 = alloc_table();
-  uint64_t *pdpt = alloc_table();
-  if (!m_pml4 || !pdpt) {
-    fk::algorithms::kerror("MEMORY MANAGER",
-                           "Failed to allocate PML4 or PDPT.");
-    return;
-  }
-
-  m_pml4[0] = reinterpret_cast<uintptr_t>(pdpt) | PageFlags::Present |
-              PageFlags::Writable;
-
-  for (int i = 0; i < 4; i++) {
-    uint64_t *pd = alloc_table();
-    if (!pd) {
-      fk::algorithms::kerror("MEMORY MANAGER",
-                             "Failed to allocate Page Directory.");
-      return;
-    }
-
-    pdpt[i] = reinterpret_cast<uintptr_t>(pd) | PageFlags::Present |
-              PageFlags::Writable;
-
-    for (int j = 0; j < 512; j++) {
-      pd[j] = (i * 512 + j) * PAGE_SIZE_2M;
-      pd[j] |= PageFlags::Present | PageFlags::Writable | PageFlags::HugePage;
-    }
-  }
-
-  write_on_cr3(reinterpret_cast<void *>(m_pml4));
-
-  map_ranges_iterative(PhysicalMemoryManager::the().m_memory_ranges.root());
-
-  fk::algorithms::klog("MEMORY MANAGER", "Virtual Memory Manager initialized");
-  HardwareInterruptManager::the().set_memory_manager(true);
-  TimerManager::the().set_memory_manager(true);
+  fk::algorithms::klog("MEMORY MANAGER", "Memory Manager initialized");
   m_is_initialized = true;
 }

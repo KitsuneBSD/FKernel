@@ -7,18 +7,6 @@
 #include <Kernel/Memory/Pages/PageFlags.h>
 #include <LibFK/Types/types.h>
 
-constexpr uintptr_t align_down(uintptr_t addr, size_t size) {
-  return addr & ~(size - 1);
-}
-
-constexpr uintptr_t align_up(uintptr_t addr, size_t size) {
-  return (addr + size - 1) & ~(size - 1);
-}
-
-constexpr bool is_aligned(uintptr_t addr, size_t size) {
-  return (addr & (size - 1)) == 0;
-}
-
 /**
  * @class MemoryManager
  * @brief Manages the system's virtual memory, including page mapping and

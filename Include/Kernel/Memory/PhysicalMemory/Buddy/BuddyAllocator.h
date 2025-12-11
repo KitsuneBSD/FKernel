@@ -1,6 +1,7 @@
 #pragma once 
 
 #include <LibFK/Types/types.h>
+#include <LibFK/Container/string.h>
 #include <LibFK/Utilities/aligner.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/FreeBlocks.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/BuddyOrder.h>
@@ -8,7 +9,8 @@
 
 class BuddyAllocator {
 private:
-    FreeBlock* m_free_lists[NUM_ORDERS] = { nullptr };
+    FreeBlock m_block_pool[16384];
+    size_t m_block_index = 0;
     uintptr_t m_base_address; 
     size_t m_length;
 protected:
@@ -22,11 +24,31 @@ protected:
     void push_free_block(size_t order, uintptr_t address);
     uintptr_t pop_free_block(size_t order);
 
+    FreeBlock* new_block(uintptr_t phys) {
+        FreeBlock* b = &m_block_pool[m_block_index++];
+        b->phys_addr = phys;
+        b->next = nullptr;
+        return b;
+    }
+
 public: 
-    BuddyAllocator(uintptr_t base_address, size_t length) : 
-        m_base_address(base_address), 
-        m_length(length) 
+    BuddyAllocator()
+        : m_base_address(0)
+        , m_length(0)
     {
+    }
+
+    BuddyAllocator(uintptr_t base_address, size_t length) 
+        : m_base_address(base_address)
+        , m_length(length)
+    {
+        initialize();
+    }
+
+    void add_range(uintptr_t base_address, size_t length){
+        m_base_address = base_address;
+        m_length = length;
+
         initialize();
     }
 

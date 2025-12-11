@@ -1,170 +1,113 @@
+#include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
-#include <Kernel/Memory/MemoryRange.h>
-
+#include <Kernel/Memory/PhysicalMemory/Buddy/BuddyOrder.h>
 #include <Kernel/Memory/PhysicalMemoryManager.h>
-
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Types/types.h>
+#include <LibFK/Core/Assertions.h>
+#include <LibFK/Memory/new.h>
 
 void PhysicalMemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
-  if (is_initialized) {
-    fk::algorithms::kerror("PHYSICAL MEMORY", "Already initialized!");
+  if (m_is_initialized)
     return;
-  }
+
+  fk::algorithms::klog("PHYSICAL MEMORY MANAGER",
+                       "Initializing physical memory manager");
 
   for (const auto &entry : *mmap) {
-    auto entry_start = entry.base_addr;
-    auto entry_end = entry.base_addr + entry.length;
-
-    if (entry_start < 2 * fk::types::MiB) {
-      entry_start = 2 * fk::types::MiB;
-    }
-
-    if (entry_end <= entry_start) {
+    if (!multiboot2::is_available(entry.type))
       continue;
-    }
 
-    auto current = m_memory_ranges.root();
-    while (current) {
-      auto &r = current->value();
-      if (entry_end <= r.m_start) {
-        current = current->left();
-      } else if (entry_start >= r.m_end) {
-        current = current->right();
-      } else {
-        if (entry_start < r.m_start)
-          entry_end = r.m_start;
-        else if (entry_end > r.m_end)
-          entry_start = r.m_end;
+    uintptr_t start_addr = entry.base_addr;
+    uintptr_t end_addr = entry.base_addr + entry.length;
 
-        if (entry_end <= entry_start) {
-          fk::algorithms::kwarn("PHYSICAL MEMORY",
-                                "Skipped overlapped range [%p - %p]",
-                                entry_start, entry_end);
-          break;
-        }
-        current = m_memory_ranges.root();
-      }
-    }
+    uintptr_t length_u = end_addr - start_addr;
+    size_t length = static_cast<size_t>(length_u);
 
-    MemoryType type = multiboot2::is_available(entry.type)
-                          ? MemoryType::Usable
-                          : MemoryType::Reserved;
-    PhysicalMemoryRange range{
-        .m_start = entry_start,
-        .m_end = entry_end,
-        .m_type = type,
-        .m_bitmap = fk::containers::Bitmap<uint64_t, 65535>(),
-        .m_page_count = 0,
-    };
+    m_total_memory += length;
+    m_free_memory += length;
 
-    range.initialize();
+    m_buddy.add_range(start_addr, length);
 
-    if (m_memory_ranges.insert(range).is_error()) {
-      fk::algorithms::kwarn("PHYSICAL MEMORY",
-                            "We can't insert the new memory range [%p - %p]",
-                            entry_start, entry_end);
-    }
+    register_zone(static_cast<uint64_t>(start_addr),
+                  static_cast<uint64_t>(length), ZoneType::NORMAL);
 
-    fk::algorithms::kdebug(
-        "PHYSICAL MEMORY", "Insert a new range of memory [ %p - %p | %s ]",
-        entry_start, entry_end,
-        multiboot2::is_available(entry.type) ? "usable" : "reserved");
+    fk::algorithms::kdebug("PHYSICAL MEMORY MANAGER",
+                           "Usable range: [%p - %p] (%lu KB)", start_addr,
+                           end_addr, length / 1024);
   }
 
-  is_initialized = true;
-  fk::algorithms::klog("PHYSICAL MEMORY",
-                       "Physical memory manager initialized");
+  m_is_initialized = true;
 }
 
-int PhysicalMemoryManager::alloc_from_node(
-    fk::containers::rb_node<PhysicalMemoryRange> *node, size_t count,
-    uintptr_t addr_hint) {
-  if (!node)
-    return -1;
+void PhysicalMemoryManager::register_zone(uintptr_t base, size_t length,
+                                          ZoneType type) {
+  assert(m_zone_count < MAX_ZONES);
 
-  int index = alloc_from_node(node->left(), count, addr_hint);
-  if (index >= 0)
-    return index;
+  new (&m_zones[m_zone_count]) Zone(base, length, type);
 
-  // TODO: If we work on continuous memory we can make allocation of more pages
-  // instead one page per range
-  if (node->value().m_type == MemoryType::Usable) {
-    index = node->value().alloc_page(count, addr_hint);
-    if (index >= 0) {
-      uintptr_t addr = node->value().m_start + index * PAGE_SIZE;
-      // kdebug("PHYSICAL MEMORY", "Allocated %zu page(s) at 0x%lx", count,
-      // addr);
-      return addr;
-    }
-  }
+  m_zone_count++;
 
-  return alloc_from_node(node->right(), count, addr_hint);
+  fk::algorithms::kdebug("PMM", "Zone registered: %p size %lu KB type %d", base,
+                         length / 1024, (int)type);
 }
 
-void *PhysicalMemoryManager::alloc_physical_page(size_t count,
-                                                 uintptr_t addr_hint) {
-  if (!is_initialized) {
-    return nullptr;
+Zone *PhysicalMemoryManager::find_zone_for_addr(uintptr_t addr) {
+  for (size_t i = 0; i < m_zone_count; i++) {
+    auto *z = m_zones[i];
+    if (addr >= z->base() && addr < z->base() + z->length())
+      return z;
   }
-
-  if (count == 0) {
-    fk::algorithms::kwarn("PHYSICAL MEMORY", "Cannot allocate zero pages");
-    return nullptr;
-  }
-
-  uintptr_t addr = alloc_from_node(m_memory_ranges.root(), count, addr_hint);
-  if (addr == static_cast<uintptr_t>(-1)) {
-    fk::algorithms::kwarn("PHYSICAL MEMORY",
-                          "No more physical memory available");
-    return nullptr;
-  }
-
-  return reinterpret_cast<void *>(addr);
+  return nullptr;
 }
 
-void PhysicalMemoryManager::free_physical_page(void *page) {
-  if (!is_initialized) {
-    return;
+Zone *PhysicalMemoryManager::select_zone(ZoneType preferred) {
+  for (size_t i = 0; i < m_zone_count; i++) {
+    if (m_zones[i]->type() == preferred)
+      return m_zones[i];
   }
-
-  uintptr_t addr = reinterpret_cast<uintptr_t>(page);
-
-  fk::containers::rb_node<PhysicalMemoryRange> *current =
-      m_memory_ranges.root();
-  while (current) {
-    auto &range = current->value();
-    if (addr < range.m_start) {
-      current = current->left();
-    } else if (addr >= range.m_end) {
-      current = current->right();
-    } else {
-      range.free_page(addr);
-      return;
-    }
-  }
-
-  fk::algorithms::kwarn("PHYSICAL MEMORY",
-                        "The address %p does not belong to any memory range",
-                        addr);
+  return nullptr;
 }
 
-uintptr_t PhysicalMemoryManager::virt_to_phys(uintptr_t addr) {
-  fk::containers::rb_node<PhysicalMemoryRange> *current =
-      m_memory_ranges.root();
-  while (current) {
-    auto &range = current->value();
-    if (addr < range.m_start) {
-      current = current->left();
-    } else if (addr >= range.m_end) {
-      current = current->right();
-    } else {
-      return addr - range.m_start + range.m_start;
-    }
+uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred) {
+  Zone *zone = select_zone(preferred);
+
+  uintptr_t addr = 0;
+
+  if (zone)
+    addr = zone->alloc_frame();
+
+  if (!addr)
+    addr = reinterpret_cast<uintptr_t>(m_buddy.alloc(0)); // order 0 = 4K
+
+  if (addr)
+    m_free_memory -= 4096;
+
+  return addr;
+}
+
+void PhysicalMemoryManager::free_page(uintptr_t addr) {
+  Zone *zone = find_zone_for_addr(addr);
+
+  if (zone) {
+    zone->free_frame(addr);
+  } else {
+    auto buddy_addr = reinterpret_cast<void *>(addr);
+    m_buddy.free(buddy_addr, 0);
   }
 
-  fk::algorithms::kwarn("PHYSICAL MEMORY",
-                        "The address %p does not belong to any memory range",
-                        addr);
-  return 0;
+  m_free_memory += 4096;
+}
+
+uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order) {
+  void *buddy_addr = m_buddy.alloc(order);
+  auto addr = reinterpret_cast<uintptr_t>(buddy_addr);
+  if (addr)
+    m_free_memory -= (1ull << order) * 4096;
+  return addr;
+}
+
+void PhysicalMemoryManager::free_contiguous(uintptr_t addr, size_t order) {
+  auto buddy_addr = reinterpret_cast<void *>(addr);
+  m_buddy.free(buddy_addr, order);
+  m_free_memory += (1ull << order) * 4096;
 }

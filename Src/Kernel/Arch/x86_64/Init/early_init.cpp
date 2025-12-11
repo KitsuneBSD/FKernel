@@ -21,8 +21,10 @@ void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
   InterruptController::the().initialize();
   MemoryManager::the().initialize(mmap);
 
+  /*
   HardwareInterruptManager::the().initialize();
   ACPIManager::the().initialize();
   TimerManager::the().initialize(100);
   ClockManager::the().initialize();
+  */
 }
