@@ -4,6 +4,198 @@ local LogParser = require("Meta.Lib.log_parser")
 
 local LogAnalysisCore = {}
 
+function LogAnalysisCore.detect_freeze_patterns(lines)
+	local freeze_patterns = {
+		"halted",
+		"system halted",
+		"deadlock",
+		"spin",
+		"stuck",
+		"soft lockup",
+		"hard lockup",
+		"no progress",
+		"watchdog",
+	}
+
+	local matches = {}
+
+	for i, line in ipairs(lines) do
+		local l = line:lower()
+		for _, pat in ipairs(freeze_patterns) do
+			if l:find(pat) then
+				table.insert(matches, {
+					line_num = i,
+					pattern = pat,
+					content = LogParser.strip_ansi(line),
+				})
+				break
+			end
+		end
+	end
+
+	return matches
+end
+
+function LogAnalysisCore.extract_timestamps(lines)
+	local timestamps = {}
+
+	for i, line in ipairs(lines) do
+		local ts = line:match("(%d+%.%d+)%s*:")
+		if ts then
+			table.insert(timestamps, {
+				line_num = i,
+				timestamp = tonumber(ts),
+				raw = LogParser.strip_ansi(line),
+			})
+		end
+	end
+
+	return timestamps
+end
+
+function LogAnalysisCore.compute_time_gaps(timestamps, max_gap)
+	max_gap = max_gap or 1.0 -- 1 segundo é atraso suspeito em kernel debug
+
+	local gaps = {}
+
+	for i = 2, #timestamps do
+		local delta = timestamps[i].timestamp - timestamps[i - 1].timestamp
+		if delta >= max_gap then
+			table.insert(gaps, {
+				from_line = timestamps[i - 1].line_num,
+				to_line = timestamps[i].line_num,
+				delta = delta,
+			})
+		end
+	end
+
+	return gaps
+end
+
+function LogAnalysisCore.detect_silence(lines, threshold)
+	threshold = threshold or 50
+
+	local silence = {}
+	local count = 0
+	local last_line = nil
+
+	for i, line in ipairs(lines) do
+		if line:match("%S") then
+			if count >= threshold and last_line then
+				table.insert(silence, {
+					start_line = last_line,
+					end_line = i - 1,
+					length = count,
+				})
+			end
+			count = 0
+			last_line = i
+		else
+			count = count + 1
+		end
+	end
+
+	return silence
+end
+
+function LogAnalysisCore.detect_interrupt_storms(interrupt_data, threshold)
+	threshold = threshold or 5000
+
+	local storms = {}
+
+	for vector, count in pairs(interrupt_data.vectors) do
+		if count >= threshold then
+			table.insert(storms, {
+				vector = vector,
+				count = count,
+			})
+		end
+	end
+
+	return storms
+end
+
+function LogAnalysisCore.detect_incomplete_init(init_status)
+	local incomplete = {}
+
+	for name, data in pairs(init_status) do
+		if data.initialized and not data.success then
+			table.insert(incomplete, {
+				subsystem = name,
+				first_line = data.first_line,
+				last_line = data.last_line,
+				messages = data.messages,
+			})
+		end
+	end
+
+	return incomplete
+end
+
+function LogAnalysisCore.find_stack_failures(lines)
+	local patterns = {
+		"stack overflow",
+		"stack underflow",
+		"stack crash",
+		"invalid rsp",
+		"invalid esp",
+		"stack guard",
+		"guard page",
+		"stack not mapped",
+		"stack corruption",
+	}
+
+	local hits = {}
+
+	for i, line in ipairs(lines) do
+		local low = line:lower()
+		for _, pat in ipairs(patterns) do
+			if low:find(pat) then
+				table.insert(hits, {
+					line_num = i,
+					pattern = pat,
+					content = LogParser.strip_ansi(line),
+				})
+				break
+			end
+		end
+	end
+
+	return hits
+end
+
+function LogAnalysisCore.find_paging_failures(lines)
+	local patterns = {
+		"page not present",
+		"paging disabled",
+		"unmapped",
+		"cr2=0x%x+",
+		"pml4",
+		"pdpt",
+		"pd ",
+		"pt ",
+		"invalid pte",
+		"invalid address",
+	}
+
+	local mmu = {}
+
+	for i, line in ipairs(lines) do
+		for _, pat in ipairs(patterns) do
+			if line:lower():find(pat) then
+				table.insert(mmu, {
+					line_num = i,
+					pattern = pat,
+					content = LogParser.strip_ansi(line),
+				})
+				break
+			end
+		end
+	end
+
+	return mmu
+end
+
 function LogAnalysisCore.find_errors(lines)
 	local errors = {}
 	local error_patterns = {

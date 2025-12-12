@@ -5,6 +5,93 @@ require("Meta.Lib.log_parser")
 
 local LogReportGenerator = {}
 
+function LogReportGenerator.output_timestamps(timestamps, gaps, outdir)
+	local path = outdir .. "/08_timestamps.txt"
+	local buf = {}
+
+	table.insert(buf, "=== TIMESTAMP ANALYSIS ===\n")
+
+	table.insert(buf, "Total timestamps: " .. #timestamps .. "\n")
+	table.insert(buf, "Detected gaps: " .. #gaps .. "\n\n")
+
+	table.insert(buf, "--- Gaps > threshold ---\n")
+	for _, g in ipairs(gaps) do
+		table.insert(buf, string.format("Line %d -> Line %d | Δt = %.3f sec\n", g.prev_line, g.curr_line, g.delta))
+	end
+
+	LogFileIO.write_file(path, table.concat(buf))
+end
+
+function LogReportGenerator.output_silence_periods(silences, outdir)
+	local path = outdir .. "/09_silence_period.txt"
+	local buf = {}
+
+	table.insert(buf, "=== SILENCE DETECTOR ===\n")
+	table.insert(buf, "Detected silence blocks: " .. #silences .. "\n\n")
+
+	for _, s in ipairs(silences) do
+		table.insert(buf, string.format("Silence: lines %d → %d (%d lines)\n", s.start_line, s.end_line, s.length))
+	end
+
+	LogFileIO.write_file(path, table.concat(buf))
+end
+
+function LogReportGenerator.output_interrupt_storms(storms, outdir)
+	local path = outdir .. "/10_interrupt_storms.txt"
+	local buf = {}
+
+	table.insert(buf, "=== INTERRUPT STORM DETECTOR ===\n")
+	table.insert(buf, "Detected storms: " .. #storms .. "\n\n")
+
+	for _, s in ipairs(storms) do
+		table.insert(buf, string.format("Vector %d storm: %d events around line %d\n", s.vector, s.count, s.line))
+	end
+
+	LogFileIO.write_file(path, table.concat(buf))
+end
+
+function LogReportGenerator.output_incomplete_init(list, outdir)
+	local path = outdir .. "/11_incomplete_init.txt"
+	local buf = {}
+
+	table.insert(buf, "=== SUBSYSTEM INITIALIZATION ISSUES ===\n")
+	table.insert(buf, "Incomplete subsystems: " .. #list .. "\n\n")
+
+	for _, entry in ipairs(list) do
+		table.insert(buf, string.format("- %s (first mention at line %d)\n", entry.name, entry.first_line or -1))
+	end
+
+	LogFileIO.write_file(path, table.concat(buf))
+end
+
+function LogReportGenerator.output_stack_failures(fails, outdir)
+	local path = outdir .. "/12_stack_failures.txt"
+	local buf = {}
+
+	table.insert(buf, "=== STACK FAILURES ===\n")
+	table.insert(buf, "Detected: " .. #fails .. "\n\n")
+
+	for _, s in ipairs(fails) do
+		table.insert(buf, string.format("Line %d: %s\n", s.line_num, s.content))
+	end
+
+	LogFileIO.write_file(path, table.concat(buf))
+end
+
+function LogReportGenerator.output_mmu_failures(list, outdir)
+	local path = outdir .. "/13_mmu_failures.txt"
+	local buf = {}
+
+	table.insert(buf, "=== MMU / PAGING FAILURES ===\n")
+	table.insert(buf, "Detected: " .. #list .. "\n\n")
+
+	for _, m in ipairs(list) do
+		table.insert(buf, string.format("Line %d: %s\n", m.line_num, m.content))
+	end
+
+	LogFileIO.write_file(path, table.concat(buf))
+end
+
 function LogReportGenerator.output_errors(errors, output_dir)
 	local content = string.format(
 		[[ 
@@ -404,8 +491,8 @@ TOP 5 LOG TYPES:
 	content = content .. "\n" .. string.rep("=", 80) .. "\n"
 	content = content .. "End of summary report.\n"
 
-	LogFileIO.write_file(output_dir .. "/00_SUMMARY.txt", content)
-	PrintMessage(false, "✓ Generated: 00_SUMMARY.txt")
+	LogFileIO.write_file(output_dir .. "/00_summary.txt", content)
+	PrintMessage(false, "✓ Generated: 00_summary.txt")
 end
 
 return LogReportGenerator
