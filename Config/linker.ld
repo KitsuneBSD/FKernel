@@ -46,4 +46,11 @@ SECTIONS
         . += 32M;       /* reserve 32MB for kernel heap */
         __heap_end = .;
     }
+
+    .phys_bitmap (NOLOAD) : ALIGN(4096) {
+        __pmm_bitmap_start = .;
+        . += 256M;          /* 4 MB bitmap */
+        __pmm_bitmap_end = .;
+    }
+
 }

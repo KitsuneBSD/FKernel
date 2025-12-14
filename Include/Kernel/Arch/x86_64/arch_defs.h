@@ -52,5 +52,19 @@ constexpr uintptr_t PAGE_MASK = ~(PAGE_SIZE - 1);
 /**
  * @brief Max number of Zones
  */
-
 constexpr size_t MAX_ZONES = 16;
+
+/**
+ * @brief Maximum number of physical frames supported by the DMA zone.
+*/
+static constexpr size_t MAX_DMA_FRAMES = 4 * fk::types::MiB;
+
+/**
+ * @brief Maximum number of physical frames supported by the NORMAL zone.
+*/
+static constexpr size_t MAX_NORMAL_FRAMES = 1 * fk::types::GiB;
+
+/**
+ * @brief Maximum number of physical frames supported by the HIGH zone.
+*/
+static constexpr size_t MAX_HIGH_FRAMES = 4 * fk::types::GiB;

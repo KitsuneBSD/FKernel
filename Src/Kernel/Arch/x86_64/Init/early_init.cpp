@@ -12,6 +12,7 @@
 #include <Kernel/Hardware/cpu.h>
 #include <Kernel/Memory/MemoryManager.h>
 
+#include <Kernel/Memory/PhysicalMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 
 void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
