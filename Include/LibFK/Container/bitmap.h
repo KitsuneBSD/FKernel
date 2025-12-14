@@ -1,65 +1,99 @@
 #pragma once
 
-#include <LibC/assert.h>
 #include <LibC/string.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Core/Assertions.h>
 #include <LibFK/Types/types.h>
 
 namespace fk {
 namespace containers {
 
-template <typename T, size_t MaxBits> class Bitmap {
-private:
-  size_t m_size;
-  T m_bits[(MaxBits + sizeof(T) * 8 - 1) / (sizeof(T) * 8)];
-
+template <typename T>
+class Bitmap {
 public:
-  Bitmap() : m_size(0) { memset(m_bits, 0, sizeof(m_bits)); }
+  Bitmap() = default;
 
-  explicit Bitmap(size_t size) : m_size(size) {
-    memset(m_bits, 0, sizeof(m_bits));
+  Bitmap(T* storage, size_t capacity_bits) {
+    assert(storage != nullptr);
+    assert(capacity_bits > 0);
+
+    m_bits     = storage;
+    m_capacity = capacity_bits;
+    m_size     = capacity_bits;
+
+    clear_all();
   }
 
-  size_t sizeInBytes() const noexcept { return (m_size + 7) / 8; }
+  T* data() const noexcept {
+    return m_bits;
+  }
 
-  const T *data() const noexcept { return m_bits; }
-  T *data() noexcept { return m_bits; }
+  ssize_t alloc() noexcept {
+    size_t word_count =
+        (m_size + BITS_PER_WORD - 1) / BITS_PER_WORD;
+
+    for (size_t word_idx = 0; word_idx < word_count; ++word_idx) {
+      T w = m_bits[word_idx];
+
+      if (~w == 0)
+        continue;
+
+      for (size_t bit = 0; bit < BITS_PER_WORD; ++bit) {
+        size_t index = word_idx * BITS_PER_WORD + bit;
+        if (index >= m_size)
+          break;
+
+        if (!(w & (T(1) << bit))) {
+          m_bits[word_idx] |= (T(1) << bit);
+          return static_cast<ssize_t>(index);
+        }
+      }
+    }
+
+    return -1;
+  }
 
   bool get(size_t index) const noexcept {
-    return (m_bits[index / (sizeof(T) * 8)] &
-            (T(1) << (index % (sizeof(T) * 8)))) != 0;
+    return (m_bits[word(index)] & mask(index)) != 0;
   }
 
   void set(size_t index, bool value) noexcept {
-    if (value) {
-      m_bits[index / (sizeof(T) * 8)] |= (T(1) << (index % (sizeof(T) * 8)));
-    } else {
-      m_bits[index / (sizeof(T) * 8)] &= ~(T(1) << (index % (sizeof(T) * 8)));
-    }
+    if (value)
+      m_bits[word(index)] |= mask(index);
+    else
+      m_bits[word(index)] &= ~mask(index);
   }
 
-  void clear(int index) { set(index, false); }
-
-  void clear_all() noexcept { memset(m_bits, 0, sizeof(m_bits)); }
-
-  void resize(size_t size) noexcept {
-    m_size = size;
-    memset(m_bits, 0, sizeof(m_bits));
+  void clear(size_t index) noexcept {
+    set(index, false);
   }
 
-  T get_mask_from(size_t index) const noexcept {
-    if (index >= m_size) {
-      return 0;
-    }
-    T mask = ~T(0) << (index % (sizeof(T) * 8));
-    return m_bits[index / (sizeof(T) * 8)] & mask;
+  void clear_all() noexcept {
+    memset(m_bits, 0, capacity_bytes());
   }
 
-  T get_mask() const noexcept { return m_bits[0]; }
+  size_t size() const noexcept {
+    return m_size;
+  }
 
-  size_t size() const noexcept { return m_size; }
+private:
+  static constexpr size_t BITS_PER_WORD = sizeof(T) * 8;
 
-  bool is_empty() const noexcept { return m_size == 0; }
+  static constexpr size_t word(size_t bit) {
+    return bit / BITS_PER_WORD;
+  }
+
+  static constexpr T mask(size_t bit) {
+    return T(1) << (bit % BITS_PER_WORD);
+  }
+
+  size_t capacity_bytes() const noexcept {
+    return ((m_capacity + BITS_PER_WORD - 1) / BITS_PER_WORD) * sizeof(T);
+  }
+
+private:
+  T*     m_bits{nullptr};
+  size_t m_capacity{0};
+  size_t m_size{0};
 };
 
 } // namespace containers

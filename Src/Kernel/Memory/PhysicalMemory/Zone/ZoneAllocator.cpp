@@ -6,52 +6,42 @@
 #include <LibFK/Core/Assertions.h>
 #include <LibFK/Types/types.h>
 
-void Zone::mark_used(size_t index, size_t count) {
-  for (size_t i = 0; i < count; ++i) {
-    m_bitmap.set(index + i, true);
-  }
+void Zone::populate_zone(uintptr_t base, size_t length, ZoneType type) {
+  assert((base % FRAME_SIZE) == 0);
+  assert((length % FRAME_SIZE) == 0);
+  assert((length / FRAME_SIZE) > 0);
 
-  fk::algorithms::kdebug("ZONE", "Marked [%lu .. %lu] as used", index,
-                         index + count - 1);
+  m_base        = base;
+  m_length      = length;
+  m_frame_count = length / FRAME_SIZE;
+  m_type        = type;
+  m_initialized = true;
+
+  fk::algorithms::kdebug(
+      "ZONE",
+      "Zone populate: base=%p size=%lu frames=%lu type=%d",
+      m_base,
+      m_length,
+      m_frame_count,
+      static_cast<int>(m_type));
 }
 
-void Zone::mark_free(size_t index, size_t count) {
-  for (size_t i = 0; i < count; ++i) {
-    m_bitmap.set(index + i, false);
-  }
-
-  fk::algorithms::kdebug("ZONE", "Marked [%lu .. %lu] as free", index,
-                         index + count - 1);
+uintptr_t Zone::base() const {
+  assert(m_initialized);
+  return m_base;
 }
 
-uintptr_t Zone::alloc_frame() {
-  for (size_t i = 0; i < m_frame_count; ++i) {
-    if (!m_bitmap.get(i)) {
-      m_bitmap.set(i, true);
-      uintptr_t addr = m_base + i * FRAME_SIZE;
-
-      fk::algorithms::kdebug("ZONE", "Allocated frame @ %p (index %lu)", addr,
-                             i);
-
-      return addr;
-    }
-  }
-
-  fk::algorithms::kdebug("ZONE", "No free frames available");
-  return 0;
+size_t Zone::length() const {
+  assert(m_initialized);
+  return m_length;
 }
 
-void Zone::free_frame(uintptr_t addr) {
-  assert(addr >= m_base && addr < m_base + m_length);
-
-  size_t index = (addr - m_base) / FRAME_SIZE;
-  m_bitmap.set(index, false);
-
-  fk::algorithms::kdebug("ZONE", "Freed frame @ %p (index %lu)", addr, index);
+size_t Zone::frame_count() const {
+  assert(m_initialized);
+  return m_frame_count;
 }
 
-bool Zone::is_free(size_t index) const {
-  assert(index < m_frame_count);
-
-  return !m_bitmap.get(index);
+ZoneType Zone::type() const {
+  assert(m_initialized);
+  return m_type;
 }

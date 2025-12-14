@@ -25,12 +25,12 @@ private:
   static constexpr size_t MaxChunks = PoolSizeInBytes / ChunkSize;
 
   size_t m_free{MaxChunks};
-  fk::containers::Bitmap<T, MaxChunks> m_bitmap;
+  fk::containers::Bitmap<T> m_bitmap;
 
-  const fk::containers::Bitmap<T, MaxChunks> &bitmap() const noexcept {
+  const fk::containers::Bitmap<T> &bitmap() const noexcept {
     return m_bitmap;
   }
-  fk::containers::Bitmap<T, MaxChunks> &bitmap() noexcept { return m_bitmap; }
+  fk::containers::Bitmap<T> &bitmap() noexcept { return m_bitmap; }
 
   ChunkAllocator(const ChunkAllocator &) = delete;
   ChunkAllocator &operator=(const ChunkAllocator &) = delete;
