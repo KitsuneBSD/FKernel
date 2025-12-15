@@ -1,7 +1,7 @@
 #include <Kernel/Boot/multiboot2.h>
 #include <Kernel/Boot/multiboot_interpreter.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/BuddyOrder.h>
-#include <Kernel/Memory/PhysicalMemoryManager.h>
+#include <Kernel/Memory/PhysicalMemory/PhysicalMemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Assertions.h>
 #include <LibFK/Memory/new.h>

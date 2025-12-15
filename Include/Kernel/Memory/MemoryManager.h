@@ -4,7 +4,7 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 #include <Kernel/Boot/multiboot2.h>
-#include <Kernel/Memory/Pages/PageFlags.h>
+#include <Kernel/Memory/VirtualMemory/Pages/PageFlags.h>
 #include <LibFK/Types/types.h>
 
 /**
