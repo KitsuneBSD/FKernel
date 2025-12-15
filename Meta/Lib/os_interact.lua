@@ -1,5 +1,7 @@
 #!/usr/bin/env lua
 
+require("Meta.Lib.run_command") -- Added require for RunCommand
+
 local OSInteract = {}
 
 -- Function Utility: Check if a file exists
@@ -33,7 +35,7 @@ function OSInteract.CopyFile(src, dst)
 end
 
 function OSInteract.CommandExists(cmd)
-	return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == 0
+	return RunCommand("command -v " .. cmd .. " >/dev/null 2>&1")
 end
 
 function OSInteract.CaptureCommand(cmd)
