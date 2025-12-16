@@ -39,3 +39,11 @@ enum PageFlags : uint64_t {
   /// No-execute (NX) bit, if supported
   ExecuteDisable = 1ULL << 63
 };
+
+inline PageFlags operator|(PageFlags a, PageFlags b) {
+    return static_cast<PageFlags>(static_cast<uint64_t>(a) | static_cast<uint64_t>(b));
+}
+
+inline PageFlags operator&(PageFlags a, PageFlags b) {
+    return static_cast<PageFlags>(static_cast<uint64_t>(a) & static_cast<uint64_t>(b));
+}

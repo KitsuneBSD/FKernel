@@ -248,3 +248,55 @@ void PhysicalMemoryManager::free_page(uintptr_t phys)
 
   m_free_memory += FRAME_SIZE;
 }
+
+uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order, ZoneType preferred) {
+    assert(m_is_initialized);
+
+    PhysicalZone* pz = select_zone(preferred);
+    if (!pz) {
+        fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER", "alloc_contiguous: No zone available");
+        return 0;
+    }
+
+    void* block = pz->buddy.alloc(order);
+    if (!block) {
+        fk::algorithms::kwarn(
+            "PHYSICAL MEMORY MANAGER",
+            "alloc_contiguous: Buddy allocation failed for order %lu in zone type %d",
+            order,
+            (int)pz->zone.type());
+        return 0;
+    }
+
+    uintptr_t phys = reinterpret_cast<uintptr_t>(block);
+    m_free_memory -= (FRAME_SIZE << order);
+
+    fk::algorithms::kdebug(
+        "PHYSICAL MEMORY MANAGER",
+        "alloc_contiguous: phys=%p order=%lu size=%lu KB zone=%d",
+        phys,
+        order,
+        (FRAME_SIZE << order) / 1024,
+        (int)pz->zone.type());
+
+    return phys;
+}
+
+void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
+    assert(m_is_initialized);
+    assert((phys % FRAME_SIZE) == 0);
+
+    PhysicalZone* pz = find_zone_for_paddr(phys);
+    assert(pz != nullptr);
+
+    pz->buddy.free(reinterpret_cast<void*>(phys), order);
+    m_free_memory += (FRAME_SIZE << order);
+
+    fk::algorithms::kdebug(
+        "PHYSICAL MEMORY MANAGER",
+        "free_contiguous: phys=%p order=%lu size=%lu KB zone=%d",
+        phys,
+        order,
+        (FRAME_SIZE << order) / 1024,
+        (int)pz->zone.type());
+}
