@@ -28,8 +28,10 @@ uint16_t PIC8259::get_irr() { return __get_irq_reg(PIC_READ_IRR); }
 uint16_t PIC8259::get_isr() { return __get_irq_reg(PIC_READ_ISR); }
 
 void PIC8259::initialize() {
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("PIC", "Initializing PIC8259...");
-
+  */
+ 
   outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);
   io_wait();
   outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4);

@@ -25,7 +25,7 @@ public:
     assert((m_length % FRAME_SIZE) == 0);
 
     assert(m_frame_count > 0);
-
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "ZONE",
         "Zone created: base=%p size=%lu frames=%lu type=%d",
@@ -33,6 +33,7 @@ public:
         m_length,
         m_frame_count,
         static_cast<int>(m_type));
+    */
   };
 
   void populate_zone(uintptr_t base, size_t length, ZoneType type); 

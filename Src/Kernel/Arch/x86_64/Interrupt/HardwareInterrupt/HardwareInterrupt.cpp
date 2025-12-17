@@ -39,8 +39,6 @@ void HardwareInterruptManager::select_and_configure_controller() {
   if (new_controller != m_controller) {
     set_controller(new_controller);
     fk::algorithms::klog("HW_INTERRUPT", "Hardware interrupt controller set to: %s", controller_name.c_str());
-  } else {
-    fk::algorithms::kdebug("HW_INTERRUPT", "Hardware interrupt controller remains: %s", controller_name.c_str());
   }
 }
 

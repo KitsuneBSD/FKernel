@@ -36,12 +36,12 @@ uint32_t APIC::read(uint32_t reg) {
 
 void APIC::initialize() {
   if (lapic_base != 0) {
-    fk::algorithms::kdebug("APIC", "APIC already initialized.");
+    fk::algorithms::kwarn("APIC", "APIC already initialized.");
     return;
   }
-
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("APIC", "Initializing Local APIC...");
-
+  */
   if (!CPU::the().has_apic()) {
     fk::algorithms::kerror("APIC", "Local APIC not detected");
     return;
@@ -50,9 +50,11 @@ void APIC::initialize() {
   uint64_t apic_msr = CPU::the().read_msr(APIC_BASE_MSR);
   uintptr_t apic_phys = apic_msr & 0xFFFFF000;
 
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("APIC", "APIC physical base detected at 0x%lx",
                          apic_phys);
 
+  */
   // Enable APIC via MSR
   apic_msr |= APIC_MSR_ENABLE;
   CPU::the().write_msr(APIC_BASE_MSR, apic_msr);
@@ -79,13 +81,13 @@ void APIC::send_eoi(uint8_t) {
 }
 
 void APIC::mask_interrupt(uint8_t irq) {
-  fk::algorithms::kdebug(
+  fk::algorithms::kwarn(
       "APIC", "Mask request for IRQ %u ignored (LAPIC doesn't mask that way)",
       irq);
 }
 
 void APIC::unmask_interrupt(uint8_t irq) {
-  fk::algorithms::kdebug(
+  fk::algorithms::kwarn(
       "APIC",
       "Unmask request for IRQ %u ignored (LAPIC doesn't unmask that way)", irq);
 }

@@ -45,7 +45,9 @@ private:
 
     asm volatile("sti");
     is_interrupt_enable = true;
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("INTERRUPT", "Interrupts enabled");
+    */
   }
 
   /**
@@ -62,7 +64,9 @@ private:
 
     asm volatile("cli");
     is_interrupt_enable = false;
-    fk::algorithms::kdebug("INTERRUPT", "Interrupts disabled");
+    /*TODO: Apply this log when we work with LogLevel
+      fk::algorithms::kdebug("INTERRUPT", "Interrupts disabled");
+    */
   }
 
 public:

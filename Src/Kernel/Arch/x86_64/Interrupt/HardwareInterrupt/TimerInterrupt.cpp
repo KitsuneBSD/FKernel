@@ -34,8 +34,6 @@ void TimerManager::select_and_configure_timer(uint32_t freq) {
       m_timer->initialize(freq);
       fk::algorithms::klog("TIMER", "Timer controller set to: %s", timer_name.c_str());
     }
-  } else {
-    fk::algorithms::kdebug("TIMER", "Timer controller remains: %s", timer_name.c_str());
   }
 }
 
@@ -50,7 +48,7 @@ void TimerManager::initialize(uint32_t freq) {
 
 void TimerManager::sleep(uint64_t awaited_ticks) {
   if (m_timer) {
-    fk::algorithms::kdebug("TIMER", "Sleeping for %lu ticks", awaited_ticks);
+    fk::algorithms::klog("TIMER", "Sleeping for %lu ticks", awaited_ticks);
     // The TickManager is independent of the chosen Timer hardware, it just counts increments.
     // The actual hardware timer (PIT, APIC, HPET) is responsible for calling increment_ticks.
     // So, here we just use the TickManager to wait for a certain number of ticks.

@@ -16,46 +16,62 @@ static_assert(EXPECTED_TSS_SIZE == 112,
 
 void GDTController::setupNull() {
   gdt[0] = 0;
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "Null descriptor initialized");
+  */
 }
 
 void GDTController::setupKernelCode() {
   gdt[1] = createSegment(SegmentAccess::Ring0Code,
                          SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-  fk::algorithms::kdebug("GDT",
+    /*TODO: Apply this log when we work with LogLevel
+                         fk::algorithms::kdebug("GDT",
                          "Kernel code segment configured (selector=0x08)");
+    */
 }
 
 void GDTController::setupKernelData() {
   gdt[2] = createSegment(SegmentAccess::Ring0Data, SegmentFlags::Granularity4K);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT",
                          "Kernel data segment configured (selector=0x10)");
+  */
 }
 
 void GDTController::setupUserCode() {
   gdt[3] = createSegment(SegmentAccess::Ring3Code,
                          SegmentFlags::LongMode | SegmentFlags::Granularity4K);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "User code segment configured (selector=0x18)");
+  */
 }
 
 void GDTController::setupUserData() {
   gdt[4] = createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "User data segment configured (selector=0x20)");
+  */
 }
 
 void GDTController::setupTSS() {
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("TSS",
                          "Initializing TSS structure and IST entries...");
-
+  */
   uint64_t rsp0_top =
       reinterpret_cast<uint64_t>(&stack_bottom) + KERNEL_STACK_SIZE;
   tss.rsp0 = rsp0_top;
+  
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("TSS", "RSP0 set to 0x%016lx", tss.rsp0);
+  */
 
   tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack[IST_STACK_SIZE]);
   tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack[IST_STACK_SIZE]);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("TSS", "RSP1 = 0x%016lx, RSP2 = 0x%016lx", tss.rsp1,
                          tss.rsp2);
+  */
 
   uint64_t *ist_targets[7] = {&tss.ist1, &tss.ist2, &tss.ist3, &tss.ist4,
                               &tss.ist5, &tss.ist6, &tss.ist7};
@@ -63,21 +79,25 @@ void GDTController::setupTSS() {
   for (size_t i = 0; i < 7; ++i) {
     uint64_t top = reinterpret_cast<uint64_t>(&ist_stacks[i][IST_STACK_SIZE]);
     *ist_targets[i] = top;
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("TSS", "IST[%zu] top = 0x%016lx (stack=%p size=%u)",
                            i + 1, *ist_targets[i], &ist_stacks[i],
                            IST_STACK_SIZE);
+    */
   }
 
   tss.io_map_base = sizeof(TSS64);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("TSS", "I/O map base = %u (TSS size = %u)",
                          tss.io_map_base, sizeof(TSS64));
-
+  */
   uint64_t base = reinterpret_cast<uint64_t>(&tss);
   uint32_t limit = static_cast<uint32_t>(sizeof(TSS64) - 1);
 
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("TSS", "TSS: %p (base=0x%016lx) limit=0x%x", &tss,
                          base, limit);
-
+  */
   uint16_t limit16 = limit & 0xFFFF;
 
   uint64_t base0 = base & 0xFFFF;
@@ -98,6 +118,7 @@ void GDTController::setupTSS() {
 
   gdt[TSS_INDEX] = low;
   gdt[TSS_INDEX + 1] = high;
+  /*TODO: Apply this log when we work with LogLevel
 
   if (gdt[TSS_INDEX] != low || gdt[TSS_INDEX + 1] != high) {
     fk::algorithms::kwarn("TSS", "GDT write/readback mismatch");
@@ -113,6 +134,7 @@ void GDTController::setupTSS() {
   fk::algorithms::kdebug("TSS", "TSS Descriptor HIGH = 0x%016lx", high);
   fk::algorithms::kdebug("TSS", "TSS selector expected = 0x%04x (index=%zu)",
                          TSS_SELECTOR, TSS_INDEX);
+*/
 }
 
 void GDTController::setupGDTR() {
@@ -124,13 +146,17 @@ void GDTController::setupGDTR() {
     fk::algorithms::kwarn("GDT", "GDTR base (0x%016lx) not 8-byte aligned",
                           gdtr.base);
   }
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "GDTR prepared: base=0x%016lx limit=0x%04x",
                          gdtr.base, gdtr.limit);
+  */
 }
 
 void GDTController::loadSegments() {
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug(
       "GDT", "Reloading segment registers (CS=0x08, DS=ES=FS=GS=SS=0x10)...");
+  */
   asm volatile("mov $0x10, %%ax\n"
                "mov %%ax, %%ds\n"
                "mov %%ax, %%es\n"
@@ -145,11 +171,15 @@ void GDTController::loadSegments() {
                :
                :
                : "rax");
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "Segment registers successfully reloaded");
+  */
 }
 
 void GDTController::setupGDT() {
+  /*
   fk::algorithms::kdebug("GDT", "Initializing GDT entries...");
+  */
   setupNull();
   setupKernelCode();
   setupKernelData();
@@ -157,41 +187,52 @@ void GDTController::setupGDT() {
   setupUserData();
   setupTSS();
   setupGDTR();
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "GDT setup completed (entries=%zu)",
                          sizeof(gdt) / sizeof(gdt[0]));
+  */
 }
 
 void GDTController::initialize() {
   if (m_initialized) {
-    fk::algorithms::kdebug("GDT", "GDT already initialized, skipping");
+    fk::algorithms::kwarn("GDT", "GDT already initialized, skipping");
     return;
   }
-
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT",
                          "Starting GDT and TSS initialization sequence...");
+  */
   setupGDT();
 
   flush_gdt(&gdtr);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "flush_gdt() called - lgdt expected");
-
+  */
+  
   GDTR loaded_gdtr = {};
   asm volatile("sgdt %0" : "=m"(loaded_gdtr));
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "SGDT returned: base=0x%016lx limit=0x%04x",
                          loaded_gdtr.base, loaded_gdtr.limit);
+  */  
   if (loaded_gdtr.base != gdtr.base || loaded_gdtr.limit != gdtr.limit) {
     fk::algorithms::kerror("GDT", "GDTR mismatch after lgdt");
   }
 
   loadSegments();
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("GDT", "Segment registers and selectors are live");
 
   fk::algorithms::kdebug("TSS", "Loading TSS with selector 0x%04x",
                          TSS_SELECTOR);
+  */
   flush_tss(TSS_SELECTOR);
 
   uint16_t tr_val = 0;
   asm volatile("str %0" : "=r"(tr_val));
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("TSS", "STR returned 0x%04x", tr_val);
+  */
   if ((tr_val & 0xFFF8) != (TSS_SELECTOR & 0xFFF8)) {
     fk::algorithms::kwarn(
         "TSS", "Loaded TR (0x%04x) does not match expected selector (0x%04x)",

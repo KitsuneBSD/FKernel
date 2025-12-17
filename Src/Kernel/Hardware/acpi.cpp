@@ -17,7 +17,7 @@ void ACPIManager::initialize() {
     return;
   }
 
-  fk::algorithms::kdebug("ACPI", "RSDP found at %p", m_rsdp);
+  fk::algorithms::klog("ACPI", "RSDP found at %p", m_rsdp);
 
   if (m_rsdp->revision >= 2 && m_rsdp->xsdt_address) {
     m_xsdt = (XSDT *)((uintptr_t)m_rsdp->xsdt_address);

@@ -26,15 +26,16 @@ PhysicalZone* PhysicalMemoryManager::create_zone(
     pz.zone.populate_zone(base, length, type);
     pz.buddy.add_range(base, length);
 
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
-        "PHYSICAL MEMORY MANAGER",
+        "PHYSICAL MEMORY ZONE",
         "Zone created: base=%p size=%lu KB frames=%lu bitmap_bits=%lu type=%d",
         base,
         length / 1024,
         bitmap_bits,
         bitmap_bits,
         (int)type);
-
+    */
     m_zone_count++;
     return &pz;
 }

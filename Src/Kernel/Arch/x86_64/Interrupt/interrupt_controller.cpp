@@ -75,7 +75,9 @@ void InterruptController::initialize() {
 }
 
 void InterruptController::clear() {
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("INTERRUPT", "Clearing all IDT entries and handlers");
+  */
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
     m_entries[i] = {};
     m_handlers[i] = nullptr;
@@ -117,7 +119,9 @@ void InterruptController::load() {
   ptr.limit = static_cast<uint16_t>(sizeof(m_entries) - 1);
   ptr.base = reinterpret_cast<uint64_t>(&m_entries);
   flush_idt(&ptr);
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("INTERRUPT", "IDT loaded to CPU", ptr.base, ptr.limit);
+  */
 }
 
 interrupt InterruptController::get_interrupt(uint8_t vector) {

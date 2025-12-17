@@ -4,7 +4,9 @@
 
 VirtualMemoryManager::VirtualMemoryManager()
     : m_pml4(nullptr), m_pml4_phys(0) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Ctor (empty)");
+    */
 }
 
 VirtualMemoryManager& VirtualMemoryManager::the() {
@@ -16,7 +18,6 @@ void VirtualMemoryManager::invlpg(uintptr_t addr) {
     asm volatile("invlpg (%0)" :: "r"(addr) : "memory");
 }
 
-// Realiza o mapeamento identidade inicial
 void VirtualMemoryManager::perform_initial_identity_mapping() {
     size_t pages = INITIAL_IDENTITY_MAPPING_SIZE / PAGE_SIZE;
     fk::algorithms::klog(
@@ -47,11 +48,13 @@ void VirtualMemoryManager::initialize() {
     m_pml4_phys = PhysicalMemoryManager::the().alloc_page();
     assert(m_pml4_phys != 0);
 
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "VIRTUAL MEMORY MANAGER",
         "PML4 allocated: phys=%p",
         m_pml4_phys
     );
+    */
 
     m_pml4 = reinterpret_cast<PageTable*>(m_pml4_phys);
     for (size_t i = 0; i < MAX_TABLES; i++)

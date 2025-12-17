@@ -16,7 +16,7 @@ void Zone::populate_zone(uintptr_t base, size_t length, ZoneType type) {
   m_frame_count = length / FRAME_SIZE;
   m_type        = type;
   m_initialized = true;
-
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug(
       "ZONE",
       "Zone populate: base=%p size=%lu frames=%lu type=%d",
@@ -24,6 +24,7 @@ void Zone::populate_zone(uintptr_t base, size_t length, ZoneType type) {
       m_length,
       m_frame_count,
       static_cast<int>(m_type));
+  */
 }
 
 uintptr_t Zone::base() const {
