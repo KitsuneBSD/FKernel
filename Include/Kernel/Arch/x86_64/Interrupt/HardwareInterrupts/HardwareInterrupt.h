@@ -1,9 +1,8 @@
 #pragma once
 
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/string.h>
+#include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
-#include <LibFK/Container/string.h>
 
 class HardwareInterrupt {
 public:
@@ -16,6 +15,7 @@ public:
 };
 
 class HardwareInterruptManager {
+friend class InterruptController;
 private:
   HardwareInterrupt *m_controller = nullptr;
   bool m_has_memory_manager = false;
@@ -42,7 +42,7 @@ public:
   void set_controller(HardwareInterrupt *controller);
   void set_memory_manager(bool is_memory_manager);
 
-private:
+protected:
   void select_and_configure_controller();
 
   fk::text::String get_name() { return m_controller ? m_controller->get_name() : "None"; }

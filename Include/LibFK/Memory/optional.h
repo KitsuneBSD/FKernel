@@ -43,7 +43,9 @@ public:
    */
   optional(T &&value) : has_value_(true) {
     new (storage) T(static_cast<T &&>(value));
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OPTIONAL", "Constructed with move value.");
+    */
   }
 
   /**
@@ -52,7 +54,9 @@ public:
    */
   optional(const T &val) : has_value_(true) {
     new (storage) T(val);
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OPTIONAL", "Constructed with copy value.");
+    */
   }
 
   /**
@@ -62,9 +66,11 @@ public:
   optional(const optional &other) : has_value_(other.has_value_) {
     if (has_value_)
       new (storage) T(*other.ptr());
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OPTIONAL",
                            "Constructed with copy optional. Has value: %b",
                            has_value_);
+    */
   }
 
   /** @brief Destructor: destroys stored value if present */
@@ -79,9 +85,11 @@ public:
       new (storage) T(static_cast<T &&>(*other.ptr()));
       other.reset(); // Ensure the other optional is empty
     }
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OPTIONAL",
                            "Constructed with move optional. Has value: %b",
                            has_value_);
+    */
   }
 
   /**
@@ -97,8 +105,10 @@ public:
         has_value_ = true;
       }
     }
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OPTIONAL", "Copy assigned. Has value: %b",
                            has_value_);
+    */
     return *this;
   }
 
@@ -114,8 +124,10 @@ public:
    */
   T &value() {
     if (!has_value_) {
+    /*TODO: Apply this log when we work with LogLevel  
       fk::algorithms::kdebug("OPTIONAL",
           "Attempted to access value of empty optional (non-const).");
+    */
     }
     return *ptr();
   }
@@ -126,7 +138,10 @@ public:
    */
   const T &value() const {
     if (!has_value_) {
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OPTIONAL", "Attempted to access value of empty optional (const).");
+      */
+      return nullptr;
     }
     return *ptr();
   }
@@ -138,7 +153,9 @@ public:
     if (has_value_) {
       ptr()->~T();
       has_value_ = false;
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OPTIONAL", "Value destroyed during reset.");
+      */
     }
   }
 };

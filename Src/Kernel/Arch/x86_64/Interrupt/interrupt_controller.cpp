@@ -71,7 +71,7 @@ void InterruptController::initialize() {
 
   enable_interrupt();
   fk::algorithms::klog("INTERRUPT",
-                       "Interrupt descriptor table initialized using PIC8259");
+                       "Interrupt descriptor table initialized using %s", HardwareInterruptManager::the().get_name().c_str());
 }
 
 void InterruptController::clear() {

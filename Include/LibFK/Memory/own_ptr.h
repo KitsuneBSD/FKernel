@@ -21,39 +21,51 @@ template <typename T> class OwnPtr {
 public:
   /** @brief Default constructor: no object owned */
   OwnPtr() : m_ptr(nullptr) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", " default constructed with nullptr");
+    */
   }
 
   /** @brief Construct OwnPtr from raw pointer */
   explicit OwnPtr(T *ptr) : m_ptr(ptr) {
+    /*TODO: Apply this log when we work with LogLevel
     if (m_ptr)
       fk::algorithms::kdebug("OWN PTR", " constructed, ptr=%p", m_ptr);
     else
       fk::algorithms::kdebug("OWN PTR", " constructed with nullptr");
+    */
   }
 
   /** @brief Move constructor */
   OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", " move constructed, ptr=%p", m_ptr);
+    */
   }
 
   /** @brief Move constructor for convertible types */
   template <typename U>
   OwnPtr(OwnPtr<U> &&other) : m_ptr(static_cast<T *>(other.leakPtr())) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", " templated move constructed, ptr=%p",
                            m_ptr);
+    */
   }
 
   /** @brief Destructor */
   ~OwnPtr() {
     if (m_ptr)
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", " destroying ptr=%p", m_ptr);
+      */
     clear();
   }
 
   /** @brief Construct OwnPtr from nullptr */
   OwnPtr(nullptr_t) : m_ptr(nullptr) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", " constructed from nullptr literal");
+    */
   }
 
   /** @brief Move assignment */
@@ -61,7 +73,9 @@ public:
     if (this != &other) {
       clear();
       m_ptr = other.leakPtr();
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", " move assigned, ptr=%p", m_ptr);
+      */
     }
     return *this;
   }
@@ -71,8 +85,10 @@ public:
     if (reinterpret_cast<void *>(this) != reinterpret_cast<void *>(&other)) {
       clear();
       m_ptr = static_cast<T *>(other.leakPtr());
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", " templated move assigned, ptr=%p",
                              m_ptr);
+      */
     }
     return *this;
   }
@@ -82,7 +98,9 @@ public:
     if (m_ptr != ptr) {
       clear();
       m_ptr = ptr;
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", " assigned raw pointer ptr=%p", m_ptr);
+      */
     }
     return *this;
   }
@@ -90,18 +108,24 @@ public:
   /** @brief Assign nullptr */
   OwnPtr &operator=(nullptr_t) {
     clear();
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", " assigned nullptr");
+    */
     return *this;
   }
 
   /** @brief Clear owned pointer */
   void clear() {
     if (m_ptr) {
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", " clearing ptr=%p", m_ptr);
+      */
       delete m_ptr;
       m_ptr = nullptr;
     } else {
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", " clear called on nullptr");
+      */
     }
   }
 
@@ -109,7 +133,9 @@ public:
   T *leakPtr() {
     T *leaked = m_ptr;
     m_ptr = nullptr;
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", " leaked ptr=%p", leaked);
+    */
     return leaked;
   }
 
@@ -142,31 +168,41 @@ private:
 template <typename T> class OwnPtr<T[]> {
 public:
   OwnPtr() : m_ptr(nullptr) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", "<T[]> default constructed with nullptr");
+    */
   }
 
   explicit OwnPtr(T *ptr) : m_ptr(ptr) {
+    /*TODO: Apply this log when we work with LogLevel
     if (m_ptr)
       fk::algorithms::kdebug("OWN PTR", "<T[]> constructed, ptr=%p", m_ptr);
     else
       fk::algorithms::kdebug("OWN PTR", "<T[]> constructed with nullptr");
+      */
   }
 
   OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", "<T[]> move constructed, ptr=%p", m_ptr);
+    */
   }
 
   ~OwnPtr() { clear(); }
 
   OwnPtr(nullptr_t) : m_ptr(nullptr) {
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", "<T[]> constructed from nullptr literal");
+    */
   }
 
   OwnPtr &operator=(OwnPtr &&other) {
     if (this != &other) {
       clear();
       m_ptr = other.leakPtr();
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", "<T[]> move assigned, ptr=%p", m_ptr);
+      */
     }
     return *this;
   }
@@ -175,32 +211,42 @@ public:
     if (m_ptr != ptr) {
       clear();
       m_ptr = ptr;
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", "<T[]> assigned raw pointer ptr=%p",
                              m_ptr);
+   */
     }
     return *this;
   }
 
   OwnPtr &operator=(nullptr_t) {
     clear();
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", "<T[]> assigned nullptr");
+    */
     return *this;
   }
 
   void clear() {
     if (m_ptr) {
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", "<T[]> clearing ptr=%p", m_ptr);
+      */
       delete[] m_ptr;
       m_ptr = nullptr;
     } else {
+      /*TODO: Apply this log when we work with LogLevel
       fk::algorithms::kdebug("OWN PTR", "<T[]> clear called on nullptr");
+      */
     }
   }
 
   T *leakPtr() {
     T *leaked = m_ptr;
     m_ptr = nullptr;
+    /*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug("OWN PTR", "<T[]> leaked ptr=%p", leaked);
+    */
     return leaked;
   }
 

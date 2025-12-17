@@ -5,7 +5,7 @@
 #include <Kernel/Memory/PhysicalMemory/Buddy/BuddyOrder.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/FreeBlocks.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/string.h>
+#include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Utilities/aligner.h>
 

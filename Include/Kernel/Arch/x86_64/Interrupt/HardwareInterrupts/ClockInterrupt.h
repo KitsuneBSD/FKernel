@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LibFK/Container/string.h"
+#include <LibFK/Text/string.h>
 #include <LibFK/Core/Result.h>
 #include <LibFK/Types/types.h>
 

@@ -1,7 +1,7 @@
 #include <LibC/assert.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/string.h>
+#include <LibFK/Text/string.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Types/types.h> // For fk::types::move
 

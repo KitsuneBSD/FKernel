@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibFK/Container/fixed_string.h>
+#include <LibFK/Text/fixed_string.h>
 #include <LibFK/Types/types.h>
 
 #include <Kernel/Hardware/Acpi/rsdp.h>
