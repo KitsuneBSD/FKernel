@@ -49,4 +49,5 @@ public:
    * @brief Initializes the virtual memory manager.
    */
   void initialize(const multiboot2::TagMemoryMap *mmap);
+  void map_page(uintptr_t virt, uintptr_t phys, PageFlags flags);
 };

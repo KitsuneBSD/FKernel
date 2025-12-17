@@ -26,7 +26,6 @@ void IOAPIC::initialize() {
   MemoryManager::the().map_page(ioapic_base, ioapic_base,
                                 PageFlags::Present | PageFlags::Writable |
                                     PageFlags::WriteThrough);
-
   uint32_t ver = read(IOAPIC_REG_VER);
   uint32_t max_entries = ((ver >> 16) & 0xFF) + 1;
 

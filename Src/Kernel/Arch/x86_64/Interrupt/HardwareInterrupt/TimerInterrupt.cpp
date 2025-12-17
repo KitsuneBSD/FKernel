@@ -44,6 +44,7 @@ void TimerManager::set_timer(Timer *timer) {
 }
 
 void TimerManager::initialize(uint32_t freq) {
+  TickManager::the().set_frequency(freq);
   select_and_configure_timer(freq);
 }
 

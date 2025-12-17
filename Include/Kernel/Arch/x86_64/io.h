@@ -55,3 +55,17 @@ static inline uint16_t inw(uint16_t port) {
 static inline void outw(uint16_t port, uint16_t value) {
     asm volatile("outw %0, %1" : : "a"(value), "Nd"(port));
 }
+
+/**
+ * @brief Invalidate a single Translation Lookaside Buffer (TLB) entry.
+ *
+ * This function issues the 'invlpg' instruction, which invalidates
+ * the TLB entry for the specified virtual address. This is necessary
+ * after modifying page table entries to ensure the CPU uses the
+ * updated mapping.
+ *
+ * @param virt The virtual address for which the TLB entry should be invalidated.
+ */
+static inline void invlpg(uintptr_t virt) {
+    asm volatile("invlpg (%0)" :: "r"(virt) : "memory");
+}

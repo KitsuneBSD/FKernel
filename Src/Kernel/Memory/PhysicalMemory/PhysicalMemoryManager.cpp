@@ -87,7 +87,6 @@ void PhysicalMemoryManager::initialize(
 
   fk::algorithms::klog("PHYSICAL MEMORY MANAGER", "Initializing Physical Memory Manager");
 
-  // Região reservada previamente no boot para bitmaps
   extern uint64_t __pmm_bitmap_start[];
   extern uint64_t __pmm_bitmap_end[];
 
@@ -136,7 +135,7 @@ PhysicalZone* PhysicalMemoryManager::find_zone_for_paddr(uintptr_t phys)
         }
     }
 
-    fk::algorithms::kdebug(
+    fk::algorithms::kwarn(
         "PHYSICAL MEMORY MANAGER",
         "No zone found for phys=%p",
         phys);
@@ -148,31 +147,37 @@ PhysicalZone* PhysicalMemoryManager::select_zone(ZoneType preferred)
 {
     for (size_t i = 0; i < m_zone_count; ++i) {
         if (m_zones[i].zone.type() == preferred) {
+/*TODO: Apply this log when we work with LogLevel
             fk::algorithms::kdebug(
                 "PHYSICAL MEMORY MANAGER",
                 "Selected preferred zone type=%d",
                 (int)preferred);
+                */
             return &m_zones[i];
         }
     }
 
     for (size_t i = 0; i < m_zone_count; ++i) {
         if (m_zones[i].zone.type() == ZoneType::NORMAL) {
+      /*TODO: Apply this log when we work with LogLevel
             fk::algorithms::kdebug(
                 "PHYSICAL MEMORY MANAGER",
                 "Preferred zone unavailable, falling back to NORMAL");
+            */
             return &m_zones[i];
         }
     }
 
     if (m_zone_count > 0) {
+    /*TODO: Apply this log when we work with LogLevel
         fk::algorithms::kdebug(
             "PHYSICAL MEMORY MANAGER",
             "Fallback to first available zone");
-        return &m_zones[0];
+      */  
+      return &m_zones[0];
     }
 
-    fk::algorithms::kdebug(
+    fk::algorithms::kwarn(
         "PHYSICAL MEMORY MANAGER",
         "No zones available");
     return nullptr;
@@ -194,13 +199,13 @@ uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred)
         pz->zone.base() + (frame * FRAME_SIZE);
 
     m_free_memory -= FRAME_SIZE;
-
+/*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "PHYSICAL MEMORY MANAGER",
         "Alloc_page(bitmap): phys=%p zone=%d",
         phys,
         (int)pz->zone.type());
-
+*/
     return phys;
   }
 
@@ -231,19 +236,21 @@ void PhysicalMemoryManager::free_page(uintptr_t phys)
   if (phys >= base && phys < end) {
     size_t frame = (phys - base) / FRAME_SIZE;
     pz->bitmap.clear(frame);
-
+/*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "PHYSICAL MEMORY MANAGER",
         "Free_page(bitmap): phys=%p frame=%lu",
         phys,
         frame);
+*/
   } else {
     pz->buddy.free(reinterpret_cast<void*>(phys), 0);
-
+/*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "PHYSICAL MEMORY MANAGER",
         "Free_page(buddy): phys=%p",
         phys);
+*/
   }
 
   m_free_memory += FRAME_SIZE;
@@ -270,7 +277,7 @@ uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order, ZoneType preferr
 
     uintptr_t phys = reinterpret_cast<uintptr_t>(block);
     m_free_memory -= (FRAME_SIZE << order);
-
+/*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "PHYSICAL MEMORY MANAGER",
         "alloc_contiguous: phys=%p order=%lu size=%lu KB zone=%d",
@@ -278,7 +285,7 @@ uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order, ZoneType preferr
         order,
         (FRAME_SIZE << order) / 1024,
         (int)pz->zone.type());
-
+*/
     return phys;
 }
 
@@ -291,7 +298,7 @@ void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
 
     pz->buddy.free(reinterpret_cast<void*>(phys), order);
     m_free_memory += (FRAME_SIZE << order);
-
+/*TODO: Apply this log when we work with LogLevel
     fk::algorithms::kdebug(
         "PHYSICAL MEMORY MANAGER",
         "free_contiguous: phys=%p order=%lu size=%lu KB zone=%d",
@@ -299,4 +306,5 @@ void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
         order,
         (FRAME_SIZE << order) / 1024,
         (int)pz->zone.type());
+  */
 }

@@ -95,16 +95,20 @@ void InterruptController::set_gate(uint8_t vector, void (*new_interrupt)(),
   d.offset_high = static_cast<uint32_t>((handler >> 32) & 0xFFFFFFFFu);
   d.zero = 0;
 
+  /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug(
       "IDT", "Gate set: vector=%u handler=%p type=%u selector=%x ist=%u",
       vector, new_interrupt, type, selector, ist);
+  */
 }
 
 void InterruptController::register_interrupt(interrupt new_interrupt,
                                              uint8_t vector) {
-  fk::algorithms::kdebug("INTERRUPT",
+  /*TODO: Apply this log when we work with LogLevel
+                                              fk::algorithms::kdebug("INTERRUPT",
                          "Registered handler: vector=%u, handler=%p", vector,
                          new_interrupt);
+  */
   m_handlers[vector] = new_interrupt;
 }
 
