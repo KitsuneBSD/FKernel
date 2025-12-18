@@ -1,4 +1,4 @@
-#include <Kernel/Hardware/acpi.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -38,6 +38,8 @@ void ACPIManager::initialize() {
       fk::algorithms::klog("ACPI", "RSDT found at %p", m_rsdt);
     }
   }
+
+  initialize_madt();
 }
 
 void *ACPIManager::find_table(const char *signature) {
@@ -91,3 +93,5 @@ RSDP *ACPIManager::find_rsdp() {
   }
   return nullptr;
 }
+
+

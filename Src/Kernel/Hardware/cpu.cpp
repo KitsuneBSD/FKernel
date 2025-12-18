@@ -1,4 +1,4 @@
-#include <Kernel/Hardware/acpi.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/cpu.h>
 #include <LibFK/Algorithms/log.h>
 

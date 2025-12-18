@@ -4,7 +4,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
-#include <Kernel/Hardware/acpi.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
 
 #include <Kernel/Boot/early_init.h>
 #include <Kernel/Boot/multiboot2.h>
