@@ -230,4 +230,70 @@ struct alignas(TAG_ALIGN) TagFramebuffer : Tag {
 static_assert(alignof(TagFramebuffer) == 8,
               "TagFramebuffer must be aligned to 8 bytes");
 
+/**
+ * @brief EFI 32-bit system table tag
+ */
+struct alignas(TAG_ALIGN) TagEFI32 : Tag {
+  uint32_t efi_system_table; ///< Physical address of EFI system table (32-bit)
+};
+static_assert(alignof(TagEFI32) == 8, "TagEFI32 must be aligned to 8 bytes");
+
+/**
+ * @brief EFI 64-bit system table tag
+ */
+struct alignas(TAG_ALIGN) TagEFI64 : Tag {
+  uint64_t efi_system_table; ///< Physical address of EFI system table (64-bit)
+};
+static_assert(alignof(TagEFI64) == 8, "TagEFI64 must be aligned to 8 bytes");
+
+/**
+ * @brief EFI 32-bit image handle tag
+ */
+struct alignas(TAG_ALIGN) TagEFI32ImageHandle : Tag {
+  uint32_t efi_image_handle; ///< EFI image handle (32-bit)
+};
+static_assert(alignof(TagEFI32ImageHandle) == 8,
+              "TagEFI32ImageHandle must be aligned to 8 bytes");
+
+/**
+ * @brief EFI 64-bit image handle tag
+ */
+struct alignas(TAG_ALIGN) TagEFI64ImageHandle : Tag {
+  uint64_t efi_image_handle; ///< EFI image handle (64-bit)
+};
+static_assert(alignof(TagEFI64ImageHandle) == 8,
+              "TagEFI64ImageHandle must be aligned to 8 bytes");
+
+/**
+ * @brief EFI boot services availability tag
+ */
+struct alignas(TAG_ALIGN) TagEFIBootServices : Tag {
+  // This tag only indicates that boot services are available
+  // No additional data fields
+};
+static_assert(alignof(TagEFIBootServices) == 8,
+              "TagEFIBootServices must be aligned to 8 bytes");
+
+/**
+ * @brief EFI memory map tag
+ */
+struct alignas(TAG_ALIGN) TagEFIMMap : Tag {
+  uint32_t descriptor_size;     ///< Size of each EFI memory descriptor
+  uint32_t descriptor_version;  ///< Version of the descriptor format
+  uint8_t descriptors[0];       ///< Flexible array of EFI memory descriptors
+
+  /**
+   * @brief EFI memory descriptor
+   */
+  struct Descriptor {
+    uint32_t type;        ///< EFI memory type
+    uint32_t padding;     ///< Padding for alignment
+    uint64_t physical_start; ///< Physical start address
+    uint64_t virtual_start;  ///< Virtual start address
+    uint64_t number_of_pages; ///< Number of 4KB pages
+    uint64_t attribute;       ///< Memory attributes
+  };
+};
+static_assert(alignof(TagEFIMMap) == 8, "TagEFIMMap must be aligned to 8 bytes");
+
 } // namespace multiboot2

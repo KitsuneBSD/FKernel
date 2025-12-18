@@ -1,5 +1,6 @@
 #include <Kernel/Hardware/Acpi/acpi.h>
 #include <LibC/string.h>
+#include <LibFK/Core/Assertions.h>
 #include <LibFK/Algorithms/log.h>
 
 ACPIManager &ACPIManager::the() {
@@ -12,31 +13,16 @@ ACPIManager::~ACPIManager() {}
 
 void ACPIManager::initialize() {
   m_rsdp = find_rsdp();
-  if (!m_rsdp) {
-    fk::algorithms::kwarn("ACPI", "RSDP not found!");
-    return;
-  }
-
-  fk::algorithms::klog("ACPI", "RSDP found at %p", m_rsdp);
+  assert(m_rsdp && "RSDP not found - critical ACPI infrastructure unavailable!");
 
   if (m_rsdp->revision >= 2 && m_rsdp->xsdt_address) {
     m_xsdt = (XSDT *)((uintptr_t)m_rsdp->xsdt_address);
-    if (!validate_checksum(m_xsdt, m_xsdt->header.length)) {
-      fk::algorithms::kwarn("ACPI", "XSDT checksum failed!");
-      m_xsdt = nullptr;
-    } else {
-      fk::algorithms::klog("ACPI", "XSDT found at %p", m_xsdt);
-    }
+    assert(validate_checksum(m_xsdt, m_xsdt->header.length) && "XSDT checksum validation failed - corrupted table!");
   }
 
   if (!m_xsdt) {
     m_rsdt = (RSDT *)((uintptr_t)m_rsdp->rsdt_address);
-    if (!validate_checksum(m_rsdt, m_rsdt->header.length)) {
-      fk::algorithms::kwarn("ACPI", "RSDT checksum failed!");
-      m_rsdt = nullptr;
-    } else {
-      fk::algorithms::klog("ACPI", "RSDT found at %p", m_rsdt);
-    }
+    assert(validate_checksum(m_rsdt, m_rsdt->header.length) && "RSDT checksum validation failed - corrupted table!");
   }
 
   initialize_madt();

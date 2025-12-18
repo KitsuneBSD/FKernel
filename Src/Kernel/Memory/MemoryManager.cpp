@@ -1,6 +1,7 @@
 #include <Kernel/Memory/MemoryManager.h>
 #include <Kernel/Memory/VirtualMemory/VirtualMemoryManager.h>
 #include <Kernel/Memory/PhysicalMemory/PhysicalMemoryManager.h>
+#include <LibFK/Core/Assertions.h>
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
@@ -10,10 +11,8 @@
 #endif
 
 void MemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
-  if (m_is_initialized) {
-    fk::algorithms::kwarn("MEMORY MANAGER", "Already initialized.");
-    return;
-  }
+  assert(!m_is_initialized && "MemoryManager: Double initialization attempted!");
+  assert(mmap && "MemoryManager: No memory map provided!");
 
   PhysicalMemoryManager::the().initialize(mmap);
   VirtualMemoryManager::the().initialize();
@@ -23,7 +22,6 @@ void MemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
   TimerManager::the().set_memory_manager(true);
   ClockManager::the().set_memory_manager(true);
 
-  fk::algorithms::klog("MEMORY MANAGER", "Memory Manager initialized");
   m_is_initialized = true;
 }
 

@@ -11,9 +11,12 @@
 
 #include <Kernel/Hardware/cpu.h>
 #include <Kernel/Memory/MemoryManager.h>
+#include <LibFK/Core/Assertions.h>
 #include <LibFK/Algorithms/log.h>
 
 void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
+  assert(mmap && "early_init: Memory map not provided!");
+  
   fk::algorithms::klog("EARLY_INIT", "Start early init (multiboot2)");
 
   GDTController::the().initialize();

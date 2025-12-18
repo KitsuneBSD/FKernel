@@ -5,31 +5,28 @@
 #include <Kernel/Hardware/Madt/madt_ioapic.h>
 #include <Kernel/Hardware/Madt/madt_interrupt_source_override.h>
 #include <Kernel/Hardware/Madt/madt_lapic_override.h>
+#include <LibFK/Core/Assertions.h>
 #include <LibFK/Algorithms/log.h>
 
 void ACPIManager::initialize_madt() {
   m_madt = (Madt *)find_table("APIC");
-  if (!m_madt) {
-    fk::algorithms::kwarn("ACPI", "MADT table not found!");
-    return;
-  }
+  assert(m_madt && "MADT table not found - APIC infrastructure unavailable!");
 
   fk::algorithms::klog("MADT", "MADT found at %p", m_madt);
   fk::algorithms::klog("MADT", "MADT signature: %.4s", &m_madt->header.signature);
   fk::algorithms::klog("MADT", "MADT length: %u bytes", m_madt->header.length);
   fk::algorithms::klog("MADT", "Local APIC address: %p", (void *)(uintptr_t)m_madt->lapic_address);
   fk::algorithms::klog("MADT", "MADT flags: 0x%x", m_madt->flags);
+  
   process_madt_entries();
 }
 
 void ACPIManager::process_madt_entries() {
-  if (!m_madt) {
-    return;
-  }
+  assert(m_madt && "process_madt_entries called without valid MADT!");
 
   uint8_t *entries_start = m_madt->entries;
   uint8_t *entries_end = (uint8_t *)m_madt + m_madt->header.length;
-  uint32_t entry_count = 0;
+  [[maybe_unused]] uint32_t entry_count = 0;
 
   fk::algorithms::klog("MADT", "Processing MADT entries...");
 
