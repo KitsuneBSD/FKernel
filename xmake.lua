@@ -142,17 +142,3 @@ on_run(function()
   os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
 end)
 task_end()
-
-task("run-uefi")
-set_category("plugin")
-
-set_menu({
-  usage = "xmake run-uefi",
-  description = "Run kernel on UEFI-Mode",
-})
-
-on_run(function()
-  os.execv("lua Meta/x86_64-tools/elf_to_efi.lua")
-  os.execv("sudo lua Meta/x86_64-tools/run_uefi_grub.lua")
-end)
-task_end()
