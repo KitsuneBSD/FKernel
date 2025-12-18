@@ -116,6 +116,21 @@ static int _parse_width(const char *fmt, size_t *i) {
   return width;
 }
 
+// New helper: Parses precision
+static int _parse_precision(const char *fmt, size_t *i) {
+  ASSERT(fmt != NULL);
+  ASSERT(i != NULL);
+  int precision = -1; // -1 means no precision specified
+  if (fmt[*i] == '.') {
+    (*i)++;
+    precision = 0;
+    while (fmt[*i] >= '0' && fmt[*i] <= '9') {
+      precision = precision * 10 + (fmt[(*i)++] - '0');
+    }
+  }
+  return precision;
+}
+
 // New helper: Parses length modifiers
 static void _parse_length_modifier(const char *fmt, size_t *i, bool *long_flag,
                                    bool *size_t_flag) {
@@ -145,13 +160,16 @@ static void _handle_char_specifier(char *buf, size_t max, size_t *idx,
 
 // New helper: Handles %s
 static void _handle_string_specifier(char *buf, size_t max, size_t *idx,
-                                     va_list args) {
+                                     va_list args, int precision) {
   ASSERT(buf != NULL);
   ASSERT(idx != NULL);
   ASSERT(max > 0);
   const char *str_val = va_arg(args, const char *);
   ASSERT(str_val != NULL);
   size_t len = strnlen(str_val, max - *idx - 1);
+  if (precision >= 0 && (size_t)precision < len) {
+    len = precision;
+  }
   for (size_t j = 0; j < len && *idx < max - 1; j++)
     buf[(*idx)++] = str_val[j];
 }
@@ -257,6 +275,7 @@ int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
 
     _parse_flags(fmt, &i, &left_align, &zero_pad, &always_sign, &alt_form);
     int width = _parse_width(fmt, &i);
+    int precision = _parse_precision(fmt, &i);
     _parse_length_modifier(fmt, &i, &long_flag, &size_t_flag);
 
     switch (fmt[i]) {
@@ -264,7 +283,7 @@ int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
       _handle_char_specifier(buf, max, &idx, args);
       break;
     case 's':
-      _handle_string_specifier(buf, max, &idx, args);
+      _handle_string_specifier(buf, max, &idx, args, precision);
       break;
     case 'd':
     case 'i':
