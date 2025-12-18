@@ -5,9 +5,17 @@ EXTERN interrupt_dispatch
 
 section .text
 
-%macro ISR_STUB 1
+%macro ISR_STUB 2
 global isr%1
 isr%1:
+    ; For exceptions that do not push an error code, we push a dummy 0
+    ; so that the stack layout always contains an error_code field.
+    ; The second macro parameter should be 1 if the CPU already pushes an
+    ; error code for this vector, or 0 otherwise.
+    %if %2 = 0
+      push 0
+    %endif
+
     push r15
     push r14
     push r13
@@ -43,11 +51,39 @@ isr%1:
     pop r13
     pop r14
     pop r15
+    %if %2 = 0
+      add rsp, 8    ; remove dummy error code
+    %endif
     iretq
 %endmacro
 
+; Vectors which push an error code automatically: 8,10,11,12,13,14,17
 %assign i 0
 %rep 256
-  ISR_STUB i
+  ; check if i is in the error-code list
+  %assign has_err 0
+  %if i = 8
+    %assign has_err 1
+  %endif
+  %if i = 10
+    %assign has_err 1
+  %endif
+  %if i = 11
+    %assign has_err 1
+  %endif
+  %if i = 12
+    %assign has_err 1
+  %endif
+  %if i = 13
+    %assign has_err 1
+  %endif
+  %if i = 14
+    %assign has_err 1
+  %endif
+  %if i = 17
+    %assign has_err 1
+  %endif
+  ISR_STUB i, has_err
   %assign i i+1
+  %undef has_err
 %endrep

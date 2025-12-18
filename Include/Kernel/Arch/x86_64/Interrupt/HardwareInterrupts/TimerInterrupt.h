@@ -23,7 +23,7 @@ public:
     return inst;
   }
 
-  void initialize(uint32_t freq);
+  void initialize(uint32_t freq = 1000);
   void sleep(uint64_t awaited_ticks);
 
   void set_timer(Timer *timer);

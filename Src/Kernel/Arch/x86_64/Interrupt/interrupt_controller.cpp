@@ -6,8 +6,8 @@
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
 
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
-
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 
 #include <LibFK/Algorithms/log.h>
@@ -58,10 +58,13 @@ void InterruptController::initialize() {
   // NOTE: Load IDT
   load();
 
+  // Initialize the TimerManager
+  TimerManager::the().initialize(1000);
+
   NMI::enable_nmi();
 
   HardwareInterruptManager::the().initialize();
-  TimerManager::the().initialize(100);
+  ClockManager::the().initialize();
 
   HardwareInterruptManager::the().unmask_interrupt(0);  // Timer
   HardwareInterruptManager::the().unmask_interrupt(1);  // Keyboard
@@ -71,7 +74,8 @@ void InterruptController::initialize() {
 
   enable_interrupt();
   fk::algorithms::klog("INTERRUPT",
-                       "Interrupt descriptor table initialized using %s", HardwareInterruptManager::the().get_name().c_str());
+                       "Interrupt descriptor table initialized using %s",
+                       HardwareInterruptManager::the().get_name().c_str());
 }
 
 void InterruptController::clear() {

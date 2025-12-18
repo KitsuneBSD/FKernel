@@ -38,7 +38,9 @@ void HardwareInterruptManager::select_and_configure_controller() {
 
   if (new_controller != m_controller) {
     set_controller(new_controller);
-    fk::algorithms::klog("HW_INTERRUPT", "Hardware interrupt controller set to: %s", controller_name.c_str());
+    fk::algorithms::klog("HW_INTERRUPT",
+                         "Hardware interrupt controller set to: %s",
+                         controller_name.c_str());
   }
 }
 
@@ -48,14 +50,15 @@ void HardwareInterruptManager::set_controller(HardwareInterrupt *controller) {
 
 void HardwareInterruptManager::initialize() {
   select_and_configure_controller();
-  TimerManager::the().initialize(1000);
 }
 
 void HardwareInterruptManager::set_memory_manager(bool is_memory_manager) {
   bool old_has_memory_manager = m_has_memory_manager;
   m_has_memory_manager = is_memory_manager;
   if (!old_has_memory_manager && m_has_memory_manager) {
-    fk::algorithms::klog("HW_INTERRUPT", "Memory manager enabled, re-evaluating interrupt controller.");
+    fk::algorithms::klog(
+        "HW_INTERRUPT",
+        "Memory manager enabled, re-evaluating interrupt controller.");
     select_and_configure_controller();
   }
 }

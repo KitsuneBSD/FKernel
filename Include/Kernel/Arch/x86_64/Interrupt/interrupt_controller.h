@@ -31,6 +31,7 @@ private:
   /// Tracks whether interrupts are enabled
   bool is_interrupt_enable = true;
 
+public:
   /**
    * @brief Enable CPU interrupts
    *
@@ -69,7 +70,19 @@ private:
     */
   }
 
-public:
+  /**
+   * @brief Get the current interrupt state (enabled/disabled).
+   *
+   * Reads the EFLAGS register to determine if the interrupt flag (IF) is set.
+   *
+   * @return True if interrupts are enabled, false otherwise.
+   */
+  bool get_interrupt_state() {
+    uint64_t eflags;
+    asm volatile("pushfq ; popq %0" : "=r"(eflags));
+    return (eflags & (1 << 9)) != 0;
+  }
+
   /**
    * @brief Get the singleton instance of the InterruptController
    *
