@@ -1,4 +1,5 @@
 #include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Hardware/Fadt/fadt.h>
 #include <LibC/string.h>
 #include <LibFK/Core/Assertions.h>
 #include <LibFK/Algorithms/log.h>
@@ -25,8 +26,13 @@ void ACPIManager::initialize() {
     assert(validate_checksum(m_rsdt, m_rsdt->header.length) && "RSDT checksum validation failed - corrupted table!");
   }
 
+  // Initialize FADT support via the FadtManager
+  extern void initialize_fadt_from_acpi(ACPIManager *);
+  initialize_fadt_from_acpi(this);
+
   initialize_madt();
 }
+
 
 void *ACPIManager::find_table(const char *signature) {
   if (m_xsdt) {
