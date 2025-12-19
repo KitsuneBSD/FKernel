@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
-#include <Kernel/Hardware/cpu.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Memory/MemoryManager.h>
 #include <LibFK/Algorithms/log.h>
 

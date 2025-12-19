@@ -3,7 +3,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/pit.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
-#include <Kernel/Hardware/cpu.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 
 void TimerManager::initialize(uint32_t freq) {
   select_and_configure_timer(freq);

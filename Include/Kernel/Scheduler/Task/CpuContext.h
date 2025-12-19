@@ -21,4 +21,10 @@ struct CpuContext {
     uint64_t rbx;
     uint64_t rax;
 };
-#endif 
+#endif
+
+CpuContext GetContextForNewTask(
+    void (*entry)(),
+    uint64_t stack_top,
+    bool is_kernel_task
+);

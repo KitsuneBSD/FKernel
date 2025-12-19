@@ -4,7 +4,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
-#include <Kernel/Hardware/cpu.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 
 void HardwareInterruptManager::select_and_configure_controller() {
   static PIC8259 pic_controller_instance;

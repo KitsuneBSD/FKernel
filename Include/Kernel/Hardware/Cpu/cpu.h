@@ -4,6 +4,8 @@
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 
+#include <Kernel/Hardware/Cpu/cpu_register.h>
+
 /**
  * @brief CPU feature detection and MSR access
  *
@@ -38,4 +40,6 @@ public:
 
   uint64_t read_msr(uint32_t msr);
   void write_msr(uint32_t msr, uint64_t value);
+  uint64_t read_register(CpuRegister reg);
+  void write_register(CpuRegister reg, uint64_t value);
 };

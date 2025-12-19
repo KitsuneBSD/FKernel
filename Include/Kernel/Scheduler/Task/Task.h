@@ -32,8 +32,9 @@ struct Task {
 Task create_a_new_task(
     TaskId id,
     const fk::text::String& name,
+    void (*entry)(),
     bool kernel_task,
-    uint8_t priority = 0,
-    uint64_t cpu_affinity = ~0ULL
-);
+    uint8_t priority,
+    uint64_t cpu_affinity
+); 
 

@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
-#include <Kernel/Hardware/cpu.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 
 // Layout US QWERTY simplificado
 static const char scancode_set1[128] = {

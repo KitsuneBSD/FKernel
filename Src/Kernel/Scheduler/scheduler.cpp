@@ -1,12 +1,16 @@
 #include <Kernel/Scheduler/Scheduler.h>
 #include <Kernel/Scheduler/Task/TaskList.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TickManager.h>
+#include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <LibFK/Algorithms/log.h>
+
+extern "C" void idle_task_entry();
 
 void SchedulerManager::initialize() {
     auto idle_task = create_a_new_task(
         0,
         "idle",
+        idle_task_entry,
         true,
         0,
         0xFFFFFFFFFFFFFFFF
@@ -26,13 +30,6 @@ void SchedulerManager::add_task(Task* task) {
     task->state = TaskState::Ready;
     task->time_slice_ticks = m_default_quantum;
     m_run_queue.push_back(task);
-
-    fk::algorithms::kdebug(
-        "SCHEDULER MANAGER",
-        "Added task %s (id: %lu) to run queue.",
-        task->name.c_str(),
-        task->id
-    );
 }
 
 void SchedulerManager::block_current() {
@@ -42,13 +39,6 @@ void SchedulerManager::block_current() {
     Task* task = m_current;
     task->state = TaskState::Blocked;
     m_current = nullptr;
-
-    fk::algorithms::kdebug(
-        "SCHEDULER MANAGER",
-        "Blocked current task %s (id: %lu).",
-        task->name.c_str(),
-        task->id
-    );
 }
 
 void SchedulerManager::sleep_current(uint64_t sleep_ticks) {
@@ -62,27 +52,12 @@ void SchedulerManager::sleep_current(uint64_t sleep_ticks) {
 
     m_sleep_queue.push_back(task);
     m_current = nullptr;
-
-    fk::algorithms::kdebug(
-        "SCHEDULER MANAGER",
-        "Task %s (id: %lu) sleeping for %lu ticks.",
-        task->name.c_str(),
-        task->id,
-        sleep_ticks
-    );
 }
 
 void SchedulerManager::wake_task(Task* task) {
     task->state = TaskState::Ready;
     task->time_slice_ticks = m_default_quantum;
     m_run_queue.push_back(task);
-
-    fk::algorithms::kdebug(
-        "SCHEDULER MANAGER",
-        "Woke up task %s (id: %lu).",
-        task->name.c_str(),
-        task->id
-    );
 }
 
 Task* SchedulerManager::pick_next() {

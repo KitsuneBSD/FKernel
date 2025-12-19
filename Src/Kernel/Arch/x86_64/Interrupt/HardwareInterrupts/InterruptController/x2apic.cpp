@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
-#include <Kernel/Hardware/cpu.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <LibFK/Algorithms/log.h>
 
 // x2APIC MSRs

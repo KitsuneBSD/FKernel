@@ -2,8 +2,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/interrupt_frame.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 
-#include <Kernel/Hardware/cpu.h>
-
 extern "C" void interrupt_dispatch(uint8_t vector,
                                    InterruptFrame *frame = nullptr) {
   auto handler = InterruptController::the().get_interrupt(vector);
