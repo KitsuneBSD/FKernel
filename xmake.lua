@@ -6,56 +6,57 @@ set_objectdir("build/objs")
 set_languages("cxx20", "c17")
 
 local flags = {
-  general = {
-    cxx = {
-      "-ffreestanding",
-      "-fno-threadsafe-statics",
-      "-fno-exceptions",
-      "-fno-rtti",
-      "-fno-stack-protector",
-      "-fno-use-cxa-atexit",
-      "-fno-pic",
-      "-fno-omit-frame-pointer",
-      "-nostdlib",
-      "-nostdinc",
-      "-Wno-constant-conversion",
-      "-Wno-c++11-narrowing",
-    },
+	general = {
+		cxx = {
+			"-ffreestanding",
+			"-fno-threadsafe-statics",
+			"-fno-exceptions",
+			"-fno-rtti",
+			"-fno-stack-protector",
+			"-fno-use-cxa-atexit",
+			"-fno-pic",
+			"-fno-omit-frame-pointer",
+			"-nostdlib",
+			"-nostdinc",
+			"-Wno-constant-conversion",
+			"-Wno-c++11-narrowing",
+		},
 
-    asm = {
-      "-w-label-orphan",
-      "-w-implicit-abs-deprecated",
-      "-w-other",
-    },
+		asm = {
+			"-w-label-orphan",
+			"-w-implicit-abs-deprecated",
+			"-w-other",
+		},
 
-    ld = {
-      "-T Config/linker.ld",
-      "-nostdlib",
-      "-z max-page-size=0x1000",
-    },
-  },
+		ld = {
+			"-T Config/linker.ld",
+			"-nostdlib",
+			"-z max-page-size=0x1000",
+		},
+	},
 
-  x86_64 = {
-    cxx = {
-      "--target=x86_64-unknown-none-elf",
-      "-mcmodel=kernel",
-      "-mno-sse",
-      "-mno-avx",
-    },
+	x86_64 = {
+		cxx = {
+			"--target=x86_64-unknown-none-elf",
+			"-mcmodel=kernel",
+			"-mno-sse",
+			"-mno-avx",
+		},
 
-    asm = {
-      "-f elf64",
-    },
-  },
+		asm = {
+			"-f elf64",
+		},
+	},
 }
 
 local kernel_non_architecture_related = {
-  "Src/Kernel/Boot/**.cpp",
-  "Src/Kernel/Driver/**.cpp",
-  "Src/Kernel/Hardware/**.cpp",
-  "Src/Kernel/Init/**.cpp",
-  "Src/Kernel/Memory/**.cpp",
-  "Src/Kernel/Posix/**.cpp",
+	"Src/Kernel/Boot/**.cpp",
+	"Src/Kernel/Driver/**.cpp",
+	"Src/Kernel/Hardware/**.cpp",
+	"Src/Kernel/Init/**.cpp",
+	"Src/Kernel/Memory/**.cpp",
+	"Src/Kernel/Posix/**.cpp",
+	"Src/Kernel/Scheduler/**.cpp",
 }
 
 toolchain("FKernel_Compiling")
@@ -76,21 +77,21 @@ set_warnings("allextra", "error")
 add_includedirs("Include")
 
 if is_mode("debug") then
-  set_symbols("debug")
-  set_optimize("fast")
-  add_defines("FKERNEL_DEBUG")
+	set_symbols("debug")
+	set_optimize("fast")
+	add_defines("FKERNEL_DEBUG")
 
-  if is_arch("x86_64", "x64") then
-    add_cxflags(flags.x86_64.cxx)
-  end
+	if is_arch("x86_64", "x64") then
+		add_cxflags(flags.x86_64.cxx)
+	end
 
-  --TODO: add tests load on the kernel if this mode is setted
+	--TODO: add tests load on the kernel if this mode is setted
 end
 
 if is_mode("release") then
-  set_symbols("hidden")
-  set_optimize("faster")
-  set_strip("all")
+	set_symbols("hidden")
+	set_optimize("faster")
+	set_strip("all")
 end
 
 add_cxflags(flags.general.cxx, { force = true })
@@ -102,30 +103,30 @@ add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
 
 if is_arch("x86_64", "x64") then
-  add_cxflags(flags.x86_64.cxx)
-  add_asflags(flags.x86_64.asm)
+	add_cxflags(flags.x86_64.cxx)
+	add_asflags(flags.x86_64.asm)
 
-  add_files("Src/Kernel/Arch/x86_64/**.asm")
-  add_files("Src/Kernel/Arch/x86_64/**.cpp")
+	add_files("Src/Kernel/Arch/x86_64/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
 end
 
 add_files(kernel_non_architecture_related)
 add_defines("FKERNEL_DEBUG")
 
 if is_arch("x86_64", "x64") then
-  after_link(function(target)
-    os.execv("lua Meta/x86_64-tools/mount_mockos.lua")
-  end)
+	after_link(function(target)
+		os.execv("lua Meta/x86_64-tools/mount_mockos.lua")
+	end)
 
-  on_run(function(target)
-    os.execv("lua Meta/x86_64-tools/run_mockos.lua")
-  end)
+	on_run(function(target)
+		os.execv("lua Meta/x86_64-tools/run_mockos.lua")
+	end)
 end
 
 on_clean(function(target)
-  os.execv("rm -rf Build")
-  os.execv("rm -rf build")
-  os.execv("rm -rf logs/")
+	os.execv("rm -rf Build")
+	os.execv("rm -rf build")
+	os.execv("rm -rf logs/")
 end)
 
 target_end()
@@ -134,11 +135,11 @@ task("analyze")
 set_category("plugin")
 
 set_menu({
-  usage = "xmake analyze",
-  description = "Run the script to analyze the kernel runtime",
+	usage = "xmake analyze",
+	description = "Run the script to analyze the kernel runtime",
 })
 
 on_run(function()
-  os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
+	os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
 end)
 task_end()
