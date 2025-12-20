@@ -31,7 +31,12 @@ public:
   size_t capacity() const { return m_metadata.second; }
 
   bool is_empty() const { return length() == 0; }
-  const char *c_str() const { return m_data.ptr() ? m_data.ptr() : ""; }
+  const char *c_str() const { 
+    if (!m_data.ptr() || m_metadata.second == 0) {
+        return "";
+    }
+    return m_data.ptr();
+}
   char *data() { return m_data.ptr(); }
   const char *data() const { return m_data.ptr(); }
 

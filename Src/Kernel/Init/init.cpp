@@ -3,4 +3,5 @@
 
 void init() {
   SchedulerManager::the().initialize();
+  SchedulerManager::the().current()->print_info();
 }

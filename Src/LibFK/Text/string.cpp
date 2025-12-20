@@ -54,8 +54,12 @@ String::String(const char *s)
 
 String::String(const String &other)
     : m_data(nullptr),
-      m_metadata({0, 0}) { // Initialize metadata pair (length set by copy_from_string)
-  _copy_from_string(other);
+      m_metadata({0, 0}) {
+  auto result = _copy_from_string(other);
+  if (result.is_error()) {
+    _initialize_buffer(1);
+    fk::algorithms::kwarn("String", "Copy constructor failed, initialized empty");
+  }
 }
 
 fk::core::Result<void, fk::core::Error> String::_copy_from_string(const String& other) {

@@ -3,8 +3,24 @@
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
 
+extern "C" void idle_task_entry() {
+  while (true) {
+    asm volatile("hlt");
+  }
+}
+
 void SchedulerManager::initialize() {
   m_is_initialized = true;
+
+  Task idle = create_a_new_task((uint64_t)0,
+                                 "idle",
+                                 idle_task_entry,
+                                 true,
+                                 0,
+                                 0);
+
+  add_task(&idle);
+  m_current = &idle;
 
   fk::algorithms::klog("SCHEDULER MANAGER",
                        "Initializing Scheduler Manager (round robin)...");

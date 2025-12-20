@@ -1,8 +1,9 @@
 #include <Kernel/Scheduler/Task/task.h>
+#include <LibFK/Algorithms/log.h>
 
 Task create_a_new_task(
     TaskId id,
-    const fk::text::String& name,
+    const fk::text::fixed_string<64>& name,
     void (*entry)(),
     bool kernel_task,
     uint8_t priority,
@@ -37,3 +38,14 @@ Task create_a_new_task(
 
     return task;
 }
+
+void Task::print_info() const {
+        fk::algorithms::kdebug("TASK INFO",
+                             "Task ID: %lu, Name: %s, State: %u, Priority: %u, CPU Affinity: %lu, Is Kernel Task: %s",
+                             id,
+                             name.c_str(),
+                             static_cast<uint8_t>(state),
+                             priority,
+                             cpu_affinity,
+                             is_a_kernel_task ? "Yes" : "No");
+    }
