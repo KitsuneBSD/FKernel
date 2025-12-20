@@ -1,5 +1,5 @@
-#include <Kernel/Memory/VirtualMemory/VirtualMemoryManager.h>
-#include <Kernel/Memory/PhysicalMemory/PhysicalMemoryManager.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
 VirtualMemoryManager::VirtualMemoryManager()

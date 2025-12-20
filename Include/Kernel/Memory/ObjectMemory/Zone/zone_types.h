@@ -1,6 +1,6 @@
 #pragma once 
 
-
+#include <Kernel/Memory/ObjectMemory/Zone/zone_defs.h>
 
 enum class ZoneType {
     DMA, // <= 16MB

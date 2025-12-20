@@ -1,4 +1,4 @@
-#include <Kernel/Scheduler/Task/CpuContext.h>
+#include <Kernel/Scheduler/Task/cpu_context.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_register.h>
 

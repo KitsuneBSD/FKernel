@@ -1,4 +1,4 @@
-#include <Kernel/Memory/PhysicalMemory/Buddy/BuddyAllocator.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Utilities/aligner.h>
 

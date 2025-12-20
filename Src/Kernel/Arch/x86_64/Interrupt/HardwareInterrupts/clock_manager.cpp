@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/cmos.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/rtc.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
 #include <LibFK/Algorithms/log.h>
 
 void ClockManager::initialize() {

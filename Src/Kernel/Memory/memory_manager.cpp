@@ -1,12 +1,12 @@
-#include <Kernel/Memory/MemoryManager.h>
-#include <Kernel/Memory/VirtualMemory/VirtualMemoryManager.h>
-#include <Kernel/Memory/PhysicalMemory/PhysicalMemoryManager.h>
+#include <Kernel/Memory/memory_manager.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <LibFK/Core/Assertions.h>
 
 #ifdef __x86_64__
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 

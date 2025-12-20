@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/interrupt_frame.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TickManager.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
 

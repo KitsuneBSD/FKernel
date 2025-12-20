@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <LibFK/Types/types.h>
 
 constexpr uint64_t GENERAL_CAPABILITIES_ID = 0x00;

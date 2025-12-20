@@ -1,4 +1,4 @@
-#include <Kernel/Memory/PhysicalMemory/Buddy/BuddyState.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_state.h>
 #include <LibFK/Algorithms/log.h>
 
 void BuddyState::reset() {

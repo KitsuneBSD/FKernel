@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 

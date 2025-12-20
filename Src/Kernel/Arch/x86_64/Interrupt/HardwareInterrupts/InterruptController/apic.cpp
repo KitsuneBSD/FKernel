@@ -1,8 +1,8 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Memory/MemoryManager.h>
+#include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
 constexpr uint8_t APIC_SPURIOUS_VECTOR = 0xFF;

@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/rtc.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
 #include <LibFK/Utilities/converter.h>
 
 fk::text::String DateTime::to_string() const {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Memory/VirtualMemory/Pages/PageFlags.h>
-#include <Kernel/Memory/VirtualMemory/Pages/PageTable.h>
+#include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
+#include <Kernel/Memory/VirtualMemory/Pages/page_table.h>
 
 
 extern "C" void write_on_cr3(void *pml4_virt_addr);

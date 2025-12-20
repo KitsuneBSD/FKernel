@@ -4,7 +4,7 @@
 #include <Kernel/Boot/boot_info.h>
 
 #include <Kernel/Driver/SerialPort/serial_port.h>
-#include <Kernel/Driver/Vga/vga_buffer.h>
+#include <Kernel/Driver/Vga/vga_adapter.h>
 
 #include <LibFK/Core/Assertions.h>
 #include <LibC/stdio.h>

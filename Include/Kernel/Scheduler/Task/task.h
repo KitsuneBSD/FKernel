@@ -3,8 +3,8 @@
 #include <LibFK/Text/string.h>
 #include <LibFK/Container/intrusive_list.h>
 
-#include <Kernel/Scheduler/Task/CpuContext.h>
-#include <Kernel/Scheduler/Task/TaskState.h>
+#include <Kernel/Scheduler/Task/cpu_context.h>
+#include <Kernel/Scheduler/Task/task_state.h>
 
 // TODO: Change the userID to a proper type based on UUID
 using TaskId = uint64_t; 

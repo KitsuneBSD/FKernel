@@ -1,5 +1,5 @@
 #include <Kernel/Driver/SerialPort/serial_port.h>
-#include <Kernel/Driver/Vga/vga_buffer.h>
+#include <Kernel/Driver/Vga/vga_adapter.h>
 #include <LibC/assert.h>
 
 extern "C" void libc_puts(char *c) {

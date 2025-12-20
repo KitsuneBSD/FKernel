@@ -1,5 +1,5 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockInterrupt.h>
-#include <Kernel/Posix/errno.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
+#include <Kernel/Posix/sys/errno.h>
 #include <Kernel/Posix/sys/time.h>
 
 namespace {

@@ -1,7 +1,7 @@
 #pragma once 
 
-#include <Kernel/Memory/PhysicalMemory/Buddy/BuddyAllocator.h>
-#include <Kernel/Memory/PhysicalMemory/Zone/ZoneAllocator.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
+#include <Kernel/Memory/ObjectMemory/Zone/zone_allocator.h>
 #include <LibFK/Container/bitmap.h>
 
 /**

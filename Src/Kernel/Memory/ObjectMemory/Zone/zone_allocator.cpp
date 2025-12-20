@@ -1,6 +1,6 @@
-#include <Kernel/Memory/PhysicalMemory/Zone/ZoneAllocator.h>
-#include <Kernel/Memory/PhysicalMemory/Zone/ZoneDefs.h>
-#include <Kernel/Memory/PhysicalMemory/Zone/ZoneType.h>
+#include <Kernel/Memory/ObjectMemory/Zone/zone_allocator.h>
+#include <Kernel/Memory/ObjectMemory/Zone/zone_defs.h>
+#include <Kernel/Memory/ObjectMemory/Zone/zone_types.h>
 
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Assertions.h>

@@ -5,7 +5,7 @@
 #include <LibFK/Text/string.h>
 #include <LibFK/Algorithms/log.h>
 
-#include <Kernel/Scheduler/Task/Task.h>
+#include <Kernel/Scheduler/Task/task.h>
 
 class SchedulerManager {
 private:

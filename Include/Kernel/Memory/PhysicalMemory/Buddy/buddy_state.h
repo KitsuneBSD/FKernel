@@ -2,8 +2,8 @@
 
 #include <LibFK/Types/types.h>
 
-#include <Kernel/Memory/PhysicalMemory/Buddy/BuddyOrder.h>
-#include <Kernel/Memory/PhysicalMemory/Buddy/FreeBlocks.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/free_blocks.h>
 
 struct BuddyState {
     FreeBlock m_block_pool[16384];
