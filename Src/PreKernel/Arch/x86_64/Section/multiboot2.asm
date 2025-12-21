@@ -1,7 +1,7 @@
 %define MULTIBOOT2_MAGIC 0xe85250d6
 %define MULTIBOOT2_i386_ARCHITECTURE 0
 
-section .multiboot_header
+section .prekernel.multiboot_header
 align 8
 header_start:
   dd MULTIBOOT2_MAGIC

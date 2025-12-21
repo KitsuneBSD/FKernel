@@ -1,6 +1,5 @@
 add_rules("mode.debug", "mode.release")
 set_policy("check.auto_ignore_flags", false)
-
 set_targetdir("build")
 set_objectdir("build/objs")
 
@@ -8,12 +7,6 @@ set_languages("cxx20", "c17")
 
 local flags = {
 	general = {
-		c = {
-			"-ffreestanding",
-			"-fno-stack-protector",
-			"-nostdlib",
-			"-nostdinc",
-		},
 		cxx = {
 			"-ffreestanding",
 			"-fno-threadsafe-statics",
@@ -25,12 +18,17 @@ local flags = {
 			"-fno-omit-frame-pointer",
 			"-nostdlib",
 			"-nostdinc",
+			"-Wno-constant-conversion",
+			"-Wno-c++11-narrowing",
 		},
+
 		asm = {
 			"-w-label-orphan",
 			"-w-implicit-abs-deprecated",
+			"-w-zeroing",
 			"-w-other",
 		},
+
 		ld = {
 			"-T Config/linker.ld",
 			"-nostdlib",
@@ -39,100 +37,138 @@ local flags = {
 	},
 
 	x86_64 = {
-		common = {
+		cxx = {
 			"--target=x86_64-unknown-none-elf",
 			"-mcmodel=kernel",
 			"-mno-sse",
 			"-mno-avx",
 		},
+
 		asm = {
 			"-f elf64",
 		},
 	},
 }
 
+local kernel_non_architecture_related = {
+	"Src/Kernel/Boot/**.cpp",
+	"Src/Kernel/Clock/**.cpp",
+	"Src/Kernel/Driver/**.cpp",
+	"Src/Kernel/Hardware/**.cpp",
+	"Src/Kernel/Init/**.cpp",
+	"Src/Kernel/Memory/**.cpp",
+	"Src/Kernel/Posix/**.cpp",
+	"Src/Kernel/Scheduler/**.cpp",
+}
+
 toolchain("FKernel_Compiling")
-	set_kind("standalone")
-	set_toolset("cc", "clang", "gcc")
-	set_toolset("cxx", "clang++", "g++")
-	set_toolset("ld", "ld.lld", "ld")
-	set_toolset("as", "nasm")
+set_kind("standalone")
+set_toolset("cc", "clang", "tcc", "cl", "gcc")
+set_toolset("cxx", "clang++", "cl", "g++")
+set_toolset("ld", "ld.lld", "gold", "link", "ld")
+set_toolset("as", "nasm", "yasm", "ml")
 toolchain_end()
 
-target("FKernel_Prekernel")
-	set_kind("object")
-	set_toolchains("FKernel_Compiling")
+target("FKernel_PreKernel")
+set_kind("object")
+set_default("true")
+set_license("BSD-3-Clause")
+set_warnings("allextra", "error")
 
-	add_cflags(flags.general.c, { force = true })
-	add_cxxflags(flags.general.cxx, {force = true})
-    add_asflags(flags.general.asm, { force = true })
+if is_mode("release") then
+	set_symbols("hidden")
+	set_optimize("faster")
+	set_strip("all")
+end
 
-	if is_arch("x86_64", "x64") then
-		add_cflags(flags.x86_64.common)
-		add_asflags(flags.x86_64.asm)
+if is_mode("debug") then
+	set_symbols("debug")
+	set_optimize("fast")
+	add_defines("FKERNEL_DEBUG")
+	--TODO: add tests load on the kernel if this mode is setted
+end
 
-        add_files("Src/PreKernel/Arch/x86_64/**.asm")
-	end
+add_cxflags(flags.general.cxx, { force = true })
+add_asflags(flags.general.asm, { force = true })
+add_ldflags(flags.general.ld, { force = true })
+
+if is_arch("x86_64", "x64") then
+	add_cxflags(flags.x86_64.cxx)
+	add_asflags(flags.x86_64.asm)
+
+	add_files("Src/PreKernel/Arch/x86_64/*/**.asm")
+end
 target_end()
 
 target("FKernel")
-	set_kind("binary")
-	set_default(true)
-	set_filename("FKernel.bin")
-	set_toolchains("FKernel_Compiling")
+set_kind("binary")
+set_default(true)
+set_filename("FKernel.bin")
 
-	add_deps("FKernel_Prekernel")
+set_license("BSD-3-Clause")
+set_warnings("allextra", "error")
+add_includedirs("Include")
 
-	set_license("BSD-3-Clause")
-	set_warnings("allextra", "error")
-	add_includedirs("Include")
+add_deps("FKernel_PreKernel")
 
-	local kernel_non_architecture_related = {
-        "Src/Kernel/Boot/**.cpp",
-	    "Src/Kernel/Clock/**.cpp",
-	    "Src/Kernel/Driver/**.cpp",
-	    "Src/Kernel/Hardware/**.cpp",
-	    "Src/Kernel/Init/**.cpp",
-	    "Src/Kernel/Memory/**.cpp",
-	    "Src/Kernel/Posix/**.cpp",
-	    "Src/Kernel/Scheduler/**.cpp",
-    }
-	
+if is_mode("debug") then
+	set_symbols("debug")
+	set_optimize("fast")
+	add_defines("FKERNEL_DEBUG")
+	--TODO: add tests load on the kernel if this mode is setted
+end
 
-	add_cxflags(flags.general.cxx, { force = true })
-	add_asflags(flags.general.asm, { force = true })
-	add_ldflags(flags.general.ld, { force = true })
+if is_mode("release") then
+	set_symbols("hidden")
+	set_optimize("faster")
+	set_strip("all")
+end
 
-	if is_arch("x86_64", "x64") then
-		add_cxflags(flags.x86_64.common)
-		add_asflags(flags.x86_64.asm)
-        add_files("Src/Kernel/Arch/x86_64/**.asm")
-	    add_files("Src/Kernel/Arch/x86_64/**.cpp")
-    end
+add_cxflags(flags.general.cxx, { force = true })
+add_asflags(flags.general.asm, { force = true })
+add_ldflags(flags.general.ld, { force = true })
 
-	if is_mode("debug") then
-		set_symbols("debug")
-		set_optimize("none") -- aqui é vital
-		add_defines("FKERNEL_DEBUG")
-	end
+add_files("Src/LibC/**.c")
+add_files("Src/LibC/**.cpp")
+add_files("Src/LibFK/**.cpp")
 
-	if is_mode("release") then
-		set_symbols("hidden")
-		set_optimize("faster")
-		set_strip("all")
-	end
+add_files(kernel_non_architecture_related)
 
-    add_files("Src/LibC/**.c")
-    add_files("Src/LibC/**.cpp")
-    add_files("Src/LibFK/**.cpp")
+add_defines("FKERNEL_DEBUG")
 
-    add_files(kernel_non_architecture_related)
+if is_arch("x86_64", "x64") then
+	add_cxflags(flags.x86_64.cxx)
+	add_asflags(flags.x86_64.asm)
 
-	after_link(function ()
+	add_files("Src/Kernel/Arch/x86_64/**.asm")
+	add_files("Src/Kernel/Arch/x86_64/**.cpp")
+
+	after_link(function(target)
 		os.execv("lua Meta/x86_64-tools/mount_mockos.lua")
 	end)
 
-	on_run(function ()
+	on_run(function(target)
 		os.execv("lua Meta/x86_64-tools/run_mockos.lua")
 	end)
+end
+
+on_clean(function(target)
+	os.execv("rm -rf Build")
+	os.execv("rm -rf build")
+	os.execv("rm -rf logs/")
+end)
+
 target_end()
+
+task("analyze")
+set_category("plugin")
+
+set_menu({
+	usage = "xmake analyze",
+	description = "Run the script to analyze the kernel runtime",
+})
+
+on_run(function()
+	os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
+end)
+task_end()

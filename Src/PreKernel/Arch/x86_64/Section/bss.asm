@@ -10,7 +10,7 @@ global page_table_l2
 global stack_bottom 
 global stack_top
 
-section .bss
+section .prekernel.bss
 align 8 
 multiboot_magic: resd 1 
 multiboot_info_ptr: resq 1

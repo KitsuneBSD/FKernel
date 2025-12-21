@@ -1,7 +1,7 @@
 global gdt64.code_segment 
 global gdt64.pointer
 
-section .rodata
+section .prekernel.rodata
 gdt64:
 	dq 0 
 .code_segment: equ $ - gdt64
