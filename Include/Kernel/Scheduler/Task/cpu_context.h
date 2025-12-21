@@ -1,5 +1,6 @@
 #pragma once 
 
+#include <Kernel/Arch/x86_64/Interrupt/Handler/interrupt_frame.h>
 #include <LibFK/Types/types.h>
 
 #ifdef __x86_64__
@@ -20,6 +21,12 @@ struct CpuContext {
     uint64_t rcx;
     uint64_t rbx;
     uint64_t rax;
+
+    uint64_t rip;
+    uint64_t cs;
+    uint64_t rflags;
+    uint64_t rsp;
+    uint64_t ss;
 };
 #endif
 
@@ -28,3 +35,6 @@ CpuContext GetContextForNewTask(
     uint64_t stack_top,
     bool is_kernel_task
 );
+
+void SaveContext(CpuContext& ctx, const InterruptFrame& frame);
+void LoadContext(InterruptFrame& frame, const CpuContext& ctx);

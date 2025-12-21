@@ -1,59 +1,58 @@
 BITS 64
-GLOBAL isr0, isr1, ..., isr255  ; ou use %rep para gerar
-
 EXTERN interrupt_dispatch
 
 section .text
 
 %macro ISR_STUB 2
-global isr%1
+GLOBAL isr%1
 isr%1:
-    ; For exceptions that do not push an error code, we push a dummy 0
-    ; so that the stack layout always contains an error_code field.
-    ; The second macro parameter should be 1 if the CPU already pushes an
-    ; error code for this vector, or 0 otherwise.
     %if %2 = 0
-      push 0
+        push 0
     %endif
 
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rbp
-    push rdi
-    push rsi
-    push rdx
-    push rcx
-    push rbx
     push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
 
     mov rdi, %1
-    lea rsi, [rsp]    ; frame_ptr
-    call interrupt_dispatch
+    mov rsi, rsp
 
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rsi
-    pop rdi
-    pop rbp
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
+    sub rsp, 8          ; alinhamento 16 bytes
+    call interrupt_dispatch
+    add rsp, 8
+
     pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rbp
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+
     %if %2 = 0
-      add rsp, 8    ; remove dummy error code
+        add rsp, 8
     %endif
+
     iretq
 %endmacro
 

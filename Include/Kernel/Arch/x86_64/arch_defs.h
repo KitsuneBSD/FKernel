@@ -5,7 +5,7 @@
 /**
  * @brief Maximum number of interrupt vectors for x86_64
  */
-static constexpr uint8_t MAX_X86_64_INTERRUPTS_LENGTH = 256;
+static constexpr uint16_t MAX_X86_64_INTERRUPTS_LENGTH = 256;
 
 /**
  * @brief Maximum number of memory chunks per range

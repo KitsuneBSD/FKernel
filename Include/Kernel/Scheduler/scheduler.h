@@ -31,7 +31,10 @@ public:
     void sleep_current(uint64_t ticks);
     void wake_task(Task* task);
     void on_tick();
+    void clear_resched() { is_need_a_resched = false; }
 
     Task* pick_next();
     Task* current(){return m_current ? m_current : nullptr;}
+
+    bool need_resched() const { return is_need_a_resched; }    
 };
