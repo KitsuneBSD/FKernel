@@ -1,4 +1,4 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
+#include <Kernel/Clock/clock_interrupt.h>
 #include <Kernel/Posix/sys/errno.h>
 #include <Kernel/Posix/sys/time.h>
 

@@ -1,4 +1,4 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/rtc.h>
+#include <Kernel/Clock/ClockController/rtc.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Utilities/converter.h>
 

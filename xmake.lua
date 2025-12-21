@@ -51,6 +51,7 @@ local flags = {
 
 local kernel_non_architecture_related = {
 	"Src/Kernel/Boot/**.cpp",
+	"Src/Kernel/Clock/**.cpp",
 	"Src/Kernel/Driver/**.cpp",
 	"Src/Kernel/Hardware/**.cpp",
 	"Src/Kernel/Init/**.cpp",

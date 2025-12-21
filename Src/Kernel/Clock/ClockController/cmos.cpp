@@ -1,4 +1,4 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/ClockController/cmos.h>
+#include <Kernel/Clock/ClockController/cmos.h>
 #include <LibFK/Utilities/converter.h>
 
 uint8_t CMOSClock::read_register(uint8_t reg) {

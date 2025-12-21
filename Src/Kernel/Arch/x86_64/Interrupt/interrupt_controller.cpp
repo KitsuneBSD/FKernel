@@ -6,9 +6,10 @@
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
 
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+
+#include <Kernel/Clock/clock_interrupt.h>
 
 #include <LibFK/Algorithms/log.h>
 

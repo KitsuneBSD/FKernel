@@ -5,10 +5,11 @@
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/clock_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
+
+#include <Kernel/Clock/clock_interrupt.h>
 
 void MemoryManager::initialize(const multiboot2::TagMemoryMap *mmap) {
   assert(!m_is_initialized && "MemoryManager: Double initialization attempted!");
