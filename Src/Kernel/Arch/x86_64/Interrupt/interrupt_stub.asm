@@ -1,5 +1,5 @@
 BITS 64
-EXTERN interrupt_dispatch
+extern interrupt_dispatch
 
 section .text
 

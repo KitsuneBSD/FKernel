@@ -1,7 +1,9 @@
 section .text
-global flush_gdt
+bits 64 
 %define NEW_CS 0x08   ; Kernel code
 %define NEW_DS 0x10   ; Kernel data
+
+global flush_gdt
 
 flush_gdt:
     ; RDI = pointer para GDTR
