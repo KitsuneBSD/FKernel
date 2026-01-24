@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+# Network configuration for FKernel
+
+description="FKernel network setup"
+
+depend() {
+    after bootmisc procps
+}
+
+start() {
+    einfo "Configuring network"
+    
+    # Bring up loopback interface
+    ip link set lo up 2>/dev/null || {
+        ewarn "ip command not available, network setup skipped"
+        return 0
+    }
+    
+    einfo "Network configured"
+    return 0
+}

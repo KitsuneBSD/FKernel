@@ -1,0 +1,6 @@
+#!/bin/sh
+# FKernel local startup script
+
+echo "FKernel system ready!"
+echo "Type 'help' for available commands"
+echo ""

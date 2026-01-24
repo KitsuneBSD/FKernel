@@ -1,0 +1,20 @@
+#!/sbin/openrc-run
+# Local system startup for FKernel
+
+description="FKernel local services"
+
+depend() {
+    after bootmisc procps
+}
+
+start() {
+    einfo "Starting local services"
+    
+    # Start any custom startup scripts
+    if [ -f /etc/rc.local ]; then
+        einfo "Running /etc/rc.local"
+        /etc/rc.local
+    fi
+    
+    return 0
+}
