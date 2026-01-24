@@ -21,7 +21,9 @@ global sys_brk
 global sys_getpid
 global sys_getppid
 global sys_getuid
+global sys_getgid
 global sys_geteuid
+global sys_getegid
 global sys_kill
 global sys_sigaction
 global sys_sigprocmask
@@ -34,9 +36,31 @@ global sys_connect
 global sys_listen
 global sys_accept
 global sys_uname
+global sys_gettimeofday
 global sys_getdents64
+global sys_nanosleep
+global sys_mount
+global sys_umount
 
 section .text
+
+; int sys_nanosleep(const void* req, void* rem)
+sys_nanosleep:
+    mov rax, SYS_NANOSLEEP
+    syscall
+    ret
+
+; int sys_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags, const void* data)
+sys_mount:
+    mov rax, SYS_MOUNT
+    syscall
+    ret
+
+; int sys_umount(const char* target, int flags)
+sys_umount:
+    mov rax, SYS_UMOUNT2
+    syscall
+    ret
 
 ; int64_t sys_getdents64(int fd, void* dirp, size_t count)
 sys_getdents64:
@@ -134,9 +158,21 @@ sys_getuid:
     syscall
     ret
 
+; gid_t sys_getgid(void)
+sys_getgid:
+    mov rax, SYS_GETGID
+    syscall
+    ret
+
 ; uid_t sys_geteuid(void)
 sys_geteuid:
     mov rax, SYS_GETEUID
+    syscall
+    ret
+
+; gid_t sys_getegid(void)
+sys_getegid:
+    mov rax, SYS_GETEGID
     syscall
     ret
 
@@ -214,13 +250,49 @@ sys_accept:
 
 ; int sys_uname(struct utsname *buf)
 
+
+
 sys_uname:
+
+
 
     mov rax, SYS_UNAME
 
+
+
     syscall
 
+
+
     ret
+
+
+
+
+
+
+
+; int sys_gettimeofday(struct timeval *tv, struct timezone *tz)
+
+
+
+sys_gettimeofday:
+
+
+
+    mov rax, SYS_GETTIMEOFDAY
+
+
+
+    syscall
+
+
+
+    ret
+
+
+
+
 
 
 
