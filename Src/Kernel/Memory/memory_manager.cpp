@@ -3,6 +3,8 @@
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Boot/boot_info.h>
 #include <LibFK/Core/Assertions.h>
+#include <LibC/string.h>
+#include <LibFK/Algorithms/log.h>
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
@@ -12,6 +14,9 @@
 
 #include <Kernel/Clock/clock_interrupt.h>
 
+extern "C" uint8_t __heap_start[];
+extern "C" uint8_t __heap_end[];
+
 void MemoryManager::initialize() {
   assert(!m_is_initialized && "MemoryManager: Double initialization attempted!");
   assert(boot::BootInfo::the().is_initialized() && "MemoryManager: BootInfo not initialized!");
@@ -19,11 +24,156 @@ void MemoryManager::initialize() {
   PhysicalMemoryManager::the().initialize();
   VirtualMemoryManager::the().initialize();
 
+  initialize_heap();
+
   HardwareInterruptManager::the().set_memory_manager(true);
   TimerManager::the().set_memory_manager(true);
   ClockManager::the().set_memory_manager(true);
 
   m_is_initialized = true;
+}
+
+void MemoryManager::initialize_heap() {
+    if (m_heap_initialized) return;
+
+    uintptr_t start_addr = (reinterpret_cast<uintptr_t>(__heap_start) + 15) & ~15;
+    uintptr_t end_addr = reinterpret_cast<uintptr_t>(__heap_end) & ~15;
+    size_t total_size = end_addr - start_addr;
+
+    ASSERT(total_size > sizeof(BlockHeader));
+
+    m_heap_head = reinterpret_cast<BlockHeader*>(start_addr);
+    m_heap_head->size = total_size - sizeof(BlockHeader);
+    m_heap_head->is_free = true;
+    m_heap_head->next = nullptr;
+    m_heap_head->magic = BlockHeader::MAGIC;
+
+    m_heap_initialized = true;
+    fk::algorithms::klog("MEMORY", "Kernel Heap initialized. Size: %zu bytes", total_size);
+}
+
+static inline uint64_t save_and_disable_interrupts() {
+    uint64_t flags;
+    asm volatile("pushfq ; popq %0 ; cli" : "=r"(flags) : : "memory");
+    return flags;
+}
+
+static inline void restore_interrupts(uint64_t flags) {
+    asm volatile("pushq %0 ; popfq" : : "g"(flags) : "memory");
+}
+
+void* MemoryManager::allocate(size_t size) {
+    if (!m_heap_initialized) return nullptr;
+
+    uint64_t flags = save_and_disable_interrupts();
+
+    // Align size to 16 bytes
+    size = (size + 15) & ~15;
+
+    BlockHeader* current = m_heap_head;
+    while (current) {
+        if (current->magic != BlockHeader::MAGIC) {
+            fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption at %p! Magic: 0x%lx Expected: 0x%lx", 
+                                  current, (uint64_t)current->magic, (uint64_t)BlockHeader::MAGIC);
+            while(1) asm volatile("hlt");
+        }
+
+        if (current->is_free && current->size >= size) {
+            if (current->size >= size + sizeof(BlockHeader) + 16) {
+                BlockHeader* new_block = reinterpret_cast<BlockHeader*>(
+                    reinterpret_cast<uint8_t*>(current) + sizeof(BlockHeader) + size
+                );
+                
+                new_block->size = current->size - size - sizeof(BlockHeader);
+                new_block->is_free = true;
+                new_block->next = current->next;
+                new_block->magic = BlockHeader::MAGIC;
+
+                current->size = size;
+                current->next = new_block;
+            }
+
+            current->is_free = false;
+            void* ptr = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(current) + sizeof(BlockHeader));
+            memset(ptr, 0, size);
+            
+            restore_interrupts(flags);
+            return ptr;
+        }
+        current = current->next;
+    }
+
+    restore_interrupts(flags);
+    fk::algorithms::kerror("MEMORY", "Kernel Heap: Out of memory! Requested: %zu", size);
+    return nullptr;
+}
+
+void* MemoryManager::reallocate(void* ptr, size_t size) {
+    if (!ptr) return allocate(size);
+    if (size == 0) {
+        free(ptr);
+        return nullptr;
+    }
+
+    uint64_t flags = save_and_disable_interrupts();
+
+    BlockHeader* header = reinterpret_cast<BlockHeader*>(
+        reinterpret_cast<uint8_t*>(ptr) - sizeof(BlockHeader)
+    );
+
+    if (header->magic != BlockHeader::MAGIC) {
+        fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption (realloc) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
+        restore_interrupts(flags);
+        while(1) asm volatile("hlt");
+    }
+
+    size_t old_size = header->size;
+    restore_interrupts(flags);
+
+    if (size <= old_size) return ptr;
+
+    void* new_ptr = allocate(size);
+    if (!new_ptr) return nullptr;
+
+    memcpy(new_ptr, ptr, old_size);
+    free(ptr);
+    
+    return new_ptr;
+}
+
+void MemoryManager::free(void* ptr) {
+    if (!ptr) return;
+
+    uint64_t flags = save_and_disable_interrupts();
+
+    BlockHeader* header = reinterpret_cast<BlockHeader*>(
+        reinterpret_cast<uint8_t*>(ptr) - sizeof(BlockHeader)
+    );
+
+    if (header->magic != BlockHeader::MAGIC) {
+        fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption (free) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
+        restore_interrupts(flags);
+        while(1) asm volatile("hlt");
+        return;
+    }
+
+    if (header->is_free) {
+        fk::algorithms::kwarn("MEMORY", "Kernel Heap: Block at %p is already free!", ptr);
+        restore_interrupts(flags);
+        return;
+    }
+
+    header->is_free = true;
+    
+    // Merge with next
+    if (header->next && header->next->is_free) {
+        if (header->next->magic == BlockHeader::MAGIC) {
+            header->size += sizeof(BlockHeader) + header->next->size;
+            header->next = header->next->next;
+        }
+    }
+
+    restore_interrupts(flags);
 }
 
 void MemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags flags){

@@ -20,6 +20,17 @@ private:
 
   bool m_is_initialized = false;
 
+  struct alignas(16) BlockHeader {
+    size_t size;
+    bool is_free;
+    BlockHeader *next;
+    static constexpr uint32_t MAGIC = 0xC0FFEE;
+    uint32_t magic;
+  };
+
+  BlockHeader *m_heap_head = nullptr;
+  bool m_heap_initialized = false;
+
 public:
   /** @return The singleton instance. */
   static MemoryManager &the() {
@@ -28,12 +39,37 @@ public:
   };
 
   /**
+   * @brief Initializes the kernel heap.
+   */
+  void initialize_heap();
+
+  /**
    * @brief Initializes the memory subsystem (PMM and VMM).
    */
   void initialize();
 
   /**
+   * @brief Checks if the kernel heap is initialized.
+   */
+  bool is_heap_initialized() const { return m_heap_initialized; }
+
+  /**
    * @brief Maps a virtual page to a physical frame.
    */
   void map_page(uintptr_t virt, uintptr_t phys, PageFlags flags);
+
+  /**
+   * @brief Allocates a memory block from the kernel heap.
+   */
+  void *allocate(size_t size);
+
+  /**
+   * @brief Reallocates a memory block.
+   */
+  void *reallocate(void *ptr, size_t size);
+
+  /**
+   * @brief Frees a previously allocated memory block.
+   */
+  void free(void *ptr);
 };

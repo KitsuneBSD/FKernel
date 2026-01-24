@@ -1,7 +1,8 @@
+#include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
-#include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <LibFK/Algorithms/log.h>
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
@@ -45,9 +46,12 @@ uint64_t sys_nanosleep(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                        uint64_t);
 uint64_t sys_mkdir(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_getdents64(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t);
+                        uint64_t);
 uint64_t sys_chdir(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_fork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+uint64_t sys_mount(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+uint64_t sys_umount2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                     uint64_t);
 uint64_t sys_execve(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_dup2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_wait4(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
@@ -59,10 +63,13 @@ uint64_t sys_gettid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_getppid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                      uint64_t);
 uint64_t sys_getuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
-uint64_t sys_geteuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+uint64_t sys_geteuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                     uint64_t);
 uint64_t sys_getgid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
-uint64_t sys_getegid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
-uint64_t sys_getpgrp(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+uint64_t sys_getegid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                     uint64_t);
+uint64_t sys_getpgrp(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                     uint64_t);
 uint64_t sys_fcntl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_kill(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t sys_sigaction(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
@@ -99,8 +106,10 @@ uint64_t sys_ipc_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                          uint64_t);
 uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                       uint64_t);
-uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
-uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                      uint64_t);
+uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                        uint64_t);
 }
 
 extern "C" void initialize_syscalls() {
@@ -158,6 +167,8 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IPC_SEND, sys_ipc_send);
   SyscallManager::the().register_syscall(SYS_IPC_RECEIVE, sys_ipc_receive);
   SyscallManager::the().register_syscall(SYS_IPC_CALL, sys_ipc_call);
+  SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
+  SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
 }
 extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
                                        uint64_t arg2, uint64_t arg3,
@@ -165,16 +176,20 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
                                        uint64_t arg6) {
   auto *task = SchedulerManager::the().current();
 
-  uint64_t result = SyscallManager::the().handle(num, arg1, arg2, arg3, arg4, arg5, arg6);
+  uint64_t result =
+      SyscallManager::the().handle(num, arg1, arg2, arg3, arg4, arg5, arg6);
 
   // Log to SyscallLogNode (DebugFS) instead of console
-  if (fk::memory::heap_allocator().m_initialized) {
-      char log_buf[256];
-      int log_len = snprintf(log_buf, sizeof(log_buf), "[SYSCALL] Task %lu: %lu (args: %p, %p, %p) -> %p\n", 
-                             task ? task->id : 0, num, (void*)arg1, (void*)arg2, (void*)arg3, (void*)result);
-      
-      auto syscall_log = fkernel::SyscallLogNode::the();
-      if (syscall_log) syscall_log->append(log_buf, log_len);
+  if (MemoryManager::the().is_heap_initialized()) {
+    char log_buf[256];
+    int log_len = snprintf(log_buf, sizeof(log_buf),
+                           "[SYSCALL] Task %lu: %lu (args: %p, %p, %p) -> %p\n",
+                           task ? task->id : 0, num, (void *)arg1, (void *)arg2,
+                           (void *)arg3, (void *)result);
+
+    auto syscall_log = fkernel::SyscallLogNode::the();
+    if (syscall_log)
+      syscall_log->append(log_buf, log_len);
   }
 
   if (task && !task->is_a_kernel_task) {

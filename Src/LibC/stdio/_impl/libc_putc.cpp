@@ -1,6 +1,7 @@
 #include <Kernel/Driver/SerialPort/serial_port.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
+#include <Kernel/Memory/memory_manager.h>
 #include <LibC/assert.h>
 #include <LibC/string.h>
 #include <LibFK/Memory/heap_malloc.h>
@@ -29,7 +30,7 @@ extern "C" void libc_puts(char *c) {
   
   // Also append to our internal debug log buffer if heap is ready
   if (g_log_targets & fk::algorithms::LogTarget::DebugFS) {
-    if (fk::memory::heap_allocator().m_initialized) {
+    if (MemoryManager::the().is_heap_initialized()) {
         auto log_node = fkernel::DebugLogNode::the();
         if (log_node) {
             log_node->append(c, strlen(c));

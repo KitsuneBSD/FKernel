@@ -58,7 +58,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   uintptr_t entry = entry_res.value();
 
   // 3. Setup the user stack (16KB)
-  constexpr uintptr_t USER_STACK_TOP = 0x00800000;
+  constexpr uintptr_t USER_STACK_TOP = 0x7fffffffe000;
   for (uintptr_t v = USER_STACK_TOP - 0x4000; v < USER_STACK_TOP; v += 0x1000) {
     uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
     VirtualMemoryManager::the().map_page(
