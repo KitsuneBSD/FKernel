@@ -15,9 +15,9 @@ private:
     };
 
     fk::containers::Vector<DeviceEntry> m_devices;
-    DevFs();
 
 public:
+    DevFs();
     static DevFs& the();
 
     // API para Drivers (Inspirado em make_dev do BSD)

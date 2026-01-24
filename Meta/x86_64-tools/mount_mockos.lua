@@ -20,7 +20,7 @@ RunCommand("mkdir -p build/userland/obj")
 Compiler.compile_asm("Src/Userland/lib/syscalls.asm", "build/userland/obj/syscalls.o")
 Compiler.compile_asm("Src/Userland/lib/crt0.asm", "build/userland/obj/crt0.o")
 
-local config = { COMPONENTS = "init,shell,ls,cat", SYSTEM_TYPE = "minimal" }
+local config = { COMPONENTS = "init,shell,ls,cat,uname,clear", SYSTEM_TYPE = "minimal" }
 local f = io.open(CONFIG_FILE, "r")
 if f then
   for line in f:lines() do
@@ -51,10 +51,21 @@ if config.SYSTEM_TYPE == "standard" or config.SYSTEM_TYPE == "advanced" then
   if config.SYSTEM_TYPE == "advanced" then
     PrintMessage(false, "Building Advanced Components (OpenRC)...")
     if RunCommand("lua Meta/UserTools/openrc/build.lua") then
-      PrintMessage(false, "Setting OpenRC as default init...")
-      RunCommand("ln -sf init.openrc " .. STAGING .. "/sbin/init")
+      -- Verify OpenRC was built successfully
+      if OSInteract.FileExists(STAGING .. "/sbin/init.openrc") then
+        PrintMessage(false, "Setting OpenRC as default init...")
+        RunCommand("rm -f " .. STAGING .. "/sbin/init")  -- Remove old symlink
+        RunCommand("ln -sf /sbin/init.openrc " .. STAGING .. "/sbin/init")
+        PrintMessage(false, "OpenRC successfully configured as init")
+      else
+        PrintMessage(true, "OpenRC build succeeded but init.openrc not found")
+        -- Fall back to BusyBox
+        RunCommand("ln -sf /bin/busybox " .. STAGING .. "/sbin/init")
+      end
     else
       PrintMessage(true, "Failed to build OpenRC. Falling back to BusyBox init.")
+      -- Ensure BusyBox init is available
+      RunCommand("ln -sf /bin/busybox " .. STAGING .. "/sbin/init")
     end
   end
 end

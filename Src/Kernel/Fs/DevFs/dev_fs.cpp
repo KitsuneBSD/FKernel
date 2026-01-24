@@ -8,8 +8,8 @@ DevFs::DevFs() {
 }
 
 DevFs& DevFs::the() {
-    static DevFs instance;
-    return instance;
+    static fk::RefPtr<DevFs> instance = fk::make_ref<DevFs>().value();
+    return *instance;
 }
 
 fk::core::Result<void, fk::core::Error> DevFs::register_device(fk::RefPtr<Node> node, const char* name) {
@@ -54,7 +54,8 @@ fk::core::Result<void, fk::core::Error> DevFs::list_dir(fk::containers::Vector<D
         if (!entry.node) continue;
         
         DirectoryEntry de;
-        strncpy(de.name, entry.name.c_str(), sizeof(de.name));
+        strncpy(de.name, entry.name.c_str(), sizeof(de.name) - 1);
+        de.name[sizeof(de.name) - 1] = '\0';
         
         if (entry.node->is_directory()) {
             de.type = 1; // DT_DIR

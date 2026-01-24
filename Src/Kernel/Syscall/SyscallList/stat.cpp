@@ -31,16 +31,23 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
   if (path[0] != '/') {
     // Resolve relative path using CWD
     size_t cwd_len = strlen(current_task->cwd.c_str());
-    strncpy(absolute_path, current_task->cwd.c_str(), 511);
+    if (cwd_len >= 512) return fkernel::return_error(fk::core::Error::IOError);
+    
+    strcpy(absolute_path, current_task->cwd.c_str());
     
     if (cwd_len > 0 && absolute_path[cwd_len - 1] != '/') {
-      if (cwd_len < 510) {
+      if (cwd_len + 1 < 512) {
           absolute_path[cwd_len] = '/';
           absolute_path[cwd_len + 1] = '\0';
+          cwd_len++;
       }
     }
     
-    strcat(absolute_path, path);
+    if (cwd_len + strlen(path) < 512) {
+      strcat(absolute_path, path);
+    } else {
+      return fkernel::return_error(fk::core::Error::IOError);
+    }
     final_path = absolute_path;
   }
 

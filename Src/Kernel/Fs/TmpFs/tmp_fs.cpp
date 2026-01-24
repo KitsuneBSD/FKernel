@@ -61,6 +61,8 @@ TmpFsDirectoryNode::create_child(const char *name, [[maybe_unused]] int mode) {
     return fk::core::Error::OutOfMemory;
 
   fk::RefPtr<Node> node = result;
+  node->set_name(name);
+  node->set_parent(this);
 
   fk::algorithms::kdebug("TMPFS", "Created child %s", name);
 
@@ -78,6 +80,9 @@ TmpFsDirectoryNode::mkdir(const char *name, [[maybe_unused]] int mode) {
     return fk::core::Error::OutOfMemory;
 
   fk::RefPtr<Node> node = result;
+  node->set_name(name);
+  node->set_parent(this);
+
   m_children.add(Child(name, node));
   return node;
 }

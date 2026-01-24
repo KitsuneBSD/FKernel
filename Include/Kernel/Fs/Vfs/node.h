@@ -57,11 +57,26 @@ public:
     return fk::core::Error::NotASymlink;
   }
 
-  virtual fk::text::String get_path() const { return ""; }
+  virtual fk::text::String get_path() const {
+    if (!m_parent) return m_name.is_empty() ? "/" : m_name;
+    fk::text::String parent_path = m_parent->get_path();
+    if (parent_path == "/") return "/" + m_name;
+    return parent_path + "/" + m_name;
+  }
+
+  void set_name(fk::text::String name) { m_name = fk::types::move(name); }
+  const fk::text::String& name() const { return m_name; }
+
+  void set_parent(fk::RefPtr<Node> parent) { m_parent = fk::types::move(parent); }
+  fk::RefPtr<Node> parent() const { return m_parent; }
 
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
 
   // Allow default constructor
   Node() = default;
+
+protected:
+  fk::text::String m_name;
+  fk::RefPtr<Node> m_parent;
 };

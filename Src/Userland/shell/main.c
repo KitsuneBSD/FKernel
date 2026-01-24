@@ -51,6 +51,33 @@ void parse_and_execute(char* line) {
         sys_exit(0);
     }
 
+    if (strcmp(argv[0], "clear") == 0) {
+        print("\033[2J\033[H");
+        return;
+    }
+
+    if (strcmp(argv[0], "uname") == 0) {
+        struct {
+            char sysname[65];
+            char nodename[65];
+            char release[65];
+            char version[65];
+            char machine[65];
+            char domainname[65];
+        } uts;
+        if (sys_uname(&uts) == 0) {
+            print(uts.sysname);
+            print(" ");
+            print(uts.release);
+            print(" ");
+            print(uts.machine);
+            print("\n");
+        } else {
+            print("uname: syscall failed\n");
+        }
+        return;
+    }
+
     // External commands
     int pid = sys_fork();
     if (pid == 0) {
@@ -58,8 +85,8 @@ void parse_and_execute(char* line) {
         if (argv[0][0] == '/' || argv[0][0] == '.') {
             sys_execve(argv[0], argv, NULL);
         } else {
-            // Try /bin/ and /sbin/
-            const char* prefixes[] = {"/bin/", "/sbin/", NULL};
+            // Try common paths (BSD style)
+            const char* prefixes[] = {"/bin/", "/sbin/", "/usr/bin/", "/usr/sbin/", "/usr/local/bin/", NULL};
             for (int i = 0; prefixes[i]; i++) {
                 char path[MAX_CMD_LEN];
                 int j = 0;

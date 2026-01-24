@@ -50,6 +50,8 @@ enum SyscallNumber : uint64_t {
     SYS_GETPPID = 110,
     SYS_ARCH_PRCTL = 158,
     SYS_SET_TID_ADDRESS = 218,
+    SYS_MOUNT = 165,
+    SYS_UMOUNT2 = 166,
     SYS_GETTID = 186,
     SYS_CLOCK_GETTIME = 228,
     SYS_EXIT_GROUP = 231,

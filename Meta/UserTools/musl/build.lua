@@ -44,7 +44,7 @@ local RANLIB = Toolchain.get_tool("llvm-ranlib", "ranlib")
 print("Configuring Musl in " .. src_dir)
 
 local cmd_configure = string.format(
-    "cd %s && CC='%s --target=%s' AR=%s RANLIB=%s ./configure --target=x86_64 --prefix= --syslibdir=/lib --disable-shared --disable-gcc-wrapper",
+    "cd %s && CC='%s --target=%s -D__linux__' AR=%s RANLIB=%s ./configure --target=x86_64 --prefix= --syslibdir=/lib --disable-shared --disable-gcc-wrapper",
     src_dir, CC, Toolchain.TRIPLE, AR, RANLIB
 )
 

@@ -124,7 +124,7 @@ void SchedulerManager::initialize() {
 
   // Create Idle tasks for each CPU
   for (uint32_t i = 0; i < m_processor_count; ++i) {
-    Task *idle = static_cast<Task *>(kmalloc(sizeof(Task)));
+    Task *idle = new Task();
     *idle =
         create_a_new_task(0, "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
 
@@ -133,7 +133,7 @@ void SchedulerManager::initialize() {
   }
 
   // Create Init task on CPU 0
-  Task *init = static_cast<Task *>(kmalloc(sizeof(Task)));
+  Task *init = new Task();
   *init = create_a_new_task(1, "init", init_task_entry, false, 5, 1, 0, 0);
 
   // Set initial memory regions for demand paging
