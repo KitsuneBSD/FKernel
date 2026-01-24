@@ -54,10 +54,11 @@ public:
   void irq_handler();
 
   /**
-   * @brief Check if a key is available in the buffer
+   * @brief Check if a key is available in the buffer. This will poll the
+   *        PS/2 controller and consume any pending scancode if present.
    * @return true if a key is available, false otherwise
    */
-  bool has_key() const;
+  bool has_key();
 
   /**
    * @brief Pop a key from the buffer

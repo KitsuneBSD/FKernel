@@ -1,0 +1,73 @@
+#pragma once
+
+#include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
+#include <Kernel/Memory/VirtualMemory/Pages/page_table.h>
+
+extern "C" void write_on_cr3(void *pml4_virt_addr);
+extern "C" uintptr_t read_on_cr3();
+
+/**
+ * @class VirtualMemoryManager
+ * @brief Manages virtual address spaces and page table mappings for x86_64.
+ */
+class VirtualMemoryManager {
+private:
+  PageTable *m_pml4 = nullptr; ///< Pointer to the active PML4 table.
+  uintptr_t m_pml4_phys = 0;   ///< Physical address of the PML4.
+
+protected:
+  /** @brief Allocates and zeroes a new page table. */
+  PageTable *alloc_page_table();
+
+  /** @brief Performs identity mapping for the lower kernel regions. */
+  void perform_initial_identity_mapping();
+
+  /** @brief Invalidates a single TLB entry. */
+  void invlpg(uintptr_t addr);
+
+  /** @brief Flushes the entire TLB by reloading CR3. */
+  void flush_tlb();
+
+  /** @brief (Internal) Calculates the virtual address of a page table. */
+  uintptr_t get_table_virtual_address(uint16_t pml4_idx, uint16_t pdpt_idx = 0,
+                                      uint16_t pd_idx = 0,
+                                      uint16_t pt_idx = 0) const;
+
+public:
+  VirtualMemoryManager();
+  VirtualMemoryManager(const VirtualMemoryManager &) = delete;
+  VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
+
+  /** @return The singleton instance. */
+  static VirtualMemoryManager &the();
+
+  /**
+   * @brief Initializes the virtual memory manager, sets up PML4 and initial
+   * mappings.
+   */
+  void initialize();
+
+  /**
+   * @brief Maps a single virtual page to a physical frame.
+   */
+  void map_page(uintptr_t virt, uintptr_t phys, PageFlags flags);
+
+  /** @brief Maps a range of pages. */
+  void map_range(uintptr_t start, uintptr_t size, PageFlags flags);
+
+  /** @brief Removes a mapping for a virtual address. */
+  void unmap_page(uintptr_t virt);
+
+  /** @brief Translates a virtual address to its corresponding physical address.
+   */
+  uintptr_t translate(uintptr_t virt);
+
+  /** @brief Creates a new address space (useful for execve). */
+  uintptr_t create_address_space();
+
+  /** @brief Clones an address space for process forking. */
+  uintptr_t clone_address_space(uintptr_t source_cr3);
+
+  /** @brief Switches the current CPU address space by updating CR3. */
+  void switch_address_space(uintptr_t cr3);
+};

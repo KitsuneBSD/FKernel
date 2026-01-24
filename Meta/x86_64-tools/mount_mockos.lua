@@ -1,52 +1,97 @@
 #!/usr/bin/env lua
 
-require("Meta.Lib.run_command")
-require("Meta.Lib.print_message")
-require("Meta.Lib.os_interact")
+local RunCommand = require("Meta.Lib.run_command")
+local PrintMessage = require("Meta.Lib.print_message")
+local OSInteract = require("Meta.Lib.os_interact")
+local Compiler = require("Meta.Lib.userland_compiler")
+local Initrd = require("Meta.Lib.initrd_builder")
+local Iso = require("Meta.Lib.iso_builder")
+local Components = require("Meta.Lib.component_manager")
 require("Meta.x86_64-tools.check-kernel")
 
--- Path's
-local grub_dir = "build/mockos/boot/grub"
-local grub_cfg = "Config/grub.cfg"
-local kernel_bin = "build/FKernel.bin"
+local STAGING = "build/initrd_root"
+local MOCKOS = "build/mockos"
+local CONFIG_FILE = "build/initrd_config.txt"
+local ONLY_INITRD = arg[1] == "--only-initrd"
 
--- Cleaning build directory
-RunCommand("rm -rf build/mockos")
+Initrd.setup_staging(STAGING)
+RunCommand("mkdir -p build/userland/obj")
 
--- Ensure grub directory exists, cleaning if necessary
-if DirExists(grub_dir) then
-	RunCommand("rm -rf " .. grub_dir)
+Compiler.compile_asm("Src/Userland/lib/syscalls.asm", "build/userland/obj/syscalls.o")
+Compiler.compile_asm("Src/Userland/lib/crt0.asm", "build/userland/obj/crt0.o")
+
+local config = { COMPONENTS = "init,shell,ls,cat", SYSTEM_TYPE = "minimal" }
+local f = io.open(CONFIG_FILE, "r")
+if f then
+  for line in f:lines() do
+    local k, v = line:match("([^=]+)=(.+)")
+    if k then config[k] = v end
+  end
+  f:close()
 end
 
-RunCommand("mkdir -p " .. grub_dir)
-PrintMessage(false, "Prepared grub directory")
+if config.SYSTEM_TYPE == "standard" or config.SYSTEM_TYPE == "advanced" then
+  PrintMessage(false, "Building Standard System (Musl + BusyBox)...")
+  if not RunCommand("lua Meta/UserTools/musl/build.lua") then
+    PrintMessage(true, "Failed to build Musl LibC.")
+    os.exit(1)
+  end
+  
+  -- Copy Musl libraries to initrd
+  RunCommand("mkdir -p " .. STAGING .. "/lib")
+  RunCommand("mkdir -p " .. STAGING .. "/usr/lib")
+  RunCommand("cp -r build/sysroot/lib/* " .. STAGING .. "/lib/ 2>/dev/null || true")
+  RunCommand("cp -r build/sysroot/include " .. STAGING .. "/usr/ 2>/dev/null || true")
 
--- Build the MockOS infrastructure
-if RunCommand(string.format("cp %s %s", grub_cfg, grub_dir)) then
-	PrintMessage(false, "Copied grub config")
-else
-	PrintMessage(true, "Failed to copy grub config")
+  if not RunCommand("lua Meta/UserTools/busybox/build.lua") then
+    PrintMessage(true, "Failed to build BusyBox.")
+    os.exit(1)
+  end
+
+  if config.SYSTEM_TYPE == "advanced" then
+    PrintMessage(false, "Building Advanced Components (OpenRC)...")
+    if RunCommand("lua Meta/UserTools/openrc/build.lua") then
+      PrintMessage(false, "Setting OpenRC as default init...")
+      RunCommand("ln -sf init.openrc " .. STAGING .. "/sbin/init")
+    else
+      PrintMessage(true, "Failed to build OpenRC. Falling back to BusyBox init.")
+    end
+  end
 end
 
-if RunCommand(string.format("cp %s build/mockos/boot", kernel_bin)) then
-	PrintMessage(false, "Copied kernel binary")
-else
-	PrintMessage(true, "Failed to copy kernel binary")
+for comp in config.COMPONENTS:gmatch("([^,]+)") do
+  local skip = false
+  if (config.SYSTEM_TYPE == "standard" or config.SYSTEM_TYPE == "advanced") and 
+     (comp == "init" or comp == "ash") then
+    skip = true
+    PrintMessage(false, "Skipping native '" .. comp .. "' (provided by BusyBox).")
+  end
+
+  if not skip then
+    Components.build(comp, config.SYSTEM_TYPE, STAGING)
+  end
 end
 
-if not RunCommand("command -v grub-mkrescue >/dev/null 2>&1") then
-	if not RunCommand("command -v grub2-mkrescue >/dev/null 2>&1") then
-		PrintMessage(true, "grub-mkrescue not found. Please install it before running this script.")
-		os.exit(1)
-	else
-		RunCommand("grub2-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos >/dev/null 2>&1 ")
-	end
-else
-	RunCommand("grub-mkrescue /usr/lib/grub/i386-pc/ -o build/FKernel-MockOS.iso build/mockos  >/dev/null 2>&1")
+local tar_output = "build/initrd.tar"
+RunCommand("ln -sf shell " .. STAGING .. "/bin/sh")
+Initrd.pack_tar(STAGING, tar_output)
+
+if ONLY_INITRD then
+  PrintMessage(false, "Standalone initrd.tar generated at build/initrd.tar")
+  os.exit(0)
 end
 
-if not FileExists("build/FKernel-HDA.qcow2") then
-	RunCommand("qemu-img create FKernel-HDA.qcow2 4G -f qcow2 >/dev/null 2>&1 ")
-	RunCommand("mv FKernel-HDA.qcow2 build/FKernel-HDA.qcow2")
-	PrintMessage(false, "Disk image created")
+RunCommand("rm -rf " .. MOCKOS)
+if Iso.prepare_grub(MOCKOS, "Config/grub.cfg", "build/FKernel.bin") then
+  -- Move the already generated tar to the iso folder
+  RunCommand("cp " .. tar_output .. " " .. MOCKOS .. "/boot/initrd.tar")
+  if Iso.create_iso(MOCKOS, "build/FKernel-MockOS.iso") then
+    PrintMessage(false, "System image created successfully.")
+  end
 end
+
+if not OSInteract.FileExists("build/FKernel-HDA.qcow2") then
+  RunCommand("qemu-img create -f qcow2 build/FKernel-HDA.qcow2 4G >/dev/null 2>&1")
+end
+
+PrintMessage(false, "FKernel build process completed.")

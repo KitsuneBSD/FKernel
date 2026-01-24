@@ -1,30 +1,51 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerInterrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 
-#include <Kernel/Boot/early_init.h>
-#include <Kernel/Boot/init.h>
-#include <Kernel/Boot/multiboot2.h>
+#include <Kernel/Boot/Stages/early_init.h>
+#include <Kernel/Boot/Stages/init.h>
+#include <Kernel/Boot/boot_info.h>
 
-#include <Kernel/Hardware/Cpu.h>
-
-#include <Kernel/MemoryManager/PhysicalMemoryManager.h>
-#include <Kernel/MemoryManager/VirtualMemoryManager.h>
-
+#include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Core/Assertions.h>
+#include <LibFK/Memory/heap_malloc.h>
 
-void early_init([[maybe_unused]] const multiboot2::TagMemoryMap *mmap) {
-  klog("EARLY_INIT", "Start early init (multiboot2)");
+namespace fk {
+namespace memory {
+Allocator &heap_allocator();
+}
+} // namespace fk
 
+void early_init() {
+  assert(boot::BootInfo::the().is_initialized() &&
+         "early_init: BootInfo not initialized!");
+
+  fk::algorithms::klog("EARLY_INIT", "Start early init");
   GDTController::the().initialize();
+
+  // Heap MUST be initialized before Interrupts and Memory Manager
+  // because they use strings and dynamic allocation.
+  fk::memory::heap_allocator().initialize();
+
+  // Now that heap is ready, finalize BootInfo iterators
+  boot::BootInfo::the().create_iterators();
+
+  fk::algorithms::klog("EARLY_INIT", "Initializing Interrupts...");
   InterruptController::the().initialize();
-  PhysicalMemoryManager::the().initialize(mmap);
-  VirtualMemoryManager::the().initialize();
 
-  HardwareInterruptManager::the().initialize();
-  TimerManager::the().initialize(100);
+  fk::algorithms::klog("EARLY_INIT", "Initializing Memory Manager...");
+  MemoryManager::the().initialize();
 
+  fk::algorithms::klog("EARLY_INIT", "Initializing ACPI...");
+  ACPIManager::the().initialize();
+
+  CPU::the().initialize_features();
+
+  fk::algorithms::klog("EARLY_INIT", "Calling init()...");
   init();
 }

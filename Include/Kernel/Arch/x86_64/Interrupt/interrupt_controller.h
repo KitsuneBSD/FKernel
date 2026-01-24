@@ -20,10 +20,10 @@ enum class GateType : uint8_t {
 class InterruptController {
 private:
   /// Array of IDT entries
-  array<idt_entry, MAX_x86_64_IDT_SIZE> m_entries;
+  fk::containers::array<idt_entry, MAX_x86_64_IDT_SIZE> m_entries;
 
   /// Array of registered interrupt handlers
-  array<interrupt, MAX_x86_64_IDT_SIZE> m_handlers;
+  fk::containers::array<interrupt, MAX_x86_64_IDT_SIZE> m_handlers;
 
   /// Private constructor for singleton; clears all entries
   InterruptController() { clear(); }
@@ -31,6 +31,7 @@ private:
   /// Tracks whether interrupts are enabled
   bool is_interrupt_enable = true;
 
+public:
   /**
    * @brief Enable CPU interrupts
    *
@@ -39,13 +40,15 @@ private:
    */
   void enable_interrupt() {
     if (is_interrupt_enable) {
-      kwarn("INTERRUPT", "Interrupts already enabled");
+      fk::algorithms::kwarn("INTERRUPT", "Interrupts already enabled");
       return;
     }
 
     asm volatile("sti");
     is_interrupt_enable = true;
-    kdebug("INTERRUPT", "Interrupts enabled");
+    /*TODO: Apply this log when we work with LogLevel
+    fk::algorithms::kdebug("INTERRUPT", "Interrupts enabled");
+    */
   }
 
   /**
@@ -56,16 +59,30 @@ private:
    */
   void disable_interrupt() {
     if (!is_interrupt_enable) {
-      kwarn("INTERRUPT", "Interrupts already disabled");
+      fk::algorithms::kwarn("INTERRUPT", "Interrupts already disabled");
       return;
     }
 
     asm volatile("cli");
     is_interrupt_enable = false;
-    kdebug("INTERRUPT", "Interrupts disabled");
+    /*TODO: Apply this log when we work with LogLevel
+      fk::algorithms::kdebug("INTERRUPT", "Interrupts disabled");
+    */
   }
 
-public:
+  /**
+   * @brief Get the current interrupt state (enabled/disabled).
+   *
+   * Reads the EFLAGS register to determine if the interrupt flag (IF) is set.
+   *
+   * @return True if interrupts are enabled, false otherwise.
+   */
+  bool get_interrupt_state() {
+    uint64_t eflags;
+    asm volatile("pushfq ; popq %0" : "=r"(eflags));
+    return (eflags & (1 << 9)) != 0;
+  }
+
   /**
    * @brief Get the singleton instance of the InterruptController
    *

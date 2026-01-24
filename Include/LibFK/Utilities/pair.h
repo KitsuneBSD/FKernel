@@ -1,5 +1,8 @@
 #pragma once
 
+namespace fk {
+namespace utilities {
+
 /**
  * @brief A simple pair of two values, similar to std::pair.
  *
@@ -63,3 +66,6 @@ template <typename T1, typename T2> struct Pair {
     return !(*this == other);
   }
 };
+
+} // namespace utilities
+} // namespace fk

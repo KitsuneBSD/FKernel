@@ -22,4 +22,5 @@ end
 file:write("};\n\n")
 
 file:close()
-print("Gerado: " .. filename)
+local PrintMessage = require("Meta.Lib.print_message")
+PrintMessage(false, "Generated: " .. filename)

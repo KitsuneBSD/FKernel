@@ -1,0 +1,50 @@
+#include <Kernel/Fs/Vfs/definitions.h>
+#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Syscall/syscall_utils.h>
+
+extern "C" {
+
+uint64_t sys_getdents(uint64_t fd, uint64_t buffer_ptr, uint64_t max_bytes, uint64_t,
+                    uint64_t, uint64_t) {
+    auto* current_task = SchedulerManager::the().current();
+    if (!current_task) return fkernel::return_error(fk::core::Error::PermissionDenied);
+
+    auto description = current_task->get_file_descriptor(static_cast<int>(fd));
+    if (!description) return fkernel::return_error(fk::core::Error::InvalidParameter);
+
+    fk::algorithms::klog("SYSCALL", "sys_getdents: fd=%lu, buffer=%p, size=%zu, offset=%lu", 
+                         fd, (void*)buffer_ptr, (size_t)max_bytes, description->offset());
+
+    auto res = VirtualFileSystem::the().readdir(description, reinterpret_cast<uint8_t*>(buffer_ptr), max_bytes);
+    if (res.is_error()) {
+        fk::algorithms::kwarn("SYSCALL", "sys_getdents: failed with error %d", (int)res.error());
+        return fkernel::return_error(res.error());
+    }
+
+    fk::algorithms::klog("SYSCALL", "sys_getdents: returned %zu bytes", res.value());
+    return res.value();
+}
+
+uint64_t sys_getdents64(uint64_t fd, uint64_t buffer_ptr, uint64_t max_bytes, uint64_t,
+                    uint64_t, uint64_t) {
+    auto* current_task = SchedulerManager::the().current();
+    if (!current_task) return fkernel::return_error(fk::core::Error::PermissionDenied);
+
+    auto description = current_task->get_file_descriptor(static_cast<int>(fd));
+    if (!description) return fkernel::return_error(fk::core::Error::InvalidParameter);
+
+    fk::algorithms::klog("SYSCALL", "sys_getdents64: fd=%lu, buffer=%p, size=%zu, offset=%lu", 
+                         fd, (void*)buffer_ptr, (size_t)max_bytes, description->offset());
+
+    auto res = VirtualFileSystem::the().readdir(description, reinterpret_cast<uint8_t*>(buffer_ptr), max_bytes);
+    if (res.is_error()) {
+        fk::algorithms::kwarn("SYSCALL", "sys_getdents64: failed with error %d", (int)res.error());
+        return fkernel::return_error(res.error());
+    }
+
+    fk::algorithms::klog("SYSCALL", "sys_getdents64: returned %zu bytes", res.value());
+    return res.value();
+}
+
+}

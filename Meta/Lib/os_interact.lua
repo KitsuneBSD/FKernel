@@ -1,9 +1,13 @@
 #!/usr/bin/env lua
 
+require("Meta.Lib.run_command") -- Added require for RunCommand
+
+local OSInteract = {}
+
 -- Function Utility: Check if a file exists
 -- Arguments:
 -- path: file path
-function FileExists(path)
+function OSInteract.FileExists(path)
 	local f = io.open(path, "r")
 	if f then
 		f:close()
@@ -15,9 +19,26 @@ end
 -- Function Utility: Check if a directory exists
 -- Arguments:
 -- path : directory path
-function DirExists(path)
+function OSInteract.DirExists(path)
 	local ok = os.execute("[ -d " .. path .. " ]")
 	return ok == true or ok == 0
 end
 
-return FileExists, DirExists
+function OSInteract.CopyFile(src, dst)
+	local ok, status, code = os.execute(string.format("cp -r %s %s", src, dst))
+	return ok == true
+end
+
+function OSInteract.CommandExists(cmd)
+	return RunCommand("command -v " .. cmd .. " >/dev/null 2>&1")
+end
+
+function OSInteract.CaptureCommand(cmd)
+	local f = io.popen(cmd .. " 2>&1")
+	local out = f:read("*a")
+	f:close()
+	return out
+end
+
+_G.OSInteract = OSInteract
+return OSInteract
