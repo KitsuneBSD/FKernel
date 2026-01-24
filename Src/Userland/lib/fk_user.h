@@ -39,7 +39,9 @@ void* sys_brk(void* addr);
 int sys_getpid();
 int sys_getppid();
 int sys_getuid();
+int sys_getgid();
 int sys_geteuid();
+int sys_getegid();
 int sys_kill(int pid, int sig);
 int sys_sigaction(int signum, const void* act, void* oldact);
 int sys_sigprocmask(int how, const void* set, void* oldset);
@@ -52,6 +54,15 @@ int sys_connect(int sockfd, const void* addr, int addrlen);
 int sys_listen(int sockfd, int backlog);
 int sys_accept(int sockfd, void* addr, int* addrlen);
 int sys_uname(void* buf);
+int sys_gettimeofday(void* tv, void* tz);
+struct timespec {
+    long tv_sec;
+    long tv_nsec;
+};
+
+int sys_nanosleep(const struct timespec* req, struct timespec* rem);
+int sys_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags, const void* data);
+int sys_umount(const char* target, int flags);
 
 // basic LibC-style functions
 static inline void print(const char* str) {
