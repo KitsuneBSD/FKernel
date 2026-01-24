@@ -45,16 +45,18 @@ The `VirtualMemoryManager` handles x86_64 4-level paging:
 Features:
 - **Identity Mapping:** Used during early boot for the lower memory regions.
 - **Address Space Cloning:** Supports `fork()` by deep-copying user-mode page tables.
+- **User Stack:** Typically located at the top of the virtual address space (e.g., `0x7fffffffe000`) to avoid conflicts with kernel regions.
 - **Page Fault Handling:** (Integrated with architecture-specific exception handlers).
 
 ---
 
 ## 3. Kernel Heap
 
-Located in `Include/LibFK/Memory/heap_malloc.h` and `Src/LibFK/Memory/heap_malloc.cpp`.
+Located in `Include/Kernel/Memory/memory_manager.h` and managed by the `MemoryManager`.
 
-The kernel heap provides a `malloc`/`free` style interface for dynamic allocations.
+The kernel heap provides a `kmalloc`/`kfree` style interface for dynamic allocations.
 - **Implementation:** Linked-list based allocator with block splitting and merging.
+- **Orchestration:** Integrated into the `MemoryManager` to centralize kernel memory resources.
 - **Alignment:** 16-byte alignment enforced for SSE and performance.
 - **Safety:** Magic numbers are used in block headers to detect heap corruption and double frees.
 - **C++ Integration:** `Src/LibFK/Memory/new.cpp` provides global `operator new` and `delete` overrides.
@@ -64,6 +66,6 @@ The kernel heap provides a `malloc`/`free` style interface for dynamic allocatio
 ## Initialization Flow
 
 1.  **Early Boot:** `setup_page_tables.asm` sets up a basic identity mapping.
-2.  **Early Init:** `fk::memory::heap_allocator().initialize()` sets up the linked-list heap.
+2.  **Early Init:** `MemoryManager::the().initialize_heap()` sets up the linked-list heap.
 3.  **Physical Memory:** `PhysicalMemoryManager::initialize()` scans the Multiboot2/UEFI memory map and populates zones.
 4.  **Virtual Memory:** `VirtualMemoryManager::initialize()` creates the final kernel PML4 and switches CR3.

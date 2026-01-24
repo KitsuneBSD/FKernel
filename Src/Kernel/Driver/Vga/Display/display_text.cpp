@@ -116,44 +116,68 @@ void display_text::write_ansi(const char *str) {
 }
 
 void display_text::write_ansi_n(const char *str, size_t size) {
-  Color current_fg = Color::LightGray;
-  Color current_bg = Color::Black;
-
   size_t i = 0;
   while (i < size) {
     if (str[i] == '\033' && (i + 1 < size) && str[i + 1] == '[') {
       i += 2;
-      int code = 0;
-      while (i < size && str[i] >= '0' && str[i] <= '9') {
-        code = code * 10 + (str[i] - '0');
-        ++i;
+      
+      int params[4] = {0, 0, 0, 0};
+      int param_count = 0;
+      
+      while (i < size && ((str[i] >= '0' && str[i] <= '9') || str[i] == ';')) {
+          if (str[i] == ';') {
+              if (param_count < 3) param_count++;
+              i++;
+              continue;
+          }
+          params[param_count] = params[param_count] * 10 + (str[i] - '0');
+          i++;
       }
-      if (i < size && str[i] == 'm') {
-        switch (code) {
-        case 0:
-          current_fg = Color::LightGray;
-          current_bg = Color::Black;
-          break;
-        case 30: current_fg = Color::Black; break;
-        case 31: current_fg = Color::Red; break;
-        case 32: current_fg = Color::Green; break;
-        case 33: current_fg = Color::Brown; break;
-        case 34: current_fg = Color::Blue; break;
-        case 35: current_fg = Color::Magenta; break;
-        case 36: current_fg = Color::Cyan; break;
-        case 37: current_fg = Color::White; break;
-        case 40: current_bg = Color::Black; break;
-        case 41: current_bg = Color::Red; break;
-        case 42: current_bg = Color::Green; break;
-        case 43: current_bg = Color::Brown; break;
-        case 44: current_bg = Color::Blue; break;
-        case 45: current_bg = Color::Magenta; break;
-        case 46: current_bg = Color::Cyan; break;
-        case 47: current_bg = Color::White; break;
-        }
-        set_color(current_fg, current_bg);
+      
+      if (param_count > 0 || params[0] != 0) param_count++;
+      else if (i < size && str[i] != ';' ) param_count = 1; // case like [m or [H
+
+      char command = (i < size) ? str[i] : 0;
+      if (i < size) i++;
+
+      if (command == 'm') {
+          Color current_fg = static_cast<Color>(color & 0x0F);
+          Color current_bg = static_cast<Color>((color >> 4) & 0x0F);
+          
+          for (int p = 0; p < (param_count == 0 ? 1 : param_count); ++p) {
+              int code = params[p];
+              switch (code) {
+              case 0: current_fg = Color::LightGray; current_bg = Color::Black; break;
+              case 30: current_fg = Color::Black; break;
+              case 31: current_fg = Color::Red; break;
+              case 32: current_fg = Color::Green; break;
+              case 33: current_fg = Color::Brown; break;
+              case 34: current_fg = Color::Blue; break;
+              case 35: current_fg = Color::Magenta; break;
+              case 36: current_fg = Color::Cyan; break;
+              case 37: current_fg = Color::White; break;
+              case 40: current_bg = Color::Black; break;
+              case 41: current_bg = Color::Red; break;
+              case 42: current_bg = Color::Green; break;
+              case 43: current_bg = Color::Brown; break;
+              case 44: current_bg = Color::Blue; break;
+              case 45: current_bg = Color::Magenta; break;
+              case 46: current_bg = Color::Cyan; break;
+              case 47: current_bg = Color::White; break;
+              }
+          }
+          set_color(current_fg, current_bg);
+      } else if (command == 'J') {
+          if (params[0] == 2) {
+              clear();
+          }
+      } else if (command == 'H' || command == 'f') {
+          row = (params[0] > 0) ? params[0] - 1 : 0;
+          col = (params[1] > 0) ? params[1] - 1 : 0;
+          if (row >= HEIGHT) row = HEIGHT - 1;
+          if (col >= WIDTH) col = WIDTH - 1;
+          update_cursor();
       }
-      if (i < size) ++i;
     } else {
       put_char(str[i]);
       ++i;

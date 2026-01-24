@@ -249,31 +249,39 @@ void display_framebuffer::write_ansi(const char *str) {
 }
 
 void display_framebuffer::write_ansi_n(const char *str, size_t size) {
-  Color current_fg_color = current_fg;
-  Color current_bg_color = current_bg;
-
   size_t i = 0;
   while (i < size) {
     if (str[i] == '\033' && (i + 1 < size) && str[i + 1] == '[') {
       i += 2;
       
-      // Parse multiple semicolon-separated codes
-      while (i < size) {
-          int code = 0;
-          bool has_digit = false;
-          while (i < size && str[i] >= '0' && str[i] <= '9') {
-              code = code * 10 + (str[i] - '0');
-              ++i;
-              has_digit = true;
+      int params[4] = {0, 0, 0, 0};
+      int param_count = 0;
+      
+      while (i < size && ((str[i] >= '0' && str[i] <= '9') || str[i] == ';')) {
+          if (str[i] == ';') {
+              if (param_count < 3) param_count++;
+              i++;
+              continue;
           }
+          params[param_count] = params[param_count] * 10 + (str[i] - '0');
+          i++;
+      }
+      
+      if (param_count > 0 || params[0] != 0) param_count++;
+      else if (i < size && str[i] != ';' ) param_count = 1;
 
-          if (has_digit || (i < size && (str[i] == ';' || str[i] == 'm'))) {
+      char command = (i < size) ? str[i] : 0;
+      if (i < size) i++;
+
+      if (command == 'm') {
+          Color current_fg_color = current_fg;
+          Color current_bg_color = current_bg;
+          
+          for (int p = 0; p < (param_count == 0 ? 1 : param_count); ++p) {
+              int code = params[p];
               switch (code) {
-              case 0:
-                  current_fg_color = Color::LightGray;
-                  current_bg_color = Color::Black;
-                  break;
-              case 1: // Bold (make it light color)
+              case 0: current_fg_color = Color::LightGray; current_bg_color = Color::Black; break;
+              case 1: // Bold
                   if (current_fg_color < Color::DarkGray)
                       current_fg_color = static_cast<Color>(static_cast<int>(current_fg_color) + 8);
                   break;
@@ -295,17 +303,17 @@ void display_framebuffer::write_ansi_n(const char *str, size_t size) {
               case 47: current_bg_color = Color::White; break;
               }
           }
-
-          if (i < size && str[i] == ';') {
-              i++;
-          } else if (i < size && str[i] == 'm') {
-              i++;
-              break;
-          } else {
-              break;
+          set_color(current_fg_color, current_bg_color);
+      } else if (command == 'J') {
+          if (params[0] == 2) {
+              clear();
           }
+      } else if (command == 'H' || command == 'f') {
+          cursor_y = (params[0] > 0) ? params[0] - 1 : 0;
+          cursor_x = (params[1] > 0) ? params[1] - 1 : 0;
+          if (cursor_y >= get_height()) cursor_y = get_height() - 1;
+          if (cursor_x >= get_width()) cursor_x = get_width() - 1;
       }
-      set_color(current_fg_color, current_bg_color);
     } else {
       put_char(str[i]);
       ++i;

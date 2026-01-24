@@ -15,12 +15,6 @@
 #include <LibFK/Core/Assertions.h>
 #include <LibFK/Memory/heap_malloc.h>
 
-namespace fk {
-namespace memory {
-Allocator &heap_allocator();
-}
-} // namespace fk
-
 void early_init() {
   assert(boot::BootInfo::the().is_initialized() &&
          "early_init: BootInfo not initialized!");
@@ -30,7 +24,7 @@ void early_init() {
 
   // Heap MUST be initialized before Interrupts and Memory Manager
   // because they use strings and dynamic allocation.
-  fk::memory::heap_allocator().initialize();
+  MemoryManager::the().initialize_heap();
 
   // Now that heap is ready, finalize BootInfo iterators
   boot::BootInfo::the().create_iterators();
