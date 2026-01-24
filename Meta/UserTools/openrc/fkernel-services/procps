@@ -1,0 +1,19 @@
+#!/sbin/openrc-run
+# Process management for FKernel
+
+description="FKernel process management"
+
+depend() {
+    after bootmisc
+}
+
+start() {
+    einfo "Starting process management"
+    
+    # Set up process environment
+    export PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+    export HOME="/root"
+    export USER="root"
+    
+    return 0
+}
