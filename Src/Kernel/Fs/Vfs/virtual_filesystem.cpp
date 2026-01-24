@@ -25,6 +25,8 @@ void VirtualFileSystem::initialize() {
   root_node->mkdir("mnt", 0755);
 
   auto &devfs = fkernel::DevFs::the();
+  devfs.set_name("dev");
+  devfs.set_parent(root_node);
   vfs.mount("/dev", fk::RefPtr<Node>(&devfs));
 
   devfs.register_device(fk::make_ref<fkernel::TtyNode>().value(), "console");
@@ -32,12 +34,18 @@ void VirtualFileSystem::initialize() {
   devfs.register_device(fk::make_ref<fkernel::TtyNode>().value(), "tty0");
 
   auto proc_res = fk::make_ref<ProcFsNode>();
-  if (proc_res)
+  if (proc_res) {
+    proc_res.value()->set_name("proc");
+    proc_res.value()->set_parent(root_node);
     vfs.mount("/proc", proc_res.value());
+  }
 
   auto debugfs_res = fk::make_ref<fkernel::DebugFsNode>();
-  if (debugfs_res)
+  if (debugfs_res) {
+    debugfs_res.value()->set_name("debug");
+    debugfs_res.value()->set_parent(root_node);
     vfs.mount("/debug", debugfs_res.value());
+  }
 
   fk::algorithms::klog("VFS", "Initialized VFS");
 }
@@ -130,9 +138,17 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
 
     size_t cur_len = strlen(resolved_path_str);
     if (cur_len > 0 && resolved_path_str[cur_len - 1] != '/') {
-      strcat(resolved_path_str, "/");
+      if (cur_len + 1 < 512) {
+        strcat(resolved_path_str, "/");
+        cur_len++;
+      }
     }
-    strcat(resolved_path_str, name);
+    
+    if (cur_len + strlen(name) < 512) {
+      strcat(resolved_path_str, name);
+    } else {
+      return fk::core::Error::IOError; // Path too long
+    }
 
     bool mounted = false;
     for (auto &m : m_mounts) {
@@ -164,9 +180,11 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
           return sub_res.error();
         current = sub_res.value();
         strncpy(resolved_path_str, link.c_str(), 511);
+        resolved_path_str[511] = '\0';
       } else {
         char parent_path[512];
         strncpy(parent_path, resolved_path_str, 511);
+        parent_path[511] = '\0';
         char *last_slash = strrchr(parent_path, '/', 512);
         if (last_slash) {
           if (last_slash == parent_path)
@@ -181,6 +199,7 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
           return sub_res.error();
         current = sub_res.value();
         strncpy(resolved_path_str, full_link_path, 511);
+        resolved_path_str[511] = '\0';
       }
       symlink_depth++;
     }

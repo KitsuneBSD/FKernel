@@ -23,17 +23,9 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
     return -1;
 
   // 1. Create and initialize a new task structure
-  Task *child = static_cast<Task *>(kmalloc(sizeof(Task)));
+  Task *child = new Task();
   if (!child)
     return -1;
-
-  // Explicitly initialize intrusive nodes to null
-  child->run_node.prev = nullptr;
-  child->run_node.next = nullptr;
-  child->wait_node.prev = nullptr;
-  child->wait_node.next = nullptr;
-  child->sleep_node.prev = nullptr;
-  child->sleep_node.next = nullptr;
 
   // 2. Clone metadata
   child->id = SchedulerManager::the().generate_pid();
@@ -68,6 +60,10 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   // 4. Setup Kernel Stack
   const size_t STACK_SIZE = 16 * 1024;
   void *child_stack_mem = kmalloc(STACK_SIZE);
+  if (!child_stack_mem) {
+      delete child;
+      return -1;
+  }
   child->kernel_stack_top =
       reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
 

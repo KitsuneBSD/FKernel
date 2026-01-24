@@ -5,10 +5,21 @@ local Compiler = require("Meta.Lib.userland_compiler")
 local InitrdBuilder = {}
 
 function InitrdBuilder.setup_staging(path)
-  RunCommand("rm -rf " .. path)
+  -- Do not rm -rf the whole path, as OpenRC/BusyBox might have installed files there
   RunCommand("mkdir -p " .. path .. "/bin")
   RunCommand("mkdir -p " .. path .. "/sbin")
   RunCommand("mkdir -p " .. path .. "/etc")
+  RunCommand("mkdir -p " .. path .. "/libexec")
+  RunCommand("mkdir -p " .. path .. "/root")
+  RunCommand("mkdir -p " .. path .. "/tmp")
+  RunCommand("mkdir -p " .. path .. "/usr/bin")
+  RunCommand("mkdir -p " .. path .. "/usr/sbin")
+  RunCommand("mkdir -p " .. path .. "/usr/lib")
+  RunCommand("mkdir -p " .. path .. "/usr/local/etc")
+  RunCommand("mkdir -p " .. path .. "/var/log")
+  RunCommand("mkdir -p " .. path .. "/var/run")
+  RunCommand("mkdir -p " .. path .. "/dev")
+  RunCommand("mkdir -p " .. path .. "/proc")
 end
 
 function InitrdBuilder.build_component(name, config, staging_path)
@@ -22,7 +33,10 @@ function InitrdBuilder.build_component(name, config, staging_path)
     f_c:close()
     local obj_c = obj_dir .. "/" .. name .. ".o"
     local crt0_obj = obj_dir .. "/crt0.o"
-    local bin = (name == "init") and (staging_path .. "/sbin/init") or (staging_path .. "/bin/" .. name)
+    
+    local bin = staging_path .. "/usr/bin/" .. name
+    if name == "init" then bin = staging_path .. "/sbin/init" end
+    if name == "shell" then bin = staging_path .. "/bin/sh" end
 
     Compiler.compile_asm("Src/Userland/lib/crt0.asm", crt0_obj)
 
@@ -37,7 +51,10 @@ function InitrdBuilder.build_component(name, config, staging_path)
   if f then
     f:close()
     local obj = obj_dir .. "/" .. name .. ".o"
-    local bin = (name == "init") and (staging_path .. "/sbin/init") or (staging_path .. "/bin/" .. name)
+    
+    local bin = staging_path .. "/usr/bin/" .. name
+    if name == "init" then bin = staging_path .. "/sbin/init" end
+    if name == "shell" then bin = staging_path .. "/bin/sh" end
 
     if Compiler.compile_asm(asm_main, obj) then
       RunCommand("rm -f " .. bin)

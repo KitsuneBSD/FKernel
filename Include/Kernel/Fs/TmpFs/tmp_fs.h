@@ -60,13 +60,11 @@ public:
   list_dir(fk::containers::Vector<DirectoryEntry>& entries) override;
   
   virtual bool is_directory() const override { return true; }
-  virtual fk::text::String get_path() const override { return m_is_root ? "/" : ""; }
 
 private:
   ChildList m_children;
-  bool m_is_root { false };
 
 public:
-  void set_is_root(bool b) { m_is_root = b; }
+  void set_is_root(bool b) { if (b) m_name = ""; }
 };
 

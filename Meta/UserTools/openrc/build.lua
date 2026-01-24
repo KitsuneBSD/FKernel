@@ -40,6 +40,12 @@ if not OSInteract.DirExists(src_dir) then
 end
 
 local build_openrc_dir = BUILD_DIR .. "/build"
+local openrc_bin = build_openrc_dir .. "/src/openrc/openrc"
+
+if OSInteract.FileExists(openrc_bin) and OSInteract.FileExists(INITRD_DIR .. "/usr/sbin/openrc") then
+    PrintMessage(false, "OpenRC is already compiled and installed. Skipping.")
+    os.exit(0)
+end
 
 -- Generate Meson Cross-File
 local cross_file = BUILD_DIR .. "/cross_file.txt"
@@ -52,8 +58,8 @@ f:write("strip = '" .. Toolchain.get_tool("llvm-strip", "strip") .. "'\n")
 f:write("pkgconfig = 'false'\n")
 f:write("\n")
 f:write("[properties]\n")
-f:write("c_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__']\n")
-f:write("cpp_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__']\n")
+f:write("c_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__', '-D__linux__']\n")
+f:write("cpp_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__', '-D__linux__']\n")
 f:write("c_link_args = ['-L" .. SYSROOT .. "/lib', '-static']\n")
 f:write("cpp_link_args = ['-L" .. SYSROOT .. "/lib', '-static']\n")
 f:write("\n")
@@ -68,8 +74,9 @@ print("Configuring OpenRC with Meson...")
 -- OpenRC options for minimal freestanding system
 local cmd_setup = string.format(
     "cd %s && meson setup %s --cross-file %s --prefix=/ --libdir=lib --sysconfdir=/etc " ..
-    "-Ddefault_library=static -Dshell=/bin/sh -Dpam=false -Dselinux=false -Daudit=false " ..
-    "-Dbranding='FKernel' -Dsysvinit=false -Dnewnet=true -Dtermcap=false",
+    "-Ddefault_library=static -Dshell=/bin/sh -Dpam=false -Dselinux=disabled -Daudit=disabled " ..
+    "-Dbranding='\"FKernel\"' -Dsysvinit=false -Dnewnet=true -Dtermcap='' -Dos=Linux " ..
+    "-Dpkgconfig=false -Dbash-completions=false -Dzsh-completions=false",
     src_dir, build_openrc_dir, cross_file
 )
 
@@ -86,7 +93,57 @@ if os.execute("cd " .. build_openrc_dir .. " && ninja") then
     -- Use ninja install with DESTDIR to get everything (binaries + scripts + config)
     if os.execute(string.format("cd %s && DESTDIR=%s ninja install", build_openrc_dir, INITRD_DIR)) then
         -- Post-install adjustments
-        os.execute("mv " .. INITRD_DIR .. "/sbin/openrc-init " .. INITRD_DIR .. "/sbin/init.openrc")
+        RunCommand("mkdir -p " .. INITRD_DIR .. "/sbin")
+        RunCommand("mv " .. INITRD_DIR .. "/usr/sbin/openrc-init " .. INITRD_DIR .. "/sbin/init.openrc")
+        
+        -- Setup OpenRC environment for FKernel
+        local function setup_fkernel_runlevels()
+            local runlevel_services = {
+                boot = {"bootmisc", "procps"},
+                default = {"local", "network"}
+            }
+            
+            for runlevel, services in pairs(runlevel_services) do
+                for _, service in ipairs(services) do
+                    local service_path = INITRD_DIR .. "/etc/init.d/" .. service
+                    local runlevel_path = INITRD_DIR .. "/etc/runlevels/" .. runlevel .. "/" .. service
+                    if OSInteract.FileExists(service_path) then
+                        os.execute("ln -sf /etc/init.d/" .. service .. " " .. runlevel_path)
+                    end
+                end
+            end
+        end
+
+        local function setup_openrc_fkernel()
+            -- Create OpenRC directory structure
+            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/init.d")
+            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/conf.d") 
+            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/runlevels/boot")
+            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/runlevels/default")
+            os.execute("mkdir -p " .. INITRD_DIR .. "/var/log")
+            
+            -- Create FKernel-specific rc.conf
+            local rc_conf = io.open(INITRD_DIR .. "/etc/rc.conf", "w")
+            rc_conf:write("# OpenRC configuration for FKernel\n")
+            rc_conf:write("rc_sys=\"FKernel\"\n")
+            rc_conf:write("rc_logger=\"YES\"\n")
+            rc_conf:write("rc_parallel=\"NO\"\n")  -- Single-core safe
+            rc_conf:write("rc_runlevel_lock_timeout=\"60\"\n")
+            rc_conf:write("rc_hotplug=\"NO\"\n")  -- No hotplug support
+            rc_conf:close()
+            
+            -- Copy FKernel-specific services
+            local services_dir = ROOT_DIR .. "/Meta/UserTools/openrc/fkernel-services"
+            if OSInteract.DirExists(services_dir) then
+                os.execute("cp " .. services_dir .. "/* " .. INITRD_DIR .. "/etc/init.d/")
+                os.execute("chmod +x " .. INITRD_DIR .. "/etc/init.d/*")
+            end
+            
+            -- Setup default runlevels
+            setup_fkernel_runlevels()
+        end
+
+        setup_openrc_fkernel()
         PrintMessage(false, "OpenRC successfully installed to initrd.")
     else
         PrintMessage(true, "Failed to install OpenRC")

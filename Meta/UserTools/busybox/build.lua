@@ -58,30 +58,32 @@ end
 local function create_all_links()
     print("Creating safe symlinks for initrd...")
     create_etc_configs()
-    mlink("busybox", "bin/sh")
-    mlink("busybox", "bin/echo")
-    mlink("busybox", "bin/mkdir")
-    mlink("busybox", "bin/rm")
-    mlink("busybox", "bin/cp")
-    mlink("busybox", "bin/mv")
-    mlink("busybox", "bin/pwd")
-    mlink("busybox", "bin/clear")
-    mlink("busybox", "bin/mount")
-    mlink("busybox", "bin/umount")
-    mlink("/bin/busybox", "sbin/init")
+    mlink("../usr/bin/busybox", "bin/sh")
+    mlink("../usr/bin/busybox", "bin/echo")
+    mlink("../usr/bin/busybox", "bin/mkdir")
+    mlink("../usr/bin/busybox", "bin/rm")
+    mlink("../usr/bin/busybox", "bin/cp")
+    mlink("../usr/bin/busybox", "bin/mv")
+    mlink("../usr/bin/busybox", "bin/pwd")
+    mlink("../usr/bin/busybox", "bin/clear")
+    mlink("../usr/bin/busybox", "bin/mount")
+    mlink("../usr/bin/busybox", "bin/umount")
+    mlink("../usr/bin/busybox", "sbin/init")
 end
 
 local src_dir = BUILD_DIR .. "/" .. BB_NAME
 if OSInteract.FileExists(src_dir .. "/busybox") then
     PrintMessage(false, "BusyBox is already compiled. Skipping build.")
+    os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
     os.execute("mkdir -p " .. INITRD_DIR .. "/bin")
     os.execute("mkdir -p " .. INITRD_DIR .. "/sbin")
-    os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/bin/")
+    os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/usr/bin/")
     create_all_links()
     os.exit(0)
 end
 
 os.execute("mkdir -p " .. BUILD_DIR)
+os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
 os.execute("mkdir -p " .. INITRD_DIR .. "/bin")
 os.execute("mkdir -p " .. INITRD_DIR .. "/sbin")
 
@@ -95,7 +97,6 @@ if not OSInteract.FileExists(src_dir .. "/.config") then
     local f = io.open(src_dir .. "/.config", "a")
     if f then
         f:write("CONFIG_STATIC=y\n")
-        f:write("CONFIG_PLATFORM_LINUX=y\n")
         f:write("CONFIG_HUSH=y\n")
         f:write("CONFIG_INIT=y\n")
         f:write("CONFIG_ECHO=y\n")
@@ -106,6 +107,7 @@ if not OSInteract.FileExists(src_dir .. "/.config") then
         f:write("CONFIG_PWD=y\n")
         f:write("CONFIG_MOUNT=y\n")
         f:write("CONFIG_UMOUNT=y\n")
+        f:write("CONFIG_FEATURE_MOUNT_FLAGS=y\n")
         f:close()
     end
     os.execute("make -C " .. src_dir .. " oldconfig")
@@ -113,7 +115,7 @@ end
 
 print("Compiling BusyBox...")
 local CC = Toolchain.get_clang()
-local cflags = string.format("--sysroot=%s -isystem %s/include --target=%s", SYSROOT, SYSROOT, Toolchain.TRIPLE)
+local cflags = string.format("--sysroot=%s -isystem %s/include --target=%s -D__linux__", SYSROOT, SYSROOT, Toolchain.TRIPLE)
 local ldflags = string.format("-static --sysroot=%s -L%s/lib", SYSROOT, SYSROOT)
 
 local make_args = {
@@ -123,7 +125,7 @@ local make_args = {
 }
 
 if BuildUtils.make(src_dir, make_args) then
-    os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/bin/")
+    os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/usr/bin/")
     create_all_links()
     PrintMessage(false, "BusyBox installed safely.")
 else
