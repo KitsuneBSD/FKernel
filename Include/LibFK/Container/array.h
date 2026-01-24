@@ -3,6 +3,9 @@
 #include <LibFK/Traits/type_traits.h>
 #include <LibFK/Types/types.h>
 
+namespace fk {
+namespace containers {
+
 /**
  * @brief Fixed-size array container (similar to std::array).
  *
@@ -79,3 +82,6 @@ template <typename T, size_t N> struct array {
     }
   }
 };
+
+} // namespace containers
+} // namespace fk

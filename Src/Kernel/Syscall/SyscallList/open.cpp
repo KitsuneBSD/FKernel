@@ -1,0 +1,54 @@
+#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/DebugFs/debug_fs.h>
+#include <Kernel/Syscall/syscall.h>
+#include <Kernel/Syscall/syscall_utils.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Core/Error.h>
+#include <LibFK/Types/types.h>
+
+extern "C" {
+uint64_t sys_open(uint64_t path_ptr, uint64_t flags, uint64_t, uint64_t,
+                  uint64_t, uint64_t) {
+  auto *current_task = SchedulerManager::the().current();
+  if (!current_task) {
+    fk::algorithms::kerror("Syscall", "sys_open: No current task");
+    return fkernel::return_error(fk::core::Error::PermissionDenied);
+  }
+
+  const char *path = (const char *)path_ptr;
+  // Log to DebugFS instead of console
+  if (fk::memory::heap_allocator().m_initialized) {
+      char log_buf[256];
+      int log_len = snprintf(log_buf, sizeof(log_buf), "[SYSCALL] sys_open: path=%s flags=%lx\n", path, (uint64_t)flags);
+      auto syscall_log = fkernel::SyscallLogNode::the();
+      if (syscall_log) syscall_log->append(log_buf, log_len);
+  }
+
+
+  if (!path)
+    return fkernel::return_error(fk::core::Error::InvalidParameter);
+
+  char absolute_path[512];
+  if (path[0] != '/') {
+      strcpy(absolute_path, current_task->cwd.c_str());
+      if (absolute_path[strlen(absolute_path)-1] != '/') {
+          strcat(absolute_path, "/");
+      }
+      strcat(absolute_path, path);
+      path = absolute_path;
+  }
+
+  auto result = VirtualFileSystem::the().open(path, (int)flags);
+  if (result.is_error()) {
+    return fkernel::return_error(result.error());
+  }
+
+  int fd = current_task->add_file_descriptor(result.value());
+  if (fd < 0) {
+      return fkernel::return_error(fk::core::Error::DeviceError); // EMFILE
+  }
+
+  return fd;
+}
+}

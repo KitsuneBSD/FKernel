@@ -3,6 +3,20 @@
 #include <LibC/stdarg.h>
 #include <LibC/stdio.h>
 
+namespace fk {
+namespace algorithms { // Or fk::logging if preferred
+
+enum LogTarget : uint32_t {
+    None = 0,
+    Display = 1 << 0,
+    Serial = 1 << 1,
+    DebugFS = 1 << 2,
+    All = 0xFFFFFFFF
+};
+
+void set_log_targets(uint32_t targets);
+uint32_t get_log_targets();
+
 /** ANSI color codes for kernel logging */
 #define KLOG_COLOR_RESET "\033[0m"
 #define KLOG_COLOR_RED "\033[31m"
@@ -72,7 +86,7 @@ inline void kdebug(const char *prefix, const char *fmt, ...) {
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_WHITE, prefix, KLOG_COLOR_RESET, buf);
 }
 
-#ifdef FKERNEL_DEBUG
+// #ifdef FKERNEL_DEBUG
 
 /**
  * @brief Print a formatted kernel log message in green by default.
@@ -113,11 +127,14 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
 
   kprintf("%s[%s]%s: %s\n", color, prefix, KLOG_COLOR_RESET, buf);
 }
-#else
-/// In release mode, kebug does nothing
-#define kdebug(...)
-/// In release mode, klog does nothing
-#define klog(...)
-/// In release mode, klog_color does nothing
-#define klog_color(...)
-#endif
+// #else
+// /// In release mode, kdebug does nothing
+// #define kdebug(...) ((void)0)
+// /// In release mode, klog does nothing
+// #define klog(...) ((void)0)
+// /// In release mode, klog_color does nothing
+// #define klog_color(...) ((void)0)
+// #endif
+
+} // namespace algorithms
+} // namespace fk

@@ -11,6 +11,9 @@
  * interrupt handlers to inspect or modify the CPU state.
  */
 struct InterruptFrame {
+  /// Alignment padding for 16-byte stack compliance
+  uint64_t padding;
+
   /// General-purpose register RAX
   uint64_t rax;
 

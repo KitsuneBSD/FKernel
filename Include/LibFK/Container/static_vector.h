@@ -4,6 +4,9 @@
 #include <LibFK/Traits/type_traits.h>
 #include <LibFK/Types/types.h>
 
+namespace fk {
+namespace containers {
+
 template <typename T> constexpr T &&move(T &obj) noexcept {
   return static_cast<T &&>(obj);
 }
@@ -87,3 +90,6 @@ template <typename T, size_t N> struct static_vector {
 
   bool is_full() const { return capacity() == count; }
 };
+
+} // namespace containers
+} // namespace fk

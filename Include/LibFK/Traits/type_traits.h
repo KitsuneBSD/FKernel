@@ -1,5 +1,10 @@
 #pragma once
 
+#include <LibC/stddef.h>
+
+namespace fk {
+namespace traits {
+
 /**
  * @brief Conditional enable_if.
  *
@@ -113,3 +118,81 @@ FK_DEFINE_INTEGRAL(unsigned long long);
  */
 template <typename T>
 inline constexpr bool is_integral_v = is_integral<T>::value;
+
+/**
+ * @brief Checks if a type is an array type.
+ */
+template <typename T> struct is_array {
+  static constexpr bool value = false;
+};
+
+/**
+ * @brief Specialization for unbounded array types.
+ */
+template <typename T> struct is_array<T[]> {
+  static constexpr bool value = true;
+};
+
+/**
+ * @brief Specialization for bounded array types.
+ */
+template <typename T, size_t N> struct is_array<T[N]> {
+  static constexpr bool value = true;
+};
+
+/**
+ * @brief Alias to directly obtain the boolean value for is_array.
+ */
+template <typename T> inline constexpr bool is_array_v = is_array<T>::value;
+
+/**
+ * @brief Removes the outermost array extent from a type.
+ */
+template <typename T> struct remove_extent {
+  using type = T;
+};
+
+/**
+ * @brief Specialization for unbounded array types.
+ */
+template <typename T> struct remove_extent<T[]> {
+  using type = T;
+};
+
+/**
+ * @brief Specialization for bounded array types.
+ */
+template <typename T, size_t N> struct remove_extent<T[N]> {
+  using type = T;
+};
+
+/**
+ * @brief Alias to simplify remove_extent usage.
+ */
+template <typename T> using remove_extent_t = typename remove_extent<T>::type;
+
+/**
+ * @brief Checks whether Base is a base class of Derived.
+ *
+ * Uses SFINAE with pointer conversion to detect inheritance.
+ */
+template <typename Base, typename Derived> struct is_base_of {
+private:
+  // This overload is chosen if Derived* can be converted to Base*
+  static constexpr char test(const Base *);
+  // This overload is chosen otherwise
+  static constexpr int test(...);
+
+public:
+  static constexpr bool value =
+      sizeof(test(static_cast<Derived *>(nullptr))) == sizeof(char);
+};
+
+/**
+ * @brief Alias to directly obtain the boolean value for is_base_of.
+ */
+template <typename Base, typename Derived>
+inline constexpr bool is_base_of_v = is_base_of<Base, Derived>::value;
+
+} // namespace traits
+} // namespace fk

@@ -1,41 +1,57 @@
+/* FKernel linker script - Multiboot2 friendly */
+
 ENTRY(start)
 
 PHDRS
 {
-    headers PT_LOAD FLAGS(5); /* R_X */
     kernel PT_LOAD FLAGS(5); /* R_X */
-    data PT_LOAD FLAGS(6); /* RW_ */
+    data   PT_LOAD FLAGS(6); /* RW_ */
 }
 
-SECTIONS {
-    .multiboot_header ALIGN(8) : {
-      KEEP(*(.multiboot_header))
-    } :headers
+/* --- Layout of the binary --- */
+SECTIONS
+{
+    /* --- Multiboot2 Header --- */
+    /* Must be located within the first 32 KiB of the final binary */
+    . = 0x400;  /* file start offset or 1 page offset */
+    .multiboot_header : {
+        KEEP(*(.multiboot_header))  /* ensure linker does not discard this section */
+    }
 
+    /* --- Kernel Text --- */
+    /* Kernel is loaded at 1MB virtual address (standard x86_64) */
     . = 1M;
-
     .text : {
         __kernel_start = .;
-        *(.text)
+        *(.text*)
     } :kernel
 
     .rodata : {
-        *(.rodata)
+        *(.rodata*)
     } :kernel
 
+    /* --- Read-Write Data --- */
     .data : {
-        *(.data)
+        *(.data*)
     } :data
 
     .bss : {
-        *(.bss)
+        *(.bss*)
         __kernel_end = .;
     } :data
 
-    .kernel_heap (NOLOAD) : {
+    /* --- Kernel Heap --- */
+    . = 64M;
+    .kernel_heap (NOLOAD) : ALIGN(4096) {
         __heap_start = .;
-        . += 32M;
+        . += 32M;       /* reserve 32MB for kernel heap */
         __heap_end = .;
     }
-}
 
+    .phys_bitmap (NOLOAD) : ALIGN(4096) {
+        __pmm_bitmap_start = .;
+        . += 32M;          /* 32 MB bitmap supports up to 1TB of RAM */
+        __pmm_bitmap_end = .;
+    }
+
+}

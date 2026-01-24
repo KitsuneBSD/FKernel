@@ -1,33 +1,26 @@
-#include <Kernel/Boot/init.h>
-#include <LibFK/Algorithms/log.h>
-
-#include <Kernel/Driver/Devices/device_manager.h>
-
-#include <Kernel/FileSystem/DevFS/devfs.h>
-#include <Kernel/FileSystem/RamFS/ramfs.h>
-#include <Kernel/FileSystem/VirtualFS/vfs.h>
-
-#include <Kernel/Driver/Ata/AtaController.h>
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
+#include <Kernel/Boot/Stages/init.h>
+#include <Kernel/Driver/Keyboard/ps2_keyboard.h>
+#include <Kernel/Driver/Storage/Ata/ata_controller.h>
+#include <Kernel/Driver/Storage/Partitions/partition_manager.h>
+#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Hardware/Pci/pci.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Syscall/syscall.h>
 
 void init() {
-  auto &vfs = VirtualFS::the();
-  auto &ramfs = RamFS::the();
-  auto &devfs = DevFS::the();
-  klog("INIT", "Start init");
+  PciManager::the().initialize();
+  PciManager::the().scan_bus();
 
-  // Monta RamFS em /
-  vfs.mount("/", ramfs.root());
+  ATAController::the().initialize();
+  ATAController::the().detect_devices();
 
-  RetainPtr<VNode> root;
-  if (vfs.lookup("/", root) != 0) {
-    kwarn("VFS", "Root lookup failed");
-    return;
-  }
+  // Initialize VFS *after* devices are ready
+  VirtualFileSystem::the().initialize();
 
-  vfs.mount("dev", devfs.root());
+  PS2Keyboard::the().initialize();
+  SchedulerManager::the().initialize();
+  SyscallManager::the().initialize();
 
-  RetainPtr<VNode> dev;
-  vfs.lookup("/dev", dev);
-
-  init_basic_device();
+  SchedulerManager::the().schedule();
 }
