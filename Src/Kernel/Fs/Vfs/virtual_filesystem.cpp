@@ -2,7 +2,6 @@
 #include <Kernel/Driver/Vga/vga_node.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
-#include <Kernel/Fs/DevFs/tty.h>
 #include <Kernel/Fs/ProcFs/proc_fs.h>
 #include <Kernel/Fs/TmpFs/tmp_fs.h>
 #include <Kernel/Fs/Vfs/definitions.h>
@@ -29,9 +28,7 @@ void VirtualFileSystem::initialize() {
   devfs.set_parent(root_node);
   vfs.mount("/dev", fk::RefPtr<Node>(&devfs));
 
-  devfs.register_device(fk::make_ref<fkernel::TtyNode>().value(), "console");
   devfs.register_device(fk::make_ref<fkernel::SerialNode>().value(), "serial");
-  devfs.register_device(fk::make_ref<fkernel::TtyNode>().value(), "tty0");
 
   auto proc_res = fk::make_ref<ProcFsNode>();
   if (proc_res) {
@@ -143,7 +140,7 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
         cur_len++;
       }
     }
-    
+
     if (cur_len + strlen(name) < 512) {
       strcat(resolved_path_str, name);
     } else {
@@ -219,19 +216,18 @@ VirtualFileSystem::open(const char *path, int flags) {
 }
 
 fk::core::Result<void, fk::core::Error>
-
 VirtualFileSystem::mkdir(const char *path, int mode) {
-
   if (!path)
-
     return fk::core::Error::InvalidParameter;
 
   const char *last_slash_ptr = strrchr(path, '/', strlen(path));
 
-  if (!last_slash_ptr)
-    return m_root->mkdir(path, mode).is_error()
-               ? fk::core::Error::NotFound
-               : fk::core::Result<void, fk::core::Error>({});
+  if (!last_slash_ptr) {
+    auto res = m_root->mkdir(path, mode);
+    if (res.is_error())
+      return res.error();
+    return {};
+  }
   size_t last_slash = last_slash_ptr - path;
   char parent_path[256];
   if (last_slash == 0)
@@ -247,6 +243,42 @@ VirtualFileSystem::mkdir(const char *path, int mode) {
   auto mkdir_res = parent_node_res.value()->mkdir(last_slash_ptr + 1, mode);
   if (mkdir_res.is_error())
     return mkdir_res.error();
+  return {};
+}
+
+fk::core::Result<void, fk::core::Error>
+VirtualFileSystem::symlink(const char *path, const char *target) {
+  if (!path || !target)
+    return fk::core::Error::InvalidParameter;
+
+  const char *last_slash_ptr = strrchr(path, '/', strlen(path));
+
+  if (!last_slash_ptr) {
+    auto res = m_root->symlink(path, target);
+    if (res.is_error())
+      return res.error();
+    return {};
+  }
+
+  size_t last_slash = last_slash_ptr - path;
+  char parent_path[256];
+  if (last_slash == 0)
+    strcpy(parent_path, "/");
+  else {
+    size_t to_copy = last_slash < 255 ? last_slash : 255;
+    strncpy(parent_path, path, to_copy);
+    parent_path[to_copy] = '\0';
+  }
+
+  auto parent_node_res = resolve_path(parent_path);
+  if (parent_node_res.is_error())
+    return parent_node_res.error();
+
+  auto symlink_res =
+      parent_node_res.value()->symlink(last_slash_ptr + 1, target);
+  if (symlink_res.is_error())
+    return symlink_res.error();
+
   return {};
 }
 
@@ -325,14 +357,28 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
   for (size_t i = start_idx; i < entries.size(); ++i) {
     auto &entry = entries[i];
     size_t name_len = strlen(entry.name);
-    
-    // Return "name\n" for each entry
-    if (bytes_written + name_len + 1 > max_bytes)
+    size_t reclen = (sizeof(linux_dirent64) + name_len + 1 + 7) & ~7;
+
+    if (bytes_written + reclen > max_bytes)
       break;
 
-    fk::memory::copy(buffer + bytes_written, entry.name, name_len);
-    buffer[bytes_written + name_len] = '\n';
-    bytes_written += name_len + 1;
+    auto *dirent = reinterpret_cast<linux_dirent64 *>(buffer + bytes_written);
+    dirent->d_ino = i + 1; // Dummy inode
+    dirent->d_off = i + 1;
+    dirent->d_reclen = static_cast<uint16_t>(reclen);
+    uint8_t dt_type = DT_UNKNOWN;
+    if (entry.type == 0)
+      dt_type = DT_REG;
+    else if (entry.type == 1)
+      dt_type = DT_DIR;
+    else if (entry.type == 2)
+      dt_type = DT_LNK;
+
+    dirent->d_type = dt_type;
+    fk::memory::copy(dirent->d_name, entry.name, name_len);
+    dirent->d_name[name_len] = '\0';
+
+    bytes_written += reclen;
     description->set_offset(i + 1);
   }
 
@@ -346,13 +392,16 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
     return node_res.error();
   auto node = node_res.value();
   fk::memory::set(buf, 0, sizeof(struct stat));
+
   buf->st_dev = 1;
   buf->st_size = node->size();
   buf->st_blksize = 4096;
   buf->st_blocks = (buf->st_size + 511) / 512;
   buf->st_ino = reinterpret_cast<uintptr_t>(node.get());
   buf->st_atime = buf->st_mtime = buf->st_ctime = 1000000;
-  if (node->is_directory()) {
+
+  bool is_dir = node->is_directory();
+  if (is_dir) {
     buf->st_mode = S_IFDIR | 0755;
     buf->st_nlink = 2;
     if (buf->st_size == 0)
@@ -364,6 +413,11 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
     buf->st_mode = S_IFREG | 0644;
     buf->st_nlink = 1;
   }
+
+  fk::algorithms::klog("VFS", "stat: path='%s' is_dir=%s mode=0%o size=%zu",
+                       path, is_dir ? "yes" : "no", buf->st_mode,
+                       (size_t)buf->st_size);
+
   return {};
 }
 
