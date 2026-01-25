@@ -1,29 +1,11 @@
 #pragma once
 
-#include <LibFK/Text/string.h>
 #include <LibFK/Core/Result.h>
+#include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 
-struct DateTime {
-  uint8_t second;
-  uint8_t minute;
-  uint8_t hour;
-  uint8_t day;
-  uint8_t month;
-  uint16_t year;
-
-  fk::text::String to_string() const;
-  void print();
-};
-
-class Clock {
-public:
-  virtual ~Clock() = default;
-
-  virtual fk::core::Result<void> initialize(uint32_t frequency) = 0;
-  virtual fk::text::String get_name() = 0;
-  virtual DateTime datetime() { return {}; }
-};
+#include <Kernel/Clock/Types/Datetime.h>
+#include <Kernel/Clock/Types/clock.h>
 
 class ClockManager {
 private:
@@ -42,9 +24,10 @@ public:
   void set_clock(Clock *clock);
   DateTime datetime();
 
-  void set_memory_manager(bool has_memory_manager) { 
-    // Currently no clocks depend on memory manager, but this is for future proofing
-    (void)has_memory_manager; 
+  void set_memory_manager(bool has_memory_manager) {
+    // Currently no clocks depend on memory manager, but this is for future
+    // proofing
+    (void)has_memory_manager;
   }
 
 private:
