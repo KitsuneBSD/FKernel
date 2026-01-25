@@ -1,13 +1,15 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/SerialPort/serial_port.h>
 
 namespace fkernel {
 
-class SerialNode final : public Node {
+class SerialNode final : public CharacterDevice {
 public:
-    SerialNode() = default;
+    SerialNode() {
+        set_name("ttyS0");
+    }
     virtual ~SerialNode() override = default;
 
     virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t, uint8_t*) override {

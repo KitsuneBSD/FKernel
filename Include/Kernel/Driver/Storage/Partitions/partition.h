@@ -4,7 +4,6 @@
 #include <LibFK/Memory/retain_ptr.h>
 
 class Partition : public StorageDevice {
-  fk::text::String m_name;
   fk::RefPtr<StorageDevice> m_parent_device;
   uint64_t m_start_sector;
   SectorCount m_partition_sector_count;
@@ -29,7 +28,6 @@ public:
   virtual SectorCount sector_count() const override {
     return m_partition_sector_count;
   }
-  virtual fk::text::String name() const override { return m_name; }
 
   uint64_t start_sector() const { return m_start_sector; }
 
