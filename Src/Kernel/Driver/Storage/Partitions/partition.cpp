@@ -2,8 +2,9 @@
 
 Partition::Partition(fk::RefPtr<StorageDevice> parent,
                      uint64_t start, uint64_t count, fk::text::String name)
-    : m_name(fk::types::move(name)), m_parent_device(parent), m_start_sector(start),
+    : m_parent_device(parent), m_start_sector(start),
       m_partition_sector_count(count) {
+  set_name(fk::types::move(name));
   // Validate parent device
   if (!parent) {
     fk::algorithms::kwarn("PARTITION", "Partition created with null parent device");
