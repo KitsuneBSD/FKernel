@@ -1,14 +1,16 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <LibC/string.h>
 
 namespace fkernel {
 
-class ConsoleNode final : public Node {
+class ConsoleNode final : public CharacterDevice {
 public:
-    ConsoleNode() = default;
+    ConsoleNode() {
+        set_name("console");
+    }
     virtual ~ConsoleNode() override = default;
 
     virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t, uint8_t*) override {
