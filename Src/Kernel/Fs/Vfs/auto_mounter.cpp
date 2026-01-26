@@ -13,6 +13,8 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
         return;
     }
     
+    fk::algorithms::klog("AUTO-MOUNT", "Attempting to auto-mount %s...", device->name().c_str());
+    
     const char* device_name = device->name().c_str();
     if (!device_name) {
         fk::algorithms::kwarn("AUTO-MOUNT", "Device has null name");
