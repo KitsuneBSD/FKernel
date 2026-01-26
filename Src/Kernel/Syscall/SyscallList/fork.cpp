@@ -81,12 +81,12 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
       reinterpret_cast<uint64_t *>(child_stack_base);
 
   *(--child_context_stack) = (uint64_t)fork_child_trampoline;
-  *(--child_context_stack) = 0; // r15
-  *(--child_context_stack) = 0; // r14
-  *(--child_context_stack) = 0; // r13
-  *(--child_context_stack) = 0; // r12
-  *(--child_context_stack) = 0; // rbp
   *(--child_context_stack) = 0; // rbx
+  *(--child_context_stack) = 0; // rbp
+  *(--child_context_stack) = 0; // r12
+  *(--child_context_stack) = 0; // r13
+  *(--child_context_stack) = 0; // r14
+  *(--child_context_stack) = 0; // r15
 
   child->stack_pointer = reinterpret_cast<uint64_t>(child_context_stack);
 
