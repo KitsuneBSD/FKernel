@@ -39,6 +39,9 @@ public:
   mkdir(const char *path, int mode);
 
   fk::core::Result<void, fk::core::Error>
+  symlink(const char *path, const char *target);
+
+  fk::core::Result<void, fk::core::Error>
   readdir(const char *path, fk::containers::Vector<DirectoryEntry>& entries);
 
   fk::core::Result<size_t, fk::core::Error>

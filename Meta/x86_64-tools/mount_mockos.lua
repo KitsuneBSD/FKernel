@@ -70,16 +70,18 @@ if config.SYSTEM_TYPE == "standard" or config.SYSTEM_TYPE == "advanced" then
   end
 end
 
-for comp in config.COMPONENTS:gmatch("([^,]+)") do
-  local skip = false
-  if (config.SYSTEM_TYPE == "standard" or config.SYSTEM_TYPE == "advanced") and 
-     (comp == "init" or comp == "ash") then
-    skip = true
-    PrintMessage(false, "Skipping native '" .. comp .. "' (provided by BusyBox).")
-  end
+for comp in (config.COMPONENTS or ""):gmatch("([^,]+)") do
+  if comp ~= "" then
+    local skip = false
+    if (config.SYSTEM_TYPE == "standard" or config.SYSTEM_TYPE == "advanced") and 
+       (comp == "init" or comp == "ash") then
+      skip = true
+      PrintMessage(false, "Skipping native '" .. comp .. "' (provided by BusyBox).")
+    end
 
-  if not skip then
-    Components.build(comp, config.SYSTEM_TYPE, STAGING)
+    if not skip then
+      Components.build(comp, config.SYSTEM_TYPE, STAGING)
+    end
   end
 end
 

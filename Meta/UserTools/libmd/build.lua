@@ -7,10 +7,14 @@ local Toolchain = require("Meta.Lib.toolchain")
 local OSInteract = require("Meta.Lib.os_interact")
 local PrintMessage = require("Meta.Lib.print_message")
 
+local RunCommand = require("Meta.Lib.run_command")
+
 local LIBMD_VERSION = "1.1.0"
 local LIBMD_NAME = "libmd-" .. LIBMD_VERSION
 local LIBMD_URL = "https://archive.hadrons.org/software/libmd/" .. LIBMD_NAME .. ".tar.xz"
-local ROOT_DIR = os.getenv("PWD")
+
+-- Infer project root directory
+local ROOT_DIR = os.getenv("PWD") or "."
 local BUILD_DIR = ROOT_DIR .. "/build/userland/libmd"
 local SYSROOT = ROOT_DIR .. "/build/sysroot"
 
@@ -21,7 +25,7 @@ if OSInteract.FileExists(SYSROOT .. "/lib/libmd.a") then
     os.exit(0)
 end
 
-os.execute("mkdir -p " .. BUILD_DIR)
+RunCommand("mkdir -p " .. BUILD_DIR)
 
 local tarball = BUILD_DIR .. "/libmd.tar.xz"
 ArchiveUtils.download(LIBMD_URL, tarball)
@@ -36,11 +40,11 @@ local cmd_configure = string.format(
     src_dir, CC, Toolchain.TRIPLE, SYSROOT
 )
 
-if os.execute(cmd_configure) then
+if RunCommand(cmd_configure) then
     print("Compiling LibMD...")
     BuildUtils.make(src_dir)
     print("Installing LibMD...")
-    os.execute("cd " .. src_dir .. " && make install DESTDIR=" .. SYSROOT)
+    RunCommand("cd " .. src_dir .. " && make install DESTDIR=" .. SYSROOT)
     PrintMessage(false, "LibMD installed successfully.")
 else
     PrintMessage(true, "Failed to configure LibMD.")
