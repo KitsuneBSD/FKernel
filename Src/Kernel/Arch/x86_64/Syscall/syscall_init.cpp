@@ -21,8 +21,13 @@ void init_syscalls() {
   g_cpu_block.cpu_id = 0;
   g_cpu_block.current_task = nullptr;
 
-  // Set MSR_KERNEL_GS_BASE to point to our block
-  CPU::the().write_msr(MSR_KERNEL_GS_BASE, (uint64_t)&g_cpu_block);
+  // Set MSR_GS_BASE to point to our block (active in kernel mode)
+  CPU::the().write_msr(MSR_GS_BASE, (uint64_t)&g_cpu_block);
+  // Set MSR_KERNEL_GS_BASE to 0 (user GS base, will be swapped on syscall)
+  CPU::the().write_msr(MSR_KERNEL_GS_BASE, 0);
+
+  // Since we are already in kernel mode, GS prefix should now work and 
+  // point to g_cpu_block because we wrote to MSR_GS_BASE.
 
   // Also initialize existing global for compatibility during transition
   syscall_kernel_stack = (uint64_t)&stack_top;

@@ -1,11 +1,12 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Fs/RamDisk/ram_disk.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Loader/elf_loader.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
@@ -194,11 +195,12 @@ void SchedulerManager::block_current() {
 
   Task *task = proc.current_task;
   task->state = TaskState::Blocked;
-  
+
   // Add to wait queue so the task is not lost from the scheduler's tracking
   m_wait_queue.push_back(task);
 
-  // Do NOT clear proc.current_task here. It is needed by schedule() to save context.
+  // Do NOT clear proc.current_task here. It is needed by schedule() to save
+  // context.
   proc.need_resched = true;
 }
 
@@ -210,7 +212,7 @@ void SchedulerManager::zombify_current() {
   Task *task = proc.current_task;
   task->state = TaskState::Blocked; // Terminated/Zombie effectively
   task->terminated = true;
-  
+
   // Add to zombie queue so it can be reaped
   m_zombie_queue.push_back(task);
 
@@ -237,8 +239,8 @@ void SchedulerManager::yield() {
   if (!proc.current_task)
     return;
 
-  Task* task = proc.current_task;
-  
+  Task *task = proc.current_task;
+
   // If the task is blocked, it shouldn't be yielding back to ready
   if (task->state != TaskState::Running && task->state != TaskState::Ready) {
     proc.need_resched = true;
@@ -246,17 +248,17 @@ void SchedulerManager::yield() {
   }
 
   task->state = TaskState::Ready;
-  
+
   // Re-queue the current task so it can run again later
   proc.run_queue.push_back(task);
-  
+
   proc.need_resched = true;
 }
 
 void SchedulerManager::wake_task(Task *task) {
   // If the task was blocked, it was added to m_wait_queue
   if (task->state == TaskState::Blocked) {
-      m_wait_queue.remove(task);
+    m_wait_queue.remove(task);
   }
 
   task->state = TaskState::Ready;
@@ -283,8 +285,8 @@ Task *SchedulerManager::pick_next() {
 
   if (proc.run_queue.empty()) {
     // Switch to idle if nothing else to run
-    // Note: If current_task is the only one and it yielded, it's in run_queue now.
-    // If it blocked, it's not.
+    // Note: If current_task is the only one and it yielded, it's in run_queue
+    // now. If it blocked, it's not.
     proc.current_task = proc.idle_task;
   } else {
     Task *next = proc.run_queue.front();
@@ -367,7 +369,7 @@ void SchedulerManager::schedule() {
     g_cpu_block.saved_rflags = next_task->saved_rflags;
 
     CPU::the().write_msr(MSR_FS_BASE, next_task->fs_base);
-    CPU::the().write_msr(MSR_GS_BASE, next_task->gs_base);
+    CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->gs_base);
 
     GDTController::the().set_kernel_stack(next_task->kernel_stack_top);
     switch_context(&prev_task->stack_pointer, next_task->stack_pointer);
@@ -454,35 +456,40 @@ Task *SchedulerManager::find_task(TaskId id) {
   return nullptr;
 }
 
-Task* SchedulerManager::find_terminated_child(TaskId ppid) {
+Task *SchedulerManager::find_terminated_child(TaskId ppid) {
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-    if (it->ppid == ppid && it->terminated) return &*it;
+    if (it->ppid == ppid && it->terminated)
+      return &*it;
   }
-  return nullptr; 
+  return nullptr;
 }
 
-Task* SchedulerManager::find_any_child(TaskId ppid) {
+Task *SchedulerManager::find_any_child(TaskId ppid) {
   // Check all queues for ANY child
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     auto &proc = m_processors[i];
     if (proc.current_task && proc.current_task->ppid == ppid)
       return proc.current_task;
-      
+
     for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
-      if (it->ppid == ppid) return &*it;
+      if (it->ppid == ppid)
+        return &*it;
     }
   }
 
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
-    if (it->ppid == ppid) return &*it;
+    if (it->ppid == ppid)
+      return &*it;
   }
 
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-    if (it->ppid == ppid) return &*it;
+    if (it->ppid == ppid)
+      return &*it;
   }
 
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
-    if (it->ppid == ppid) return &*it;
+    if (it->ppid == ppid)
+      return &*it;
   }
 
   return nullptr;
