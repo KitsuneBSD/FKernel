@@ -7,7 +7,7 @@
 #include <LibFK/Memory/heap_malloc.h>
 #include <LibFK/Algorithms/log.h>
 
-static uint32_t g_log_targets = fk::algorithms::LogTarget::Display | fk::algorithms::LogTarget::DebugFS;
+static uint32_t g_log_targets = fk::algorithms::LogTarget::Display | fk::algorithms::LogTarget::DebugFS | fk::algorithms::LogTarget::Serial;
 
 void fk::algorithms::set_log_targets(uint32_t targets) {
     g_log_targets = targets;
