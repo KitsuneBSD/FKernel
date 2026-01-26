@@ -31,6 +31,8 @@ public:
 
   uint64_t start_sector() const { return m_start_sector; }
 
+  fk::RefPtr<StorageDevice> underlying_device() const { return m_parent_device; }
+
 private:
   bool is_within_bounds(uint64_t start, size_t count) const;
 };

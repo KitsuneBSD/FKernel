@@ -143,8 +143,13 @@ void ATAController::detect_legacy() {
       // Scan for partitions
       PartitionManager::the().scan(dev);
 
-      // Try to mount the raw device (Superfloppy)
-      fkernel::AutoMounter::try_mount(dev);
+      // Try to mount the raw device (Superfloppy) only if NO partitions were found
+      if (!PartitionManager::the().has_partitions_for_device(dev)) {
+          fk::algorithms::klog("ATA", "[%s] No partitions found, trying raw mount...", bsd_name.c_str());
+          fkernel::AutoMounter::try_mount(dev);
+      } else {
+          fk::algorithms::klog("ATA", "[%s] Partitions found, skipping raw mount.", bsd_name.c_str());
+      }
     }
   }
 }
