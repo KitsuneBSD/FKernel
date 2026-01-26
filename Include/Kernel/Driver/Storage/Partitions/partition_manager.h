@@ -14,5 +14,7 @@ public:
   void scan(fk::RefPtr<StorageDevice> device);
   void add_partition(fk::RefPtr<Partition> partition);
 
+  bool has_partitions_for_device(fk::RefPtr<StorageDevice> device) const;
+
   const PartitionList &partitions() const { return m_partitions; }
 };

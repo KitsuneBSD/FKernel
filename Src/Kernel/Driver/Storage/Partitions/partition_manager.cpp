@@ -43,6 +43,15 @@ void PartitionManager::add_partition(
   fkernel::AutoMounter::try_mount(partition);
 }
 
+bool PartitionManager::has_partitions_for_device(fk::RefPtr<StorageDevice> device) const {
+  for (auto& partition : m_partitions.all()) {
+    if (partition->underlying_device() == device) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void PartitionManager::scan(fk::RefPtr<StorageDevice> device) {
   fk::algorithms::klog("PARTITION MANAGER", "[%s] Scanning for partitions...",
                        device->name().c_str());
