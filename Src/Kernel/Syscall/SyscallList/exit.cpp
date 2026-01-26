@@ -12,6 +12,9 @@ uint64_t sys_exit(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t, uint6
 
     auto* parent = SchedulerManager::the().find_task(current->ppid);
     if (parent) {
+        if (parent->vfork_waiting && current->vfork_parent_id == parent->id) {
+            parent->vfork_waiting = false;
+        }
         fk::algorithms::klog("SYSCALL", "Waking parent PID %lu", parent->id);
         SchedulerManager::the().wake_task(parent);
     }

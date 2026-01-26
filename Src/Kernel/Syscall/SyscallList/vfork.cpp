@@ -66,6 +66,9 @@ extern "C" uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
             *(--child_context_stack) = parent_gprs[i];
     }
 
+    *(--child_context_stack) = 0; // Alignment padding
+    *(--child_context_stack) = 0; // Arg6
+
     // 6.5. Inherit callee-saved registers
     uint64_t rbx, rbp, r12, r13, r14, r15;
     asm volatile("mov %%rbx, %0" : "=r"(rbx));
@@ -76,12 +79,12 @@ extern "C" uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
     asm volatile("mov %%r15, %0" : "=r"(r15));
 
     *(--child_context_stack) = (uint64_t)fork_child_trampoline;
-    *(--child_context_stack) = r15;
-    *(--child_context_stack) = r14;
-    *(--child_context_stack) = r13;
-    *(--child_context_stack) = r12;
-    *(--child_context_stack) = rbp;
     *(--child_context_stack) = rbx;
+    *(--child_context_stack) = rbp;
+    *(--child_context_stack) = r12;
+    *(--child_context_stack) = r13;
+    *(--child_context_stack) = r14;
+    *(--child_context_stack) = r15;
     child->stack_pointer = reinterpret_cast<uint64_t>(child_context_stack);
 
     // 7. Add child to scheduler and BLOCK parent
