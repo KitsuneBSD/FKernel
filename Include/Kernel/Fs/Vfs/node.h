@@ -42,6 +42,11 @@ public:
   }
 
   virtual fk::core::Result<void, fk::core::Error>
+  symlink([[maybe_unused]] const char *name, [[maybe_unused]] const char *target) {
+    return fk::core::Error::NotADirectory;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error>
   list_dir([[maybe_unused]] fk::containers::Vector<DirectoryEntry> &entries) {
     return fk::core::Error::NotADirectory;
   }
@@ -53,6 +58,8 @@ public:
 
   virtual bool is_directory() const { return false; }
   virtual bool is_symlink() const { return false; }
+  virtual bool is_block_device() const { return false; }
+  virtual bool is_character_device() const { return false; }
   virtual fk::core::Result<fk::text::String, fk::core::Error> read_link() {
     return fk::core::Error::NotASymlink;
   }

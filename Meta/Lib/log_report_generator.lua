@@ -232,7 +232,7 @@ Generated: %s
 	)
 
 	content = content .. "SUMMARY:\n\n"
-	content = content .. string.format("% -25s % -15s % -10s %s\n", "SUBSYSTEM", "INITIALIZED", "SUCCESS", "LINES")
+	content = content .. string.format("%-25s %-15s %-10s %s\n", "SUBSYSTEM", "INITIALIZED", "SUCCESS", "LINES")
 	content = content .. string.rep("-", 80) .. "\n"
 
 	local sorted = {}
@@ -252,7 +252,7 @@ Generated: %s
 			or "N/A"
 
 		content = content
-			.. string.format("% -25s % -15s % -10s %s\n", item.name, symbol_init, symbol_success, line_range)
+			.. string.format("%-25s %-15s %-10s %s\n", item.name, symbol_init, symbol_success, line_range)
 	end
 
 	content = content .. "\n\n" .. string.rep("=", 80) .. "\n"

@@ -6,15 +6,19 @@ local Toolchain = require("Meta.Lib.toolchain")
 local OSInteract = require("Meta.Lib.os_interact")
 local PrintMessage = require("Meta.Lib.print_message")
 
+local RunCommand = require("Meta.Lib.run_command")
+
 local OPENRC_VERSION = "0.52.1"
 local OPENRC_NAME = "openrc-" .. OPENRC_VERSION
 local OPENRC_URL = "https://github.com/OpenRC/openrc/archive/refs/tags/" .. OPENRC_VERSION .. ".tar.gz"
-local ROOT_DIR = os.getenv("PWD")
+
+-- Infer project root directory
+local ROOT_DIR = os.getenv("PWD") or "."
 local BUILD_DIR = ROOT_DIR .. "/build/userland/openrc"
 local SYSROOT = ROOT_DIR .. "/build/sysroot"
 local INITRD_DIR = ROOT_DIR .. "/build/initrd_root"
 
-print("---" .. " FKernel OpenRC Toolchain ---")
+print("--- FKernel OpenRC Toolchain ---")
 
 -- Previous checks
 if not OSInteract.CommandExists("meson") then
@@ -27,7 +31,7 @@ if not OSInteract.FileExists(SYSROOT .. "/lib/libc.a") then
     os.exit(1)
 end
 
-os.execute("mkdir -p " .. BUILD_DIR)
+RunCommand("mkdir -p " .. BUILD_DIR)
 
 local tarball = BUILD_DIR .. "/openrc.tar.gz"
 if not OSInteract.FileExists(tarball) then
@@ -81,17 +85,17 @@ local cmd_setup = string.format(
 )
 
 if not OSInteract.DirExists(build_openrc_dir) then
-    if not os.execute(cmd_setup) then
+    if not RunCommand(cmd_setup) then
         PrintMessage(true, "Failed to configure OpenRC")
         os.exit(1)
     end
 end
 
 print("Compiling OpenRC...")
-if os.execute("cd " .. build_openrc_dir .. " && ninja") then
+if RunCommand("cd " .. build_openrc_dir .. " && ninja") then
     print("Installing OpenRC to initrd staging via DESTDIR...")
     -- Use ninja install with DESTDIR to get everything (binaries + scripts + config)
-    if os.execute(string.format("cd %s && DESTDIR=%s ninja install", build_openrc_dir, INITRD_DIR)) then
+    if RunCommand(string.format("cd %s && DESTDIR=%s ninja install", build_openrc_dir, INITRD_DIR)) then
         -- Post-install adjustments
         RunCommand("mkdir -p " .. INITRD_DIR .. "/sbin")
         RunCommand("mv " .. INITRD_DIR .. "/usr/sbin/openrc-init " .. INITRD_DIR .. "/sbin/init.openrc")
@@ -108,7 +112,7 @@ if os.execute("cd " .. build_openrc_dir .. " && ninja") then
                     local service_path = INITRD_DIR .. "/etc/init.d/" .. service
                     local runlevel_path = INITRD_DIR .. "/etc/runlevels/" .. runlevel .. "/" .. service
                     if OSInteract.FileExists(service_path) then
-                        os.execute("ln -sf /etc/init.d/" .. service .. " " .. runlevel_path)
+                        RunCommand("ln -sf /etc/init.d/" .. service .. " " .. runlevel_path)
                     end
                 end
             end
@@ -116,11 +120,11 @@ if os.execute("cd " .. build_openrc_dir .. " && ninja") then
 
         local function setup_openrc_fkernel()
             -- Create OpenRC directory structure
-            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/init.d")
-            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/conf.d") 
-            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/runlevels/boot")
-            os.execute("mkdir -p " .. INITRD_DIR .. "/etc/runlevels/default")
-            os.execute("mkdir -p " .. INITRD_DIR .. "/var/log")
+            RunCommand("mkdir -p " .. INITRD_DIR .. "/etc/init.d")
+            RunCommand("mkdir -p " .. INITRD_DIR .. "/etc/conf.d") 
+            RunCommand("mkdir -p " .. INITRD_DIR .. "/etc/runlevels/boot")
+            RunCommand("mkdir -p " .. INITRD_DIR .. "/etc/runlevels/default")
+            RunCommand("mkdir -p " .. INITRD_DIR .. "/var/log")
             
             -- Create FKernel-specific rc.conf
             local rc_conf = io.open(INITRD_DIR .. "/etc/rc.conf", "w")
@@ -135,8 +139,8 @@ if os.execute("cd " .. build_openrc_dir .. " && ninja") then
             -- Copy FKernel-specific services
             local services_dir = ROOT_DIR .. "/Meta/UserTools/openrc/fkernel-services"
             if OSInteract.DirExists(services_dir) then
-                os.execute("cp " .. services_dir .. "/* " .. INITRD_DIR .. "/etc/init.d/")
-                os.execute("chmod +x " .. INITRD_DIR .. "/etc/init.d/*")
+                RunCommand("cp " .. services_dir .. "/* " .. INITRD_DIR .. "/etc/init.d/")
+                RunCommand("chmod +x " .. INITRD_DIR .. "/etc/init.d/*")
             end
             
             -- Setup default runlevels

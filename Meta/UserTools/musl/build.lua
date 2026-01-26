@@ -7,18 +7,22 @@ local Toolchain = require("Meta.Lib.toolchain")
 local OSInteract = require("Meta.Lib.os_interact")
 local PrintMessage = require("Meta.Lib.print_message")
 
+local RunCommand = require("Meta.Lib.run_command")
+
 local MUSL_VERSION = "1.2.4"
 local MUSL_NAME = "musl-" .. MUSL_VERSION
 local MUSL_URL = "https://musl.libc.org/releases/" .. MUSL_NAME .. ".tar.gz"
-local ROOT_DIR = os.getenv("PWD")
+
+-- Infer project root directory
+local ROOT_DIR = os.getenv("PWD") or "."
 local BUILD_DIR = ROOT_DIR .. "/build/userland/musl"
 local SYSROOT = ROOT_DIR .. "/build/sysroot"
 
 local function clean_kernel_leakage()
     print("Ensuring Sysroot is free of Kernel property...")
     -- Remove any possible leaked kernel-internal property
-    os.execute("rm -rf " .. SYSROOT .. "/include/LibC")
-    os.execute("rm -rf " .. SYSROOT .. "/include/LibFK")
+    RunCommand("rm -rf " .. SYSROOT .. "/include/LibC")
+    RunCommand("rm -rf " .. SYSROOT .. "/include/LibFK")
 end
 
 print("--- FKernel Musl Toolchain ---")
@@ -29,8 +33,8 @@ if OSInteract.FileExists(SYSROOT .. "/lib/libc.a") then
     os.exit(0)
 end
 
-os.execute("mkdir -p " .. BUILD_DIR)
-os.execute("mkdir -p " .. SYSROOT)
+RunCommand("mkdir -p " .. BUILD_DIR)
+RunCommand("mkdir -p " .. SYSROOT)
 
 local tarball = BUILD_DIR .. "/musl.tar.gz"
 ArchiveUtils.download(MUSL_URL, tarball)
@@ -44,16 +48,16 @@ local RANLIB = Toolchain.get_tool("llvm-ranlib", "ranlib")
 print("Configuring Musl in " .. src_dir)
 
 local cmd_configure = string.format(
-    "cd %s && CC='%s --target=%s -D__linux__' AR=%s RANLIB=%s ./configure --target=x86_64 --prefix= --syslibdir=/lib --disable-shared --disable-gcc-wrapper",
+    "cd %s && CC='%s --target=%s' AR=%s RANLIB=%s ./configure --target=x86_64 --prefix= --syslibdir=/lib --disable-shared --disable-gcc-wrapper",
     src_dir, CC, Toolchain.TRIPLE, AR, RANLIB
 )
 
-if os.execute(cmd_configure) then
+if RunCommand(cmd_configure) then
     print("Compiling Musl...")
     BuildUtils.make(src_dir)
     
     print("Installing Musl to Sysroot (".. SYSROOT .. ")...")
-    os.execute("cd " .. src_dir .. " && make install DESTDIR=" .. SYSROOT)
+    RunCommand("cd " .. src_dir .. " && make install DESTDIR=" .. SYSROOT)
     
     clean_kernel_leakage()
     

@@ -95,6 +95,11 @@ end
 
 toolchain_end()
 
+option("initrd_mode")
+    set_default("busybox")
+    set_values("busybox", "openrc")
+    set_description("Select initrd system style")
+
 target("FKernel")
 set_kind("binary")
 set_toolchains("FKernel_Compiling")
@@ -193,10 +198,10 @@ task_end()
 task("build-initrd")
 set_menu({
   usage = "xmake build-initrd",
-  description = "Compile and package the configured userland components into initrd.tar",
+  description = "Compile and package the initrd (BusyBox or OpenRC)",
 })
 on_run(function()
-  os.execv("lua Meta/x86_64-tools/mount_mockos.lua --only-initrd")
+  os.execv("lua", {"Meta/x86_64-tools/mount_mockos.lua", "--only-initrd"})
 end)
 task_end()
 
