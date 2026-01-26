@@ -4,11 +4,23 @@
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Algorithms/log.h>
 
+static bool is_canonical(uint64_t addr) {
+  return ((int64_t)addr >> 47) == 0 || ((int64_t)addr >> 47) == -1;
+}
+
 extern "C" uint64_t sys_arch_prctl(uint64_t code, uint64_t addr, uint64_t,
                                    uint64_t, uint64_t, uint64_t) {
-  auto *task = SchedulerManager::the().current();
+  auto* task = SchedulerManager::the().current();
+  
+  if (code == 0x1002 || code == 0x1001) {
+    if (!is_canonical(addr)) {
+      fk::algorithms::kwarn("SYSCALL", "sys_arch_prctl: non-canonical address 0x%lx", addr);
+      return -1;
+    }
+  }
 
   switch (code) {
+
   case 0x1002: // ARCH_SET_FS
     if (task)
       task->fs_base = addr;

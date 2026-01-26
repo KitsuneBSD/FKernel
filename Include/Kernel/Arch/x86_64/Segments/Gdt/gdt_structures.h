@@ -47,9 +47,10 @@ static constexpr uint64_t createSegment(SegmentAccess access,
                                         SegmentFlags flags) {
   uint64_t entry = 0;
 
-  entry |= 0xFFFFULL;              // limite
+  entry |= 0xFFFFULL;              // limit bits 0-15
   entry |= (uint64_t)access << 40; // access byte
-  entry |= (uint64_t)flags << 48;  // flags+granularity
+  entry |= (uint64_t)(flags & 0xF0) << 48;  // flags bits 52-55, plus limit bits 48-51
+  entry |= (uint64_t)0xF << 48;    // limit bits 16-19 (at descriptor bits 48-51)
 
   return entry;
 }
