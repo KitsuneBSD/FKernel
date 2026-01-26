@@ -21,6 +21,11 @@ bool ElfLoader::validate_header(const Elf64_Ehdr &header) {
 
 fk::core::Result<uintptr_t, fk::core::Error>
 ElfLoader::load(fk::RefPtr<Node> node) {
+    return load_with_base(node, 0);
+}
+
+fk::core::Result<uintptr_t, fk::core::Error>
+ElfLoader::load_with_base(fk::RefPtr<Node> node, uintptr_t load_base) {
   Elf64_Ehdr header;
   auto read_res =
       node->read(0, sizeof(Elf64_Ehdr), reinterpret_cast<uint8_t *>(&header));
@@ -34,10 +39,16 @@ ElfLoader::load(fk::RefPtr<Node> node) {
     return fk::core::Error::InvalidParameter;
   }
 
-  fk::algorithms::klog("ELF", "Header type: %u, Entry: %p, PHNum: %u", 
-                       (uint32_t)header.e_type, (void*)header.e_entry, (uint32_t)header.e_phnum);
+  // ET_DYN (Type 3) is a shared object file, usually used for position-independent executables
+  // If we are loading an ET_DYN at base 0, we should probably pick a better base.
+  if (header.e_type == 3 && load_base == 0) {
+      load_base = 0x400000; // Standard base for PIE if not specified
+  }
 
-  uintptr_t load_base = 0;
+  fk::algorithms::klog("ELF", "Header type: %u, Entry: %p, PHNum: %u, Base: %p", 
+                       (uint32_t)header.e_type, (void*)header.e_entry, 
+                       (uint32_t)header.e_phnum, (void*)load_base);
+
   fk::text::String interpreter_path;
 
   // 1. Scan for PT_INTERP first
@@ -71,6 +82,8 @@ ElfLoader::load(fk::RefPtr<Node> node) {
           (vaddr_with_base + phdr.p_memsz + 0xFFF) & ~0xFFFULL;
 
       for (uintptr_t vaddr = start_vaddr; vaddr < end_vaddr; vaddr += 0x1000) {
+        // If we already have a mapping that is NOT identity, we don't want to overwrite it
+        // but we might need to make it writable for loading.
         uintptr_t existing_phys = VirtualMemoryManager::the().translate(vaddr);
 
         if (existing_phys == 0 || existing_phys == vaddr) {
@@ -96,10 +109,8 @@ ElfLoader::load(fk::RefPtr<Node> node) {
           return interp_node_res.error();
       }
       
-      // NOTE: Interpreters (ld.so) are usually ET_DYN and need a non-zero load_base.
-      // For now, we simplify and assume they load at a fixed high address or handle themselves.
-      // Real implementation would call load recursively with a base offset.
-      return load(interp_node_res.value());
+      // Load interpreter at a fixed high offset to avoid clashing with executable
+      return load_with_base(interp_node_res.value(), 0x70000000);
   }
 
   return (uintptr_t)header.e_entry + load_base;

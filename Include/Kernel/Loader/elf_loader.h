@@ -56,6 +56,7 @@ public:
     static fk::core::Result<uintptr_t, fk::core::Error> load(fk::RefPtr<Node> node);
 
 private:
+    static fk::core::Result<uintptr_t, fk::core::Error> load_with_base(fk::RefPtr<Node> node, uintptr_t load_base);
     static bool validate_header(const Elf64_Ehdr& header);
 };
 

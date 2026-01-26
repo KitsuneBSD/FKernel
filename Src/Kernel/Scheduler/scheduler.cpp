@@ -74,8 +74,8 @@ extern "C" void init_task_entry() {
   fk::algorithms::klog("INIT", "Jumping to user-mode init at %p",
                        (void *)entry);
 
-  // Map user stack (16 KB)
-  constexpr uintptr_t USER_STACK_TOP = 0x00800000;
+  // Map user stack (16 KB) at the top of the user address space
+  constexpr uintptr_t USER_STACK_TOP = 0x7fffffffe000;
   constexpr size_t STACK_PAGES = 4;
   for (size_t i = 0; i < STACK_PAGES; ++i) {
     uintptr_t stack_phys = PhysicalMemoryManager::the().alloc_page();
