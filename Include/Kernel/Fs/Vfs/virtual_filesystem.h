@@ -56,6 +56,6 @@ public:
   resolve_path(const char *path, int depth = 0);
 
 private:
-  fk::core::Result<fk::pair<fk::RefPtr<Node>, fk::text::String>, fk::core::Error>
+  fk::core::Result<fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>, fk::core::Error>
   resolve_path_to_parent(const char *path, int depth = 0);
 };
