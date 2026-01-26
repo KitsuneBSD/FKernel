@@ -1,5 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Boot/boot_info.h>
@@ -208,9 +209,10 @@ void SchedulerManager::zombify_current() {
 
   Task *task = proc.current_task;
   task->state = TaskState::Blocked; // Terminated/Zombie effectively
+  task->terminated = true;
   
-  // Add to wait queue so we can find it later in find_terminated_child
-  m_wait_queue.push_back(task);
+  // Add to zombie queue so it can be reaped
+  m_zombie_queue.push_back(task);
 
   // Do NOT clear proc.current_task here.
   proc.need_resched = true;
@@ -270,6 +272,10 @@ void SchedulerManager::wake_task(Task *task) {
   }
 
   m_processors[target_cpu].run_queue.push_back(task);
+}
+
+void SchedulerManager::remove_zombie(Task *task) {
+  m_zombie_queue.remove(task);
 }
 
 Task *SchedulerManager::pick_next() {
@@ -360,6 +366,9 @@ void SchedulerManager::schedule() {
     g_cpu_block.saved_rip = next_task->saved_rip;
     g_cpu_block.saved_rflags = next_task->saved_rflags;
 
+    CPU::the().write_msr(MSR_FS_BASE, next_task->fs_base);
+    CPU::the().write_msr(MSR_GS_BASE, next_task->gs_base);
+
     GDTController::the().set_kernel_stack(next_task->kernel_stack_top);
     switch_context(&prev_task->stack_pointer, next_task->stack_pointer);
   }
@@ -396,6 +405,12 @@ void SchedulerManager::print_all_tasks() {
     t.print_info();
   }
 
+  for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
+    Task &t = *it;
+    fk::algorithms::kdebug("SCHEDULER", " ZombieQueue:");
+    t.print_info();
+  }
+
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
     Task &t = *it;
     fk::algorithms::kdebug("SCHEDULER", " SleepQueue:");
@@ -424,6 +439,12 @@ Task *SchedulerManager::find_task(TaskId id) {
       return &t;
   }
 
+  for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
+    Task &t = *it;
+    if (t.id == id)
+      return &t;
+  }
+
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
     Task &t = *it;
     if (t.id == id)
@@ -434,49 +455,9 @@ Task *SchedulerManager::find_task(TaskId id) {
 }
 
 Task* SchedulerManager::find_terminated_child(TaskId ppid) {
-  // Check all queues for a zombie child
-  
-  // 1. Processors (though terminated tasks shouldn't be running, check anyway in case of race/logic)
-  for (uint32_t i = 0; i < m_processor_count; ++i) {
-    auto &proc = m_processors[i];
-    if (proc.current_task && proc.current_task->ppid == ppid && proc.current_task->terminated)
-      return proc.current_task;
-      
-    for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
-      if (it->ppid == ppid && it->terminated) return &*it;
-    }
-  }
-
-  // 2. Wait Queue
-  for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
+  for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
     if (it->ppid == ppid && it->terminated) return &*it;
   }
-
-  // 3. Sleep Queue
-  for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
-    if (it->ppid == ppid && it->terminated) return &*it;
-  }
-
-  // TODO: Ideally we should have a 'zombie' list instead of keeping them in waiting/blocked state.
-  // For now, sys_exit blocks forever, so the task is likely in blocked state (proc.current_task is null, 
-  // but where is the pointer? Ah, block_current doesn't add to a queue!)
-  
-  // WAIT! Current implementation of block_current() sets state=Blocked but DOES NOT add to any list.
-  // The task pointer is effectively lost from the scheduler's view unless we track it globally.
-  // We need to fix this architectural issue or we'll never find the zombie.
-  
-  // TEMPORARY FIX: We must iterate ALL allocated tasks.
-  // But we don't have a global task list.
-  
-  // FIX: In sys_exit, instead of block_current(), let's add it to a 'zombie_queue' or similar?
-  // Or reuse 'wait_node' to add to m_wait_queue?
-  
-  // Let's modify sys_exit to add to m_wait_queue (as a holding area) before blocking.
-  // But wait_queue is for waiting tasks.
-  
-  // Let's check m_wait_queue.
-  // If sys_exit calls block_current(), the task is dangling.
-  
   return nullptr; 
 }
 
@@ -493,6 +474,10 @@ Task* SchedulerManager::find_any_child(TaskId ppid) {
   }
 
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
+    if (it->ppid == ppid) return &*it;
+  }
+
+  for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
     if (it->ppid == ppid) return &*it;
   }
 
