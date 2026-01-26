@@ -8,8 +8,10 @@
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Core/Result.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/pair.h>
 
 void VirtualFileSystem::initialize() {
   auto &vfs = the();
@@ -124,12 +126,6 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
       return lookup_res.error();
     current = lookup_res.value();
 
-    // Check if the NEW current is a mount point (entering a mount)
-    for (auto &m : m_mounts) {
-        // This is tricky because mounts are path-based. 
-        // We need to know the path of the current node.
-    }
-
     // Handle Symlinks
     int symlink_depth = 0;
     while (current->is_symlink() && symlink_depth < 8) {
@@ -185,7 +181,7 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
   return current;
 }
 
-fk::core::Result<fk::pair<fk::RefPtr<Node>, fk::text::String>, fk::core::Error>
+fk::core::Result<fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>, fk::core::Error>
 VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
     if (!path || path[0] == '\0') return fk::core::Error::InvalidParameter;
 
@@ -202,20 +198,20 @@ VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
         auto *task = SchedulerManager::the().current();
         auto cwd_res = resolve_path(task ? task->cwd.c_str() : "/", depth + 1);
         if (cwd_res.is_error()) return cwd_res.error();
-        return fk::pair<fk::RefPtr<Node>, fk::text::String>(cwd_res.value(), name);
+        return fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>(cwd_res.value(), name);
     }
 
     if (last_slash == parent_path) {
         // Parent is root
         name = last_slash + 1;
-        return fk::pair<fk::RefPtr<Node>, fk::text::String>(m_root, name);
+        return fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>(m_root, name);
     }
 
     *last_slash = '\0';
     name = last_slash + 1;
     auto parent_res = resolve_path(parent_path, depth + 1);
     if (parent_res.is_error()) return parent_res.error();
-    return fk::pair<fk::RefPtr<Node>, fk::text::String>(parent_res.value(), name);
+    return fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>(parent_res.value(), name);
 }
 
 fk::core::Result<fk::RefPtr<FileDescription>, fk::core::Error>
@@ -234,8 +230,8 @@ VirtualFileSystem::mkdir(const char *path, int mode) {
   auto parent_res = resolve_path_to_parent(path);
   if (parent_res.is_error()) return parent_res.error();
   
-  auto res = parent_res.value().first->mkdir(parent_res.value().second.c_str(), mode);
-  return res;
+  TRY(parent_res.value().first->mkdir(parent_res.value().second.c_str(), mode));
+  return {};
 }
 
 fk::core::Result<void, fk::core::Error>
@@ -243,8 +239,8 @@ VirtualFileSystem::symlink(const char *path, const char *target) {
   auto parent_res = resolve_path_to_parent(path);
   if (parent_res.is_error()) return parent_res.error();
   
-  auto res = parent_res.value().first->symlink(parent_res.value().second.c_str(), target);
-  return res;
+  TRY(parent_res.value().first->symlink(parent_res.value().second.c_str(), target));
+  return {};
 }
 
 fk::core::Result<void, fk::core::Error>
