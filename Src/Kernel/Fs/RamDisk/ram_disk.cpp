@@ -52,6 +52,8 @@ void RamDiskNode::parse_tar() {
             auto file_node_res = fk::make_ref<RamFileNode>(data_ptr, file_size);
             if (!file_node_res.is_error()) {
                 auto file_node = file_node_res.value();
+                file_node->set_name(final_filename);
+                file_node->set_parent(fk::RefPtr<Node>(this));
                 m_files.push_back({final_filename, file_node});
                 fk::algorithms::klog("RAMDISK", "Loaded file: %s (%zu bytes)", final_filename, file_size);
             }
@@ -68,6 +70,8 @@ void RamDiskNode::parse_tar() {
             auto symlink_node_res = fk::make_ref<RamSymlinkNode>(link_target);
             if (!symlink_node_res.is_error()) {
                 auto symlink_node = symlink_node_res.value();
+                symlink_node->set_name(final_filename);
+                symlink_node->set_parent(fk::RefPtr<Node>(this));
                 m_files.push_back({final_filename, symlink_node});
                 fk::algorithms::klog("RAMDISK", "Loaded symlink: %s -> %s", final_filename, link_target);
             }
@@ -79,6 +83,10 @@ void RamDiskNode::parse_tar() {
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const char* name) {
     if (!name || name[0] == '\0' || strcmp(name, ".") == 0) return fk::RefPtr<Node>(this);
+    if (strcmp(name, "..") == 0) {
+        if (m_parent) return m_parent;
+        return fk::RefPtr<Node>(this);
+    }
 
     const char* clean_name = (name[0] == '/') ? name + 1 : name;
     char full_lookup[512];
@@ -110,6 +118,8 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
         auto dir_node = dir_node_res.value();
         for (auto& f : m_files) dir_node->m_files.push_back(f);
         dir_node->m_prefix = dir_prefix;
+        dir_node->set_name(name);
+        dir_node->set_parent(fk::RefPtr<Node>(this));
         return fk::RefPtr<Node>(dir_node);
     }
 
