@@ -133,6 +133,11 @@ void ATAController::detect_legacy() {
         continue;
       auto dev = fk::types::move(dev_res.value());
 
+      if (sectors == 0) {
+          fk::algorithms::kwarn("ATA", "[%s] Disk has 0 sectors, skipping.", bsd_name.c_str());
+          continue;
+      }
+
       m_devices.push_back(dev);
 
       // Register in DevFs with proper name lifetime management
