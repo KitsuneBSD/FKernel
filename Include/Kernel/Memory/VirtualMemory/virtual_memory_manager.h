@@ -62,6 +62,9 @@ public:
    */
   uintptr_t translate(uintptr_t virt);
 
+  /** @brief Gets the flags for a mapped virtual page. */
+  fk::core::Result<PageFlags, fk::core::Error> get_page_flags(uintptr_t virt);
+
   /** @brief Creates a new address space (useful for execve). */
   uintptr_t create_address_space();
 
