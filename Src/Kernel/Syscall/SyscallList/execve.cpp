@@ -189,10 +189,15 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
 
   uintptr_t final_rsp = current_user_stack;
 
-  // 5. Update return state via PtRegs
+  // 5. Update return state via PtRegs and CpuControlBlock
   regs->rip = entry;
   regs->rsp = final_rsp;
   regs->rflags = 0x202; // IF | Reserved
+
+  extern CpuControlBlock g_cpu_block;
+  g_cpu_block.saved_rip = entry;
+  g_cpu_block.user_rsp = final_rsp;
+  g_cpu_block.saved_rflags = 0x202;
 
   task->dump_file_descriptors();
 
