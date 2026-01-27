@@ -49,7 +49,10 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> DevFs::lookup(const char* na
         }
     }
     
-    fk::algorithms::kdebug("DEVFS", "lookup failed for: '%s'", name);
+    fk::algorithms::kdebug("DEVFS", "lookup failed for: '%s'. Registered devices:", name);
+    for (auto& entry : m_devices) {
+        fk::algorithms::kdebug("DEVFS", "  - %s", entry.name.c_str());
+    }
     return fk::core::Error::NotFound;
 }
 
