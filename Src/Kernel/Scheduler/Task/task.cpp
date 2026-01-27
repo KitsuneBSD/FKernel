@@ -1,5 +1,6 @@
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Task/task.h>
+#include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/heap_malloc.h>
 
