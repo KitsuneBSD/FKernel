@@ -7,7 +7,7 @@
 extern "C" {
 
 uint64_t sys_brk(uint64_t brk_addr, uint64_t, uint64_t, uint64_t, uint64_t,
-                 uint64_t, PtRegs* regs) {
+                 uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto* task = SchedulerManager::the().current();
   if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 

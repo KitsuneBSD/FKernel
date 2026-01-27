@@ -5,7 +5,7 @@
 
 extern "C" {
 uint64_t sys_dup2(uint64_t oldfd_u64, uint64_t newfd_u64, uint64_t, uint64_t,
-                  uint64_t, uint64_t, PtRegs* regs) {
+                  uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     int oldfd = (int)oldfd_u64;
     int newfd = (int)newfd_u64;
 

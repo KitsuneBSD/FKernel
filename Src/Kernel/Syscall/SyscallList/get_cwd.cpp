@@ -7,7 +7,7 @@
 extern "C" {
 
 uint64_t sys_getcwd(uint64_t buf_ptr, uint64_t size, uint64_t, uint64_t,
-                    uint64_t, uint64_t, PtRegs* regs) {
+                    uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto *current_task = SchedulerManager::the().current();
   if (!current_task)
     return fkernel::return_error(fk::core::Error::PermissionDenied);

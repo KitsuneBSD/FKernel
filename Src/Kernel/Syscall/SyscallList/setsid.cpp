@@ -2,7 +2,7 @@
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 
-extern "C" uint64_t sys_setsid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+extern "C" uint64_t sys_setsid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return -1;
     // For now, just return PID as a stub for new session ID

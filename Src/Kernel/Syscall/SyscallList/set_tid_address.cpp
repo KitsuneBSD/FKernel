@@ -5,7 +5,7 @@
 
 extern "C" {
 
-uint64_t sys_set_tid_address(uint64_t tidptr, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+uint64_t sys_set_tid_address(uint64_t tidptr, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return -1;
 

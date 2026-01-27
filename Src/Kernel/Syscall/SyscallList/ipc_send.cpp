@@ -9,7 +9,7 @@ extern "C" uint64_t sys_ipc_send(uint64_t handle, uint64_t info_raw,
                                  [[maybe_unused]] uint64_t arg1,
                                  [[maybe_unused]] uint64_t arg2,
                                  [[maybe_unused]] uint64_t arg3,
-                                 [[maybe_unused]] uint64_t arg4, PtRegs* regs) {
+                                 [[maybe_unused]] uint64_t arg4, [[maybe_unused]] PtRegs* regs) {
   using namespace fkernel::ipc;
   auto *task = SchedulerManager::the().current();
   if (!task || !task->cspace)

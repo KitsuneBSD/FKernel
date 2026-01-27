@@ -6,7 +6,7 @@
 extern "C" {
 
 uint64_t sys_sigprocmask(uint64_t how, uint64_t set_ptr, uint64_t oldset_ptr,
-                         uint64_t /* sigsetsize */, uint64_t, uint64_t, PtRegs* regs) {
+                         uint64_t /* sigsetsize */, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto *task = SchedulerManager::the().current();
   if (!task)
     return -1;

@@ -14,7 +14,7 @@ struct utsname {
 
 extern "C" {
 uint64_t sys_uname(uint64_t buf_ptr, uint64_t, uint64_t, uint64_t, uint64_t,
-                   uint64_t, PtRegs* regs) {
+                   uint64_t, [[maybe_unused]] PtRegs* regs) {
   if (!buf_ptr)
     return -22; // EINVAL
 
