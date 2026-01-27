@@ -15,6 +15,8 @@ LoadDomain::process_load_segments(const fk::containers::Vector<Elf64_Phdr>& head
     
     for (const auto& phdr : headers) {
         if (phdr.p_type == PT_LOAD) {
+            fk::algorithms::kdebug("ELF", "Loading segment: VAddr=%p, PAddr=%p, FileSz=%p, MemSz=%p, Flags=%x",
+                                   (void*)phdr.p_vaddr, (void*)phdr.p_paddr, (void*)phdr.p_filesz, (void*)phdr.p_memsz, phdr.p_flags);
             auto process_res = process_single_load_segment(phdr, load_base);
             if (process_res.is_error())
                 return process_res.error();
@@ -41,9 +43,9 @@ LoadDomain::extract_memory_regions(const fk::containers::Vector<Elf64_Phdr>& hea
 MemoryRegion LoadDomain::calculate_memory_region(const Elf64_Phdr& phdr, uintptr_t load_base) {
     MemoryRegion region;
     
-    uintptr_t vaddr_with_base = phdr.p_vaddr + load_base;
-    region.start_vaddr = vaddr_with_base & ~0xFFFULL;
-    region.end_vaddr = (vaddr_with_base + phdr.p_memsz + 0xFFF) & ~0xFFFULL;
+    region.actual_vaddr = phdr.p_vaddr + load_base;
+    region.start_vaddr = region.actual_vaddr & ~0xFFFULL;
+    region.end_vaddr = (region.actual_vaddr + phdr.p_memsz + 0xFFF) & ~0xFFFULL;
     region.permissions = MemoryDomain::elf_flags_to_page_flags(phdr.p_flags);
     region.file_offset = phdr.p_offset;
     region.file_size = phdr.p_filesz;
@@ -58,9 +60,8 @@ LoadDomain::copy_segment_data(const MemoryRegion& region) {
         return {};
     }
     
-    uintptr_t vaddr_with_base = region.start_vaddr + (region.start_vaddr % 0x1000);
     auto read_res = read_from_node(region.file_offset, region.file_size, 
-                                   reinterpret_cast<uint8_t*>(vaddr_with_base));
+                                   reinterpret_cast<uint8_t*>(region.actual_vaddr));
     if (read_res.is_error())
         return read_res.error();
     if (read_res.value() < region.file_size)
@@ -71,7 +72,7 @@ LoadDomain::copy_segment_data(const MemoryRegion& region) {
 
 void LoadDomain::zero_fill_bss(const MemoryRegion& region) {
     if (region.memory_size > region.file_size) {
-        uintptr_t bss_start = region.start_vaddr + (region.start_vaddr % 0x1000) + region.file_size;
+        uintptr_t bss_start = region.actual_vaddr + region.file_size;
         size_t bss_size = region.memory_size - region.file_size;
         fk::memory::set(reinterpret_cast<void*>(bss_start), 0, bss_size);
     }
