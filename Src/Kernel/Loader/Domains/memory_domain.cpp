@@ -18,9 +18,25 @@ MemoryDomain::allocate_memory_region(const MemoryRegion& region, bool for_writin
 fk::core::Result<void, fk::core::Error>
 MemoryDomain::apply_final_permissions(const MemoryRegion& region) {
     for (uintptr_t vaddr = region.start_vaddr; vaddr < region.end_vaddr; vaddr += 0x1000) {
-        uintptr_t phys = VirtualMemoryManager::the().translate(vaddr & ~0xFFFULL);
-        if (phys != 0) {
-            auto remap_res = remap_page_with_permissions(vaddr, region.permissions);
+        auto existing_flags_res = VirtualMemoryManager::the().get_page_flags(vaddr);
+        if (existing_flags_res.is_ok()) {
+            PageFlags current = existing_flags_res.value();
+            PageFlags requested = region.permissions;
+            
+            // Merge flags: 
+            // - If ANY request allows execution (NX bit 0), the result allows execution.
+            // - If ANY request is writable, the result is writable.
+            
+            uint64_t combined = static_cast<uint64_t>(current) | static_cast<uint64_t>(requested);
+            
+            // Special handling for NX (bit 63): it should only be set if BOTH current and requested have it set.
+            // (i.e. if either wants execution, clear NX)
+            if (!(static_cast<uint64_t>(current) & static_cast<uint64_t>(PageFlags::ExecuteDisable)) ||
+                !(static_cast<uint64_t>(requested) & static_cast<uint64_t>(PageFlags::ExecuteDisable))) {
+                combined &= ~static_cast<uint64_t>(PageFlags::ExecuteDisable);
+            }
+            
+            auto remap_res = remap_page_with_permissions(vaddr, static_cast<PageFlags>(combined));
             if (remap_res.is_error())
                 return remap_res.error();
         }
