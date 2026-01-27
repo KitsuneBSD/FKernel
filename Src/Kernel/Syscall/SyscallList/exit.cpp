@@ -6,6 +6,8 @@
 extern "C" {
 uint64_t sys_exit(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     auto* current = SchedulerManager::the().current();
+    if (!current) return -1;
+
     fk::algorithms::klog("SYSCALL", "Process %lu exiting with status %lu", current->id, status);
     
     current->terminated = true;

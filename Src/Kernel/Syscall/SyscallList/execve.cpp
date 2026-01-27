@@ -17,12 +17,14 @@
 extern "C" {
 uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
                     uint64_t, uint64_t, uint64_t, PtRegs* regs) {
-  // 1. Capture data from user space before we lose the address space
-  fk::text::String path = reinterpret_cast<const char *>(path_ptr);
+  if (!path_ptr) return -static_cast<int>(fk::core::Error::InvalidParameter);
 
   auto *task = SchedulerManager::the().current();
   if (!task)
     return -1;
+
+  // 1. Capture data from user space before we lose the address space
+  fk::text::String path = reinterpret_cast<const char *>(path_ptr);
 
   fk::containers::Vector<fk::text::String> args;
   if (argv_ptr) {

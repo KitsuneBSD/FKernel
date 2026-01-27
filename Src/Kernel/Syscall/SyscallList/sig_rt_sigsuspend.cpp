@@ -12,7 +12,9 @@ uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
   // For now, block until a signal (or wakeup).
   // In our simple model, sys_exit of child will wake us up.
   auto* task = SchedulerManager::the().current();
-  fk::algorithms::klog("SYSCALL", "sigsuspend: PID %lu blocking", task ? task->id : 0);
+  if (!task) return -1;
+
+  fk::algorithms::klog("SYSCALL", "sigsuspend: PID %lu blocking", task->id);
   SchedulerManager::the().block_current();
   SchedulerManager::the().schedule();
 

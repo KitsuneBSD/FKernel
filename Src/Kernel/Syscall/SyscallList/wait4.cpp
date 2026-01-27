@@ -11,6 +11,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
                     [[maybe_unused]] uint64_t rusage_ptr, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   int64_t pid = (int64_t)pid_val;
   auto* current_task = SchedulerManager::the().current();
+  if (!current_task) return -1;
 
   fk::algorithms::klog("SYSCALL", "wait4: PID %lu waiting for child PID %ld (options=%lu)", current_task->id, pid, options);
 
