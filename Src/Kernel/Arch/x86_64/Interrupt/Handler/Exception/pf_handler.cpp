@@ -23,8 +23,8 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
         else if (cr2 >= task->memory_regions.mmap_start && cr2 < task->memory_regions.mmap_end) {
             valid = true;
         }
-        // 3. User stack (including child processes)
-        else if (cr2 >= 0x700000 && cr2 < 0x900000) {
+        // 3. User stack (expand range to cover typical user stack locations)
+        else if (cr2 >= 0x7ffffff00000ULL && cr2 < 0x7fffffffe000ULL) {
             valid = true;
         }
 
@@ -32,13 +32,14 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
             uintptr_t vaddr = cr2 & ~0xFFFULL;
             uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
             
+            fk::algorithms::kdebug("DEMAND PAGING", "Task %lu: Mapping page %p -> %p (CR2=%p, RIP=%p)", 
+                                   task->id, (void*)vaddr, (void*)phys, (void*)cr2, (void*)frame->rip);
+
             // Map as RW User
             VirtualMemoryManager::the().map_page(vaddr, phys, PageFlags::Present | PageFlags::Writable | PageFlags::User);
             
             // Zero the page
             memset(reinterpret_cast<void*>(vaddr), 0, 0x1000);
-            
-            // fk::algorithms::klog("DEMAND PAGING", "Mapped user page: %p -> %p", (void*)vaddr, (void*)phys);
             
             return;
         }
@@ -46,13 +47,14 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
 
     fk::algorithms::kexception(
         "Page Fault",
-        "vector=%u error=0x%lx (%s, %s, %s %s) RIP=%p RSP=%p CR2=%p",
+        "vector=%u error=0x%lx (%s, %s, %s %s) RIP=%p RSP=%p CR2=%p PID=%lu",
         (unsigned)vector, (uint64_t)frame->error_code,
         (frame->error_code & 1) ? "Present" : "Not Present",
         (frame->error_code & 2) ? "Write" : "Read",
         (frame->error_code & 4) ? "User" : "Kernel",
         (frame->error_code & 16) ? "Instruction Fetch" : "Data Access",
-        (void*)frame->rip, (void*)frame->rsp, (void*)cr2
+        (void*)frame->rip, (void*)frame->rsp, (void*)cr2,
+        task ? task->id : 0
     );
 
     halt_forever();
