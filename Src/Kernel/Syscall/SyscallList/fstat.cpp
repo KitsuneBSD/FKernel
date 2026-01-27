@@ -43,6 +43,12 @@ uint64_t sys_fstat(uint64_t fd, uint64_t statbuf_ptr, uint64_t, uint64_t,
   } else if (node->is_symlink()) {
       buf->st_mode = S_IFLNK | 0777;
       buf->st_nlink = 1;
+  } else if (node->is_character_device()) {
+      buf->st_mode = S_IFCHR | 0666;
+      buf->st_nlink = 1;
+  } else if (node->is_block_device()) {
+      buf->st_mode = S_IFBLK | 0660;
+      buf->st_nlink = 1;
   } else {
       buf->st_mode = S_IFREG | 0644;
       buf->st_nlink = 1;
