@@ -103,6 +103,8 @@ LoadDomain::process_single_load_segment(const Elf64_Phdr& phdr, uintptr_t load_b
     
     zero_fill_bss(region);
     
+    fk::algorithms::kdebug("ELF", "Applying final permissions (0x%lx) to region %p - %p", 
+                           (uint64_t)region.permissions, (void*)region.start_vaddr, (void*)region.end_vaddr);
     auto perm_res = memory.apply_final_permissions(region);
     if (perm_res.is_error())
         return perm_res.error();
