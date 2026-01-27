@@ -89,6 +89,7 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
     }
 
     const char* clean_name = (name[0] == '/') ? name + 1 : name;
+    fk::algorithms::kdebug("RAMDISK", "lookup: name='%s' (clean='%s'), prefix='%s'", name, clean_name, m_prefix.c_str());
     char full_lookup[512];
     if (m_prefix.is_empty()) {
         strncpy(full_lookup, clean_name, sizeof(full_lookup) - 1);
@@ -127,9 +128,9 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
         auto dir_node_res = fk::make_ref<RamDiskNode>(m_start, m_end);
         if (dir_node_res.is_error()) return dir_node_res.error();
         auto dir_node = dir_node_res.value();
+        dir_node->set_name(clean_name); // Set the component name
         for (auto& f : m_files) dir_node->m_files.push_back(f);
         dir_node->m_prefix = dir_prefix;
-        dir_node->set_name(name);
         dir_node->set_parent(fk::RefPtr<Node>(this));
         return fk::RefPtr<Node>(dir_node);
     }

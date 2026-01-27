@@ -90,6 +90,8 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
   if (!path || !m_root)
     return fk::core::Error::InvalidParameter;
 
+  fk::algorithms::kdebug("VFS", "resolve_path: '%s' (depth %d)", path, depth);
+
   fk::RefPtr<Node> current = m_root;
   const char *ptr = path;
 
@@ -132,8 +134,10 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
     }
 
     auto lookup_res = current->lookup(name);
-    if (lookup_res.is_error())
+    if (lookup_res.is_error()) {
+      fk::algorithms::kdebug("VFS", "lookup failed for '%s' in node '%s'", name, current->name().c_str());
       return lookup_res.error();
+    }
     current = lookup_res.value();
 
     // Handle Symlinks
@@ -144,6 +148,8 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
         return link_res.error();
       
       fk::text::String link = link_res.value();
+      fk::algorithms::kdebug("VFS", "traversing symlink '%s' -> '%s'", current->name().c_str(), link.c_str());
+      
       if (link.c_str()[0] == '/') {
         auto sub_res = resolve_path(link.c_str(), depth + 1);
         if (sub_res.is_error())
