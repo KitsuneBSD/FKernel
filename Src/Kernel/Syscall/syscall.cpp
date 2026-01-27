@@ -49,6 +49,7 @@ uint64_t sys_getdents64(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                         uint64_t, PtRegs*);
 uint64_t sys_chdir(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_fork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_mount(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_umount2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                      uint64_t, PtRegs*);
@@ -127,7 +128,9 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_GETDENTS64, sys_getdents64);
   SyscallManager::the().register_syscall(262, sys_newfstatat); // SYS_NEWFSTATAT
   SyscallManager::the().register_syscall(SYS_CHDIR, sys_chdir);
+  SyscallManager::the().register_syscall(SYS_CLONE, sys_vfork);
   SyscallManager::the().register_syscall(SYS_FORK, sys_fork);
+  SyscallManager::the().register_syscall(SYS_VFORK, sys_vfork);
   SyscallManager::the().register_syscall(SYS_EXECVE, sys_execve);
   SyscallManager::the().register_syscall(SYS_FCNTL, sys_fcntl);
   SyscallManager::the().register_syscall(SYS_DUP2, sys_dup2);

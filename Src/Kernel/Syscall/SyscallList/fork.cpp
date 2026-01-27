@@ -1,3 +1,4 @@
+#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
@@ -22,12 +23,12 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
          PtRegs* regs) {
   auto *parent = SchedulerManager::the().current();
   if (!parent)
-    return return_error(fk::core::Error::PermissionDenied);
+    return fkernel::return_error(fk::core::Error::PermissionDenied);
 
   // 1. Create and initialize a new task structure
   Task *child = new Task();
   if (!child)
-    return return_error(fk::core::Error::OutOfMemory);
+    return fkernel::return_error(fk::core::Error::OutOfMemory);
 
   // 2. Clone metadata
   child->id = SchedulerManager::the().generate_pid();
@@ -65,7 +66,7 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   void *child_stack_mem = kmalloc(STACK_SIZE);
   if (!child_stack_mem) {
       delete child;
-      return return_error(fk::core::Error::OutOfMemory);
+      return fkernel::return_error(fk::core::Error::OutOfMemory);
   }
   child->kernel_stack_top =
       reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;

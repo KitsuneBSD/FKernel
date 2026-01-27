@@ -1,3 +1,4 @@
+#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Fs/DebugFs/debug_fs.h>

@@ -41,11 +41,15 @@ fk::core::Result<void, fk::core::Error> DevFs::unregister_device(const char* nam
 }
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> DevFs::lookup(const char* name) {
+    if (!name) return fk::core::Error::InvalidParameter;
+
     for (auto& entry : m_devices) {
-        if (entry.name == name && entry.node) {
+        if (entry.node && strcmp(entry.name.c_str(), name) == 0) {
             return entry.node;
         }
     }
+    
+    fk::algorithms::kdebug("DEVFS", "lookup failed for: '%s'", name);
     return fk::core::Error::NotFound;
 }
 
