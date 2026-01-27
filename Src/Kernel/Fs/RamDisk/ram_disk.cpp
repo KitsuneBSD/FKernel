@@ -94,7 +94,12 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
         strncpy(full_lookup, clean_name, sizeof(full_lookup) - 1);
         full_lookup[sizeof(full_lookup) - 1] = '\0';
     } else {
-        snprintf(full_lookup, sizeof(full_lookup), "%s%s", m_prefix.c_str(), clean_name);
+        // Ensure m_prefix ends with /
+        if (m_prefix.c_str()[m_prefix.length() - 1] == '/') {
+            snprintf(full_lookup, sizeof(full_lookup), "%s%s", m_prefix.c_str(), clean_name);
+        } else {
+            snprintf(full_lookup, sizeof(full_lookup), "%s/%s", m_prefix.c_str(), clean_name);
+        }
     }
 
     for (auto& entry : m_files) {
@@ -102,13 +107,19 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
     }
 
     char dir_prefix[512];
-    snprintf(dir_prefix, sizeof(dir_prefix), "%s/", full_lookup);
+    if (full_lookup[0] == '\0') {
+        dir_prefix[0] = '\0';
+    } else {
+        snprintf(dir_prefix, sizeof(dir_prefix), "%s/", full_lookup);
+    }
 
     bool found_prefix = false;
-    for (auto& entry : m_files) {
-        if (strncmp(entry.name.c_str(), dir_prefix, strlen(dir_prefix)) == 0) {
-            found_prefix = true;
-            break;
+    if (dir_prefix[0] != '\0') {
+        for (auto& entry : m_files) {
+            if (strncmp(entry.name.c_str(), dir_prefix, strlen(dir_prefix)) == 0) {
+                found_prefix = true;
+                break;
+            }
         }
     }
 

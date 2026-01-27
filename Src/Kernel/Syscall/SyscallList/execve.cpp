@@ -46,9 +46,16 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   }
 
   auto res = VirtualFileSystem::the().open(path.c_str(), 0);
-  if (res.is_error())
+  if (res.is_error()) {
+    fk::algorithms::kwarn("SYSCALL", "sys_execve: Failed to open %s: %d", path.c_str(), (int)res.error());
     return fkernel::return_error(res.error());
-  if (res.value()->node()->is_directory())
+  }
+  
+  auto node = res.value()->node();
+  fk::algorithms::klog("SYSCALL", "sys_execve: Opened %s, type=%s, size=%zu", 
+                       path.c_str(), node->is_directory() ? "dir" : "file", node->size());
+
+  if (node->is_directory())
     return fkernel::return_error(fk::core::Error::IsDirectory);
 
   // 2. Load the new binary into a fresh address space
