@@ -1,5 +1,6 @@
 #include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <LibFK/Algorithms/log.h>
 
 CPU::CPU() {
@@ -66,10 +67,16 @@ void CPU::detect_cpu_features() {
     */
     m_has_hpet = true;
   }
+
+  // Check for NX support (CPUID 0x80000001, EDX bit 20)
+  cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+  if (edx & (1 << 20)) {
+    m_has_nx = true;
+  }
 }
 
 void CPU::initialize_features() {
-  fk::algorithms::klog("CPU", "Initializing features (SSE)...");
+  fk::algorithms::klog("CPU", "Initializing features (SSE, NX)...");
 
   uint64_t cr0, cr4;
   asm volatile("mov %%cr0, %0" : "=r"(cr0));
@@ -81,6 +88,12 @@ void CPU::initialize_features() {
   cr4 |= (1ULL << 9);  // Set OSFXSR (FXSAVE/FXRSTOR support)
   cr4 |= (1ULL << 10); // Set OSXMMEXCPT (SIMD Exception support)
   asm volatile("mov %0, %%cr4" ::"r"(cr4));
+
+  // Enable NX if supported
+  if (m_has_nx) {
+    uint64_t efer = read_msr(MSR_EFER);
+    write_msr(MSR_EFER, efer | EFER_NXE);
+  }
 }
 
 void CPU::write_msr(uint32_t msr, uint64_t value) {

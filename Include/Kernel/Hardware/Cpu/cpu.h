@@ -21,6 +21,7 @@ private:
   bool m_has_apic = false;
   bool m_has_x2apic = false;
   bool m_has_hpet = false;
+  bool m_has_nx = false;
 
   void cpuid(uint32_t eax, uint32_t ecx, uint32_t *a, uint32_t *b, uint32_t *c,
              uint32_t *d);
@@ -39,6 +40,7 @@ public:
   bool has_apic() const { return m_has_apic; }
   bool has_x2apic() const { return m_has_x2apic; }
   bool has_hpet() const { return m_has_hpet; }
+  bool has_nx() const { return m_has_nx; }
 
   void initialize_features();
 
