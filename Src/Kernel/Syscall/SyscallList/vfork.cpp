@@ -15,13 +15,13 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
                              [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6,
                              PtRegs* regs) {
     auto *parent = SchedulerManager::the().current();
-    if (!parent) return -1;
+    if (!parent) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
     fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu forking...", parent->id);
 
     // 1. Create child task
     Task *child = new Task();
-    if (!child) return -1;
+    if (!child) return fkernel::return_error(fk::core::Error::OutOfMemory);
 
     // 2. Clone metadata
     child->id = SchedulerManager::the().generate_pid();
@@ -44,7 +44,7 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     void *child_stack_mem = kmalloc(STACK_SIZE);
     if (!child_stack_mem) {
         delete child;
-        return -1;
+        return fkernel::return_error(fk::core::Error::OutOfMemory);
     }
     child->kernel_stack_top = reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
     memcpy(child_stack_mem, reinterpret_cast<void*>(parent->kernel_stack_top - STACK_SIZE), STACK_SIZE);

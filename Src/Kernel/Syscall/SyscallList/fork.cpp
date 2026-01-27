@@ -22,12 +22,12 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
          PtRegs* regs) {
   auto *parent = SchedulerManager::the().current();
   if (!parent)
-    return -1;
+    return return_error(fk::core::Error::PermissionDenied);
 
   // 1. Create and initialize a new task structure
   Task *child = new Task();
   if (!child)
-    return -1;
+    return return_error(fk::core::Error::OutOfMemory);
 
   // 2. Clone metadata
   child->id = SchedulerManager::the().generate_pid();
@@ -65,7 +65,7 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   void *child_stack_mem = kmalloc(STACK_SIZE);
   if (!child_stack_mem) {
       delete child;
-      return -1;
+      return return_error(fk::core::Error::OutOfMemory);
   }
   child->kernel_stack_top =
       reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
