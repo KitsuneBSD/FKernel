@@ -11,6 +11,7 @@ static bool is_canonical(uint64_t addr) {
 extern "C" uint64_t sys_arch_prctl(uint64_t code, uint64_t addr, uint64_t,
                                    uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto* task = SchedulerManager::the().current();
+  if (!task) return -1;
   
   if (code == 0x1002 || code == 0x1001) {
     if (!is_canonical(addr)) {
