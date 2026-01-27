@@ -7,8 +7,8 @@
 
 extern "C" {
 
-uintptr_t sys_wait4(uintptr_t pid_val, uintptr_t status_ptr, uintptr_t options,
-                    [[maybe_unused]] uintptr_t rusage_ptr, uintptr_t, uintptr_t) {
+uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
+                    [[maybe_unused]] uint64_t rusage_ptr, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   int64_t pid = (int64_t)pid_val;
   auto* current_task = SchedulerManager::the().current();
 
