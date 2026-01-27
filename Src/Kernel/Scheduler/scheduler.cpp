@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
@@ -19,6 +20,8 @@ extern CpuControlBlock g_cpu_block;
 
 extern "C" void switch_context(uint64_t *prev_stack_ptr,
                                uint64_t next_stack_ptr);
+
+extern "C" void enter_user_mode(uintptr_t rip, uintptr_t rsp);
 
 extern "C" uint64_t syscall_kernel_stack;
 
@@ -113,7 +116,6 @@ extern "C" void init_task_entry() {
 
   uintptr_t final_rsp = reinterpret_cast<uintptr_t>(pointers);
 
-  extern void enter_user_mode(uintptr_t rip, uintptr_t rsp);
   enter_user_mode(entry, final_rsp);
 
   while (true)
@@ -169,14 +171,14 @@ void SchedulerManager::initialize() {
 }
 
 void SchedulerManager::add_task(Task *task) {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   task->state = TaskState::Ready;
   task->time_slice_ticks = m_default_quantum;
 
-  // Simple load balancing: add to the specific CPU if affinity is set,
-  // otherwise current CPU
   uint32_t target_cpu = 0;
   if (task->cpu_affinity != 0) {
-    // Find first set bit in affinity
     for (uint32_t i = 0; i < 32; ++i) {
       if (task->cpu_affinity & (1ULL << i)) {
         target_cpu = i;
@@ -190,76 +192,79 @@ void SchedulerManager::add_task(Task *task) {
   if (target_cpu >= 32)
     target_cpu = 0;
   m_processors[target_cpu].run_queue.push_back(task);
+
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::block_current() {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   auto &proc = current_processor();
-  if (!proc.current_task)
-    return;
+  if (proc.current_task) {
+    Task *task = proc.current_task;
+    task->state = TaskState::Blocked;
+    m_wait_queue.push_back(task);
+    proc.need_resched = true;
+  }
 
-  Task *task = proc.current_task;
-  task->state = TaskState::Blocked;
-
-  // Add to wait queue so the task is not lost from the scheduler's tracking
-  m_wait_queue.push_back(task);
-
-  // Do NOT clear proc.current_task here. It is needed by schedule() to save
-  // context.
-  proc.need_resched = true;
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::zombify_current() {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   auto &proc = current_processor();
-  if (!proc.current_task)
-    return;
+  if (proc.current_task) {
+    Task *task = proc.current_task;
+    task->state = TaskState::Blocked;
+    task->terminated = true;
+    proc.need_resched = true;
+  }
 
-  Task *task = proc.current_task;
-  task->state = TaskState::Blocked; // Terminated/Zombie effectively
-  task->terminated = true;
-
-  // Zombie task cleanup would be handled by parent process
-
-  // Do NOT clear proc.current_task here.
-  proc.need_resched = true;
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::sleep_current(uint64_t sleep_ticks) {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   auto &proc = current_processor();
-  if (!proc.current_task)
-    return;
+  if (proc.current_task) {
+    Task *task = proc.current_task;
+    task->state = TaskState::Sleeping;
+    task->wake_up_time_ticks = TickManager::the().get_ticks() + sleep_ticks;
+    m_sleep_queue.push_back(task);
+    proc.need_resched = true;
+  }
 
-  Task *task = proc.current_task;
-  task->state = TaskState::Sleeping;
-  task->wake_up_time_ticks = TickManager::the().get_ticks() + sleep_ticks;
-
-  m_sleep_queue.push_back(task);
-  // Do NOT clear proc.current_task here.
-  proc.need_resched = true;
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::yield() {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   auto &proc = current_processor();
-  if (!proc.current_task)
-    return;
-
-  Task *task = proc.current_task;
-
-  // If the task is blocked, it shouldn't be yielding back to ready
-  if (task->state != TaskState::Running && task->state != TaskState::Ready) {
-    proc.need_resched = true;
-    return;
+  if (proc.current_task) {
+    Task *task = proc.current_task;
+    // Only yield if we are currently running
+    if (task->state == TaskState::Running) {
+      task->state = TaskState::Ready;
+      proc.run_queue.push_back(task);
+      proc.need_resched = true;
+      schedule(); // Switch context immediately
+    }
   }
 
-  task->state = TaskState::Ready;
-
-  // Re-queue the current task so it can run again later
-  proc.run_queue.push_back(task);
-
-  proc.need_resched = true;
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::wake_task(Task *task) {
-  // If the task was blocked, it was added to m_wait_queue
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   if (task->state == TaskState::Blocked) {
     m_wait_queue.remove(task);
   }
@@ -267,7 +272,6 @@ void SchedulerManager::wake_task(Task *task) {
   task->state = TaskState::Ready;
   task->time_slice_ticks = m_default_quantum;
 
-  // Wake on whichever CPU it's affined to or CPU 0
   uint32_t target_cpu = 0;
   for (uint32_t i = 0; i < 32; ++i) {
     if (task->cpu_affinity & (1ULL << i)) {
@@ -277,17 +281,15 @@ void SchedulerManager::wake_task(Task *task) {
   }
 
   m_processors[target_cpu].run_queue.push_back(task);
+
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
-
-
 Task *SchedulerManager::pick_next() {
+  // pick_next is called within schedule() which is already protected
   auto &proc = current_processor();
 
   if (proc.run_queue.empty()) {
-    // Switch to idle if nothing else to run
-    // Note: If current_task is the only one and it yielded, it's in run_queue
-    // now. If it blocked, it's not.
     proc.current_task = proc.idle_task;
   } else {
     Task *next = proc.run_queue.front();
@@ -307,10 +309,12 @@ Task *SchedulerManager::pick_next() {
 }
 
 void SchedulerManager::on_tick() {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
   uint64_t now = TickManager::the().get_ticks();
   auto &proc = current_processor();
 
-  // Only CPU 0 handles sleep queue for now (simplified)
   if (proc.id == 0) {
     for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end();) {
       Task *task = &*it;
@@ -323,18 +327,16 @@ void SchedulerManager::on_tick() {
     }
   }
 
-if (!proc.current_task || proc.current_task == proc.idle_task || !proc.run_queue.empty()) {
+  if (!proc.current_task || proc.current_task == proc.idle_task || !proc.run_queue.empty()) {
     proc.need_resched = true;
-    return;
-  }
-  
-  if (--proc.current_task->time_slice_ticks == 0) {
+  } else if (--proc.current_task->time_slice_ticks == 0) {
     Task *task = proc.current_task;
     task->state = TaskState::Ready;
     proc.run_queue.push_back(task);
-    // Do NOT clear proc.current_task
     proc.need_resched = true;
   }
+
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 fkernel::Processor &SchedulerManager::current_processor() {
@@ -345,40 +347,42 @@ fkernel::Processor &SchedulerManager::current_processor() {
 }
 
 void SchedulerManager::schedule() {
-  if (!is_need_resched())
-    return;
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
 
-  auto &proc = current_processor();
-  Task *prev_task = proc.current_task;
-  Task *next_task = pick_next();
+  if (is_need_resched()) {
+    auto &proc = current_processor();
+    Task *prev_task = proc.current_task;
+    Task *next_task = pick_next();
 
-  if (prev_task && prev_task != next_task) {
-    fk::algorithms::klog(
-        "SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
-        prev_task->name.c_str(), prev_task, (void *)prev_task->stack_pointer,
-        next_task->name.c_str(), next_task, (void *)next_task->stack_pointer);
+    if (prev_task && prev_task != next_task) {
+      fk::algorithms::klog(
+          "SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
+          prev_task->name.c_str(), prev_task, (void *)prev_task->stack_pointer,
+          next_task->name.c_str(), next_task, (void *)next_task->stack_pointer);
 
-    if (next_task->cr3 != 0 && next_task->cr3 != prev_task->cr3) {
-      VirtualMemoryManager::the().switch_address_space(next_task->cr3);
+      if (next_task->cr3 != 0 && next_task->cr3 != prev_task->cr3) {
+        VirtualMemoryManager::the().switch_address_space(next_task->cr3);
+      }
+
+      prev_task->user_rsp = g_cpu_block.user_rsp;
+      prev_task->saved_rip = g_cpu_block.saved_rip;
+      prev_task->saved_rflags = g_cpu_block.saved_rflags;
+
+      g_cpu_block.kernel_stack = next_task->kernel_stack_top;
+      g_cpu_block.user_rsp = next_task->user_rsp;
+      g_cpu_block.saved_rip = next_task->saved_rip;
+      g_cpu_block.saved_rflags = next_task->saved_rflags;
+
+      CPU::the().write_msr(MSR_FS_BASE, next_task->fs_base);
+      CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->gs_base);
+
+      GDTController::the().set_kernel_stack(next_task->kernel_stack_top);
+      switch_context(&prev_task->stack_pointer, next_task->stack_pointer);
     }
-
-    // Save current syscall state
-    prev_task->user_rsp = g_cpu_block.user_rsp;
-    prev_task->saved_rip = g_cpu_block.saved_rip;
-    prev_task->saved_rflags = g_cpu_block.saved_rflags;
-
-    // Restore next syscall state
-    g_cpu_block.kernel_stack = next_task->kernel_stack_top;
-    g_cpu_block.user_rsp = next_task->user_rsp;
-    g_cpu_block.saved_rip = next_task->saved_rip;
-    g_cpu_block.saved_rflags = next_task->saved_rflags;
-
-    CPU::the().write_msr(MSR_FS_BASE, next_task->fs_base);
-    CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->gs_base);
-
-    GDTController::the().set_kernel_stack(next_task->kernel_stack_top);
-    switch_context(&prev_task->stack_pointer, next_task->stack_pointer);
   }
+
+  if (intr_state) InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::print_all_tasks() {

@@ -1,6 +1,7 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
 
 // Layout US QWERTY simplificado
 static const char scancode_set1[128] = {
@@ -28,15 +29,6 @@ void PS2Keyboard::push_char(char c) {
 }
 
 bool PS2Keyboard::has_key() {
-  // If our software buffer is empty, poll the PS/2 controller for data
-  if (head == tail) {
-    uint8_t status = inb(PS2_STATUS_PORT);
-    if (status & 1) {
-      uint8_t scancode = inb(PS2_DATA_PORT);
-      handle_scancode(scancode);
-    }
-  }
-
   return head != tail;
 }
 
@@ -72,6 +64,13 @@ void PS2Keyboard::irq_handler() {
   handle_scancode(scancode);
 }
 
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+
+// ... (includes remain the same)
+
+// ... (code remains the same)
+
 void PS2Keyboard::initialize() {
-  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1");
+  HardwareInterruptManager::the().unmask_interrupt(1);
+  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked)");
 }

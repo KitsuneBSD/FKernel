@@ -58,74 +58,24 @@ local function create_all_links()
   print("Creating safe symlinks for initrd...")
   create_etc_configs()
   mlink("../usr/bin/busybox", "bin/sh")
-  mlink("../usr/bin/busybox", "bin/echo")
-  mlink("../usr/bin/busybox", "bin/ls")
-  mlink("../usr/bin/busybox", "bin/mkdir")
-  mlink("../usr/bin/busybox", "bin/rm")
-  mlink("../usr/bin/busybox", "bin/cp")
-  mlink("../usr/bin/busybox", "bin/mv")
-  mlink("../usr/bin/busybox", "bin/pwd")
-  mlink("../usr/bin/busybox", "bin/clear")
-  mlink("../usr/bin/busybox", "bin/mount")
-  mlink("../usr/bin/busybox", "bin/umount")
   mlink("../usr/bin/busybox", "sbin/init")
+  
+  -- Requested tools
   mlink("../usr/bin/busybox", "bin/cat")
-  mlink("../usr/bin/busybox", "bin/touch")
-  mlink("../usr/bin/busybox", "bin/chmod")
-  mlink("../usr/bin/busybox", "bin/chown")
-  mlink("../usr/bin/busybox", "bin/ln")
+  mlink("../usr/bin/busybox", "bin/rm")
   mlink("../usr/bin/busybox", "bin/rmdir")
-  mlink("../usr/bin/busybox", "bin/dd")
-  mlink("../usr/bin/busybox", "bin/head")
-  mlink("../usr/bin/busybox", "bin/tail")
-  mlink("../usr/bin/busybox", "bin/more")
+  mlink("../usr/bin/busybox", "bin/ls")
   mlink("../usr/bin/busybox", "bin/vi")
-  mlink("../usr/bin/busybox", "bin/sed")
-  mlink("../usr/bin/busybox", "bin/awk")
-  mlink("../usr/bin/busybox", "bin/grep")
-  mlink("../usr/bin/busybox", "bin/find")
-  mlink("../usr/bin/busybox", "bin/stat")
-  mlink("../usr/bin/busybox", "bin/du")
-  mlink("../usr/bin/busybox", "bin/df")
-  mlink("../usr/bin/busybox", "bin/which")
-  mlink("../usr/bin/busybox", "bin/tar")
-  mlink("../usr/bin/busybox", "bin/gzip")
-  mlink("../usr/bin/busybox", "bin/gunzip")
-  mlink("../usr/bin/busybox", "bin/sleep")
-  mlink("../usr/bin/busybox", "bin/printf")
-  mlink("../usr/bin/busybox", "bin/test")
-  mlink("../usr/bin/busybox", "bin/basename")
-  mlink("../usr/bin/busybox", "bin/dirname")
-  mlink("../usr/bin/busybox", "bin/env")
-  mlink("../usr/bin/busybox", "bin/expr")
-  mlink("../usr/bin/busybox", "bin/false")
-  mlink("../usr/bin/busybox", "bin/true")
-  mlink("../usr/bin/busybox", "bin/id")
-  mlink("../usr/bin/busybox", "bin/readlink")
-  mlink("../usr/bin/busybox", "bin/realpath")
-  mlink("../usr/bin/busybox", "bin/sort")
-  mlink("../usr/bin/busybox", "bin/split")
-  mlink("../usr/bin/busybox", "bin/tee")
-  mlink("../usr/bin/busybox", "bin/tr")
-  mlink("../usr/bin/busybox", "bin/tty")
-  mlink("../usr/bin/busybox", "bin/uname")
-  mlink("../usr/bin/busybox", "bin/uniq")
-  mlink("../usr/bin/busybox", "bin/wc")
-  mlink("../usr/bin/busybox", "bin/whoami")
-  mlink("../usr/bin/busybox", "bin/yes")
+  
+  -- Essentials
+  mlink("../usr/bin/busybox", "bin/echo")
 end
+
+-- Force rebuild to apply new config
+-- local src_dir = BUILD_DIR .. "/" .. BB_NAME
+-- if OSInteract.FileExists(src_dir .. "/busybox") then ... end
 
 local src_dir = BUILD_DIR .. "/" .. BB_NAME
-if OSInteract.FileExists(src_dir .. "/busybox") then
-  PrintMessage(false, "BusyBox is already compiled. Skipping build.")
-  os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
-  os.execute("mkdir -p " .. INITRD_DIR .. "/bin")
-  os.execute("mkdir -p " .. INITRD_DIR .. "/sbin")
-  os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/usr/bin/")
-  create_all_links()
-  os.exit(0)
-end
-
 os.execute("mkdir -p " .. BUILD_DIR)
 os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
 os.execute("mkdir -p " .. INITRD_DIR .. "/bin")
@@ -138,19 +88,10 @@ ArchiveUtils.extract(tarball, BUILD_DIR)
 local function ensure_config_set(config_file, key)
   local grep_cmd = string.format("grep -q '^%s=y' %s", key, config_file)
   if not os.execute(grep_cmd) then
-    -- Key is not set or set to no. Use sed to force it.
-    -- First try to replace "# CONFIG_... is not set" with "CONFIG_...=y"
     local sed_cmd1 = string.format("sed -i 's/^# %s is not set/%s=y/' %s", key, key, config_file)
     os.execute(sed_cmd1)
-    
-    -- Then try to replace "CONFIG_...=n" with "CONFIG_...=y" just in case
     local sed_cmd2 = string.format("sed -i 's/^%s=n/%s=y/' %s", key, key, config_file)
     os.execute(sed_cmd2)
-
-    -- If the key was not found at all (neither commented nor =n), append it.
-    -- This is trickier to detect reliably with just sed without regex logic, 
-    -- but usually standard configs have all keys. 
-    -- For safety, we can append if grep still fails.
     if not os.execute(grep_cmd) then
        local f = io.open(config_file, "a")
        if f then 
@@ -179,35 +120,18 @@ local desired_configs = {
   "CONFIG_STATIC", "CONFIG_ASH", "CONFIG_SH_IS_ASH", "CONFIG_INIT", 
   "CONFIG_FEATURE_USE_INITTAB", "CONFIG_FEATURE_INIT_SCTTY",
   
-  -- File manipulation (requested + BSD basics)
-  "CONFIG_ECHO", "CONFIG_MKDIR", "CONFIG_LS", "CONFIG_RM", 
-  "CONFIG_CP", "CONFIG_MV", "CONFIG_PWD", "CONFIG_CAT", 
-  "CONFIG_TOUCH", "CONFIG_CHMOD", "CONFIG_CHOWN", "CONFIG_LN", 
-  "CONFIG_RMDIR", "CONFIG_DD", "CONFIG_HEAD", "CONFIG_TAIL", 
-  "CONFIG_MORE", "CONFIG_MOUNT", "CONFIG_UMOUNT", 
-  "CONFIG_FEATURE_MOUNT_FLAGS", "CONFIG_STAT", "CONFIG_TIME",
-  "CONFIG_DU", "CONFIG_DF", "CONFIG_WHICH",
-  "CONFIG_SLEEP", "CONFIG_PRINTF", "CONFIG_TEST", "CONFIG_BASENAME",
-  "CONFIG_DIRNAME", "CONFIG_ENV", "CONFIG_EXPR", "CONFIG_FALSE",
-  "CONFIG_TRUE", "CONFIG_ID", "CONFIG_READLINK", "CONFIG_REALPATH",
-  "CONFIG_SORT", "CONFIG_SPLIT", "CONFIG_TEE", "CONFIG_TR",
-  "CONFIG_TTY", "CONFIG_UNAME", "CONFIG_UNIQ", "CONFIG_WC",
-  "CONFIG_WHOAMI", "CONFIG_YES",
+  -- Requested Tools
+  "CONFIG_CAT", "CONFIG_RM", "CONFIG_RMDIR", "CONFIG_LS",
+  "CONFIG_VI", 
   
-  -- LS features (all sub-configs)
+  -- Essentials (implicit shell support)
+  "CONFIG_ECHO",
+  
+  -- LS features
   "CONFIG_FEATURE_LS_FILETYPES", "CONFIG_FEATURE_LS_FOLLOWLINKS",
   "CONFIG_FEATURE_LS_RECURSIVE", "CONFIG_FEATURE_LS_WIDTH",
   "CONFIG_FEATURE_LS_SORTFILES", "CONFIG_FEATURE_LS_TIMESTAMPS",
-  "CONFIG_FEATURE_LS_USERNAME", "CONFIG_FEATURE_LS_COLOR",
-  
-  -- Editors & Text processing
-  "CONFIG_VI", "CONFIG_SED", "CONFIG_AWK", "CONFIG_CMP", 
-  "CONFIG_DIFF", "CONFIG_PATCH", "CONFIG_GREP", "CONFIG_EGREP", 
-  "CONFIG_FGREP", "CONFIG_XARGS", "CONFIG_FIND",
-  
-  -- Other useful BSD-ish tools
-  "CONFIG_CLEAR", "CONFIG_RESET", "CONFIG_BUNZIP2", "CONFIG_BZIP2",
-  "CONFIG_GUNZIP", "CONFIG_GZIP", "CONFIG_TAR", "CONFIG_UNZIP"
+  "CONFIG_FEATURE_LS_USERNAME", "CONFIG_FEATURE_LS_COLOR"
 }
 
 for _, cfg in ipairs(desired_configs) do

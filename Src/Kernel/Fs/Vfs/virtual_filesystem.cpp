@@ -115,16 +115,29 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
       name[i++] = *ptr++;
     name[i] = '\0';
 
-    if (strcmp(name, ".") == 0)
+    if (name[0] == '\0' || strcmp(name, ".") == 0)
       continue;
 
     if (strcmp(name, "..") == 0) {
-      if (current->parent())
-        current = current->parent();
+      // Crossing mount border upwards
+      fk::RefPtr<Node> target_node = nullptr;
+      for (auto &m : m_mounts) {
+        if (m.source == current) {
+          target_node = m.target;
+          break;
+        }
+      }
+
+      if (target_node && target_node->parent()) {
+          current = target_node->parent();
+      } else if (current->parent()) {
+          current = current->parent();
+      }
       continue;
     }
 
     // Check if current node is a mount point's target, if so, switch to source
+    // (Crossing border downwards into a mount)
     for (auto &m : m_mounts) {
       if (m.target == current) {
         current = m.source;
@@ -136,7 +149,7 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
     if (lookup_res.is_error()) {
       // Fallback: If this is a mount source (like RamDisk on /), 
       // check if the underlying target (TmpFs root) has the entry.
-      // This allows seeing /dev, /proc etc.
+      // This allows seeing /dev, /proc etc from the root mount.
       fk::RefPtr<Node> underlying = nullptr;
       for (auto &m : m_mounts) {
         if (m.source == current) {
@@ -150,11 +163,18 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
       }
 
       if (lookup_res.is_error()) {
-          fk::algorithms::kdebug("VFS", "lookup failed for '%s' in node '%s' (and no underlying)", name, current->name().c_str());
           return lookup_res.error();
       }
     }
     current = lookup_res.value();
+
+    // Check if the RESOLVED node is a mount point's target
+    for (auto &m : m_mounts) {
+      if (m.target == current) {
+        current = m.source;
+        break;
+      }
+    }
 
     // Handle Symlinks
     int symlink_depth = 0;

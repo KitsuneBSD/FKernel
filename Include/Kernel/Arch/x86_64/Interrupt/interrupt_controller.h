@@ -39,16 +39,8 @@ public:
    * enabled.
    */
   void enable_interrupt() {
-    if (is_interrupt_enable) {
-      fk::algorithms::kwarn("INTERRUPT", "Interrupts already enabled");
-      return;
-    }
-
     asm volatile("sti");
     is_interrupt_enable = true;
-    /*TODO: Apply this log when we work with LogLevel
-    fk::algorithms::kdebug("INTERRUPT", "Interrupts enabled");
-    */
   }
 
   /**
@@ -58,16 +50,8 @@ public:
    * disabled.
    */
   void disable_interrupt() {
-    if (!is_interrupt_enable) {
-      fk::algorithms::kwarn("INTERRUPT", "Interrupts already disabled");
-      return;
-    }
-
     asm volatile("cli");
     is_interrupt_enable = false;
-    /*TODO: Apply this log when we work with LogLevel
-      fk::algorithms::kdebug("INTERRUPT", "Interrupts disabled");
-    */
   }
 
   /**
