@@ -86,7 +86,9 @@ for comp in (config.COMPONENTS or ""):gmatch("([^,]+)") do
 end
 
 local tar_output = "build/initrd.tar"
-RunCommand("ln -sf shell " .. STAGING .. "/bin/sh")
+if config.SYSTEM_TYPE ~= "standard" and config.SYSTEM_TYPE ~= "advanced" then
+  RunCommand("ln -sf shell " .. STAGING .. "/bin/sh")
+end
 Initrd.pack_tar(STAGING, tar_output)
 
 if ONLY_INITRD then

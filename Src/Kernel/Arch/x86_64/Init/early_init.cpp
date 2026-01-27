@@ -34,6 +34,10 @@ void early_init() {
 
   fk::algorithms::klog("EARLY_INIT", "Initializing Memory Manager...");
   MemoryManager::the().initialize();
+  
+  // Now that we have memory mapping capabilities, we can potentially upgrade 
+  // to APIC/IOAPIC if available.
+  HardwareInterruptManager::the().set_memory_manager(true);
 
   fk::algorithms::klog("EARLY_INIT", "Initializing ACPI...");
   ACPIManager::the().initialize();

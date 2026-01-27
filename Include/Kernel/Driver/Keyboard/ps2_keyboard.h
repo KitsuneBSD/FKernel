@@ -15,8 +15,8 @@ static constexpr size_t KEYBOARD_BUFFER_SIZE = 256; ///< Size of the key buffer
 class PS2Keyboard {
 private:
   char buffer[KEYBOARD_BUFFER_SIZE]; ///< Circular buffer for pressed keys
-  size_t head = 0;                   ///< Head index of the buffer
-  size_t tail = 0;                   ///< Tail index of the buffer
+  volatile size_t head = 0;                   ///< Head index of the buffer
+  volatile size_t tail = 0;                   ///< Tail index of the buffer
   bool shift_pressed = false;        ///< Track shift key state
 
   PS2Keyboard() = default; ///< Private constructor for singleton

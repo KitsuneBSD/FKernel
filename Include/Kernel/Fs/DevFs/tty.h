@@ -16,6 +16,12 @@ public:
 
 private:
     [[maybe_unused]] int m_index;
+    
+    // Simple line buffering
+    static constexpr size_t LINE_BUFFER_SIZE = 1024;
+    char m_line_buffer[LINE_BUFFER_SIZE];
+    size_t m_line_len = 0;
+    size_t m_read_index = 0;
 };
 
 } // namespace fkernel

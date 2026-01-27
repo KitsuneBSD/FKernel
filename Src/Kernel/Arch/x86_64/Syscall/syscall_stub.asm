@@ -53,7 +53,9 @@ syscall_stub:
     mov rsi, rdi ; Arg1
     mov rdi, rax ; Num
     
+    sti
     call syscall_dispatcher
+    cli
     
 global syscall_stub_post_dispatch
 syscall_stub_post_dispatch:

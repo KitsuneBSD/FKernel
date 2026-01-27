@@ -94,8 +94,7 @@ TmpFsDirectoryNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
         strncpy(de.name, child.name().c_str(), sizeof(de.name) - 1);
         de.name[sizeof(de.name) - 1] = '\0';
         
-        bool is_dir = child.node()->is_directory();
-        if (is_dir) {
+        if (child.node()->is_directory()) {
             de.type = 1; // Directory
         } else if (child.node()->is_symlink()) {
             de.type = 2; // Symlink
@@ -103,7 +102,6 @@ TmpFsDirectoryNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
             de.type = 0; // File
         }
         
-        fk::algorithms::klog("TMPFS", "list_dir entry: %s, type: %u (is_dir: %s)", de.name, de.type, is_dir ? "true" : "false");
         entries.push_back(de);
     }
     return {};

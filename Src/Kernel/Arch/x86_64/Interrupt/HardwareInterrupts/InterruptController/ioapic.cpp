@@ -32,9 +32,13 @@ void IOAPIC::initialize() {
   fk::algorithms::klog("IOAPIC", "Version %u, %u redirection entries",
                        ver & 0xFF, max_entries);
 
-  // Mask all IRQs initially
+  // Initialize all entries with default mapping (Vector = 32 + IRQ, Dest=BSP) but MASKED
   for (uint32_t i = 0; i < max_entries; ++i) {
-    mask_interrupt(i);
+    // Vector starts at 32 (0x20) for IRQ0
+    uint8_t vector = 32 + i;
+    // Default: Edge Triggered (0), Active High (0), Physical Dest (0), Fixed Delivery (0)
+    // We only set the Masked bit initially.
+    remap_irq(i, vector, 0, IOAPIC_REDIR_MASKED);
   }
 }
 
