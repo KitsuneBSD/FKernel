@@ -1,5 +1,6 @@
 #include <Kernel/Driver/SerialPort/serial_node.h>
 #include <Kernel/Driver/Vga/vga_node.h>
+#include <Kernel/Driver/Device/CharacterDevice/null_device.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <Kernel/Fs/DevFs/tty.h>
@@ -33,6 +34,8 @@ void VirtualFileSystem::initialize() {
 
   devfs.register_device(fk::make_ref<fkernel::SerialNode>().value(), "serial");
   devfs.register_device(fk::make_ref<fkernel::ConsoleNode>().value(), "console");
+  devfs.register_device(fk::make_ref<fkernel::NullDevice>().value(), "null");
+  devfs.register_device(fk::make_ref<fkernel::ZeroDevice>().value(), "zero");
 
   // Register TTY devices
   devfs.register_device(fk::make_ref<fkernel::TTYDevice>(-1).value(), "tty");
