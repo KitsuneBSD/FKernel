@@ -3,7 +3,7 @@
 #include <Kernel/Driver/Device/CharacterDevice/null_device.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
-#include <Kernel/Fs/DevFs/tty.h>
+#include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Fs/ProcFs/proc_fs.h>
 #include <Kernel/Fs/TmpFs/tmp_fs.h>
 #include <Kernel/Fs/Vfs/definitions.h>
@@ -37,13 +37,8 @@ void VirtualFileSystem::initialize() {
   devfs.register_device(fk::make_ref<fkernel::NullDevice>().value(), "null");
   devfs.register_device(fk::make_ref<fkernel::ZeroDevice>().value(), "zero");
 
-  // Register TTY devices
-  devfs.register_device(fk::make_ref<fkernel::TTYDevice>(-1).value(), "tty");
-  for (int i = 0; i <= 5; ++i) {
-      char tty_name[8];
-      snprintf(tty_name, sizeof(tty_name), "tty%d", i);
-      devfs.register_device(fk::make_ref<fkernel::TTYDevice>(i).value(), tty_name);
-  }
+  // Initialize terminal manager (will create default TTYs dynamically)
+  fkernel::terminal::TerminalManager::the().initialize();
 
   auto proc_res = fk::make_ref<ProcFsNode>();
   if (proc_res) {
