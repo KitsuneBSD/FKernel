@@ -102,7 +102,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
       task->vfork_parent_id = 0;
   }
 
-  auto entry_res = fkernel::ElfLoader::load(res.value()->node());
+  auto entry_res = fkernel::ElfLoader::load(node);
   if (entry_res.is_error())
     return fkernel::return_error(entry_res.error());
   uintptr_t entry = entry_res.value();
