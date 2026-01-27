@@ -49,5 +49,7 @@ task_trampoline:
 
 fork_child_trampoline:
     xor rax, rax ; return 0 for child
-    ; The scheduler already updated g_cpu_block.saved_rip/rflags/user_rsp
+    ; The syscall_stub_post_dispatch expects to cleanup 16 bytes of arguments (Arg7/Arg8)
+    ; from the stack before restoring registers. We must match this layout.
+    sub rsp, 16
     jmp syscall_stub_post_dispatch
