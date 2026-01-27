@@ -111,6 +111,12 @@ uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                       uint64_t, PtRegs*);
 uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                         uint64_t, PtRegs*);
+uint64_t sys_pipe(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_kqueue(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_kevent(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_tty_create_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_tty_delete_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_tty_list_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 }
 
 extern "C" void initialize_syscalls() {
@@ -133,6 +139,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_VFORK, sys_vfork);
   SyscallManager::the().register_syscall(SYS_EXECVE, sys_execve);
   SyscallManager::the().register_syscall(SYS_FCNTL, sys_fcntl);
+  SyscallManager::the().register_syscall(SYS_PIPE, sys_pipe);
   SyscallManager::the().register_syscall(SYS_DUP2, sys_dup2);
   SyscallManager::the().register_syscall(SYS_WAIT4, sys_wait4);
   SyscallManager::the().register_syscall(SYS_MMAP, sys_mmap);
@@ -172,6 +179,11 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IPC_CALL, sys_ipc_call);
   SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
   SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
+  SyscallManager::the().register_syscall(SYS_KQUEUE, sys_kqueue);
+  SyscallManager::the().register_syscall(SYS_KEVENT, sys_kevent);
+  SyscallManager::the().register_syscall(SYS_TTY_CREATE, sys_tty_create_kernel);
+  SyscallManager::the().register_syscall(SYS_TTY_DELETE, sys_tty_delete_kernel);
+  SyscallManager::the().register_syscall(SYS_TTY_LIST, sys_tty_list_kernel);
 }
 extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
                                        uint64_t arg2, uint64_t arg3,

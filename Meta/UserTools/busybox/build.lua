@@ -71,12 +71,28 @@ local function create_all_links()
   mlink("../usr/bin/busybox", "bin/echo")
 end
 
--- Force rebuild to apply new config
--- local src_dir = BUILD_DIR .. "/" .. BB_NAME
--- if OSInteract.FileExists(src_dir .. "/busybox") then ... end
-
 local src_dir = BUILD_DIR .. "/" .. BB_NAME
+local lock_file = BUILD_DIR .. "/.build.lock"
+
+-- Prevent simultaneous builds
+if OSInteract.FileExists(lock_file) then
+  PrintMessage(true, "BusyBox build is already in progress (lock found). Skipping.")
+  os.exit(0)
+end
+
+-- If binary exists and is recent enough, skip build but ensure links
+if OSInteract.FileExists(src_dir .. "/busybox") then
+  PrintMessage(false, "BusyBox already built. Ensuring symlinks...")
+  os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
+  os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/usr/bin/")
+  create_all_links()
+  os.exit(0)
+end
+
+-- Create lock
 os.execute("mkdir -p " .. BUILD_DIR)
+os.execute("touch " .. lock_file)
+
 os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
 os.execute("mkdir -p " .. INITRD_DIR .. "/bin")
 os.execute("mkdir -p " .. INITRD_DIR .. "/sbin")
@@ -197,7 +213,9 @@ local make_args = {
 if BuildUtils.make(src_dir, make_args) then
   os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/usr/bin/")
   create_all_links()
+  os.execute("rm -f " .. lock_file)
   PrintMessage(false, "BusyBox installed safely.")
 else
+  os.execute("rm -f " .. lock_file)
   os.exit(1)
 end

@@ -1,0 +1,36 @@
+#pragma once
+
+#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Ipc/notification.h>
+#include <LibFK/Container/vector.h>
+
+namespace fkernel {
+
+class PipeNode final : public Node {
+public:
+    static fk::core::Result<fk::RefPtr<PipeNode>, fk::core::Error> create();
+
+    PipeNode();
+    virtual ~PipeNode() override = default;
+
+    virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size, uint8_t* buffer) override;
+    virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t offset, size_t size, const uint8_t* buffer) override;
+    virtual size_t size() const override { return m_buffer.size(); }
+    virtual bool is_directory() const override { return false; }
+
+    void set_eof() { m_eof = true; m_notification.signal(DATA_AVAILABLE); }
+
+private:
+    static constexpr size_t PIPE_BUFFER_SIZE = 65536;
+    static constexpr uint64_t DATA_AVAILABLE = 1 << 0;
+    static constexpr uint64_t SPACE_AVAILABLE = 1 << 1;
+
+    fk::containers::Vector<uint8_t> m_buffer;
+    size_t m_read_pos{0};
+    size_t m_write_pos{0};
+    bool m_eof{false};
+
+    ipc::Notification m_notification;
+};
+
+} // namespace fkernel

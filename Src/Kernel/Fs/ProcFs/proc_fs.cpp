@@ -1,5 +1,6 @@
 #include <Kernel/Fs/ProcFs/proc_fs.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Text/string.h>
@@ -7,6 +8,12 @@
 using namespace fk::core;
 
 fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
+  // Add partitions entry
+  DirectoryEntry p_de;
+  strncpy(p_de.name, "partitions", sizeof(p_de.name));
+  p_de.type = 0; // Regular file
+  entries.push_back(p_de);
+
   // Add an entry for each active PID
   auto& scheduler = SchedulerManager::the();
   
@@ -33,6 +40,12 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> ProcFsNode::lookup(const char* name) {
   // If name is numeric, return a ProcProcessNode for that pid
   if (!name || !*name) return fk::core::Error::NotFound;
+
+  if (strcmp(name, "partitions") == 0) {
+    auto res = fk::make_ref<ProcPartitionsNode>().value();
+    if (!res) return fk::core::Error::OutOfMemory;
+    return fk::RefPtr<Node>(res);
+  }
 
   // Check if numeric
   uint64_t pid = 0;
@@ -78,6 +91,35 @@ void ProcProcessNode::ensure_cached() {
     }
     int n = snprintf(tmp, sizeof(tmp), "Name: %s\nPID: %lu\nState: %s\n", t->name.c_str(), t->id, state);
     if (n > 0) buf = fk::text::String(tmp);
+  }
+
+  m_cached.clear();
+  for (size_t i = 0; i < buf.length(); ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+}
+
+fk::core::Result<size_t, fk::core::Error> ProcPartitionsNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
+  ensure_cached();
+  if (offset >= m_cached.size()) return static_cast<size_t>(0);
+  size_t available = m_cached.size() - offset;
+  size_t to_copy = (size < available) ? size : available;
+  for (size_t i = 0; i < to_copy; ++i) buffer[i] = m_cached[offset + i];
+  return to_copy;
+}
+
+void ProcPartitionsNode::ensure_cached() {
+  if (!m_cached.is_empty()) return;
+  
+  fk::text::String buf = "major minor  #blocks  name\n\n";
+  auto& partitions = PartitionManager::the().partitions().all();
+  
+  for (auto& part : partitions) {
+    char tmp[256];
+    // We don't have major/minor yet, using dummy values
+    snprintf(tmp, sizeof(tmp), "   1     %d   %llu %s\n", 
+             0, // dummy minor
+             part->sector_count().value(),
+             part->name().c_str());
+    buf = buf + fk::text::String(tmp);
   }
 
   m_cached.clear();

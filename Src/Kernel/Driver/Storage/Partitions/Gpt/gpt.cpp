@@ -24,13 +24,10 @@ GPTParser::parse(fk::RefPtr<StorageDevice> device) {
   bool primary_ok = false;
   if (read_res.is_ok()) {
     auto *header = reinterpret_cast<GPTHeader *>(buffer);
-    // Verify header is within buffer bounds
-    if (header->header_size > 0 && header->header_size <= sector_size) {
-      fk::algorithms::kdebug("GPT", "Primary header signature: %c%c%c%c%c%c%c%c%c", 
-                             header->signature[0], header->signature[1], header->signature[2],
-                             header->signature[3], header->signature[4], header->signature[5],
-                             header->signature[6], header->signature[7]);
-      if (fk::memory::compare(header->signature, "EFI PART", 8) == 0) {
+    // Check signature first to avoid noise on non-GPT disks
+    if (fk::memory::compare(header->signature, "EFI PART", 8) == 0) {
+      if (header->header_size > 0 && header->header_size <= sector_size) {
+        fk::algorithms::kdebug("GPT", "Primary header signature valid");
         uint32_t original_crc = header->header_crc;
         header->header_crc = 0;
         uint32_t calculated_crc = fk::algorithms::crc32(header, header->header_size);
@@ -39,10 +36,10 @@ GPTParser::parse(fk::RefPtr<StorageDevice> device) {
                                original_crc, calculated_crc);
         if (calculated_crc == original_crc) primary_ok = true;
       } else {
-        fk::algorithms::kwarn("GPT", "Invalid signature, not EFI PART");
+        fk::algorithms::kwarn("GPT", "Invalid header size: %u", header->header_size);
       }
     } else {
-      fk::algorithms::kwarn("GPT", "Invalid header size: %u", header->header_size);
+      fk::algorithms::kdebug("GPT", "No GPT signature found at LBA 1");
     }
   } else {
     fk::algorithms::kwarn("GPT", "Failed to read primary header LBA 1");
@@ -202,10 +199,20 @@ GPTParser::parse(fk::RefPtr<StorageDevice> device) {
     name_buffer[36] = '\0';
 
     static const uint8_t esp_guid[16] = {0x28, 0x73, 0x2A, 0xC1, 0x1F, 0xF8, 0xD2, 0x11, 0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B};
+    static const uint8_t linux_data_guid[16] = {0xAF, 0x3D, 0xC6, 0x0F, 0x83, 0x84, 0x72, 0x47, 0x8E, 0x79, 0x3D, 0x69, 0xD8, 0x47, 0x7D, 0xE4};
+    static const uint8_t windows_data_guid[16] = {0xEB, 0x0E, 0xD1, 0xEB, 0x2F, 0x40, 0x4F, 0x44, 0x84, 0x2E, 0x2F, 0x7A, 0x75, 0x18, 0xA0, 0x1F};
+
     bool is_esp = (fk::memory::compare(entry->partition_type_guid, esp_guid, 16) == 0);
+    bool is_linux = (fk::memory::compare(entry->partition_type_guid, linux_data_guid, 16) == 0);
+    bool is_windows = (fk::memory::compare(entry->partition_type_guid, windows_data_guid, 16) == 0);
+
+    const char* type_str = "";
+    if (is_esp) type_str = "[ESP] ";
+    else if (is_linux) type_str = "[Linux] ";
+    else if (is_windows) type_str = "[Windows] ";
 
     fk::algorithms::kdebug("GPT", "Partition %u: %sName='%s', Start=%llu, Count=%llu", 
-                           i + 1, is_esp ? "[ESP] " : "", name_buffer, entry->starting_lba, count);
+                           i + 1, type_str, name_buffer, entry->starting_lba, count);
 
     // BSD/Linux style naming: ad0p1, ad0p2, etc. where the number is the 1-based index in the table.
     // However, FKernel's StorageDeviceName::generate just appends. 

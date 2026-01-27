@@ -295,9 +295,11 @@ Task *SchedulerManager::pick_next() {
     Task *next = proc.run_queue.front();
     proc.run_queue.pop_front();
 
+    /*
     if (next->id > 1) {
         fk::algorithms::kdebug("SCHEDULER", "Scheduling task %lu (%s)", next->id, next->name.c_str());
     }
+    */
 
     next->state = TaskState::Running;
     next->time_slice_ticks = m_default_quantum;

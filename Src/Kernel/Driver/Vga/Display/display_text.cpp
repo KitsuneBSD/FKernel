@@ -171,11 +171,32 @@ void display_text::write_ansi_n(const char *str, size_t size) {
           if (params[0] == 2) {
               clear();
           }
+      } else if (command == 'K') {
+          // Clear line from cursor to end
+          for (size_t c = col; c < WIDTH; ++c) {
+              buffer[row * WIDTH + c] = (static_cast<uint16_t>(color) << 8) | ' ';
+          }
       } else if (command == 'H' || command == 'f') {
           row = (params[0] > 0) ? params[0] - 1 : 0;
           col = (params[1] > 0) ? params[1] - 1 : 0;
           if (row >= HEIGHT) row = HEIGHT - 1;
           if (col >= WIDTH) col = WIDTH - 1;
+          update_cursor();
+      } else if (command == 'A') { // Cursor Up
+          int n = (params[0] == 0) ? 1 : params[0];
+          if (row >= (size_t)n) row -= n; else row = 0;
+          update_cursor();
+      } else if (command == 'B') { // Cursor Down
+          int n = (params[0] == 0) ? 1 : params[0];
+          row += n; if (row >= HEIGHT) row = HEIGHT - 1;
+          update_cursor();
+      } else if (command == 'C') { // Cursor Forward
+          int n = (params[0] == 0) ? 1 : params[0];
+          col += n; if (col >= WIDTH) col = WIDTH - 1;
+          update_cursor();
+      } else if (command == 'D') { // Cursor Backward
+          int n = (params[0] == 0) ? 1 : params[0];
+          if (col >= (size_t)n) col -= n; else col = 0;
           update_cursor();
       }
     } else {
