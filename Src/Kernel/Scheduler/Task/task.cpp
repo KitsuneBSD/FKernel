@@ -73,6 +73,7 @@ int Task::add_file_descriptor(
   for (size_t i = 0; i < file_descriptors.size(); ++i) {
     if (!file_descriptors[i]) {
       file_descriptors[i] = description;
+      fk::algorithms::klog("TASK", "Task %lu: Added FD %zu -> %s", id, i, description->node()->name().c_str());
       return static_cast<int>(i);
     }
   }
@@ -80,7 +81,27 @@ int Task::add_file_descriptor(
   // No empty slots? Add to the end.
   int fd = static_cast<int>(file_descriptors.size());
   file_descriptors.push_back(description);
+  fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", id, fd, description->node()->name().c_str());
   return fd;
+}
+
+void Task::dump_file_descriptors() const {
+    fk::algorithms::klog("TASK", "FD table for Task %lu (%s):", id, name.c_str());
+    for (size_t i = 0; i < file_descriptors.size(); ++i) {
+        if (file_descriptors[i]) {
+            auto node = file_descriptors[i]->node();
+            const char* type = "unknown";
+            if (node->is_character_device()) type = "char";
+            else if (node->is_block_device()) type = "block";
+            else if (node->is_directory()) type = "dir";
+            else type = "file";
+
+            fk::algorithms::klog("TASK", "  [%zu] -> %s (type: %s, ptr: %p)", 
+                                 i, node->name().c_str(), type, node.get());
+        } else {
+            // fk::algorithms::klog("TASK", "  [%zu] -> empty", i);
+        }
+    }
 }
 
 int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min_fd) {

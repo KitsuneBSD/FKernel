@@ -87,6 +87,7 @@ struct Task {
   fk::RefPtr<FileDescription> get_file_descriptor(int fd);
   void close_file_descriptor(int fd);
 
+  void dump_file_descriptors() const;
   void print_info() const;
 };
 
