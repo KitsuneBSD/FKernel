@@ -319,7 +319,7 @@ void SchedulerManager::on_tick() {
     }
   }
 
-if (!proc.current_task || proc.current_task == proc.idle_task) {
+if (!proc.current_task || proc.current_task == proc.idle_task || !proc.run_queue.empty()) {
     proc.need_resched = true;
     return;
   }
