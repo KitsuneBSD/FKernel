@@ -11,7 +11,8 @@ constexpr uint32_t MSR_FS_BASE = 0xC0000100;
 constexpr uint32_t MSR_GS_BASE = 0xC0000101;
 constexpr uint32_t MSR_KERNEL_GS_BASE = 0xC0000102;
 
-constexpr uint64_t EFER_SCE = 1;
+constexpr uint64_t EFER_SCE = 1 << 0;
+constexpr uint64_t EFER_NXE = 1 << 11;
 
 struct PtRegs {
   uint64_t r15;
