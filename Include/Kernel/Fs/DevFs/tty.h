@@ -15,7 +15,7 @@ public:
     virtual size_t size() const override { return 0; }
 
 private:
-    int m_index;
+    [[maybe_unused]] int m_index;
 };
 
 } // namespace fkernel
