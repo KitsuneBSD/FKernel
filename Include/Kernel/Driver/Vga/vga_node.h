@@ -4,6 +4,8 @@
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <LibC/string.h>
 
+#include <Kernel/Driver/Keyboard/ps2_keyboard.h>
+
 namespace fkernel {
 
 class ConsoleNode final : public CharacterDevice {
@@ -13,9 +15,17 @@ public:
     }
     virtual ~ConsoleNode() override = default;
 
-    virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t, uint8_t*) override {
-        // TODO: Implementar leitura do teclado aqui futuramente
-        return fk::core::Error::NotImplemented;
+    virtual fk::core::Result<size_t, fk::core::Error> read([[maybe_unused]] uint64_t offset, size_t size, uint8_t* buffer) override {
+        if (!buffer || size == 0) return 0;
+
+        size_t count = 0;
+        auto& kb = PS2Keyboard::the();
+        
+        while (count < size && kb.has_key()) {
+            buffer[count++] = static_cast<uint8_t>(kb.pop_key());
+        }
+
+        return count;
     }
 
     virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t, size_t size, const uint8_t* buffer) override {
