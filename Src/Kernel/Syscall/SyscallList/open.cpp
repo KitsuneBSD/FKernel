@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Memory/memory_manager.h>
@@ -10,7 +11,7 @@
 
 extern "C" {
 uint64_t sys_open(uint64_t path_ptr, uint64_t flags, uint64_t, uint64_t,
-                  uint64_t, uint64_t) {
+                  uint64_t, uint64_t, PtRegs* regs) {
   auto *current_task = SchedulerManager::the().current();
   if (!current_task) {
     fk::algorithms::kerror("Syscall", "sys_open: No current task");

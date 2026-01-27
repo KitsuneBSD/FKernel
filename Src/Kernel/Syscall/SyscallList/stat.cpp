@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Posix/sys/stat.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -10,7 +11,7 @@
 extern "C" {
 
 uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
-                  uint64_t, uint64_t) {
+                  uint64_t, uint64_t, PtRegs* regs) {
   if (!path_ptr || !statbuf_ptr)
     return fkernel::return_error(fk::core::Error::InvalidParameter);
 

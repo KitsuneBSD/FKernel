@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
@@ -14,10 +15,10 @@ void fork_child_trampoline();
 }
 
 extern "C" {
-uint64_t
-sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
+uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
          [[maybe_unused]] uint64_t arg3, [[maybe_unused]] uint64_t arg4,
-         [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6) {
+         [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6,
+         PtRegs* regs) {
   auto *parent = SchedulerManager::the().current();
   if (!parent)
     return -1;
@@ -51,6 +52,8 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->user_rsp = g_cpu_block.user_rsp;
   child->saved_rip = g_cpu_block.saved_rip;
   child->saved_rflags = g_cpu_block.saved_rflags;
+  child->fs_base = parent->fs_base;
+  child->gs_base = parent->gs_base;
 
   // 3. Clone File Descriptors
   for (size_t i = 0; i < parent->file_descriptors.size(); ++i) {
@@ -76,19 +79,35 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->cr3 = VirtualMemoryManager::the().clone_address_space(parent->cr3);
 
   // 6. Setup child's context for switch_context
-  uintptr_t child_stack_base = child->kernel_stack_top - 96;
-  uint64_t *child_context_stack =
-      reinterpret_cast<uint64_t *>(child_stack_base);
+  // Calculate RSP relative to stack top
+  uintptr_t parent_stack_ptr = reinterpret_cast<uintptr_t>(regs);
+  uintptr_t stack_offset = parent->kernel_stack_top - parent_stack_ptr;
+  uintptr_t child_stack_ptr = child->kernel_stack_top - stack_offset;
 
-  *(--child_context_stack) = (uint64_t)fork_child_trampoline;
-  *(--child_context_stack) = 0; // rbx
-  *(--child_context_stack) = 0; // rbp
-  *(--child_context_stack) = 0; // r12
-  *(--child_context_stack) = 0; // r13
-  *(--child_context_stack) = 0; // r14
-  *(--child_context_stack) = 0; // r15
+  PtRegs* child_regs = reinterpret_cast<PtRegs*>(child_stack_ptr);
+  child_regs->rax = 0; // Return 0 for child in fork()
 
-  child->stack_pointer = reinterpret_cast<uint64_t>(child_context_stack);
+  // We need to push callee-saved registers for switch_context
+  // Layout after switch_context (push rbx...r15):
+  // [PtRegs]
+  // [ret_addr (fork_child_trampoline)]
+  // [r15]
+  // [r14]
+  // [r13]
+  // [r12]
+  // [rbp]
+  // [rbx]  <- RSP
+  
+  uint64_t* context = reinterpret_cast<uint64_t*>(child_stack_ptr);
+  *(--context) = (uint64_t)fork_child_trampoline;
+  *(--context) = 0; // r15
+  *(--context) = 0; // r14
+  *(--context) = 0; // r13
+  *(--context) = 0; // r12
+  *(--context) = 0; // rbp
+  *(--context) = 0; // rbx
+
+  child->stack_pointer = reinterpret_cast<uint64_t>(context);
 
   // 7. Add to scheduler
   SchedulerManager::the().add_task(child);

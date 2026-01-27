@@ -28,6 +28,12 @@ syscall_stub:
     push qword [gs:16] ; User RIP
 
     ; Save General Purpose Registers
+    push rbx
+    push rbp
+    push r12
+    push r13
+    push r14
+    push r15
     push rax 
     push rdi
     push rsi
@@ -37,8 +43,8 @@ syscall_stub:
     push r9
 
     ; Prepare C arguments
-    push 0       ; Alignment padding
-    push r9      ; Arg6
+    push rsp     ; Arg8: Pointer to PtRegs
+    push r9      ; Arg7: Arg6
     
     mov r9, r8   ; Arg5
     mov r8, r10  ; Arg4
@@ -54,7 +60,7 @@ syscall_stub_post_dispatch:
     ; RAX now contains return value
     
     ; Cleanup Stack
-    add rsp, 16  ; Remove Arg6 + Padding
+    add rsp, 16  ; Remove Arg7 + Arg8
     
     ; Restore Registers
     pop r9
@@ -64,6 +70,12 @@ syscall_stub_post_dispatch:
     pop rsi
     pop rdi
     add rsp, 8   ; discarding saved RAX
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    pop rbx
     
     ; Discard old stack context (we'll use values from GS)
     add rsp, 24

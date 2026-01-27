@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -11,7 +12,7 @@
 extern "C" {
 
 uint64_t sys_fstat(uint64_t fd, uint64_t statbuf_ptr, uint64_t, uint64_t,
-                   uint64_t, uint64_t) {
+                   uint64_t, uint64_t, PtRegs* regs) {
   auto* task = SchedulerManager::the().current();
   if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 

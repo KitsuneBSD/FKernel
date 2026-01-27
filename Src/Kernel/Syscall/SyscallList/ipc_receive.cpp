@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Ipc/cspace.h>
 #include <Kernel/Ipc/endpoint.h>
 #include <Kernel/Ipc/message_info.h>
@@ -5,7 +6,7 @@
 #include <Kernel/Syscall/syscall.h>
 
 extern "C" uint64_t sys_ipc_receive(uint64_t handle, uint64_t, uint64_t,
-                                    uint64_t, uint64_t, uint64_t) {
+                                    uint64_t, uint64_t, uint64_t, PtRegs* regs) {
   using namespace fkernel::ipc;
   auto *task = SchedulerManager::the().current();
   if (!task || !task->cspace)

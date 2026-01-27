@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Algorithms/log.h>
@@ -5,7 +6,7 @@
 extern "C" {
 
 uint64_t sys_sigprocmask(uint64_t how, uint64_t set_ptr, uint64_t oldset_ptr,
-                         uint64_t /* sigsetsize */, uint64_t, uint64_t) {
+                         uint64_t /* sigsetsize */, uint64_t, uint64_t, PtRegs* regs) {
   auto *task = SchedulerManager::the().current();
   if (!task)
     return -1;

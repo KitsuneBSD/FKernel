@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
@@ -16,7 +17,7 @@ struct timeval {
 
 extern "C" {
 
-uint64_t sys_clock_gettime([[maybe_unused]] uint64_t clk_id, uint64_t tp_ptr, uint64_t, uint64_t, uint64_t, uint64_t) {
+uint64_t sys_clock_gettime([[maybe_unused]] uint64_t clk_id, uint64_t tp_ptr, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
     auto* tp = reinterpret_cast<struct timespec*>(tp_ptr);
     if (!tp) return fkernel::return_error(fk::core::Error::InvalidParameter);
 
@@ -40,7 +41,7 @@ uint64_t sys_clock_gettime([[maybe_unused]] uint64_t clk_id, uint64_t tp_ptr, ui
     return 0;
 }
 
-uint64_t sys_gettimeofday(uint64_t tv_ptr, [[maybe_unused]] uint64_t tz_ptr, uint64_t, uint64_t, uint64_t, uint64_t) {
+uint64_t sys_gettimeofday(uint64_t tv_ptr, [[maybe_unused]] uint64_t tz_ptr, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
     auto* tv = reinterpret_cast<struct timeval*>(tv_ptr);
     if (!tv) return fkernel::return_error(fk::core::Error::InvalidParameter);
 
@@ -60,7 +61,7 @@ uint64_t sys_gettimeofday(uint64_t tv_ptr, [[maybe_unused]] uint64_t tz_ptr, uin
     return 0;
 }
 
-uint64_t sys_nanosleep(uint64_t req_ptr, uint64_t rem_ptr, uint64_t, uint64_t, uint64_t, uint64_t) {
+uint64_t sys_nanosleep(uint64_t req_ptr, uint64_t rem_ptr, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
     auto* req = reinterpret_cast<const struct timespec*>(req_ptr);
     if (!req) return fkernel::return_error(fk::core::Error::InvalidParameter);
 
