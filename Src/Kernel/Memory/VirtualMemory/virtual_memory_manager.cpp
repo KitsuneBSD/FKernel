@@ -145,6 +145,8 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags fl
     // PT
     pt->entries[pt_idx] = phys | static_cast<uint64_t>(flags) | static_cast<uint64_t>(PageFlags::Present);
     
+    fk::algorithms::kdebug("VMM", "Mapped %p -> %p (flags: 0x%lx)", (void*)virt, (void*)phys, (uint64_t)flags);
+
     if (changed_parents) {
         flush_tlb();
     } else {

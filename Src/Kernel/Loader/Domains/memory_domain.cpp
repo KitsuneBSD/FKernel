@@ -37,6 +37,8 @@ PageFlags MemoryDomain::elf_flags_to_page_flags(uint32_t elf_flags) {
     if (!(elf_flags & PF_X))
         flags = flags | PageFlags::ExecuteDisable;
     
+    fk::algorithms::kdebug("ELF", "Mapping ELF flags %x to PageFlags 0x%lx", elf_flags, (uint64_t)flags);
+
     return flags;
 }
 
