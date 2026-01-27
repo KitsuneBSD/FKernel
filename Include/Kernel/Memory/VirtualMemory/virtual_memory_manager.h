@@ -3,6 +3,9 @@
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_table.h>
 
+#include <LibFK/Core/Error.h>
+#include <LibFK/Core/Result.h>
+
 extern "C" void write_on_cr3(void *pml4_virt_addr);
 extern "C" uintptr_t read_on_cr3();
 
