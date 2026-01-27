@@ -11,8 +11,15 @@ ElfHeaderResult ParserDomain::validate_header() {
     auto read_res = read_from_node(0, sizeof(Elf64_Ehdr), reinterpret_cast<uint8_t*>(&header));
     if (read_res.is_error())
         return read_res.error();
-    if (read_res.value() < sizeof(Elf64_Ehdr))
+    
+    if (read_res.value() < sizeof(Elf64_Ehdr)) {
+        fk::algorithms::kwarn("ELF", "validate_header: Truncated read (%zu < %zu)", read_res.value(), sizeof(Elf64_Ehdr));
         return fk::core::Error::InvalidParameter;
+    }
+
+    fk::algorithms::kdebug("ELF", "validate_header: Magic=%02x %c %c %c, Type=%u", 
+                           header.e_ident[0], header.e_ident[1], header.e_ident[2], header.e_ident[3],
+                           (uint32_t)header.e_type);
 
     if (header.e_ident[0] != 0x7f || header.e_ident[1] != 'E' ||
         header.e_ident[2] != 'L' || header.e_ident[3] != 'F')
