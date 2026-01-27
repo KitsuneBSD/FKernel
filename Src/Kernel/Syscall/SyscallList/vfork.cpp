@@ -55,10 +55,9 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     child->memory_regions = parent->memory_regions;
 
     // 6. Setup context
-    extern CpuControlBlock g_cpu_block;
-    child->user_rsp = g_cpu_block.user_rsp;
-    child->saved_rip = g_cpu_block.saved_rip;
-    child->saved_rflags = g_cpu_block.saved_rflags;
+    child->user_rsp = regs->rsp;
+    child->saved_rip = regs->rip;
+    child->saved_rflags = regs->rflags;
     child->fs_base = parent->fs_base;
     child->gs_base = parent->gs_base;
 
