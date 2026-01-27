@@ -58,6 +58,35 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   if (node->is_directory())
     return fkernel::return_error(fk::core::Error::IsDirectory);
 
+  // Check for shebang (#!)
+  char magic[2];
+  auto magic_read_res = node->read(0, 2, reinterpret_cast<uint8_t*>(magic));
+  if (magic_read_res.is_ok() && magic_read_res.value() == 2 && magic[0] == '#' && magic[1] == '!') {
+      fk::algorithms::klog("SYSCALL", "sys_execve: Detected script (shebang), invoking /bin/sh");
+      
+      // Prepend /bin/sh to arguments
+      fk::containers::Vector<fk::text::String> script_args;
+      script_args.push_back("/bin/sh");
+      script_args.push_back(path);
+      for (size_t i = 1; i < args.size(); ++i) {
+          script_args.push_back(args[i]);
+      }
+      
+      // Recurse with /bin/sh
+      // Note: We need to resolve /bin/sh to its absolute path if it isn't already.
+      // For now, assume it's at /bin/sh.
+      auto sh_res = VirtualFileSystem::the().open("/bin/sh", 0);
+      if (sh_res.is_error()) {
+          fk::algorithms::kwarn("SYSCALL", "sys_execve: Script detected but /bin/sh not found!");
+          return fkernel::return_error(fk::core::Error::NotFound);
+      }
+      
+      // Update variables for the rest of the function to load /bin/sh instead
+      path = "/bin/sh";
+      args = fk::types::move(script_args);
+      node = sh_res.value()->node();
+  }
+
   // 2. Load the new binary into a fresh address space
   uintptr_t new_cr3 = VirtualMemoryManager::the().create_address_space();
   VirtualMemoryManager::the().switch_address_space(new_cr3);
