@@ -58,6 +58,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
       }
 
       if (options & 1) { // WNOHANG (assuming 1 is WNOHANG)
+          fk::algorithms::klog("SYSCALL", "wait4: WNOHANG returning 0");
           return 0;
       }
 
