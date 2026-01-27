@@ -4,8 +4,9 @@
 
 namespace fkernel::elf_domains {
 struct MemoryRegion {
-    uintptr_t start_vaddr;
-    uintptr_t end_vaddr;
+    uintptr_t start_vaddr;  // Page aligned start
+    uintptr_t end_vaddr;    // Page aligned end
+    uintptr_t actual_vaddr; // Original segment vaddr
     PageFlags permissions;
     size_t file_offset;
     size_t file_size;
