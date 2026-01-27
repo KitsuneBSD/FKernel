@@ -104,7 +104,10 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
     }
 
     for (auto& entry : m_files) {
-        if (entry.name == full_lookup) return entry.node;
+        if (entry.name == full_lookup) {
+            entry.node->set_parent(fk::RefPtr<Node>(this));
+            return entry.node;
+        }
     }
 
     char dir_prefix[512];

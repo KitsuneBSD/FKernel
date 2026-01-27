@@ -70,10 +70,6 @@ fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::mount(const char *path, fk::RefPtr<Node> node) {
   if (!path || !node)
     return fk::core::Error::InvalidParameter;
-  if (strcmp(path, "/") == 0) {
-    m_root = node;
-    return {};
-  }
 
   auto target_res = resolve_path(path);
   if (target_res.is_error())
@@ -135,8 +131,25 @@ VirtualFileSystem::resolve_path(const char *path, int depth) {
 
     auto lookup_res = current->lookup(name);
     if (lookup_res.is_error()) {
-      fk::algorithms::kdebug("VFS", "lookup failed for '%s' in node '%s'", name, current->name().c_str());
-      return lookup_res.error();
+      // Fallback: If this is a mount source (like RamDisk on /), 
+      // check if the underlying target (TmpFs root) has the entry.
+      // This allows seeing /dev, /proc etc.
+      fk::RefPtr<Node> underlying = nullptr;
+      for (auto &m : m_mounts) {
+        if (m.source == current) {
+          underlying = m.target;
+          break;
+        }
+      }
+
+      if (underlying) {
+          lookup_res = underlying->lookup(name);
+      }
+
+      if (lookup_res.is_error()) {
+          fk::algorithms::kdebug("VFS", "lookup failed for '%s' in node '%s' (and no underlying)", name, current->name().c_str());
+          return lookup_res.error();
+      }
     }
     current = lookup_res.value();
 
