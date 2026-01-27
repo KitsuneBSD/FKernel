@@ -150,6 +150,8 @@ void SchedulerManager::initialize() {
     init->add_file_descriptor(console_res.value()); // 0
     init->add_file_descriptor(console_res.value()); // 1
     init->add_file_descriptor(console_res.value()); // 2
+  } else {
+    fk::algorithms::kerror("SCHEDULER", "Init failed to open /dev/console: %d", (int)console_res.error());
   }
 
   // Migrate logs: disable Display, keep Serial and DebugFS
