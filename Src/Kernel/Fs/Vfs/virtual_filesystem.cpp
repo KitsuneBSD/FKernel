@@ -31,6 +31,7 @@ void VirtualFileSystem::initialize() {
   vfs.mount("/dev", fk::RefPtr<Node>(&devfs));
 
   devfs.register_device(fk::make_ref<fkernel::SerialNode>().value(), "serial");
+  devfs.register_device(fk::make_ref<fkernel::ConsoleNode>().value(), "console");
 
   auto proc_res = fk::make_ref<ProcFsNode>();
   if (proc_res) {
