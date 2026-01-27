@@ -39,6 +39,7 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     for (size_t i = 0; i < parent->file_descriptors.size(); ++i) {
         child->file_descriptors.push_back(parent->file_descriptors[i]);
     }
+    child->dump_file_descriptors();
 
     // 4. Setup Kernel Stack
     const size_t STACK_SIZE = 16 * 1024;

@@ -158,6 +158,8 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   regs->rsp = final_rsp;
   regs->rflags = 0x202; // IF | Reserved
 
+  task->dump_file_descriptors();
+
   fk::algorithms::klog("SYSCALL",
                        "EXECVE: Success. Arg0='%s', RSP=%p, Entry=%p",
                        args.size() > 0 ? args[0].c_str() : "N/A",
