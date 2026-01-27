@@ -374,14 +374,19 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
   buf->st_ino = reinterpret_cast<uintptr_t>(node.get());
   buf->st_atime = buf->st_mtime = buf->st_ctime = 1000000;
 
-  bool is_dir = node->is_directory();
-  if (is_dir) {
+  if (node->is_directory()) {
     buf->st_mode = S_IFDIR | 0755;
     buf->st_nlink = 2;
     if (buf->st_size == 0)
       buf->st_size = 4096;
   } else if (node->is_symlink()) {
     buf->st_mode = S_IFLNK | 0777;
+    buf->st_nlink = 1;
+  } else if (node->is_character_device()) {
+    buf->st_mode = S_IFCHR | 0666;
+    buf->st_nlink = 1;
+  } else if (node->is_block_device()) {
+    buf->st_mode = S_IFBLK | 0660;
     buf->st_nlink = 1;
   } else {
     buf->st_mode = S_IFREG | 0644;
