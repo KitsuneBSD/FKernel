@@ -6,7 +6,7 @@
 extern "C" {
 
 uint64_t sys_sigaction(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                       uint64_t, PtRegs* regs) {
+                       uint64_t, [[maybe_unused]] PtRegs* regs) {
 
   return 0;
 }

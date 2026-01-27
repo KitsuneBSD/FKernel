@@ -11,7 +11,7 @@
 #include <LibFK/Text/string.h>
 
 extern "C" {
-uint64_t sys_umount2(uint64_t target_ptr, uint64_t /*flags*/, PtRegs* regs) {
+uint64_t sys_umount2(uint64_t target_ptr, uint64_t /*flags*/, [[maybe_unused]] PtRegs* regs) {
     auto *current_task = SchedulerManager::the().current();
     if (!current_task) {
         fk::algorithms::kerror("Syscall", "sys_umount2: No current task");

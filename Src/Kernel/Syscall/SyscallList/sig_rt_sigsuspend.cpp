@@ -7,7 +7,7 @@
 extern "C" {
 
 uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                           uint64_t, PtRegs* regs) {
+                           uint64_t, [[maybe_unused]] PtRegs* regs) {
 
   // For now, block until a signal (or wakeup).
   // In our simple model, sys_exit of child will wake us up.

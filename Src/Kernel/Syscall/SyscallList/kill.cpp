@@ -7,7 +7,7 @@
 extern "C" {
 
 uint64_t sys_kill(uint64_t pid, uint64_t sig, uint64_t, uint64_t, uint64_t,
-                  uint64_t, PtRegs* regs) {
+                  uint64_t, [[maybe_unused]] PtRegs* regs) {
   using namespace fkernel::ipc;
 
   Notification *notification =

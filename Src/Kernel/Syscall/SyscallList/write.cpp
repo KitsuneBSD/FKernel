@@ -14,7 +14,7 @@ struct iovec {
 
 extern "C" {
 uint64_t sys_write(uint64_t fd, uint64_t buffer_ptr, uint64_t count, uint64_t,
-                   uint64_t, uint64_t, PtRegs* regs) {
+                   uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto *task = SchedulerManager::the().current();
   if (!task)
     return -1;
@@ -35,7 +35,7 @@ uint64_t sys_write(uint64_t fd, uint64_t buffer_ptr, uint64_t count, uint64_t,
 }
 
 uint64_t sys_writev(uint64_t fd, uint64_t iov_ptr, uint64_t iovcnt, uint64_t,
-                    uint64_t, uint64_t, PtRegs* regs) {
+                    uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto *task = SchedulerManager::the().current();
   if (!task)
     return -1;

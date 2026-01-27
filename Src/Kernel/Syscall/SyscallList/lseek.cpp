@@ -8,7 +8,7 @@
 
 extern "C" {
 uint64_t sys_lseek(uint64_t fd_u64, uint64_t offset, uint64_t whence, uint64_t,
-                   uint64_t, uint64_t, PtRegs* regs) {
+                   uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   int fd = (int)fd_u64;
 
   auto *current_task = SchedulerManager::the().current();

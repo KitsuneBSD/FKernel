@@ -12,7 +12,7 @@
 extern "C" {
 
 uint64_t sys_fstat(uint64_t fd, uint64_t statbuf_ptr, uint64_t, uint64_t,
-                   uint64_t, uint64_t, PtRegs* regs) {
+                   uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto* task = SchedulerManager::the().current();
   if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 

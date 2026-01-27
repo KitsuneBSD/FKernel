@@ -4,7 +4,7 @@
 #include <LibFK/Algorithms/log.h>
 
 extern "C" {
-uint64_t sys_exit(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+uint64_t sys_exit(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     auto* current = SchedulerManager::the().current();
     fk::algorithms::klog("SYSCALL", "Process %lu exiting with status %lu", current->id, status);
     
@@ -29,7 +29,7 @@ uint64_t sys_exit(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t, uint6
     return 0; 
 }
 
-uint64_t sys_exit_group(uint64_t status, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, PtRegs* regs) {
+uint64_t sys_exit_group(uint64_t status, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, [[maybe_unused]] PtRegs* regs) {
     return sys_exit(status, a1, a2, a3, a4, a5);
 }
 }

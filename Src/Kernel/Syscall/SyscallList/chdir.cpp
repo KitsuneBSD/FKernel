@@ -6,7 +6,7 @@
 extern "C" {
 
 uint64_t sys_chdir(uint64_t path_ptr, uint64_t, uint64_t, uint64_t, uint64_t,
-                   uint64_t, PtRegs* regs) {
+                   uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto *current_task = SchedulerManager::the().current();
   if (!current_task)
     return -1;

@@ -8,7 +8,7 @@
 
 extern "C" {
 uint64_t sys_read(uint64_t fd_u64, uint64_t buf_ptr, uint64_t count, uint64_t,
-                  uint64_t, uint64_t, PtRegs* regs) {
+                  uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   int fd = (int)fd_u64;
   fk::algorithms::klog("SYSCALL", "sys_read: start (fd=%d, count=%zu)", fd, (size_t)count);
 

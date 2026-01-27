@@ -3,7 +3,7 @@
 #include <Kernel/Syscall/syscall.h>
 
 extern "C" {
-uint64_t sys_yield(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+uint64_t sys_yield(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     // Force a reschedule
     SchedulerManager::the().set_need_resched(true);
     return 0;

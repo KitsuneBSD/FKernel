@@ -13,7 +13,7 @@
 extern "C" {
 uint64_t sys_mount(uint64_t source_ptr, uint64_t target_ptr,
                    uint64_t filesystemtype_ptr, uint64_t /*mountflags*/,
-                   uint64_t /*data*/, PtRegs* regs) {
+                   uint64_t /*data*/, [[maybe_unused]] PtRegs* regs) {
   auto *current_task = SchedulerManager::the().current();
   if (!current_task) {
     fk::algorithms::kerror("Syscall", "sys_mount: No current task");

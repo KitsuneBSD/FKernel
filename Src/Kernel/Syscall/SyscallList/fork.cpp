@@ -15,7 +15,8 @@ void fork_child_trampoline();
 }
 
 extern "C" {
-uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
+uint64_t
+sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
          [[maybe_unused]] uint64_t arg3, [[maybe_unused]] uint64_t arg4,
          [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6,
          PtRegs* regs) {

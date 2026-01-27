@@ -11,7 +11,7 @@
 extern "C" {
 
 uint64_t sys_mmap(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t prot, uint64_t flags,
-                  uint64_t fd, [[maybe_unused]] uint64_t offset, PtRegs* regs) {
+                  uint64_t fd, [[maybe_unused]] uint64_t offset, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
@@ -32,7 +32,7 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t prot, u
     return target_addr;
 }
 
-uint64_t sys_munmap(uint64_t addr, uint64_t len, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+uint64_t sys_munmap(uint64_t addr, uint64_t len, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     // FIXME: Implement page unmapping
     fk::algorithms::klog("SYSCALL", "munmap(%p, %lu) stub called", (void*)addr, len);
     return 0;

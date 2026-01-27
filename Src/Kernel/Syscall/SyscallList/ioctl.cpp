@@ -15,7 +15,7 @@ struct winsize {
 
 extern "C" {
 
-uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto *task = SchedulerManager::the().current();
   if (!task) return -1;
 

@@ -150,11 +150,10 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
 
   uintptr_t final_rsp = current_user_stack;
 
-  // 5. Update return state via CpuControlBlock
-  extern CpuControlBlock g_cpu_block;
-  g_cpu_block.user_rsp = final_rsp;
-  g_cpu_block.saved_rip = entry;
-  g_cpu_block.saved_rflags = 0x202; // IF | Reserved
+  // 5. Update return state via PtRegs
+  regs->rip = entry;
+  regs->rsp = final_rsp;
+  regs->rflags = 0x202; // IF | Reserved
 
   fk::algorithms::klog("SYSCALL",
                        "EXECVE: Success. Arg0='%s', RSP=%p, Entry=%p",
