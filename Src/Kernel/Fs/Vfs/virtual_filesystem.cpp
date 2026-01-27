@@ -230,6 +230,9 @@ VirtualFileSystem::mkdir(const char *path, int mode) {
   auto parent_res = resolve_path_to_parent(path);
   if (parent_res.is_error()) return parent_res.error();
   
+  if (!parent_res.value().first)
+    return fk::core::Error::NotFound;
+
   TRY(parent_res.value().first->mkdir(parent_res.value().second.c_str(), mode));
   return {};
 }

@@ -213,8 +213,7 @@ void SchedulerManager::zombify_current() {
   task->state = TaskState::Blocked; // Terminated/Zombie effectively
   task->terminated = true;
 
-  // Add to zombie queue so it can be reaped
-  m_zombie_queue.push_back(task);
+  // Zombie task cleanup would be handled by parent process
 
   // Do NOT clear proc.current_task here.
   proc.need_resched = true;
@@ -276,9 +275,7 @@ void SchedulerManager::wake_task(Task *task) {
   m_processors[target_cpu].run_queue.push_back(task);
 }
 
-void SchedulerManager::remove_zombie(Task *task) {
-  m_zombie_queue.remove(task);
-}
+
 
 Task *SchedulerManager::pick_next() {
   auto &proc = current_processor();
@@ -318,11 +315,11 @@ void SchedulerManager::on_tick() {
     }
   }
 
-  if (!proc.current_task || proc.current_task == proc.idle_task) {
+if (!proc.current_task || proc.current_task == proc.idle_task) {
     proc.need_resched = true;
     return;
   }
-
+  
   if (--proc.current_task->time_slice_ticks == 0) {
     Task *task = proc.current_task;
     task->state = TaskState::Ready;

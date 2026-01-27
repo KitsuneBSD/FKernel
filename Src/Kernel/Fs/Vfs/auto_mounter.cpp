@@ -26,10 +26,10 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
     
     // Ensure mount directory exists
     auto mkdir_res = VirtualFileSystem::the().mkdir("/mnt", 0755);
-    if (mkdir_res.is_error()) {
-        // If /mnt doesn't exist, skip auto-mounting for now
-        // This can happen during early boot before VFS is fully initialized
-        return;
+    if (mkdir_res.is_error() && mkdir_res.error() != fk::core::Error::PermissionDenied) {
+        // If it's not a "PermissionDenied" (which TmpFs uses for AlreadyExists),
+        // we might have a real issue. But let's try to proceed anyway if /mnt exists.
+        fk::algorithms::kwarn("AUTO-MOUNT", "mkdir /mnt failed: %d", (int)mkdir_res.error());
     }
 
     // Try FAT12

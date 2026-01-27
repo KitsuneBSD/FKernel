@@ -47,6 +47,17 @@ struct Task {
 
   uintptr_t clear_child_tid{0};
 
+  // vfork tracking
+  bool vfork_waiting{false};
+  TaskId vfork_parent_id{0};
+
+  // x86_64 segment bases
+  uint64_t fs_base{0};
+  uint64_t gs_base{0};
+
+  // vfork address space sharing
+  bool is_vfork_sharing_address_space{false};
+
   struct MemoryRegions {
     uintptr_t heap_start{0};
     uintptr_t heap_break{0};

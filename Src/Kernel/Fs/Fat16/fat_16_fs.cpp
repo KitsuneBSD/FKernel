@@ -36,6 +36,8 @@ Fat16FileSystem::create(fk::RefPtr<StorageDevice> device) {
     if (clusters < 4085 || clusters >= 65525) return fk::core::Error::InvalidData;
 
     auto fs = fk::adopt_ref(new Fat16FileSystem(device));
+    if (!fs) return fk::core::Error::OutOfMemory;
+
     fs->m_fat_sector = bpb.reserved_sectors;
     fs->m_root_dir_sectors = root_dir_sectors;
     fs->m_first_data_sector = bpb.reserved_sectors + (bpb.fat_count * bpb.fat_size_16) + root_dir_sectors;

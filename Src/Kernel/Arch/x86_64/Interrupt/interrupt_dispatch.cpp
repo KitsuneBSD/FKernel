@@ -11,5 +11,9 @@ extern "C" void interrupt_dispatch(uint8_t vector,
   } else
     default_handler(vector, frame);
 
-  SchedulerManager::the().schedule();
+  // Only schedule if explicitly requested (e.g., by timer interrupt)
+  // This prevents double-scheduling and excessive context switching
+  if (SchedulerManager::the().is_need_resched()) {
+    SchedulerManager::the().schedule();
+  }
 }
