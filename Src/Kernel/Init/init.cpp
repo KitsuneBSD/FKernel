@@ -12,11 +12,11 @@ void init() {
   PciManager::the().initialize();
   PciManager::the().scan_bus();
 
+  // Initialize VFS BEFORE storage detection to allow auto-mounting
+  VirtualFileSystem::the().initialize();
+
   ATAController::the().initialize();
   ATAController::the().detect_devices();
-
-  // Initialize VFS *after* devices are ready
-  VirtualFileSystem::the().initialize();
 
   PS2Keyboard::the().initialize();
   SchedulerManager::the().initialize();

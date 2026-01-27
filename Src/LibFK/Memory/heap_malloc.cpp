@@ -34,7 +34,9 @@ extern "C" {
     void kfree(void* ptr) { MemoryManager::the().free(ptr); }
     
     void* kcalloc(size_t nmemb, size_t size) {
-        void* ptr = kmalloc(nmemb * size);
+        size_t total = nmemb * size;
+        void* ptr = kmalloc(total);
+        if (ptr) memset(ptr, 0, total);
         return ptr;
     }
     

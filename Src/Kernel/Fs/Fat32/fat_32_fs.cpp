@@ -38,6 +38,8 @@ Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {
     if (bpb.root_cluster < 2) return fk::core::Error::InvalidData;
 
     auto fs = fk::adopt_ref(new Fat32FileSystem(device));
+    if (!fs) return fk::core::Error::OutOfMemory;
+
     fs->m_fat_sector = bpb.reserved_sectors;
     fs->m_root_cluster = bpb.root_cluster;
     fs->m_sectors_per_cluster = bpb.sectors_per_cluster;
