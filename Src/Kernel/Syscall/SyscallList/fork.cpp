@@ -101,12 +101,12 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   
   uint64_t* context = reinterpret_cast<uint64_t*>(child_stack_ptr);
   *(--context) = (uint64_t)fork_child_trampoline;
-  *(--context) = 0; // r15
-  *(--context) = 0; // r14
-  *(--context) = 0; // r13
-  *(--context) = 0; // r12
-  *(--context) = 0; // rbp
-  *(--context) = 0; // rbx
+  *(--context) = regs->r15;
+  *(--context) = regs->r14;
+  *(--context) = regs->r13;
+  *(--context) = regs->r12;
+  *(--context) = regs->rbp;
+  *(--context) = regs->rbx;
 
   child->stack_pointer = reinterpret_cast<uint64_t>(context);
 
