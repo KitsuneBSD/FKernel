@@ -32,16 +32,25 @@ public:
     static TerminalManager& the();
     
     // Create terminal on-demand
-    fk::core::Result<TerminalId, fk::core::Error> create_terminal(TerminalType type);
+    fk::core::Result<TerminalId, fk::core::Error> create_terminal(TerminalType type, const char* name_hint = nullptr);
     
     // Find existing terminal
     fk::memory::optional<VGATerminal*> find_vga_terminal(TerminalId id);
+    
+    // Delete terminal
+    fk::core::Result<void, fk::core::Error> delete_terminal(TerminalId id);
+    
+    // Get terminal by ID (generic)
+    fk::memory::optional<Terminal*> find_terminal(TerminalId id);
     
     // Get all terminals
     const fk::containers::Vector<fk::OwnPtr<VGATerminal>>& vga_terminals() const { return m_vga_terminals; }
     
     // Initialize default terminals
     void initialize();
+    
+    // Get terminal count by type
+    size_t vga_terminal_count() const { return m_vga_terminals.size(); }
     
 private:
     TerminalManager() = default;

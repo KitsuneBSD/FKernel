@@ -6,6 +6,11 @@ static constexpr uint16_t PS2_DATA_PORT = 0x60;     ///< PS/2 data port
 static constexpr uint16_t PS2_STATUS_PORT = 0x64;   ///< PS/2 status port
 static constexpr size_t KEYBOARD_BUFFER_SIZE = 256; ///< Size of the key buffer
 
+enum class KeyboardLayout {
+  US,
+  ABNT2
+};
+
 /**
  * @brief PS/2 keyboard controller
  *
@@ -18,9 +23,11 @@ private:
   volatile size_t head = 0;                   ///< Head index of the buffer
   volatile size_t tail = 0;                   ///< Tail index of the buffer
   bool shift_pressed = false;        ///< Track shift key state
+  KeyboardLayout m_layout = KeyboardLayout::US;
 
   PS2Keyboard() = default; ///< Private constructor for singleton
 
+public:
   /**
    * @brief Push a character into the internal buffer
    * @param c Character to push
@@ -33,7 +40,6 @@ private:
    */
   void handle_scancode(uint8_t scancode);
 
-public:
   /**
    * @brief Get the singleton instance of the PS2Keyboard
    * @return Reference to the keyboard instance
@@ -42,6 +48,9 @@ public:
     static PS2Keyboard instance;
     return instance;
   }
+
+  void set_layout(KeyboardLayout layout) { m_layout = layout; }
+  KeyboardLayout layout() const { return m_layout; }
 
   /**
    * @brief Initialize the PS/2 keyboard

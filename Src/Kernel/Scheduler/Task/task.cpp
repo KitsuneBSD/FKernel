@@ -80,6 +80,11 @@ int Task::add_file_descriptor(
   }
 
   // No empty slots? Add to the end.
+  if (file_descriptors.is_full()) {
+    fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", id);
+    return -24; // -EMFILE
+  }
+
   int fd = static_cast<int>(file_descriptors.size());
   file_descriptors.push_back(description);
   fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", id, fd, description->node()->name().c_str());

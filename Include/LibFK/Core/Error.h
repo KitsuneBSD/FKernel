@@ -26,6 +26,7 @@ enum class Error {
   NotASymlink = 22,                 // Same as EINVAL
   IsASymlink = 40,                  // ELOOP or EINVAL
   NotImplemented = 38,              // ENOSYS
+  AlreadyExists = 17,               // EEXIST
 };
 
 } // namespace core

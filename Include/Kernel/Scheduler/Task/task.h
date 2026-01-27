@@ -79,7 +79,7 @@ struct Task {
   fk::containers::IntrusiveListNode<Task> wait_node;
   fk::containers::IntrusiveListNode<Task> sleep_node;
 
-  fk::containers::static_vector<fk::RefPtr<FileDescription>, 32>
+  fk::containers::static_vector<fk::RefPtr<FileDescription>, 128>
       file_descriptors;
 
   int add_file_descriptor(fk::RefPtr<FileDescription> description);

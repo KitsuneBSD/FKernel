@@ -2,22 +2,56 @@
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <LibFK/Algorithms/log.h>
 
-// Layout US QWERTY simplificado
-static const char scancode_set1[128] = {
-    0,   27,  '1',  '2',  '3',  '4', '5', '6',  '7', '8', '9', '0',
-    '-', '=', '\b', '\t', 'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
-    'o', 'p', '[',  ']',  '\n', 0,   'a', 's',  'd', 'f', 'g', 'h',
-    'j', 'k', 'l',  ';',  '\'', '`', 0,   '\\', 'z', 'x', 'c', 'v',
-    'b', 'n', 'm',  ',',  '.',  '/', 0,   '*',  0,   ' ', 0,
+// Row helper: 16 entries
+#define R16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p
+
+// Layout US QWERTY
+static const char us_set1[128] = {
+    R16(0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t'), // 0x00
+    R16('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 0, 'a', 's'),  // 0x10
+    R16('d', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0, '\\', 'z', 'x', 'c', 'v'), // 0x20
+    R16('b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x50
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                                // 0x70
 };
 
-static const char scancode_set1_shift[128] = {
-    0,   27,  '!',  '@',  '#',  '$', '%', '^', '&', '*', '(', ')',
-    '_', '+', '\b', '\t', 'Q',  'W', 'E', 'R', 'T', 'Y', 'U', 'I',
-    'O', 'P', '{',  '}',  '\n', 0,   'A', 'S', 'D', 'F', 'G', 'H',
-    'J', 'K', 'L',  ':',  '"',  '~', 0,   '|', 'Z', 'X', 'C', 'V',
-    'B', 'N', 'M',  '<',  '>',  '?', 0,   '*', 0,   ' ', 0,
+static const char us_set1_shift[128] = {
+    R16(0, 27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', '\t'), // 0x00
+    R16('Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0, 'A', 'S'),  // 0x10
+    R16('D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|', 'Z', 'X', 'C', 'V'),  // 0x20
+    R16('B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x50
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                                // 0x70
+};
+
+// Layout ABNT2
+static const char abnt2_set1[128] = {
+    R16(0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t'), // 0x00
+    R16('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 0, '[', '\n', 0, 'a', 's'),   // 0x10 (0x1A: acute)
+    R16('d', 'f', 'g', 'h', 'j', 'k', 'l', 'c', '~', '\'', 0, ']', 'z', 'x', 'c', 'v'), // 0x20 (0x27: ç -> c, 0x2B: ])
+    R16('b', 'n', 'm', ',', '.', ';', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30 (0x35: ;)
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
+    R16(0, 0, 0, 0, 0, 0, '\\', 0, 0, 0, 0, 0, 0, 0, 0, 0),                            // 0x50 (0x56: \)
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
+    R16(0, 0, 0, '/', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                               // 0x70 (0x73: /)
+};
+
+static const char abnt2_set1_shift[128] = {
+    R16(0, 27, '!', '@', '#', '$', '%', 0, '&', '*', '(', ')', '_', '+', '\b', '\t'),   // 0x00
+    R16('Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 0, '{', '\n', 0, 'A', 'S'),   // 0x10 (0x1A: grave)
+    R16('D', 'F', 'G', 'H', 'J', 'K', 'L', 'C', '^', '"', 0, '}', 'Z', 'X', 'C', 'V'),  // 0x20 (0x27: Ç -> C, 0x2B: })
+    R16('B', 'N', 'M', '<', '>', ':', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30 (0x35: :)
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
+    R16(0, 0, 0, 0, 0, 0, '|', 0, 0, 0, 0, 0, 0, 0, 0, 0),                             // 0x50 (0x56: |)
+    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
+    R16(0, 0, 0, '?', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                               // 0x70 (0x73: ?)
 };
 
 void PS2Keyboard::push_char(char c) {
@@ -29,6 +63,13 @@ void PS2Keyboard::push_char(char c) {
 }
 
 bool PS2Keyboard::has_key() {
+  if (head == tail) {
+    // Polling fallback if interrupts are disabled/slow
+    if (inb(PS2_STATUS_PORT) & 1) {
+      uint8_t scancode = inb(PS2_DATA_PORT);
+      handle_scancode(scancode);
+    }
+  }
   return head != tail;
 }
 
@@ -53,10 +94,19 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
   if (key_released)
     return;
 
-  char c =
-      shift_pressed ? scancode_set1_shift[keycode] : scancode_set1[keycode];
-  if (c)
+  char c = 0;
+  if (m_layout == KeyboardLayout::ABNT2) {
+      c = shift_pressed ? abnt2_set1_shift[keycode] : abnt2_set1[keycode];
+  } else {
+      c = shift_pressed ? us_set1_shift[keycode] : us_set1[keycode];
+  }
+
+  if (c) {
+    // fk::algorithms::klog("KEYBOARD", "Key: %c (keycode: 0x%X)", c, keycode);
     push_char(c);
+  } else {
+    // fk::algorithms::kdebug("KEYBOARD", "Unmapped keycode: 0x%X", keycode);
+  }
 }
 
 void PS2Keyboard::irq_handler() {
@@ -64,13 +114,8 @@ void PS2Keyboard::irq_handler() {
   handle_scancode(scancode);
 }
 
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
-
-// ... (includes remain the same)
-
-// ... (code remains the same)
-
 void PS2Keyboard::initialize() {
+  m_layout = KeyboardLayout::ABNT2;
   HardwareInterruptManager::the().unmask_interrupt(1);
-  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked)");
+  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked, ABNT2, Polling Fallback)");
 }
