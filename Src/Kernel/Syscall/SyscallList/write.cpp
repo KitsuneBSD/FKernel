@@ -1,3 +1,4 @@
+#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Driver/SerialPort/serial_port.h"
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
