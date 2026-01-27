@@ -394,7 +394,7 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
   }
 
   fk::algorithms::klog("VFS", "stat: path='%s' is_dir=%s mode=0%o size=%zu",
-                       path, is_dir ? "yes" : "no", buf->st_mode,
+                       path, node->is_directory() ? "yes" : "no", buf->st_mode,
                        (size_t)buf->st_size);
 
   return {};
