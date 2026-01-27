@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -6,7 +7,7 @@
 extern "C" {
 
 uint64_t sys_getcwd(uint64_t buf_ptr, uint64_t size, uint64_t, uint64_t,
-                    uint64_t, uint64_t) {
+                    uint64_t, uint64_t, PtRegs* regs) {
   auto *current_task = SchedulerManager::the().current();
   if (!current_task)
     return fkernel::return_error(fk::core::Error::PermissionDenied);

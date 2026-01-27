@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
@@ -7,7 +8,7 @@
 
 extern "C" {
 uint64_t sys_close(uint64_t fd_u64, uint64_t, uint64_t, uint64_t, uint64_t,
-                   uint64_t) {
+                   uint64_t, PtRegs* regs) {
   int fd = (int)fd_u64;
 
   auto *current_task = SchedulerManager::the().current();

@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall_utils.h>
@@ -14,7 +15,7 @@ struct winsize {
 
 extern "C" {
 
-uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64_t, uint64_t) {
+uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
   auto *task = SchedulerManager::the().current();
   if (!task) return -1;
 

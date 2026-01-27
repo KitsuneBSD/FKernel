@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -13,7 +14,7 @@ extern "C" {
 #define F_SETFL 4
 #define F_DUPFD_CLOEXEC 1030
 
-uint64_t sys_fcntl([[maybe_unused]] uint64_t fd, uint64_t cmd, [[maybe_unused]] uint64_t arg, [[maybe_unused]] uint64_t arg4, [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6) {
+uint64_t sys_fcntl([[maybe_unused]] uint64_t fd, uint64_t cmd, [[maybe_unused]] uint64_t arg, [[maybe_unused]] uint64_t arg4, [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6, PtRegs* regs) {
     fk::algorithms::klog("SYSCALL", "fcntl: FD %lu, CMD %lu, ARG 0x%lx", fd, cmd, arg);
 
     auto* task = SchedulerManager::the().current();

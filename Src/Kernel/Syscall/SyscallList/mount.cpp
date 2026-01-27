@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Memory/memory_manager.h>
@@ -12,7 +13,7 @@
 extern "C" {
 uint64_t sys_mount(uint64_t source_ptr, uint64_t target_ptr,
                    uint64_t filesystemtype_ptr, uint64_t /*mountflags*/,
-                   uint64_t /*data*/) {
+                   uint64_t /*data*/, PtRegs* regs) {
   auto *current_task = SchedulerManager::the().current();
   if (!current_task) {
     fk::algorithms::kerror("Syscall", "sys_mount: No current task");

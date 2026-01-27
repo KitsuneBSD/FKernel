@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <LibC/string.h>
@@ -13,7 +14,7 @@ struct utsname {
 
 extern "C" {
 uint64_t sys_uname(uint64_t buf_ptr, uint64_t, uint64_t, uint64_t, uint64_t,
-                   uint64_t) {
+                   uint64_t, PtRegs* regs) {
   if (!buf_ptr)
     return -22; // EINVAL
 

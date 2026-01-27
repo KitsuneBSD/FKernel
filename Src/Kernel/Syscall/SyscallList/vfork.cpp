@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -9,7 +10,10 @@ extern "C" {
 void fork_child_trampoline();
 }
 
-extern "C" uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t) {
+extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
+                             [[maybe_unused]] uint64_t arg3, [[maybe_unused]] uint64_t arg4,
+                             [[maybe_unused]] uint64_t arg5, [[maybe_unused]] uint64_t arg6,
+                             PtRegs* regs) {
     auto *parent = SchedulerManager::the().current();
     if (!parent) return -1;
 
@@ -25,6 +29,7 @@ extern "C" uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
     child->name = parent->name;
     child->state = TaskState::Ready;
     child->priority = parent->priority;
+    child->cpu_affinity = parent->cpu_affinity;
     child->is_a_kernel_task = parent->is_a_kernel_task;
     child->cwd = parent->cwd;
     child->vfork_parent_id = parent->id; // Mark as vfork child
@@ -37,6 +42,10 @@ extern "C" uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
     // 4. Setup Kernel Stack
     const size_t STACK_SIZE = 16 * 1024;
     void *child_stack_mem = kmalloc(STACK_SIZE);
+    if (!child_stack_mem) {
+        delete child;
+        return -1;
+    }
     child->kernel_stack_top = reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
     memcpy(child_stack_mem, reinterpret_cast<void*>(parent->kernel_stack_top - STACK_SIZE), STACK_SIZE);
 
@@ -53,39 +62,24 @@ extern "C" uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
     child->fs_base = parent->fs_base;
     child->gs_base = parent->gs_base;
 
-    uint64_t *child_context_stack = reinterpret_cast<uint64_t *>(child->kernel_stack_top);
-    *(--child_context_stack) = parent->user_rsp;     // top - 8
-    *(--child_context_stack) = parent->saved_rflags;  // top - 16
-    *(--child_context_stack) = parent->saved_rip;     // top - 24
-    
-    uint64_t *parent_gprs = reinterpret_cast<uint64_t *>(parent->kernel_stack_top - 24 - 56);
-    for (int i = 6; i >= 0; --i) { // RAX, RDI, RSI, RDX, R10, R8, R9
-        if (i == 6) // RAX
-            *(--child_context_stack) = 0; // Child returns 0
-        else
-            *(--child_context_stack) = parent_gprs[i];
-    }
+    // Calculate RSP relative to stack top
+    uintptr_t parent_stack_ptr = reinterpret_cast<uintptr_t>(regs);
+    uintptr_t stack_offset = parent->kernel_stack_top - parent_stack_ptr;
+    uintptr_t child_stack_ptr = child->kernel_stack_top - stack_offset;
 
-    *(--child_context_stack) = 0; // Alignment padding
-    *(--child_context_stack) = 0; // Arg6
+    PtRegs* child_regs = reinterpret_cast<PtRegs*>(child_stack_ptr);
+    child_regs->rax = 0; // Return 0 for child
 
-    // 6.5. Inherit callee-saved registers
-    uint64_t rbx, rbp, r12, r13, r14, r15;
-    asm volatile("mov %%rbx, %0" : "=r"(rbx));
-    asm volatile("mov %%rbp, %0" : "=r"(rbp));
-    asm volatile("mov %%r12, %0" : "=r"(r12));
-    asm volatile("mov %%r13, %0" : "=r"(r13));
-    asm volatile("mov %%r14, %0" : "=r"(r14));
-    asm volatile("mov %%r15, %0" : "=r"(r15));
+    uint64_t* context = reinterpret_cast<uint64_t*>(child_stack_ptr);
+    *(--context) = (uint64_t)fork_child_trampoline;
+    *(--context) = 0; // r15
+    *(--context) = 0; // r14
+    *(--context) = 0; // r13
+    *(--context) = 0; // r12
+    *(--context) = 0; // rbp
+    *(--context) = 0; // rbx
 
-    *(--child_context_stack) = (uint64_t)fork_child_trampoline;
-    *(--child_context_stack) = rbx;
-    *(--child_context_stack) = rbp;
-    *(--child_context_stack) = r12;
-    *(--child_context_stack) = r13;
-    *(--child_context_stack) = r14;
-    *(--child_context_stack) = r15;
-    child->stack_pointer = reinterpret_cast<uint64_t>(child_context_stack);
+    child->stack_pointer = reinterpret_cast<uint64_t>(context);
 
     // 7. Add child to scheduler and BLOCK parent
     SchedulerManager::the().add_task(child);

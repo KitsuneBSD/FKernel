@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
@@ -15,7 +16,7 @@
 
 extern "C" {
 uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
-                    uint64_t, uint64_t, uint64_t) {
+                    uint64_t, uint64_t, uint64_t, PtRegs* regs) {
   // 1. Capture data from user space before we lose the address space
   fk::text::String path = reinterpret_cast<const char *>(path_ptr);
 

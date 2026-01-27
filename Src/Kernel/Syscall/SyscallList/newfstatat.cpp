@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
@@ -8,7 +9,7 @@
 extern "C" {
 
 uint64_t sys_newfstatat(uint64_t dirfd, uint64_t path_ptr, uint64_t statbuf_ptr, [[maybe_unused]] uint64_t flags,
-                       uint64_t, uint64_t) {
+                       uint64_t, uint64_t, PtRegs* regs) {
     auto* current_task = SchedulerManager::the().current();
     if (!current_task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
