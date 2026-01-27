@@ -2,6 +2,7 @@
 #include <Kernel/Driver/Vga/vga_node.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
+#include <Kernel/Fs/DevFs/tty.h>
 #include <Kernel/Fs/ProcFs/proc_fs.h>
 #include <Kernel/Fs/TmpFs/tmp_fs.h>
 #include <Kernel/Fs/Vfs/definitions.h>
@@ -32,6 +33,14 @@ void VirtualFileSystem::initialize() {
 
   devfs.register_device(fk::make_ref<fkernel::SerialNode>().value(), "serial");
   devfs.register_device(fk::make_ref<fkernel::ConsoleNode>().value(), "console");
+
+  // Register TTY devices
+  devfs.register_device(fk::make_ref<fkernel::TTYDevice>(-1).value(), "tty");
+  for (int i = 0; i <= 5; ++i) {
+      char tty_name[8];
+      snprintf(tty_name, sizeof(tty_name), "tty%d", i);
+      devfs.register_device(fk::make_ref<fkernel::TTYDevice>(i).value(), tty_name);
+  }
 
   auto proc_res = fk::make_ref<ProcFsNode>();
   if (proc_res) {
