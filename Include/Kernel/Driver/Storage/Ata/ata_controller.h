@@ -11,6 +11,8 @@ private:
   ATAController() = default;
   void detect_on_pci(const PciDevice &device);
   void detect_legacy();
+  void probe_channel(uint16_t io, uint16_t ctrl, int channel_index);
+
 public:
   static ATAController &the();
   void initialize();

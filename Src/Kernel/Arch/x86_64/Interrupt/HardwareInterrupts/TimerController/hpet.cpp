@@ -1,5 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
 #include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Hardware/Acpi/hpet.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -12,17 +13,15 @@ void HPETTimer::write_reg(uint64_t reg, uint64_t value) {
 }
 
 void HPETTimer::initialize(uint32_t frequency) {
-  auto hpet_table = ACPIManager::the().find_table("HPET");
+  auto *hpet_table = static_cast<HPETTable *>(ACPIManager::the().find_table("HPET"));
   if (!hpet_table) {
     fk::algorithms::kerror("HPET", "HPET table not found!");
     return;
   }
 
-  // The HPET table contains the base address of the HPET registers.
-  // This is a simplified representation.
-  uintptr_t hpet_phys_addr = 0; // Get this from hpet_table parsing
-  // For now, let's assume a common address for QEMU for demonstration
-  hpet_phys_addr = 0xFED00000;
+  uintptr_t hpet_phys_addr = hpet_table->base_address.address;
+
+  fk::algorithms::klog("HPET", "Found HPET at physical address %p", (void*)hpet_phys_addr);
 
   MemoryManager::the().map_page(hpet_phys_addr, hpet_phys_addr,
                                 PageFlags::Present | PageFlags::Writable |
