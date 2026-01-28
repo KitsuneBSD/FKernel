@@ -1,11 +1,12 @@
 #pragma once
 
 #include <Kernel/Driver/Storage/Ata/ata_device.h>
+#include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Hardware/Pci/pci.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/retain_ptr.h>
 
-class ATAController {
+class ATAController final : public fkernel::Driver {
 private:
   fk::containers::Vector<fk::RefPtr<ATADevice>> m_devices;
   ATAController() = default;
@@ -14,6 +15,10 @@ private:
 public:
   static ATAController &the();
   void initialize();
+
+  // Driver interface
+  virtual const char* name() const override { return "ATAController"; }
+  virtual void probe() override { detect_devices(); }
 
   void detect_on_pci(const PciDevice &device);
   void detect_legacy();

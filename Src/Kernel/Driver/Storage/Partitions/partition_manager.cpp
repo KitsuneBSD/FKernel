@@ -1,6 +1,7 @@
 #include <Kernel/Driver/Storage/Partitions/Gpt/gpt.h>
 #include <Kernel/Driver/Storage/Partitions/Mbr/mbr.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
+#include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Driver/Storage/storage_device.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/log.h>
@@ -22,18 +23,8 @@ void PartitionManager::add_partition(
   
   m_partitions.add(partition);
 
-  // Register in DevFs (BSD style: ad0s1, etc.)
-  // Copy the name to ensure lifetime during registration
-  auto* node_ptr = partition.get();
-  if (node_ptr) {
-    fk::text::String device_name = partition->name();  // Copy to ensure lifetime
-    const char* name = device_name.c_str();
-    if (name) {
-      // Create a RefPtr from the RetainPtr to maintain proper lifetime
-      fk::RefPtr<Node> node_ref = fk::adopt_ref<Node>(node_ptr);
-      fkernel::DevFs::the().register_device(node_ref, name);
-    }
-  }
+  // Register in DriverManager (which handles DevFs)
+  fkernel::DriverManager::the().register_device(partition);
 
   fk::algorithms::klog("PARTITION", "Added LBA %llu, count %llu",
                        partition->start_sector(),

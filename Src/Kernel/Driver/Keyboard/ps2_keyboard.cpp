@@ -3,10 +3,33 @@
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
 
 // Row helper: 16 entries
 #define R16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p
+
+fk::core::Result<size_t, fk::core::Error> PS2Keyboard::read([[maybe_unused]] uint64_t offset, size_t size, uint8_t* out_buffer) {
+    if (size == 0) return 0;
+    if (!out_buffer) return fk::core::Error::InvalidParameter;
+
+    size_t count = 0;
+    while (count < size) {
+        if (has_key()) {
+            out_buffer[count++] = static_cast<uint8_t>(pop_key());
+            // Return immediately if we have at least one character
+            if (count > 0) return count;
+        } else {
+            if (count > 0) return count;
+            SchedulerManager::the().yield();
+        }
+    }
+    return count;
+}
+
+fk::core::Result<size_t, fk::core::Error> PS2Keyboard::write(uint64_t, size_t, const uint8_t*) {
+    return fk::core::Error::PermissionDenied;
+}
 
 // Layout US QWERTY
 static const char us_set1[128] = {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Kernel/Driver/Device/CharacterDevice/character_device.h>
+#include <LibFK/Core/Result.h>
 #include <LibFK/Types/types.h>
 
 static constexpr uint16_t PS2_DATA_PORT = 0x60;     ///< PS/2 data port
@@ -17,7 +19,7 @@ enum class KeyboardLayout {
  * Handles PS/2 keyboard input, manages an internal key buffer, and
  * provides a singleton interface for reading key presses.
  */
-class PS2Keyboard {
+class PS2Keyboard final : public fkernel::CharacterDevice {
 private:
   char buffer[KEYBOARD_BUFFER_SIZE]; ///< Circular buffer for pressed keys
   volatile size_t head = 0;                   ///< Head index of the buffer
@@ -25,9 +27,16 @@ private:
   bool shift_pressed = false;        ///< Track shift key state
   KeyboardLayout m_layout = KeyboardLayout::US;
 
-  PS2Keyboard() = default; ///< Private constructor for singleton
+  PS2Keyboard() {
+      set_name("keyboard");
+  }
 
 public:
+  // CharacterDevice interface
+  virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size, uint8_t* buffer) override;
+  virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t offset, size_t size, const uint8_t* buffer) override;
+  virtual size_t size() const override { return 0; }
+
   /**
    * @brief Push a character into the internal buffer
    * @param c Character to push
