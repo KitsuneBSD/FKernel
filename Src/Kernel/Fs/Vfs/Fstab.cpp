@@ -20,7 +20,7 @@ fk::core::Result<fk::containers::Vector<FstabEntry>, fk::core::Error> Fstab::par
              continue;
         }
 
-        entries.push_back({"/dev/ata0", "/", "fat12", "defaults", 0, 0});
+        entries.push_back({"/dev/ata0", "/", "fat32", "defaults", 0, 0});
         
         while (*line_ptr && *line_ptr != '\n') line_ptr++;
         if (*line_ptr == '\n') line_ptr++;
