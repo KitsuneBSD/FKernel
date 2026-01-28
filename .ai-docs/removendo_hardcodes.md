@@ -24,8 +24,18 @@
     - O controlador agora lê o `ProgIF` do dispositivo PCI para determinar se os canais estão em modo "Native" ou "Compatibility".
     - Em modo Native, utiliza os endereços dos BARs.
     - Em modo Compatibility (ou se nenhum controlador PCI for encontrado), utiliza as portas legadas (`0x1F0`, `0x3F6`, etc.).
-- **Object Calisthenics:** Removido o uso da palavra-chave `else` em conformidade com as regras do projeto.
+## Extensão: PCI Driver Matching
 
-## Validação Recomendada
+### 4. Sistema de Matching de Drivers PCI
+- **Arquivos:**
+    - `Include/Kernel/Hardware/Pci/pci.h`
+    - `Src/Kernel/Hardware/Pci/pci.cpp`
+    - `Src/Kernel/Init/init.cpp`
+- **Mudança:** Implementado um sistema de registro de drivers baseado em `Class Code` e `Subclass`.
+- **Lógica:**
+    - `PciManager` agora permite registrar lambdas ou funções como fábricas de drivers via `register_driver`.
+    - O método `instantiate_drivers()` percorre todos os dispositivos detectados e executa as fábricas correspondentes.
+    - Isso desacopla o `init.cpp` da lógica específica de cada driver, permitindo uma inicialização mais modular.
+- **Integração:** O `ATAController` foi migrado para este sistema, sendo registrado como o driver para dispositivos de classe `0x01` (Mass Storage) e subclasse `0x01` (IDE).
 - Boot em QEMU com e sem `-machine q35` (para testar MCFG vs Legado).
 - Verificação de logs do kernel para mensagens "Found HPET at physical address", "MCFG found", e logs de detecção de ATA.
