@@ -5,15 +5,6 @@
 
 namespace fkernel {
 
-static size_t octal_to_int(const char* str, size_t max_len) {
-    size_t result = 0;
-    for (size_t i = 0; i < max_len && str[i]; ++i) {
-        if (str[i] < '0' || str[i] > '7') break;
-        result = result * 8 + (str[i] - '0');
-    }
-    return result;
-}
-
 fk::core::Result<size_t, fk::core::Error> RamFileNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
     if (offset >= m_size) return 0;
     size_t to_read = (offset + size > m_size) ? (m_size - offset) : size;
@@ -30,14 +21,14 @@ fk::core::Result<fk::RefPtr<RamDiskNode>, fk::core::Error> RamDiskNode::create(u
 void RamDiskNode::parse_tar() {
     uint8_t* ptr = reinterpret_cast<uint8_t*>(m_start);
     while (ptr < reinterpret_cast<uint8_t*>(m_end)) {
-        TarHeader* header = reinterpret_cast<TarHeader*>(ptr);
+        auto* header = reinterpret_cast<fk::archive::TarHeader*>(ptr);
         if (header->filename[0] == '\0') break;
 
         char safe_filename[101];
         strncpy(safe_filename, header->filename, 100);
         safe_filename[100] = '\0';
 
-        size_t file_size = octal_to_int(header->size, 12);
+        size_t file_size = fk::archive::TarParser::octal_to_int(header->size, 12);
         uint8_t* data_ptr = ptr + 512;
 
         const char* final_filename = safe_filename;
