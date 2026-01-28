@@ -14,28 +14,61 @@ Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {
         return fk::core::Error::IOError;
 
     // Basic validation for FAT32
-    if (bpb.bytes_per_sector != 512) return fk::core::Error::InvalidData;
-    if (bpb.sectors_per_cluster == 0) return fk::core::Error::InvalidData;
-    if (bpb.root_entry_count != 0) return fk::core::Error::InvalidData; // Should be 0 for FAT32
-    if (bpb.fat_size_16 != 0) return fk::core::Error::InvalidData; // Should be 0 for FAT32
-    if (bpb.fat_count == 0 || bpb.fat_count > 2) return fk::core::Error::InvalidData;
-    if (bpb.fat_size_32 == 0) return fk::core::Error::InvalidData;
+    if (bpb.bytes_per_sector != 512) {
+        fk::algorithms::kwarn("FAT32", "Invalid bytes per sector: %u", bpb.bytes_per_sector);
+        return fk::core::Error::InvalidData;
+    }
+    if (bpb.sectors_per_cluster == 0) {
+        fk::algorithms::kwarn("FAT32", "Invalid sectors per cluster: 0");
+        return fk::core::Error::InvalidData;
+    }
+    if (bpb.root_entry_count != 0) {
+        fk::algorithms::kwarn("FAT32", "Invalid root entry count: %u (expected 0 for FAT32)", bpb.root_entry_count);
+        // return fk::core::Error::InvalidData; // Some formatters might be loose here
+    }
+    if (bpb.fat_size_16 != 0) {
+        fk::algorithms::kwarn("FAT32", "Invalid FAT size 16: %u (expected 0 for FAT32)", bpb.fat_size_16);
+        // return fk::core::Error::InvalidData;
+    }
+    if (bpb.fat_count == 0 || bpb.fat_count > 2) {
+        fk::algorithms::kwarn("FAT32", "Invalid FAT count: %u", bpb.fat_count);
+        return fk::core::Error::InvalidData;
+    }
+    if (bpb.fat_size_32 == 0) {
+        fk::algorithms::kwarn("FAT32", "Invalid FAT size 32: 0");
+        return fk::core::Error::InvalidData;
+    }
     
     // Check filesystem type signature
     if (fk::memory::compare(bpb.fs_type, "FAT32   ", 8) != 0) {
-        return fk::core::Error::InvalidData;
+        char type_str[9];
+        fk::memory::copy(type_str, bpb.fs_type, 8);
+        type_str[8] = '\0';
+        fk::algorithms::kwarn("FAT32", "Invalid fs_type signature: '%s'", type_str);
+        // return fk::core::Error::InvalidData; // Many modern tools put garbage or different strings here
     }
     
     // Validate cluster count - should be reasonable
     uint32_t total_sectors = bpb.total_sectors_32 ? bpb.total_sectors_32 : bpb.total_sectors_16;
-    if (total_sectors == 0) return fk::core::Error::InvalidData;
+    if (total_sectors == 0) {
+        fk::algorithms::kwarn("FAT32", "Total sectors is 0");
+        return fk::core::Error::InvalidData;
+    }
     
     uint32_t data_sectors = total_sectors - bpb.reserved_sectors - (bpb.fat_count * bpb.fat_size_32);
     uint32_t total_clusters = data_sectors / bpb.sectors_per_cluster;
-    if (total_clusters < 65525) return fk::core::Error::InvalidData; // Too few clusters for FAT32
+    if (total_clusters < 65525) {
+        fk::algorithms::kwarn("FAT32", "Too few clusters for FAT32: %u (expected > 65525)", total_clusters);
+        // return fk::core::Error::InvalidData;
+    }
     
     // Validate root cluster - should be 2 or higher
-    if (bpb.root_cluster < 2) return fk::core::Error::InvalidData;
+    if (bpb.root_cluster < 2) {
+        fk::algorithms::kwarn("FAT32", "Invalid root cluster: %u", bpb.root_cluster);
+        return fk::core::Error::InvalidData;
+    }
+
+    fk::algorithms::klog("FAT32", "Validation successful. Root cluster: %u, Sectors/Cluster: %u", bpb.root_cluster, bpb.sectors_per_cluster);
 
     auto fs = fk::adopt_ref(new Fat32FileSystem(device));
     if (!fs) return fk::core::Error::OutOfMemory;
