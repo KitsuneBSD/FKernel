@@ -34,6 +34,10 @@ void ATAController::detect_devices() {
                        m_devices.size());
 }
 
+void ATAController::create(const PciDevice& device) {
+  the().detect_on_pci(device);
+}
+
 void ATAController::detect_on_pci(const PciDevice &device) {
   fk::algorithms::klog("ATA CONTROLLER",
                        "Found PCI IDE controller at %02x:%02x.%d (ProgIF: %02x)",
