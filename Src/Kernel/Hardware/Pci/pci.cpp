@@ -54,20 +54,27 @@ uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
 }
 
 void PciManager::register_driver(uint8_t class_code, uint8_t subclass, DriverFactory factory) {
+  fk::algorithms::klog("PCI", "Registering driver for Class %02x, Subclass %02x", class_code, subclass);
   m_drivers.push_back({class_code, subclass, fk::types::move(factory)});
 }
 
 void PciManager::instantiate_drivers() {
-  fk::algorithms::klog("PCI", "Instantiating drivers for detected devices...");
+  fk::algorithms::klog("PCI", "Instantiating drivers for %d detected devices...", m_devices.size());
   for (const auto &device : m_devices) {
+    bool driver_found = false;
     for (const auto &driver : m_drivers) {
       if (device.class_code() == driver.class_code && 
           device.subclass_code() == driver.subclass) {
-        fk::algorithms::klog("PCI", "Matching driver found for device %02x:%02x.%d (Class: %02x, Sub: %02x)",
+        fk::algorithms::klog("PCI", "  -> Found driver for %02x:%02x.%d (Vendor:%04x Device:%04x)",
                              device.address().bus(), device.address().device(), 
-                             device.address().function(), device.class_code(), device.subclass_code());
+                             device.address().function(), device.vendor_id(), device.device_id());
         driver.factory(device);
+        driver_found = true;
       }
+    }
+    if (!driver_found) {
+        // Optional: log devices without drivers at debug level
+        // fk::algorithms::kdebug("PCI", "  No driver for %02x:%02x.%d (Class:%02x Sub:%02x)", ...);
     }
   }
 }

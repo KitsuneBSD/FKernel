@@ -19,24 +19,18 @@ ATAController &ATAController::the() {
 }
 
 void ATAController::detect_devices() {
-  fk::algorithms::klog("ATA CONTROLLER", "Starting device detection...");
+  // Manual call to instantiate drivers - this will trigger detect_on_pci 
+  // for any detected PCI IDE controllers.
+  PciManager::the().instantiate_drivers();
 
-  bool found_pci_ide = false;
-  auto &pci_devices = PciManager::the().devices();
-  for (auto &device : pci_devices) {
-    if (device.class_code() == 0x01 && device.subclass_code() == 0x01) {
-      detect_on_pci(device);
-      found_pci_ide = true;
-    }
-  }
-
-  if (!found_pci_ide) {
-    fk::algorithms::klog("ATA CONTROLLER", "No PCI IDE controller found, falling back to legacy probing");
+  // If no devices were found via PCI, fallback to legacy only if ACPI says it's okay
+  if (m_devices.is_empty()) {
+    fk::algorithms::klog("ATA CONTROLLER", "No IDE devices found via PCI, trying legacy...");
     detect_legacy();
   }
 
   fk::algorithms::klog("ATA CONTROLLER",
-                       "Detection complete. Found %d devices.",
+                       "Detection complete. Total devices: %d",
                        m_devices.size());
 }
 
@@ -51,16 +45,19 @@ void ATAController::detect_on_pci(const PciDevice &device) {
   uint16_t secondary_io = 0x170;
   uint16_t secondary_ctrl = 0x376;
 
+  // Read BARs if in native mode
   if (device.prog_if() & 0x01) { // Native mode primary
-    primary_io = PciManager::the().read_config_dword(device.address(), 0x10) & 0xFFFC;
-    primary_ctrl = PciManager::the().read_config_dword(device.address(), 0x14) & 0xFFFC;
-    if (primary_ctrl != 0) primary_ctrl += 2;
+    uint32_t bar0 = PciManager::the().read_config_dword(device.address(), 0x10);
+    uint32_t bar1 = PciManager::the().read_config_dword(device.address(), 0x14);
+    if (bar0 != 0) primary_io = bar0 & 0xFFFC;
+    if (bar1 != 0) primary_ctrl = (bar1 & 0xFFFC) + 2;
   }
 
   if (device.prog_if() & 0x04) { // Native mode secondary
-    secondary_io = PciManager::the().read_config_dword(device.address(), 0x18) & 0xFFFC;
-    secondary_ctrl = PciManager::the().read_config_dword(device.address(), 0x1C) & 0xFFFC;
-    if (secondary_ctrl != 0) secondary_ctrl += 2;
+    uint32_t bar2 = PciManager::the().read_config_dword(device.address(), 0x18);
+    uint32_t bar3 = PciManager::the().read_config_dword(device.address(), 0x1C);
+    if (bar2 != 0) secondary_io = bar2 & 0xFFFC;
+    if (bar3 != 0) secondary_ctrl = (bar3 & 0xFFFC) + 2;
   }
 
   probe_channel(primary_io, primary_ctrl, 0);
@@ -68,6 +65,9 @@ void ATAController::detect_on_pci(const PciDevice &device) {
 }
 
 void ATAController::detect_legacy() {
+  fk::algorithms::klog("ATA CONTROLLER", "Probing legacy IO ports (0x1F0, 0x170)...");
+  // Optional: check ACPI FADT 8042 flag or similar if needed
+  // For now, just probe standard ports as a last resort
   probe_channel(0x1F0, 0x3F6, 0);
   probe_channel(0x170, 0x376, 1);
 }
