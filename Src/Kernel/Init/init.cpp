@@ -21,15 +21,8 @@ void init() {
   // Initialize VFS BEFORE storage detection to allow auto-mounting
   VirtualFileSystem::the().initialize();
 
-  ATAController::the().initialize();
-  
-  // If no PCI IDE was found, fallback to legacy (handled by instantiate_drivers or manual call)
-  PciManager::the().instantiate_drivers();
-  
-  // Optional: check if any devices were found, if not, try legacy
-  if (ATAController::the().devices().is_empty()) {
-      ATAController::the().detect_legacy();
-  }
+  // Trigger driver matching and device detection
+  ATAController::the().detect_devices();
 
   PS2Keyboard::the().initialize();
   SchedulerManager::the().initialize();
