@@ -1,3 +1,6 @@
+#include <LibC/stdarg.h>
+#include <LibC/stddef.h>
+#include <LibC/string.h>
 #include <Kernel/Driver/SerialPort/serial_node.h>
 #include <Kernel/Driver/Vga/vga_node.h>
 #include <Kernel/Driver/Device/CharacterDevice/null_device.h>
@@ -314,6 +317,9 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
   if (!buffer)
     return fk::core::Error::InvalidParameter;
 
+  fk::algorithms::klog("VFS", "readdir: node='%s', max_bytes=%zu, offset=%lu", 
+                       description->node()->name().c_str(), max_bytes, description->offset());
+
   fk::containers::Vector<DirectoryEntry> entries;
 
   DirectoryEntry dot;
@@ -326,6 +332,8 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
   entries.push_back(dotdot);
 
   (void)description->node()->list_dir(entries);
+
+  fk::algorithms::klog("VFS", "readdir: entries after list_dir: %zu", entries.size());
 
   // Add mount points if we are at the right level
   fk::text::String current_path = description->node()->get_path();
@@ -373,7 +381,7 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
   for (size_t i = start_idx; i < entries.size(); ++i) {
     auto &entry = entries[i];
     size_t name_len = strlen(entry.name);
-    size_t reclen = (sizeof(linux_dirent64) + name_len + 1 + 7) & ~7;
+    size_t reclen = (offsetof(linux_dirent64, d_name) + name_len + 1 + 7) & ~7;
 
     if (bytes_written + reclen > max_bytes)
       break;
