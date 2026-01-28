@@ -4,6 +4,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <LibFK/Algorithms/log.h>
 
 // Row helper: 16 entries
@@ -86,13 +87,6 @@ void PS2Keyboard::push_char(char c) {
 }
 
 bool PS2Keyboard::has_key() {
-  if (head == tail) {
-    // Polling fallback if interrupts are disabled/slow
-    if (inb(PS2_STATUS_PORT) & 1) {
-      uint8_t scancode = inb(PS2_DATA_PORT);
-      handle_scancode(scancode);
-    }
-  }
   return head != tail;
 }
 
@@ -114,6 +108,18 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
     return;
   }
 
+  if (keycode == 56) { // alt
+    alt_pressed = !key_released;
+    return;
+  }
+
+  // Handle TTY switching (F1-F6)
+  if (!key_released && (keycode >= 0x3B && keycode <= 0x40)) {
+    int tty_index = keycode - 0x3B;
+    fkernel::terminal::TerminalManager::the().switch_to(tty_index);
+    return;
+  }
+
   if (key_released)
     return;
 
@@ -125,7 +131,10 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
   }
 
   if (c) {
-    // fk::algorithms::klog("KEYBOARD", "Key: %c (keycode: 0x%X)", c, keycode);
+    // Notify TerminalManager
+    fkernel::terminal::TerminalManager::the().handle_input(c);
+    
+    // Also keep local buffer for direct reads from /dev/keyboard
     push_char(c);
   } else {
     // fk::algorithms::kdebug("KEYBOARD", "Unmapped keycode: 0x%X", keycode);

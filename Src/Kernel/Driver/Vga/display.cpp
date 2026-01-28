@@ -14,15 +14,19 @@ static Display *s_current_display = nullptr;
 Display &Display::the() {
   static bool initializing = false;
 
-  // Se o MemoryManager ainda não subiu, ou se já estamos inicializando o
-  // display, forçamos o modo texto (safe fallback).
-  if (!MemoryManager::the().is_initialized() || initializing) {
-    return DisplayText::the();
+  // Allow VESA fallback if memory is ready, otherwise use text mode
+  if (!MemoryManager::the().is_initialized() && initializing) {
+    return DisplayText::the(); // Memory not ready, use VGA
   }
-
+  
   if (s_current_display)
     return *s_current_display;
-
+  
+  // Don't early initialize - let init() handle display selection
+  if (!MemoryManager::the().is_initialized()) {
+    return DisplayText::the(); // Safe fallback for early boot
+  }
+  
   initializing = true;
   if (boot::BootInfo::the().has_framebuffer()) {
     s_current_display = &DisplayFramebuffer::the();

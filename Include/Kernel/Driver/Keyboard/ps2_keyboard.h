@@ -24,8 +24,9 @@ private:
   char buffer[KEYBOARD_BUFFER_SIZE]; ///< Circular buffer for pressed keys
   volatile size_t head = 0;                   ///< Head index of the buffer
   volatile size_t tail = 0;                   ///< Tail index of the buffer
-  bool shift_pressed = false;        ///< Track shift key state
-  KeyboardLayout m_layout = KeyboardLayout::US;
+  bool shift_pressed{false};
+  bool alt_pressed{false};
+  KeyboardLayout m_layout{KeyboardLayout::US};
 
   PS2Keyboard() {
       set_name("keyboard");

@@ -110,6 +110,42 @@ void TerminalManager::initialize() {
                            "Failed to create default VGA terminal %d", i);
     }
   }
+  // Set default active terminal
+  m_active_terminal_index = 0;
+}
+
+void TerminalManager::handle_input(char c) {
+  if (auto* active = active_terminal()) {
+    active->on_char(c);
+  }
+}
+
+void TerminalManager::switch_to(int index) {
+  if (index < 0 || static_cast<size_t>(index) >= m_vga_terminals.size()) {
+    return;
+  }
+  
+  if (m_active_terminal_index == index) return;
+
+  m_active_terminal_index = index;
+  auto* terminal = m_vga_terminals[index].get();
+  
+  // Update the global active TTY for legacy reasons/convenience
+  VGATerminal::set_active(terminal);
+  
+  fk::algorithms::klog("TERMINAL MANAGER", "Switched to tty%d", index);
+  
+  // In a real OS, we would trigger a screen redraw here
+  // For now, let's just clear and show terminal name
+  terminal->clear();
+  char msg[32];
+  snprintf(msg, sizeof(msg), "\n--- Switched to TTY%d ---\n", index);
+  terminal->write(0, strlen(msg), reinterpret_cast<const uint8_t*>(msg));
+}
+
+VGATerminal* TerminalManager::active_terminal() const {
+  if (m_vga_terminals.is_empty()) return nullptr;
+  return m_vga_terminals[m_active_terminal_index].get();
 }
 
 } // namespace terminal

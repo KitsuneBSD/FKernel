@@ -49,9 +49,14 @@ public:
   void initialize();
 
   /**
-   * @brief Checks if the kernel heap is initialized.
+   * @brief Checks if kernel heap is initialized.
    */
   bool is_heap_initialized() const { return m_heap_initialized; }
+  
+  /**
+   * @brief Checks if memory manager is initialized.
+   */
+  bool is_initialized() const { return m_is_initialized; }
 
   /**
    * @brief Maps a virtual page to a physical frame.

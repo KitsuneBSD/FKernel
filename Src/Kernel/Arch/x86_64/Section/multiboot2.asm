@@ -8,13 +8,19 @@ header_start:
   dd MULTIBOOT2_i386_ARCHITECTURE
   dd header_end - header_start
   dd -(MULTIBOOT2_MAGIC + MULTIBOOT2_i386_ARCHITECTURE + (header_end - header_start))
+
+  ; Framebuffer Tag (Type 5)
+  align 8
+  dw 5          ; Type
+  dw 0          ; Flags (not optional)
+  dd 20         ; Size
+  dd 1024       ; Width
+  dd 768        ; Height
+  dd 32         ; BPP
+
   ; End tag obrigatório
-  dw 0
-  dw 0
-  dd 8
-  ; TODO: Validate that this header is placed within the first 32KiB of
-  ; the final binary image. Some tools (grub-file) require the header to be
-  ; reachable within the first 32KiB of the file image to be recognized.
-  ; FIXME: If the linker places this section in a non-loadable segment or
-  ; at an offset that gurub doesn't inspect, GRUB may not detect it.
+  align 8
+  dw 0          ; Type
+  dw 0          ; Flags
+  dd 8          ; Size
 header_end:
