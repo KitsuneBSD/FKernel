@@ -33,10 +33,4 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t prot, u
     return target_addr;
 }
 
-uint64_t sys_munmap(uint64_t addr, uint64_t len, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
-    // FIXME: Implement page unmapping
-    fk::algorithms::klog("SYSCALL", "munmap(%p, %lu) stub called", (void*)addr, len);
-    return 0;
-}
-
 }
