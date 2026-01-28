@@ -1,11 +1,36 @@
 #include <Kernel/Arch/x86_64/io.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Hardware/Acpi/mcfg.h>
 #include <Kernel/Hardware/Pci/pci.h>
+#include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
 static constexpr uint16_t PCI_CONFIG_ADDRESS = 0xCF8;
 static constexpr uint16_t PCI_CONFIG_DATA = 0xCFC;
 
 void PciManager::initialize() {
+  auto *mcfg = static_cast<MCFGTable *>(ACPIManager::the().find_table("MCFG"));
+  if (mcfg) {
+    size_t entries_count = (mcfg->header.length - sizeof(MCFGTable)) / sizeof(MCFGEntry);
+    if (entries_count > 0) {
+      m_mcfg_base = mcfg->entries[0].base_address;
+      m_has_mcfg = true;
+      fk::algorithms::klog("PCI", "MCFG found at %p, covering buses %d-%d", 
+                           (void*)m_mcfg_base, mcfg->entries[0].start_bus_number, 
+                           mcfg->entries[0].end_bus_number);
+      
+      // Map first few buses for scanning (e.g., 32MB covers 32 buses)
+      // In a real kernel, we should map more or use a dynamic mapper
+      for (uintptr_t addr = m_mcfg_base; addr < m_mcfg_base + (32 * 1024 * 1024); addr += 4096) {
+          MemoryManager::the().map_page(addr, addr, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+      }
+    }
+  }
+
+  if (!m_has_mcfg) {
+    fk::algorithms::klog("PCI", "MCFG not found, using legacy IO ports");
+  }
+
   fk::algorithms::klog("PCI", "Manager initialized");
 }
 
@@ -15,6 +40,15 @@ PciManager &PciManager::the() {
 }
 
 uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
+  if (m_has_mcfg) {
+    uintptr_t config_addr = m_mcfg_base + 
+                            ((address.bus() << 20) | 
+                             (address.device() << 15) | 
+                             (address.function() << 12) | 
+                             (offset & 0xFFF));
+    return *reinterpret_cast<volatile uint32_t *>(config_addr);
+  }
+
   outl(PCI_CONFIG_ADDRESS, address.to_config_address(offset));
   return inl(PCI_CONFIG_DATA);
 }
