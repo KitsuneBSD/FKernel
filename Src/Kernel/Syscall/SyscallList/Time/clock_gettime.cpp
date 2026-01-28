@@ -11,11 +11,6 @@ struct timespec {
     int64_t tv_nsec;
 };
 
-struct timeval {
-    int64_t tv_sec;
-    int64_t tv_usec;
-};
-
 extern "C" {
 
 uint64_t sys_clock_gettime([[maybe_unused]] uint64_t clk_id, uint64_t tp_ptr, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
@@ -38,42 +33,6 @@ uint64_t sys_clock_gettime([[maybe_unused]] uint64_t clk_id, uint64_t tp_ptr, ui
     tp->tv_nsec = (ticks % 100) * 10000000; // 100Hz ticks -> 10ms increments
 
     fk::algorithms::klog("SYSCALL", "clock_gettime: %lu seconds", tp->tv_sec);
-
-    return 0;
-}
-
-uint64_t sys_gettimeofday(uint64_t tv_ptr, [[maybe_unused]] uint64_t tz_ptr, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
-    auto* tv = reinterpret_cast<struct timeval*>(tv_ptr);
-    if (!tv) return fkernel::return_error(fk::core::Error::InvalidParameter);
-
-    auto dt = ClockManager::the().datetime();
-    uint64_t y = dt.year - 1970;
-    uint64_t days = y * 365 + (y + 2) / 4;
-    static const int days_in_month[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-    for (int i = 0; i < dt.month - 1 && i < 12; ++i) days += days_in_month[i];
-    if (dt.month > 2 && (dt.year % 4 == 0)) days++;
-    days += (dt.day - 1);
-
-    tv->tv_sec = days * 86400 + dt.hour * 3600 + dt.minute * 60 + dt.second;
-    
-    uint64_t ticks = TickManager::the().get_ticks();
-    tv->tv_usec = (ticks % 100) * 10000;
-
-    return 0;
-}
-
-uint64_t sys_nanosleep(uint64_t req_ptr, uint64_t rem_ptr, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
-    auto* req = reinterpret_cast<const struct timespec*>(req_ptr);
-    if (!req) return fkernel::return_error(fk::core::Error::InvalidParameter);
-
-    uint64_t ms = req->tv_sec * 1000 + req->tv_nsec / 1000000;
-    TickManager::the().sleep(ms);
-
-    if (rem_ptr) {
-        auto* rem = reinterpret_cast<struct timespec*>(rem_ptr);
-        rem->tv_sec = 0;
-        rem->tv_nsec = 0;
-    }
 
     return 0;
 }
