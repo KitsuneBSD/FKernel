@@ -35,6 +35,12 @@ public:
         return value;
     }
 
+    void remove_last() {
+        if (is_empty()) return;
+        m_head = (m_head == 0) ? (N - 1) : (m_head - 1);
+        m_size--;
+    }
+
     T& operator[](size_t index) {
         assert(index < m_size);
         return m_data[(m_tail + index) % N];

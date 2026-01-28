@@ -10,6 +10,7 @@
 #include <Kernel/Boot/Stages/init.h>
 #include <Kernel/Boot/boot_info.h>
 
+#include <Kernel/Driver/Vga/display_framebuffer.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Assertions.h>
@@ -35,6 +36,12 @@ void early_init() {
   fk::algorithms::klog("EARLY_INIT", "Initializing Memory Manager...");
   MemoryManager::the().initialize();
   
+  // Initialize VESA driver AFTER MemoryManager to ensure correct mapping
+  if (boot::BootInfo::the().has_framebuffer()) {
+      fk::algorithms::klog("EARLY_INIT", "Pre-initializing VESA driver...");
+      DisplayFramebuffer::the(); 
+  }
+
   // Now that we have memory mapping capabilities, we can potentially upgrade 
   // to APIC/IOAPIC if available.
   HardwareInterruptManager::the().set_memory_manager(true);

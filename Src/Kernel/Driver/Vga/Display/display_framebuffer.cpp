@@ -2,6 +2,8 @@
 #include <Kernel/Driver/Vga/display_framebuffer.h>
 #include <Kernel/Driver/Vga/font.h>
 #include <Kernel/Memory/memory_manager.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/heap_malloc.h>
 #include <LibFK/Text/string.h>
@@ -14,16 +16,8 @@ DisplayFramebuffer::DisplayFramebuffer()
 void DisplayFramebuffer::select_best_font() {
   m_current_font = Vga::default_font;
 
-  // Se a resolução for 1024x768 ou maior, usamos escala 2x para conforto
-  // (16x32px)
-  if (fb_width >= 1024 || fb_height >= 768) {
-    m_current_font.scale = 2;
-    fk::algorithms::klog("DISPLAY",
-                         "HiDPI threshold reached, using 2x font scale (%ux%u)",
-                         m_current_font.width * 2, m_current_font.height * 2);
-  } else {
-    m_current_font.scale = 1;
-  }
+  // A escala de 1x é preferida pelo usuário para maior densidade de informação
+  m_current_font.scale = 1;
 }
 
 void DisplayFramebuffer::initialize_framebuffer() {
@@ -46,21 +40,7 @@ void DisplayFramebuffer::initialize_framebuffer() {
                                       PageFlags::Present | PageFlags::Writable |
                                           PageFlags::CacheDisabled);
       }
-
-      // Alocar back buffer em RAM se o Heap estiver pronto
-      if (MemoryManager::the().is_heap_initialized()) {
-        if (back_buffer)
-          kfree(back_buffer);
-        back_buffer = static_cast<uint8_t *>(kmalloc(fb_size));
-        fk::algorithms::klog("DISPLAY",
-                             "Back buffer allocated at %p (%zu bytes)",
-                             back_buffer, fb_size);
-      }
     }
-
-    fk::algorithms::klog("DISPLAY",
-                         "Using BootInfo Framebuffer: %ux%u %ubpp at %p",
-                         fb_width, fb_height, fb_bpp, framebuffer);
   } else if (vesa::VESADriver::the().is_available() &&
              vesa::VESADriver::the().get_framebuffer() != nullptr) {
     framebuffer = vesa::VESADriver::the().get_framebuffer();
@@ -80,26 +60,10 @@ void DisplayFramebuffer::initialize_framebuffer() {
                                       PageFlags::Present | PageFlags::Writable |
                                           PageFlags::CacheDisabled);
       }
-
-      // Alocar back buffer em RAM
-      if (MemoryManager::the().is_heap_initialized()) {
-        if (back_buffer)
-          kfree(back_buffer);
-        back_buffer = static_cast<uint8_t *>(kmalloc(fb_size));
-        fk::algorithms::klog("DISPLAY",
-                             "Back buffer (VESA) allocated at %p (%zu bytes)",
-                             back_buffer, fb_size);
-      }
     }
   } else {
     framebuffer = nullptr;
   }
-}
-
-void DisplayFramebuffer::flush() {
-  if (!framebuffer || !back_buffer)
-    return;
-  memcpy(framebuffer, back_buffer, fb_height * fb_pitch);
 }
 
 fk::core::Result<void, fk::core::Error>
@@ -108,7 +72,6 @@ DisplayFramebuffer::set_vesa_mode(uint16_t mode) {
   if (res.is_ok()) {
     initialize_framebuffer();
     clear();
-    flush();
   }
   return res;
 }
@@ -120,7 +83,6 @@ DisplayFramebuffer::set_resolution(uint32_t width, uint32_t height,
   if (res.is_ok()) {
     initialize_framebuffer();
     clear();
-    flush();
   }
   return res;
 }
@@ -227,7 +189,7 @@ uint32_t DisplayFramebuffer::color_to_pixel(Color c) const {
 
 void DisplayFramebuffer::render_char(uint32_t x, uint32_t y, char c,
                                      uint32_t fg_color, uint32_t bg_color) {
-  uint8_t *target = back_buffer ? back_buffer : framebuffer;
+  uint8_t *target = framebuffer;
   if (!target)
     return;
 
@@ -271,7 +233,7 @@ void DisplayFramebuffer::render_char(uint32_t x, uint32_t y, char c,
 }
 
 void DisplayFramebuffer::scroll() {
-  uint8_t *target = back_buffer ? back_buffer : framebuffer;
+  uint8_t *target = framebuffer;
   if (!target)
     return;
 
@@ -375,6 +337,16 @@ void DisplayFramebuffer::put_char(char c) {
   put_codepoint(static_cast<uint8_t>(c));
 }
 
+void DisplayFramebuffer::test_render() {
+  fk::algorithms::klog("DISPLAY", "=== VESA Render Test ===");
+  put_char('T');
+  put_char('E');
+  put_char('S');
+  put_char('T');
+  flush();
+  fk::algorithms::klog("DISPLAY", "Test text rendered");
+}
+
 void DisplayFramebuffer::write(const char *str) {
   size_t i = 0;
   while (str[i]) {
@@ -406,7 +378,7 @@ void DisplayFramebuffer::write(const char *str) {
 }
 
 void DisplayFramebuffer::clear() {
-  uint8_t *target = back_buffer ? back_buffer : framebuffer;
+  uint8_t *target = framebuffer;
   if (!target)
     return;
   uint32_t bg_pixel = color_to_pixel(current_bg);

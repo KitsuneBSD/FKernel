@@ -2,13 +2,10 @@
 
 #include <Kernel/Driver/Terminal/terminal.h>
 #include <LibFK/Core/Result.h>
+#include <LibFK/Container/circular_buffer.h>
 
 namespace fkernel {
 namespace terminal {
-
-// Forward declarations
-class InputDevice;
-class OutputDevice;
 
 /// @brief VGA Terminal implementation using VGA adapter and PS/2 keyboard
 class VGATerminal final : public Terminal {
@@ -17,6 +14,7 @@ public:
   virtual ~VGATerminal() override = default;
 
   static VGATerminal &the();
+  static void set_active(VGATerminal* terminal);
 
   void on_char(char c);
 
@@ -42,17 +40,20 @@ public:
   // Public access to index
   int index() const { return m_index; }
 
+  // Clear screen
+  void clear();
+
 private:
   [[maybe_unused]] int m_index;
 
-  // Simple line buffering
-  static constexpr size_t LINE_BUFFER_SIZE = 1024;
-  char m_line_buffer[LINE_BUFFER_SIZE];
-  size_t m_line_len = 0;
-  size_t m_read_index = 0;
+  // Input queue for keys
+  static constexpr size_t INPUT_QUEUE_SIZE = 1024;
+  fk::containers::CircularBuffer<char, INPUT_QUEUE_SIZE> m_input_queue;
 
   // Terminal state
   bool m_raw_mode{false};
+  bool m_echo_enabled{true};
+  size_t m_line_chars{0};
   uint16_t m_rows{25};
   uint16_t m_cols{80};
 };

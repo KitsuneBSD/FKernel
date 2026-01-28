@@ -45,6 +45,10 @@ const char* VGATerminal::type_name() const {
     return "VGA";
 }
 
+void VGATerminal::set_active(VGATerminal* terminal) {
+    s_vga_tty = terminal;
+}
+
 VGATerminal& VGATerminal::the() {
     if (s_vga_tty) return *s_vga_tty;
     
@@ -54,22 +58,48 @@ VGATerminal& VGATerminal::the() {
 }
 
 void VGATerminal::on_char(char c) {
-    if (m_raw_mode) return;
-
+    // 1. Trata Backspace
     if (c == '\b') {
-        if (m_line_len > 0) {
-            m_line_len--;
-            vga::the().put_char('\b');
+        if (!m_raw_mode) {
+            if (m_line_chars > 0) {
+                m_input_queue.remove_last();
+                m_line_chars--;
+                if (m_echo_enabled) {
+                    vga::the().put_char('\b');
+                }
+            }
+        } else {
+            // Em modo RAW, apenas enviamos o caractere \b para a fila
+            m_input_queue.enqueue(c);
         }
         return;
     }
 
-    // Echo imediato para feedback visual
-    vga::the().put_char(c);
-
-    if (m_line_len < LINE_BUFFER_SIZE) {
-        m_line_buffer[m_line_len++] = c;
+    // 2. Trata Newline
+    if (c == '\n' || c == '\r') {
+        c = '\n'; // Normaliza para \n
+        m_line_chars = 0;
+        if (m_echo_enabled && !m_raw_mode) {
+            vga::the().put_char('\n');
+        }
+        m_input_queue.enqueue(c);
+        return;
     }
+
+    // 3. Caracteres Normais
+    if (m_echo_enabled && !m_raw_mode) {
+        vga::the().put_char(c);
+    }
+
+    if (!m_raw_mode) {
+        m_line_chars++;
+    }
+    
+    m_input_queue.enqueue(c);
+}
+
+void VGATerminal::clear() {
+    vga::the().clear();
 }
 
 VGATerminal::VGATerminal(int index) : m_index(index) {
@@ -91,47 +121,41 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uin
     if (size == 0) return 0;
     if (!buffer) return fk::core::Error::InvalidParameter;
 
-    m_rows = static_cast<uint16_t>(Display::the().get_height());
-    m_cols = static_cast<uint16_t>(Display::the().get_width());
-
     if (m_raw_mode) {
-        size_t read = 0;
-        while (read < size) {
-            if (PS2Keyboard::the().has_key()) {
-                buffer[read++] = static_cast<uint8_t>(PS2Keyboard::the().pop_key());
-                if (read > 0) return read;
+        size_t read_count = 0;
+        while (read_count < size) {
+            if (!m_input_queue.is_empty()) {
+                buffer[read_count++] = static_cast<uint8_t>(m_input_queue.dequeue());
+                if (read_count > 0) return read_count;
             } else {
-                if (read > 0) return read;
+                if (read_count > 0) return read_count;
                 SchedulerManager::the().yield();
             }
         }
-        return read;
+        return read_count;
     }
 
-    if (m_read_index < m_line_len) {
-        size_t copied = 0;
-        while (m_read_index < m_line_len && copied < size) {
-            buffer[copied++] = m_line_buffer[m_read_index++];
-        }
-        if (m_read_index == m_line_len) {
-            m_read_index = 0;
-            m_line_len = 0;
-        }
-        return copied;
-    }
-
+    // Canonical mode: wait for a full line (ending in \n)
     while (true) {
-        if (m_line_len > 0 && m_line_buffer[m_line_len - 1] == '\n') {
-            size_t copied = 0;
-            while (m_read_index < m_line_len && copied < size) {
-                buffer[copied++] = m_line_buffer[m_read_index++];
+        // Check if we have a newline in the queue
+        bool has_newline = false;
+        size_t newline_pos = 0;
+        for (size_t i = 0; i < m_input_queue.size(); ++i) {
+            if (m_input_queue[i] == '\n') {
+                has_newline = true;
+                newline_pos = i;
+                break;
             }
-            if (m_read_index == m_line_len) {
-                m_read_index = 0;
-                m_line_len = 0;
-            }
-            return copied;
         }
+
+        if (has_newline) {
+            size_t to_copy = (newline_pos + 1 < size) ? (newline_pos + 1) : size;
+            for (size_t i = 0; i < to_copy; ++i) {
+                buffer[i] = static_cast<uint8_t>(m_input_queue.dequeue());
+            }
+            return to_copy;
+        }
+        
         SchedulerManager::the().yield();
     }
 }
@@ -174,13 +198,14 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
         case TCGETS: {
             auto* t = reinterpret_cast<termios*>(arg);
             if (!t) return fk::core::Error::InvalidParameter;
-            t->c_lflag = (m_raw_mode ? 0 : (ICANON | ECHO));
+            t->c_lflag = (m_raw_mode ? 0 : ICANON) | (m_echo_enabled ? ECHO : 0);
             return 0;
         }
         case TCSETS: {
             auto* t = reinterpret_cast<termios*>(arg);
             if (!t) return fk::core::Error::InvalidParameter;
             m_raw_mode = !(t->c_lflag & ICANON);
+            m_echo_enabled = (t->c_lflag & ECHO);
             return 0;
         }
     }

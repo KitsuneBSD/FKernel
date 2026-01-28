@@ -13,13 +13,12 @@
 #include <LibFK/Container/circular_buffer.h>
 
 class DisplayFramebuffer : public Display {
-private:
+ private:
   uint8_t *framebuffer = nullptr;
-  uint8_t *back_buffer = nullptr;
-
+  
   // Command Queue for batched rendering
   static constexpr size_t QUEUE_SIZE =
-      128; // Increased from 10 to a power of 2 for better performance
+      128; 
   fk::containers::CircularBuffer<RenderCommand, QUEUE_SIZE> m_command_queue;
 
   uint32_t fb_width = 0;
@@ -49,8 +48,14 @@ public:
     return drv;
   }
 
-  /// Copy back buffer to front buffer
-  void flush();
+  // Test method for VESA rendering verification
+  void test_render();
+
+  /// No-op in direct rendering mode
+  void flush() {}
+
+  /// No-op in direct rendering mode
+  void next_frame() {}
 
   void put_char(char c) override;
   void put_codepoint(uint32_t codepoint) override;

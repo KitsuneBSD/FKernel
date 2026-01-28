@@ -51,6 +51,13 @@ public:
     
     // Get terminal count by type
     size_t vga_terminal_count() const { return m_vga_terminals.size(); }
+
+    // Input handling from keyboard driver
+    void handle_input(char c);
+
+    // Active terminal management
+    void switch_to(int index);
+    VGATerminal* active_terminal() const;
     
 private:
     TerminalManager() = default;
@@ -58,6 +65,7 @@ private:
     
     TerminalId m_next_id{1};
     fk::containers::Vector<fk::OwnPtr<VGATerminal>> m_vga_terminals;
+    int m_active_terminal_index{0};
     
     // Non-copyable, non-movable
     TerminalManager(const TerminalManager&) = delete;
