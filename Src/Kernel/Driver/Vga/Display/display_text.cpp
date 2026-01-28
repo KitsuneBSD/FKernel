@@ -4,12 +4,12 @@
 #include <Kernel/Arch/x86_64/io.h>
 #endif
 
-display_text::display_text() : row(0), col(0), color(0x07) {
+DisplayText::DisplayText() : row(0), col(0), color(0x07) {
   enable_cursor();
   update_cursor();
 }
 
-void display_text::update_cursor() {
+void DisplayText::update_cursor() {
   uint16_t pos = static_cast<uint16_t>(row * WIDTH + col);
 
   outb(0x3D4, 0x0F);
@@ -19,7 +19,7 @@ void display_text::update_cursor() {
   outb(0x3D5, static_cast<uint8_t>((pos >> 8) & 0xFF));
 }
 
-void display_text::enable_cursor() {
+void DisplayText::enable_cursor() {
   outb(0x3D4, 0x0A);
   outb(0x3D5, (inb(0x3D5) & 0xC0) | 6);
 
@@ -27,7 +27,7 @@ void display_text::enable_cursor() {
   outb(0x3D5, (inb(0x3D5) & 0xE0) | 7);
 }
 
-void display_text::scroll() {
+void DisplayText::scroll() {
   if (row < HEIGHT)
     return;
 
@@ -44,11 +44,15 @@ void display_text::scroll() {
   row = HEIGHT - 1;
 }
 
-void display_text::set_color(Color fg, Color bg) {
+void DisplayText::set_color(Color fg, Color bg) {
   color = static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4);
 }
 
-void display_text::put_char(char c) {
+void DisplayText::put_codepoint(uint32_t codepoint) {
+    put_char(static_cast<char>(codepoint));
+}
+
+void DisplayText::put_char(char c) {
   if (c == '\n') {
     col = 0;
     ++row;
@@ -94,13 +98,33 @@ void display_text::put_char(char c) {
   update_cursor();
 }
 
-void display_text::write(const char *str) {
-  for (size_t i = 0; str[i]; ++i) {
-    put_char(str[i]);
+void DisplayText::write(const char *str) {
+  size_t i = 0;
+  while (str[i]) {
+      uint32_t codepoint = 0;
+      uint8_t c = static_cast<uint8_t>(str[i]);
+
+      if (c <= 0x7F) {
+          codepoint = c;
+          i += 1;
+      } else if ((c & 0xE0) == 0xC0) {
+          codepoint = ((c & 0x1F) << 6) | (static_cast<uint8_t>(str[i+1]) & 0x3F);
+          i += 2;
+      } else if ((c & 0xF0) == 0xE0) {
+          codepoint = ((c & 0x0F) << 12) | ((static_cast<uint8_t>(str[i+1]) & 0x3F) << 6) | (static_cast<uint8_t>(str[i+2]) & 0x3F);
+          i += 3;
+      } else if ((c & 0xF8) == 0xF0) {
+          codepoint = ((c & 0x07) << 18) | ((static_cast<uint8_t>(str[i+1]) & 0x3F) << 12) | ((static_cast<uint8_t>(str[i+2]) & 0x3F) << 6) | (static_cast<uint8_t>(str[i+3]) & 0x3F);
+          i += 4;
+      } else {
+          codepoint = '?';
+          i += 1;
+      }
+      put_codepoint(codepoint);
   }
 }
 
-void display_text::clear() {
+void DisplayText::clear() {
   for (size_t r = 0; r < HEIGHT; ++r) {
     for (size_t c = 0; c < WIDTH; ++c) {
       buffer[r * WIDTH + c] = (static_cast<uint16_t>(color) << 8) | ' ';
@@ -111,11 +135,11 @@ void display_text::clear() {
   update_cursor();
 }
 
-void display_text::write_ansi(const char *str) {
+void DisplayText::write_ansi(const char *str) {
   write_ansi_n(str, strlen(str));
 }
 
-void display_text::write_ansi_n(const char *str, size_t size) {
+void DisplayText::write_ansi_n(const char *str, size_t size) {
   size_t i = 0;
   while (i < size) {
     if (str[i] == '\033' && (i + 1 < size) && str[i + 1] == '[') {
@@ -200,8 +224,26 @@ void display_text::write_ansi_n(const char *str, size_t size) {
           update_cursor();
       }
     } else {
-      put_char(str[i]);
-      ++i;
+      uint32_t codepoint = 0;
+      uint8_t c = static_cast<uint8_t>(str[i]);
+
+      if (c <= 0x7F) {
+          codepoint = c;
+          i += 1;
+      } else if ((c & 0xE0) == 0xC0 && i + 1 < size) {
+          codepoint = ((c & 0x1F) << 6) | (static_cast<uint8_t>(str[i+1]) & 0x3F);
+          i += 2;
+      } else if ((c & 0xF0) == 0xE0 && i + 2 < size) {
+          codepoint = ((c & 0x0F) << 12) | ((static_cast<uint8_t>(str[i+1]) & 0x3F) << 6) | (static_cast<uint8_t>(str[i+2]) & 0x3F);
+          i += 3;
+      } else if ((c & 0xF8) == 0xF0 && i + 3 < size) {
+          codepoint = ((c & 0x07) << 18) | ((static_cast<uint8_t>(str[i+1]) & 0x3F) << 12) | ((static_cast<uint8_t>(str[i+2]) & 0x3F) << 6) | (static_cast<uint8_t>(str[i+3]) & 0x3F);
+          i += 4;
+      } else {
+          codepoint = '?';
+          i += 1;
+      }
+      put_codepoint(codepoint);
     }
   }
 }

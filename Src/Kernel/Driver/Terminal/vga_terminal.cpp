@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Terminal/vga_terminal.h>
+#include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -6,6 +7,8 @@
 
 namespace fkernel {
 namespace terminal {
+
+static VGATerminal* s_vga_tty = nullptr;
 
 fk::core::Result<void, fk::core::Error> VGATerminal::attach_input(InputDevice* device) {
     [[maybe_unused]] auto* dev = device;
@@ -42,6 +45,33 @@ const char* VGATerminal::type_name() const {
     return "VGA";
 }
 
+VGATerminal& VGATerminal::the() {
+    if (s_vga_tty) return *s_vga_tty;
+    
+    // Fallback inicial seguro
+    static VGATerminal fallback(0);
+    return fallback;
+}
+
+void VGATerminal::on_char(char c) {
+    if (m_raw_mode) return;
+
+    if (c == '\b') {
+        if (m_line_len > 0) {
+            m_line_len--;
+            vga::the().put_char('\b');
+        }
+        return;
+    }
+
+    // Echo imediato para feedback visual
+    vga::the().put_char(c);
+
+    if (m_line_len < LINE_BUFFER_SIZE) {
+        m_line_buffer[m_line_len++] = c;
+    }
+}
+
 VGATerminal::VGATerminal(int index) : m_index(index) {
     char name_buf[16];
     if (index == -1) {
@@ -50,18 +80,25 @@ VGATerminal::VGATerminal(int index) : m_index(index) {
         snprintf(name_buf, sizeof(name_buf), "tty%d", index);
         set_name(name_buf);
     }
+    
+    if (index == 0) s_vga_tty = this;
+
+    m_rows = static_cast<uint16_t>(Display::the().get_height());
+    m_cols = static_cast<uint16_t>(Display::the().get_width());
 }
 
 fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uint64_t offset, size_t size, uint8_t* buffer) {
     if (size == 0) return 0;
     if (!buffer) return fk::core::Error::InvalidParameter;
 
+    m_rows = static_cast<uint16_t>(Display::the().get_height());
+    m_cols = static_cast<uint16_t>(Display::the().get_width());
+
     if (m_raw_mode) {
         size_t read = 0;
         while (read < size) {
             if (PS2Keyboard::the().has_key()) {
                 buffer[read++] = static_cast<uint8_t>(PS2Keyboard::the().pop_key());
-                // Return immediately in raw mode if we have at least one char
                 if (read > 0) return read;
             } else {
                 if (read > 0) return read;
@@ -71,7 +108,6 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uin
         return read;
     }
 
-    // Flush any pending data from previous lines
     if (m_read_index < m_line_len) {
         size_t copied = 0;
         while (m_read_index < m_line_len && copied < size) {
@@ -84,47 +120,19 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uin
         return copied;
     }
 
-    // Blocking read loop (canonical mode simulation)
     while (true) {
-        if (PS2Keyboard::the().has_key()) {
-            char c = PS2Keyboard::the().pop_key();
-
-            if (c == '\b') { // Backspace
-                if (m_line_len > 0) {
-                    m_line_len--;
-                    // Visual backspace
-                    vga::the().put_char('\b');
-                    vga::the().put_char(' ');
-                    vga::the().put_char('\b');
-                }
-                continue;
+        if (m_line_len > 0 && m_line_buffer[m_line_len - 1] == '\n') {
+            size_t copied = 0;
+            while (m_read_index < m_line_len && copied < size) {
+                buffer[copied++] = m_line_buffer[m_read_index++];
             }
-
-            // Echo character
-            vga::the().put_char(c);
-
-            // Buffer character
-            if (m_line_len < LINE_BUFFER_SIZE) {
-                m_line_buffer[m_line_len++] = c;
+            if (m_read_index == m_line_len) {
+                m_read_index = 0;
+                m_line_len = 0;
             }
-
-            // Return on newline
-            if (c == '\n') {
-                // fk::algorithms::klog("TTY", "Newline detected, returning line of len %zu", m_line_len);
-                size_t copied = 0;
-                while (m_read_index < m_line_len && copied < size) {
-                    buffer[copied++] = m_line_buffer[m_read_index++];
-                }
-                if (m_read_index == m_line_len) {
-                    m_read_index = 0;
-                    m_line_len = 0;
-                }
-                return copied;
-            }
-        } else {
-            // Yield CPU while waiting for input
-            SchedulerManager::the().yield();
+            return copied;
         }
+        SchedulerManager::the().yield();
     }
 }
 
@@ -173,7 +181,6 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
             auto* t = reinterpret_cast<termios*>(arg);
             if (!t) return fk::core::Error::InvalidParameter;
             m_raw_mode = !(t->c_lflag & ICANON);
-            // fk::algorithms::klog("TTY", "Switched to %s mode", m_raw_mode ? "RAW" : "CANONICAL");
             return 0;
         }
     }
@@ -182,11 +189,9 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
 
 fk::core::Result<size_t, fk::core::Error> VGATerminal::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
     if (!buffer) return fk::core::Error::InvalidParameter;
-
     for (size_t i = 0; i < size; ++i) {
         vga::the().put_char(static_cast<char>(buffer[i]));
     }
-
     return size;
 }
 
