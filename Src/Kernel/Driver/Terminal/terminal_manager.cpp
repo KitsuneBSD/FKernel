@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
+#include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -31,10 +32,9 @@ TerminalManager::create_terminal(TerminalType type, const char *name_hint) {
       return fk::core::Error::OutOfMemory;
     }
 
-    // Register with DevFs
-    char name_buf[16];
-    snprintf(name_buf, sizeof(name_buf), "tty%d", tty_index);
-    DevFs::the().register_device(terminal.get(), name_buf);
+    // Register with DriverManager (which also handles DevFs)
+    auto* term_ptr = terminal.get();
+    fkernel::DriverManager::the().register_device(fk::RefPtr<Node>(term_ptr));
 
     m_vga_terminals.push_back(fk::types::move(terminal));
     fk::algorithms::klog("TERMINAL MANAGER",
@@ -69,10 +69,8 @@ TerminalManager::delete_terminal(TerminalId id) {
   // Find and remove VGA terminal
   for (size_t i = 0; i < m_vga_terminals.size(); ++i) {
     if (m_vga_terminals[i]->index() == static_cast<int>(id.value() - 1)) {
-      // Unregister from DevFs
-      char name_buf[16];
-      snprintf(name_buf, sizeof(name_buf), "tty%d", id.value() - 1);
-      DevFs::the().unregister_device(name_buf);
+      // Unregister from DriverManager
+      fkernel::DriverManager::the().unregister_device(fk::RefPtr<Node>(m_vga_terminals[i].get()));
 
       // Remove from vector (manual swap and pop for efficiency)
       if (i < m_vga_terminals.size() - 1) {

@@ -145,9 +145,8 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index)
     auto dev = fk::types::move(dev_res.value());
     m_devices.push_back(dev);
 
-    fk::text::String device_name = bsd_name;
-    fk::RefPtr<Node> node_ref = dev;
-    fkernel::DevFs::the().register_device(node_ref, device_name.c_str());
+    // Register with DriverManager (which also handles DevFs)
+    fkernel::DriverManager::the().register_device(dev);
 
     PartitionManager::the().scan(dev);
 

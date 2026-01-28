@@ -1,6 +1,7 @@
 #include <Kernel/Driver/SerialPort/serial_node.h>
 #include <Kernel/Driver/Vga/vga_node.h>
 #include <Kernel/Driver/Device/CharacterDevice/null_device.h>
+#include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
@@ -32,10 +33,11 @@ void VirtualFileSystem::initialize() {
   devfs.set_parent(root_node);
   vfs.mount("/dev", fk::RefPtr<Node>(&devfs));
 
-  devfs.register_device(fk::make_ref<fkernel::SerialNode>().value(), "serial");
-  devfs.register_device(fk::make_ref<fkernel::ConsoleNode>().value(), "console");
-  devfs.register_device(fk::make_ref<fkernel::NullDevice>().value(), "null");
-  devfs.register_device(fk::make_ref<fkernel::ZeroDevice>().value(), "zero");
+  auto& driver_manager = fkernel::DriverManager::the();
+  driver_manager.register_device(fk::make_ref<fkernel::SerialNode>().value());
+  driver_manager.register_device(fk::make_ref<fkernel::ConsoleNode>().value());
+  driver_manager.register_device(fk::make_ref<fkernel::NullDevice>().value());
+  driver_manager.register_device(fk::make_ref<fkernel::ZeroDevice>().value());
 
   // /dev/tty should point to the current tty, let's link it to tty0 for now
   vfs.symlink("/dev/tty", "tty0");
