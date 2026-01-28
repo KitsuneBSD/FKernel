@@ -18,7 +18,15 @@ Task create_a_new_task(TaskId id, const fk::text::fixed_string<64> &name,
   void *stack_mem = kmalloc(STACK_SIZE);
   uint64_t stack_top = reinterpret_cast<uint64_t>(stack_mem) + STACK_SIZE;
 
-  // ... (context setup code) ...
+  // Setup initial stack for switch_context
+  // switch_context expects:
+  // [RIP (task_trampoline)]
+  // [R15]
+  // [R14]
+  // [R13]
+  // [R12]
+  // [RBP]
+  // [RBX] <- stack_pointer
   uint64_t *stack = reinterpret_cast<uint64_t *>(stack_top);
   *(--stack) = reinterpret_cast<uint64_t>(task_trampoline);
   *(--stack) = 0;                                 // rbx

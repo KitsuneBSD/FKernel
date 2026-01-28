@@ -26,7 +26,7 @@ private:
     }
 
     memory::OwnPtr<CallableBase> clone() const override {
-      return make_own<Callable<F>>(m_callable);
+      return make_owned<Callable<F>>(m_callable);
     }
 
   private:
@@ -39,7 +39,7 @@ public:
   Function() = default;
 
   template <typename F>
-  Function(F f) : m_callable(make_own<Callable<F>>(fk::types::move(f))) {}
+  Function(F f) : m_callable(make_owned<Callable<F>>(fk::types::move(f))) {}
 
   Function(const Function &other) {
     if (other.m_callable) {
