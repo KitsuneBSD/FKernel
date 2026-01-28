@@ -24,32 +24,37 @@ public:
 
   /// Set text color (delegates to the active display backend)
   void set_color(Color fg, Color bg) {
-    display::the().set_color(fg, bg);
+    Display::the().set_color(fg, bg);
   }
 
   /// Output a single character
   void put_char(char c) {
-    display::the().put_char(c);
+    Display::the().put_char(c);
+  }
+
+  /// Output a single Unicode codepoint
+  void put_codepoint(uint32_t cp) {
+    Display::the().put_codepoint(cp);
   }
 
   /// Write a null-terminated ANSI string
   void write_ansi(const char *str) {
-    display::the().write_ansi(str);
+    Display::the().write_ansi(str);
   }
 
   /// Write a fixed-size buffer with ANSI escape codes
   void write_ansi_n(const char *str, size_t size) {
-    display::the().write_ansi_n(str, size);
+    Display::the().write_ansi_n(str, size);
   }
 
   /// Write a null-terminated string
   void write(const char *str) {
-    display::the().write(str);
+    Display::the().write(str);
   }
 
   /// Clear the display
   void clear() {
-    display::the().clear();
+    Display::the().clear();
   }
 
 private:
