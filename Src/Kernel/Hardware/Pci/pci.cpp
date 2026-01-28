@@ -53,6 +53,20 @@ uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
   return inl(PCI_CONFIG_DATA);
 }
 
+void PciManager::write_config_dword(PciAddress address, uint8_t offset, uint32_t value) {
+  if (m_has_mcfg) {
+    uintptr_t config_addr = m_mcfg_base + 
+                            ((address.bus() << 20) | 
+                             (address.device() << 15) | 
+                             (address.function() << 12) | 
+                             (offset & 0xFFF));
+    *reinterpret_cast<volatile uint32_t *>(config_addr) = value;
+  } else {
+    outl(PCI_CONFIG_ADDRESS, address.to_config_address(offset));
+    outl(PCI_CONFIG_DATA, value);
+  }
+}
+
 void PciManager::register_driver(uint8_t class_code, uint8_t subclass, DriverFactory factory) {
   fk::algorithms::klog("PCI", "Registering driver for Class %02x, Subclass %02x", class_code, subclass);
   m_drivers.push_back({class_code, subclass, fk::types::move(factory)});
@@ -77,6 +91,13 @@ void PciManager::instantiate_drivers() {
         // fk::algorithms::kdebug("PCI", "  No driver for %02x:%02x.%d (Class:%02x Sub:%02x)", ...);
     }
   }
+}
+
+void PciManager::auto_discover() {
+  fk::algorithms::klog("PCI", "Starting auto-discovery...");
+  scan_bus();
+  instantiate_drivers();
+  fk::algorithms::klog("PCI", "Auto-discovery complete. %d devices found.", m_devices.size());
 }
 
 void PciManager::scan_bus() {

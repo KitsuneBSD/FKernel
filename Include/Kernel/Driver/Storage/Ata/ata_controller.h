@@ -14,6 +14,11 @@ private:
 
 public:
   static ATAController &the();
+  
+  /// @brief Factory method for PCI driver registration compatibility
+  /// @param device PCI device (unused for ATA legacy detection)
+  static void create(const PciDevice& device);
+  
   void initialize();
 
   // Driver interface
