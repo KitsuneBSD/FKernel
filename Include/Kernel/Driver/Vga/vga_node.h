@@ -5,6 +5,7 @@
 #include <LibC/string.h>
 
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
+#include <Kernel/Scheduler/scheduler.h>
 
 namespace fkernel {
 
@@ -21,8 +22,15 @@ public:
         size_t count = 0;
         auto& kb = PS2Keyboard::the();
         
-        while (count < size && kb.has_key()) {
-            buffer[count++] = static_cast<uint8_t>(kb.pop_key());
+        while (count < size) {
+            if (kb.has_key()) {
+                buffer[count++] = static_cast<uint8_t>(kb.pop_key());
+                // If we got at least one char, we can return (standard read behavior)
+                if (count > 0) return count;
+            } else {
+                if (count > 0) return count;
+                SchedulerManager::the().yield();
+            }
         }
 
         return count;

@@ -18,6 +18,9 @@ public:
     OwnPtr(OwnPtr&& other) noexcept : m_ptr(other.m_ptr) {
         other.m_ptr = nullptr;
     }
+
+    template <typename U>
+    OwnPtr(OwnPtr<U>&& other) noexcept : m_ptr(other.leak_ptr()) {}
     
     OwnPtr& operator=(OwnPtr&& other) noexcept {
         if (this != &other) {

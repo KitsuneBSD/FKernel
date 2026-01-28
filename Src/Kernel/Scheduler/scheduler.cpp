@@ -132,6 +132,8 @@ void SchedulerManager::initialize() {
     *idle =
         create_a_new_task(0, "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
 
+    idle->gs_base = (uint64_t)&g_cpu_block;
+
     m_processors[i].idle_task = idle;
     m_processors[i].current_task = idle;
   }
@@ -140,14 +142,18 @@ void SchedulerManager::initialize() {
   Task *init = new Task();
   *init = create_a_new_task(1, "init", init_task_entry, false, 5, 1, 0, 0);
 
+  // x86_64: Initialize GS base to point to the CPU block for the first task
+  // In a multi-core kernel, this would be the block for the specific CPU.
+  init->gs_base = (uint64_t)&g_cpu_block;
+
   // Set initial memory regions for demand paging
   init->memory_regions.heap_start = 0x10000000;
   init->memory_regions.heap_break = 0x10000000;
   init->memory_regions.mmap_start = 0x40000000;
   init->memory_regions.mmap_end = 0x40000000;
 
-  // Populate FDs 0, 1, 2
-  auto console_res = VirtualFileSystem::the().open("/dev/console", O_RDWR);
+  // Populate FDs 0, 1, 2. We use tty0 instead of console for better input support.
+  auto console_res = VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
   if (console_res.is_ok()) {
     init->add_file_descriptor(console_res.value()); // 0
     init->add_file_descriptor(console_res.value()); // 1

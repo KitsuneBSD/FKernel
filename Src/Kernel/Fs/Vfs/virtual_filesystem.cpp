@@ -37,6 +37,9 @@ void VirtualFileSystem::initialize() {
   devfs.register_device(fk::make_ref<fkernel::NullDevice>().value(), "null");
   devfs.register_device(fk::make_ref<fkernel::ZeroDevice>().value(), "zero");
 
+  // /dev/tty should point to the current tty, let's link it to tty0 for now
+  vfs.symlink("/dev/tty", "tty0");
+
   // Initialize terminal manager (will create default TTYs dynamically)
   fkernel::terminal::TerminalManager::the().initialize();
 

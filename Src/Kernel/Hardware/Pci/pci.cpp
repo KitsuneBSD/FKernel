@@ -61,7 +61,7 @@ void PciManager::instantiate_drivers() {
   fk::algorithms::klog("PCI", "Instantiating drivers for detected devices...");
   for (const auto &device : m_devices) {
     for (const auto &driver : m_drivers) {
-      if (device.class_code() == driver.class_code() && 
+      if (device.class_code() == driver.class_code && 
           device.subclass_code() == driver.subclass) {
         fk::algorithms::klog("PCI", "Matching driver found for device %02x:%02x.%d (Class: %02x, Sub: %02x)",
                              device.address().bus(), device.address().device(), 

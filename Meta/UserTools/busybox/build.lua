@@ -26,14 +26,14 @@ local function create_etc_configs()
   os.execute("mkdir -p " .. INITRD_DIR .. "/etc/init.d")
 
   -- Create /etc/inittab
-  -- local inittab = io.open(INITRD_DIR .. "/etc/inittab", "w")
-  -- if inittab then
-  --     inittab:write("::sysinit:/etc/init.d/rcS\n")
-  --     inittab:write("::askfirst:-/bin/sh\n")
-  --     inittab:write("::ctrlaltdel:/sbin/reboot\n")
-  --     inittab:write("::shutdown:/bin/umount -a -r\n")
-  --     inittab:close()
-  -- end
+  local inittab = io.open(INITRD_DIR .. "/etc/inittab", "w")
+  if inittab then
+      inittab:write("::sysinit:/etc/init.d/rcS\n")
+      inittab:write("::respawn:-/bin/sh\n")
+      inittab:write("::ctrlaltdel:/sbin/reboot\n")
+      inittab:write("::shutdown:/bin/umount -a -r\n")
+      inittab:close()
+  end
 
   -- Create /etc/init.d/rcS
   local rcs = io.open(INITRD_DIR .. "/etc/init.d/rcS", "w")
