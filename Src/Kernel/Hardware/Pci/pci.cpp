@@ -53,6 +53,25 @@ uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
   return inl(PCI_CONFIG_DATA);
 }
 
+void PciManager::register_driver(uint8_t class_code, uint8_t subclass, DriverFactory factory) {
+  m_drivers.push_back({class_code, subclass, fk::types::move(factory)});
+}
+
+void PciManager::instantiate_drivers() {
+  fk::algorithms::klog("PCI", "Instantiating drivers for detected devices...");
+  for (const auto &device : m_devices) {
+    for (const auto &driver : m_drivers) {
+      if (device.class_code() == driver.class_code() && 
+          device.subclass_code() == driver.subclass) {
+        fk::algorithms::klog("PCI", "Matching driver found for device %02x:%02x.%d (Class: %02x, Sub: %02x)",
+                             device.address().bus(), device.address().device(), 
+                             device.address().function(), device.class_code(), device.subclass_code());
+        driver.factory(device);
+      }
+    }
+  }
+}
+
 void PciManager::scan_bus() {
   fk::algorithms::klog("PCI", "Starting PCI bus scan...");
   for (uint16_t bus = 0; bus < 256; ++bus) {
