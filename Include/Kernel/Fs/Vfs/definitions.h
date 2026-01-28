@@ -28,7 +28,7 @@ struct linux_dirent {
     char     d_name[];
 };
 
-struct linux_dirent64 {
+struct [[gnu::packed]] linux_dirent64 {
     uint64_t d_ino;
     int64_t  d_off;
     uint16_t d_reclen;

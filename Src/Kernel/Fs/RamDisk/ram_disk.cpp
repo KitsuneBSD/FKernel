@@ -20,9 +20,21 @@ fk::core::Result<fk::RefPtr<RamDiskNode>, fk::core::Error> RamDiskNode::create(u
 
 void RamDiskNode::parse_tar() {
     uint8_t* ptr = reinterpret_cast<uint8_t*>(m_start);
+    fk::algorithms::klog("RAMDISK", "Parsing TAR at %p - %p (size: %zu)", 
+                         (void*)m_start, (void*)m_end, m_end - m_start);
+    
+    size_t files_loaded = 0;
     while (ptr < reinterpret_cast<uint8_t*>(m_end)) {
         auto* header = reinterpret_cast<fk::archive::TarHeader*>(ptr);
-        if (header->filename[0] == '\0') break;
+        if (header->filename[0] == '\0') {
+            fk::algorithms::klog("RAMDISK", "End of TAR found (null filename)");
+            break;
+        }
+
+        // Lenient magic check: some TARs don't have ustar magic
+        if (header->magic[0] != '\0' && strncmp(header->magic, "ustar", 5) != 0) {
+            fk::algorithms::kwarn("RAMDISK", "Suspicious TAR magic at %p: '%.6s'", ptr, header->magic);
+        }
 
         char safe_filename[101];
         strncpy(safe_filename, header->filename, 100);
@@ -47,6 +59,7 @@ void RamDiskNode::parse_tar() {
                 file_node->set_parent(fk::RefPtr<Node>(this));
                 m_files.push_back({final_filename, file_node});
                 fk::algorithms::klog("RAMDISK", "Loaded file: %s (%zu bytes)", final_filename, file_size);
+                files_loaded++;
             }
         } else if (header->typeflag[0] == '5') {
             // Directory entry in TAR - we don't strictly need to create nodes for these 
@@ -65,11 +78,13 @@ void RamDiskNode::parse_tar() {
                 symlink_node->set_parent(fk::RefPtr<Node>(this));
                 m_files.push_back({final_filename, symlink_node});
                 fk::algorithms::klog("RAMDISK", "Loaded symlink: %s -> %s", final_filename, link_target);
+                files_loaded++;
             }
         }
 
         ptr += 512 + ((file_size + 511) & ~511u);
     }
+    fk::algorithms::klog("RAMDISK", "TAR parsing complete. %zu entries loaded.", files_loaded);
 }
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const char* name) {
@@ -136,6 +151,9 @@ fk::core::Result<void, fk::core::Error> RamDiskNode::list_dir(fk::containers::Ve
     fk::containers::Vector<fk::text::String> added_names;
     size_t prefix_len = m_prefix.length();
 
+    fk::algorithms::klog("RAMDISK", "list_dir: prefix='%s' (len %zu), m_files size: %zu", 
+                         m_prefix.c_str(), prefix_len, m_files.size());
+
     for (auto& entry : m_files) {
         if (prefix_len > 0 && strncmp(entry.name.c_str(), m_prefix.c_str(), prefix_len) != 0)
             continue;
@@ -172,7 +190,7 @@ fk::core::Result<void, fk::core::Error> RamDiskNode::list_dir(fk::containers::Ve
             de.name[sizeof(de.name) - 1] = '\0';
             de.type = slash ? 1 : 0; // 1 for Dir, 0 for File (simplified)
             
-            // fk::algorithms::klog("RAMDISK", "list_dir entry: %s, type: %u", de.name, de.type);
+            fk::algorithms::klog("RAMDISK", "  entry: '%s' (type %u)", de.name, de.type);
             
             entries.push_back(de);
             added_names.push_back(component);

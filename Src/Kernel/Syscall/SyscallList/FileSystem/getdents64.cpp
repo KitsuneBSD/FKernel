@@ -24,7 +24,7 @@ uint64_t sys_getdents64(uint64_t fd, uint64_t buffer_ptr, uint64_t max_bytes, ui
         return fkernel::return_error(res.error());
     }
 
-    fk::algorithms::klog("SYSCALL", "sys_getdents64: returned %zu bytes", res.value());
+    fk::algorithms::klog("SYSCALL", "sys_getdents64: returned %zu bytes, next offset=%lu", res.value(), description->offset());
     return res.value();
 }
 
