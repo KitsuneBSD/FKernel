@@ -6,6 +6,9 @@
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
+#include <Kernel/Ipc/cspace.h>
+#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/global_endpoint_manager.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/heap_malloc.h>
@@ -40,6 +43,15 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->is_a_kernel_task = parent->is_a_kernel_task;
   child->cwd = parent->cwd;
   child->clear_child_tid = 0;
+
+  // 2.5 Initialize IPC CSpace for child
+  child->cspace = new fkernel::ipc::CSpace();
+  auto *signal_notification = new fkernel::ipc::Notification();
+  child->cspace->install(fkernel::ipc::Capability(
+      signal_notification, fkernel::ipc::CapabilityType::Notification));
+  fkernel::ipc::GlobalEndpointManager::the().register_notification(
+      child->id, signal_notification);
+
   child->time_slice_ticks = 5;
   child->wake_up_time_ticks = 0;
   child->signal_state.mask = parent->signal_state.mask;
