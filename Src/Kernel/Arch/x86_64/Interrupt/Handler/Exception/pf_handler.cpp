@@ -57,5 +57,10 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
         task ? task->identity.id.value() : 0
     );
 
+    if (task && !task->is_a_kernel_task && (frame->error_code & 4)) {
+        fk::algorithms::kerror("PF", "User-mode Page Fault. Killing process %lu", task->identity.id.value());
+        SchedulerManager::the().terminate_current(-11); // SIGSEGV = 11
+    }
+
     halt_forever();
 }

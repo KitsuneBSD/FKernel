@@ -14,7 +14,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
   auto* current_task = SchedulerManager::the().current();
   if (!current_task) return -1;
 
-  fk::algorithms::klog("SYSCALL", "wait4: PID %lu waiting for child PID %ld (options=%lu)", 
+  fk::algorithms::kdebug("SYSCALL", "wait4: PID %lu waiting for child PID %ld (options=%lu)", 
                        current_task->identity.id.value(), pid, options);
 
   while (true) {
@@ -56,11 +56,11 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
       }
 
       if (options & 1) { // WNOHANG
-          fk::algorithms::klog("SYSCALL", "wait4: WNOHANG returning 0");
+          fk::algorithms::kdebug("SYSCALL", "wait4: WNOHANG returning 0");
           return 0;
       }
 
-      fk::algorithms::klog("SYSCALL", "wait4: No zombie yet, blocking PID %lu", 
+      fk::algorithms::kdebug("SYSCALL", "wait4: No zombie yet, blocking PID %lu", 
                            current_task->identity.id.value());
       SchedulerManager::the().block_current();
       SchedulerManager::the().schedule(); 
