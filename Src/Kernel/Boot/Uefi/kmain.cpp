@@ -21,24 +21,12 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle,
     // GOP not available or failed - will fall back to VGA text mode in kernel
   }
 
-  // Find block device
-  EFI_BLOCK_IO_PROTOCOL *block_io = uefi::find_block_device(system_table);
-  if (!block_io) {
-    kprintf("ERROR: No block device found!\n");
-    return EFI_NOT_FOUND;
-  }
-
-  // Initialize FAT filesystem
-  uefi::fat::FatContext fat_context;
-  if (!uefi::fat::initialize(block_io, fat_context)) {
-    kprintf("ERROR: Failed to initialize FAT filesystem!\n");
-    return EFI_LOAD_ERROR;
-  }
-
-  // Load kernel ELF
+  // Load kernel using Simple File System Protocol
   uint64_t kernel_entry = 0;
-  if (!uefi::load_kernel(fat_context, "kernel.elf", kernel_entry)) {
-    kprintf("ERROR: Failed to load kernel!\n");
+  const uint16_t kernel_filename[] = { 'k', 'e', 'r', 'n', 'e', 'l', '.', 'e', 'l', 'f', 0 };
+  
+  if (!uefi::load_kernel_uefi_file(system_table, kernel_filename, kernel_entry)) {
+    kprintf("ERROR: Failed to load kernel via UEFI file system!\n");
     return EFI_LOAD_ERROR;
   }
 
@@ -47,10 +35,11 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle,
   EFI_MEMORY_DESCRIPTOR *memory_map = nullptr;
   size_t map_key = 0;
   size_t descriptor_size = 0;
+  uint32_t descriptor_version = 0;
 
   EFI_STATUS status =
       uefi::collect_memory_map(system_table->BootServices, memory_map_size,
-                               memory_map, map_key, descriptor_size);
+                               memory_map, map_key, descriptor_size, descriptor_version);
 
   if (status != EFI_SUCCESS) {
     kprintf("ERROR: Failed to collect memory map!\n");
@@ -68,6 +57,15 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle,
   boot::BootInfo::the().initialize_from_uefi(
       system_table, image_handle, framebuffer_info, memory_map,
       descriptor_count, descriptor_size, acpi_info);
+
+  // Set up virtual address map for runtime services
+  // This must be done before ExitBootServices()
+  status = (*system_table->RuntimeServices->SetVirtualAddressMap)(
+      memory_map_size, descriptor_size, descriptor_version, memory_map);
+  if (status != EFI_SUCCESS) {
+    kprintf("ERROR: Failed to set virtual address map!\n");
+    return status;
+  }
 
   // Exit Boot Services
   status =

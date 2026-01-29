@@ -7,6 +7,7 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
+#include <Kernel/Fs/DevFs/tty.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Fs/ProcFs/proc_fs.h>
 #include <Kernel/Fs/TmpFs/tmp_fs.h>
@@ -57,11 +58,11 @@ void VirtualFileSystem::initialize() {
   auto& driver_manager = fkernel::DriverManager::the();
   driver_manager.register_device(fk::make_ref<fkernel::SerialNode>().value());
   driver_manager.register_device(fk::make_ref<fkernel::ConsoleNode>().value());
+  driver_manager.register_device(fk::make_ref<fkernel::CurrentTTYNode>().value());
   driver_manager.register_device(fk::make_ref<fkernel::NullDevice>().value());
   driver_manager.register_device(fk::make_ref<fkernel::ZeroDevice>().value());
 
   // 5. Initialize Terminal System
-  vfs.symlink("/dev/tty", "tty0");
   fkernel::terminal::TerminalManager::the().initialize();
 
   fk::algorithms::klog("VFS", "Initialized VFS with Dentry Cache");

@@ -81,9 +81,14 @@ void DisplayText::put_char(char c) {
   if (c == '\b') {
     if (col > 0) {
       --col;
-      buffer[row * WIDTH + col] = (static_cast<uint16_t>(color) << 8) | ' ';
-      update_cursor();
+    } else if (row > 0) {
+      --row;
+      col = WIDTH - 1;
+    } else {
+      return;
     }
+    buffer[row * WIDTH + col] = (static_cast<uint16_t>(color) << 8) | ' ';
+    update_cursor();
     return;
   }
 

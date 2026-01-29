@@ -9,8 +9,9 @@
 class ATAController final : public fkernel::Driver {
 private:
   fk::containers::Vector<fk::RefPtr<ATADevice>> m_devices;
+  uint16_t m_bm_base{0};
   ATAController() = default;
-  void probe_channel(uint16_t io, uint16_t ctrl, int channel_index);
+  void probe_channel(uint16_t io, uint16_t ctrl, int channel_index, uint16_t bm_base = 0);
 
 public:
   static ATAController &the();
