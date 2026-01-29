@@ -68,17 +68,26 @@ struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
   void *Mode;
 };
 
-// EFI Runtime Services
-struct EFI_RUNTIME_SERVICES {
-  EFI_TABLE_HEADER Hdr;
-  // ... other fields
-};
-
 // Forward declarations and typedefs for types used in function pointers
 struct EFI_MEMORY_DESCRIPTOR;
 struct EFI_GUID;
 struct EFI_BLOCK_IO_MEDIA;
 typedef uint64_t EFI_LBA;
+
+// Function pointer type for SetVirtualAddressMap
+typedef EFI_STATUS (*EFI_SET_VIRTUAL_ADDRESS_MAP)(
+    size_t MemoryMapSize,
+    size_t DescriptorSize,
+    uint32_t DescriptorVersion,
+    EFI_MEMORY_DESCRIPTOR *VirtualMap
+);
+
+// EFI Runtime Services
+struct EFI_RUNTIME_SERVICES {
+  EFI_TABLE_HEADER Hdr;
+  EFI_SET_VIRTUAL_ADDRESS_MAP *SetVirtualAddressMap;
+  // ... other fields
+};
 
 // EFI Locate Search Type (must be defined before function pointer types)
 enum EFI_LOCATE_SEARCH_TYPE {
@@ -299,6 +308,64 @@ struct EFI_DEVICE_PATH_PROTOCOL {
   uint16_t Length;
 };
 
+// EFI File Handle (opaque pointer)
+struct EFI_FILE_PROTOCOL;
+typedef EFI_FILE_PROTOCOL *EFI_FILE_HANDLE;
+
+// EFI Simple File System Protocol
+struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
+  uint64_t Revision;
+  
+  typedef EFI_STATUS (*EFI_OPEN_VOLUME)(
+      EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *This,
+      EFI_FILE_HANDLE *Root
+  );
+  
+  EFI_OPEN_VOLUME *OpenVolume;
+};
+
+// EFI File Protocol
+struct EFI_FILE_PROTOCOL {
+  uint64_t Revision;
+  
+  typedef EFI_STATUS (*EFI_FILE_OPEN)(
+      EFI_FILE_PROTOCOL *This,
+      EFI_FILE_HANDLE *NewHandle,
+      const uint16_t *FileName,
+      uint64_t OpenMode,
+      uint64_t Attributes
+  );
+  
+  typedef EFI_STATUS (*EFI_FILE_CLOSE)(
+      EFI_FILE_PROTOCOL *This
+  );
+  
+  typedef EFI_STATUS (*EFI_FILE_READ)(
+      EFI_FILE_PROTOCOL *This,
+      size_t *BufferSize,
+      void *Buffer
+  );
+  
+  typedef EFI_STATUS (*EFI_FILE_SET_POSITION)(
+      EFI_FILE_PROTOCOL *This,
+      uint64_t Position
+  );
+  
+  EFI_FILE_OPEN *Open;
+  EFI_FILE_CLOSE *Close;
+  EFI_FILE_READ *Read;
+  EFI_FILE_SET_POSITION *SetPosition;
+  // ... other file operations omitted for brevity
+};
+
+// Simple File System Protocol GUID
+constexpr uint64_t EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID_DATA1 = 0x0964e5b22;
+constexpr uint16_t EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID_DATA2 = 0x6459;
+constexpr uint16_t EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID_DATA3 = 0x11d2;
+constexpr uint8_t EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID_DATA4[8] = {
+  0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b
+};
+
 // ACPI 2.0 Table GUID
 constexpr uint64_t ACPI_20_TABLE_GUID_PART1 = 0x8868e871;
 constexpr uint64_t ACPI_20_TABLE_GUID_PART2 = 0xe4b0a1c2;
@@ -312,6 +379,9 @@ struct EFI_GUID {
   uint16_t Data3;
   uint8_t Data4[8];
 };
+
+// Simple File System Protocol GUID
+extern const EFI_GUID EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 
 // Configuration Table Entry
 struct EFI_CONFIGURATION_TABLE {

@@ -41,6 +41,8 @@ class DisplayFramebuffer : public Display {
                    uint32_t bg_color);
   uint32_t color_to_pixel(Color c) const;
   void scroll();
+  void draw_cursor();
+  void erase_cursor();
 
 public:
   static DisplayFramebuffer &the() {

@@ -21,7 +21,7 @@ static constexpr int O_CLOEXEC = 0x80000;
 static constexpr int O_LARGEFILE = 0x8000;
 static constexpr int O_ACCMODE = 3;
 
-struct linux_dirent {
+struct [[gnu::packed]] linux_dirent {
     uint32_t d_ino;
     uint32_t d_off;
     uint16_t d_reclen;

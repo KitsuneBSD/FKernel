@@ -185,6 +185,78 @@ end)
 
 target_end()
 
+-- UEFI Application Target for real hardware boot
+target("FKernelUEFI")
+set_kind("binary")
+set_toolchains("FKernel_Compiling")
+set_filename("FKernel.efi")
+
+-- UEFI-specific configuration
+add_defines("FKERNEL_UEFI_APPLICATION")
+add_includedirs("Include")
+
+-- UEFI build flags
+local uefi_flags = {
+  cxx = {
+    "-ffreestanding",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-fno-stack-protector",
+    "-fno-use-cxa-atexit",
+    "-fno-pic",
+    "-fno-omit-frame-pointer",
+    "-nostdlib",
+    "-nostdinc",
+    "-D__fkernel__",
+    "-U__linux__",
+    "-U__linux",
+    "-Ulinux",
+    "-Wno-constant-conversion",
+    "-Wno-c++11-narrowing",
+    "--target=x86_64-efi",
+    "-mcmodel=large",
+    "-mno-red-zone",
+    "-mno-sse",
+    "-mno-avx",
+  },
+  ld = {
+    "-nostdlib",
+    "-pie",
+    "-e efi_main",
+    "-shared",
+    "-Bsymbolic",
+    "-z max-page-size=0x1000",
+    "--subsystem=10",  -- EFI_APPLICATION subsystem
+    "-T Config/uefi_linker.ld",
+  }
+}
+
+add_cxflags(uefi_flags.cxx, { force = true })
+add_ldflags(uefi_flags.ld, { force = true })
+
+-- UEFI-specific source files
+add_files("Src/Kernel/Boot/Uefi/**.cpp")
+add_files("Src/LibC/**.c")
+add_files("Src/LibC/**.cpp") 
+add_files("Src/LibFK/**.cpp")
+
+-- Architecture-specific UEFI files
+if is_arch("x86_64", "x64") then
+  add_asflags("-f elf64", { force = true })
+  -- Note: UEFI apps don't need the kernel's assembly entry points
+  -- They enter directly at efi_main
+end
+
+-- Create custom UEFI linker script
+after_build(function(target)
+  -- Create a PE/COFF header fixup if needed
+  local efi_file = target:targetfile()
+  print("UEFI application built: " .. efi_file)
+  
+  -- Copy to build directory with standard name
+  os.cp(efi_file, "build/FKernel.efi")
+end)
+
 task("setup-hda")
 set_menu({
   usage = "xmake setup-hda",

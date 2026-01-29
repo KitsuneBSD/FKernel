@@ -1,6 +1,7 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Storage/Ata/ata_controller.h>
 #include <Kernel/Driver/Storage/Ata/pio_strategy.h>
+#include <Kernel/Driver/Storage/Ata/dma_strategy.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Storage/storage_device_name.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
@@ -64,19 +65,26 @@ void ATAController::detect_on_pci(const PciDevice &device) {
     if (bar3 != 0) secondary_ctrl = (bar3 & 0xFFFC) + 2;
   }
 
-  probe_channel(primary_io, primary_ctrl, 0);
-  probe_channel(secondary_io, secondary_ctrl, 1);
+  // Detect Bus Master IDE base address (BAR4)
+  uint32_t bar4 = PciManager::the().read_config_dword(device.address(), 0x20);
+  if (bar4 & 0x01) {
+      m_bm_base = bar4 & 0xFFFC;
+      fk::algorithms::klog("ATA CONTROLLER", "Bus Master IDE base address: %04x", m_bm_base);
+  }
+
+  probe_channel(primary_io, primary_ctrl, 0, m_bm_base);
+  probe_channel(secondary_io, secondary_ctrl, 1, m_bm_base ? m_bm_base + 8 : 0);
 }
 
 void ATAController::detect_legacy() {
   fk::algorithms::klog("ATA CONTROLLER", "Probing legacy IO ports (0x1F0, 0x170)...");
   // Optional: check ACPI FADT 8042 flag or similar if needed
   // For now, just probe standard ports as a last resort
-  probe_channel(0x1F0, 0x3F6, 0);
-  probe_channel(0x170, 0x376, 1);
+  probe_channel(0x1F0, 0x3F6, 0, 0);
+  probe_channel(0x170, 0x376, 1, 0);
 }
 
-void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index) {
+void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index, uint16_t bm_base) {
   if (io == 0 || ctrl == 0) return;
 
   for (int master = 0; master < 2; ++master) {
@@ -139,10 +147,15 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index)
     fk::algorithms::klog("ATA", "Detected drive [%s]. Sectors: %lu (%lu GiB)",
                          bsd_name.c_str(), sectors, gib);
 
-    auto strategy = fk::memory::make_owned<PIOStrategy>(io, ctrl, is_master);
-    if (!strategy) continue;
+    fk::memory::OwnPtr<ATATransferStrategy> transfer_strategy;
+    if (bm_base != 0) {
+        transfer_strategy = fk::memory::make_owned<fkernel::DMAStrategy>(io, bm_base, is_master);
+    } else {
+        transfer_strategy = fk::memory::make_owned<PIOStrategy>(io, ctrl, is_master);
+    }
+    
+    if (!transfer_strategy) continue;
 
-    fk::memory::OwnPtr<ATATransferStrategy> transfer_strategy(strategy.leak_ptr());
     auto dev_res = fk::make_ref<ATADevice>(bsd_name, fk::types::move(transfer_strategy), SectorCount(sectors));
     if (dev_res.is_error()) continue;
     

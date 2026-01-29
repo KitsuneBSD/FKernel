@@ -267,6 +267,7 @@ void DisplayFramebuffer::scroll() {
 }
 
 void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
+  erase_cursor();
   uint32_t font_w = m_current_font.width * m_current_font.scale;
   uint32_t font_h = m_current_font.height * m_current_font.scale;
 
@@ -274,11 +275,13 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
     cursor_x = 0;
     cursor_y++;
     scroll();
+    draw_cursor();
     return;
   }
 
   if (codepoint == '\r') {
     cursor_x = 0;
+    draw_cursor();
     return;
   }
 
@@ -294,15 +297,23 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
       cursor_y++;
       scroll();
     }
+    draw_cursor();
     return;
   }
 
   if (codepoint == '\b') {
     if (cursor_x > 0) {
       cursor_x--;
-      render_char(cursor_x * font_w, cursor_y * font_h, ' ',
-                  color_to_pixel(current_fg), color_to_pixel(current_bg));
+    } else if (cursor_y > 0) {
+      cursor_y--;
+      cursor_x = get_width() - 1;
+    } else {
+      draw_cursor();
+      return;
     }
+    render_char(cursor_x * font_w, cursor_y * font_h, ' ',
+                color_to_pixel(current_fg), color_to_pixel(current_bg));
+    draw_cursor();
     return;
   }
 
@@ -315,6 +326,7 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
       cursor_y++;
       scroll();
     }
+    draw_cursor();
     return;
   }
 
@@ -324,13 +336,52 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
     scroll();
   }
 
-  if (codepoint < 32 && codepoint != 27)
+  if (codepoint < 32 && codepoint != 27) {
+    draw_cursor();
     return;
+  }
 
   char c = (codepoint < 128) ? static_cast<char>(codepoint) : '?';
   render_char(cursor_x * font_w, cursor_y * font_h, c,
               color_to_pixel(current_fg), color_to_pixel(current_bg));
   cursor_x++;
+  draw_cursor();
+}
+
+void DisplayFramebuffer::draw_cursor() {
+  if (!framebuffer) return;
+  uint32_t font_w = m_current_font.width * m_current_font.scale;
+  uint32_t font_h = m_current_font.height * m_current_font.scale;
+  uint32_t px_start = cursor_x * font_w;
+  uint32_t py_start = cursor_y * font_h + (font_h - 2); // Linha na base
+  uint32_t color = color_to_pixel(current_fg);
+
+  for (uint32_t y = py_start; y < py_start + 2 && y < fb_height; ++y) {
+    for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
+      uint32_t offset = y * fb_pitch + x * (fb_bpp / 8);
+      if (fb_bpp == 32) {
+        *reinterpret_cast<uint32_t *>(framebuffer + offset) = color;
+      }
+    }
+  }
+}
+
+void DisplayFramebuffer::erase_cursor() {
+  if (!framebuffer) return;
+  uint32_t font_w = m_current_font.width * m_current_font.scale;
+  uint32_t font_h = m_current_font.height * m_current_font.scale;
+  uint32_t px_start = cursor_x * font_w;
+  uint32_t py_start = cursor_y * font_h + (font_h - 2);
+  uint32_t color = color_to_pixel(current_bg);
+
+  for (uint32_t y = py_start; y < py_start + 2 && y < fb_height; ++y) {
+    for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
+      uint32_t offset = y * fb_pitch + x * (fb_bpp / 8);
+      if (fb_bpp == 32) {
+        *reinterpret_cast<uint32_t *>(framebuffer + offset) = color;
+      }
+    }
+  }
 }
 
 void DisplayFramebuffer::put_char(char c) {
@@ -378,6 +429,7 @@ void DisplayFramebuffer::write(const char *str) {
 }
 
 void DisplayFramebuffer::clear() {
+  erase_cursor();
   uint8_t *target = framebuffer;
   if (!target)
     return;

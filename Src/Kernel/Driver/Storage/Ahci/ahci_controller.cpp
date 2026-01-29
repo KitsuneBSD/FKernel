@@ -1,5 +1,6 @@
 #include <Kernel/Driver/Storage/Ahci/ahci_controller.h>
 #include <Kernel/Memory/memory_manager.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Hardware/Pci/pci.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Assertions.h>
@@ -86,6 +87,34 @@ fk::core::Result<void, fk::core::Error> AHCIController::initialize_controller() 
     
     // Scan for devices
     scan_ports();
+
+    // Allocate memory for each port's Command List and FIS
+    for (auto& port : m_ports) {
+        if (!port.is_implemented) continue;
+
+        // Allocate physical pages
+        uintptr_t clb_phys = PhysicalMemoryManager::the().alloc_page();
+        uintptr_t fb_phys = PhysicalMemoryManager::the().alloc_page();
+        
+        ASSERT(clb_phys != 0 && fb_phys != 0);
+
+        // Identity map for simplicity (or should use VMM properly)
+        MemoryManager::the().map_page(clb_phys, clb_phys, PageFlags::Present | PageFlags::Writable);
+        MemoryManager::the().map_page(fb_phys, fb_phys, PageFlags::Present | PageFlags::Writable);
+
+        port.regs->clb = (uint32_t)clb_phys;
+        port.regs->clbu = (uint32_t)(clb_phys >> 32);
+        port.regs->fb = (uint32_t)fb_phys;
+        port.regs->fbu = (uint32_t)(fb_phys >> 32);
+
+        // Clear memory
+        memset(reinterpret_cast<void*>(clb_phys), 0, 4096);
+        memset(reinterpret_cast<void*>(fb_phys), 0, 4096);
+
+        // Enable port
+        port.regs->cmd |= (1 << 4); // FRE (FIS Receive Enable)
+        port.regs->cmd |= (1 << 0); // ST (Start)
+    }
     
     m_initialized = true;
     return {};
@@ -144,16 +173,16 @@ void AHCIController::scan_ports() {
         port.is_implemented = true;
         port.has_device = false;
         port.sig = 0;
+        port.regs = reinterpret_cast<volatile HBA_PORT*>(m_hba_base + 0x100 + (i * 0x80));
         
         // Check if port has device connected
-        volatile uint32_t* port_base = reinterpret_cast<volatile uint32_t*>(m_hba_base + 0x100 + (i * 0x80));
-        uint32_t ssts = port_base[PORT_SSTS / 4]; // Serial ATA Status
+        uint32_t ssts = port.regs->ssts; // Serial ATA Status
         
         // Check device detection (DET field)
         uint8_t det = ssts & 0x0F;
         if (det == 0x01 || det == 0x03) { // Device present
             port.has_device = true;
-            port.sig = port_base[PORT_SIG / 4]; // Signature
+            port.sig = port.regs->sig; // Signature
             
             const char* device_type = "Unknown";
             switch (port.sig) {
@@ -169,14 +198,20 @@ void AHCIController::scan_ports() {
         
         m_ports.push_back(port);
     }
-    
-    uint32_t devices_with_devices = 0;
-    for (const auto& port : m_ports) {
-        if (port.has_device) devices_with_devices++;
-    }
-    
-    fk::algorithms::klog("AHCI", "Port scan complete. %u total ports, %u with devices", 
-                         m_ports.size(), devices_with_devices);
+}
+
+fk::core::Result<void, fk::core::Error> AHCIController::read_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, uint16_t* buffer) {
+    if (port_idx >= m_ports.size()) return fk::core::Error::InvalidParameter;
+    // AHCI Read logic here
+    (void)start_sector; (void)count; (void)buffer;
+    return fk::core::Error::NotImplemented;
+}
+
+fk::core::Result<void, fk::core::Error> AHCIController::write_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, const uint16_t* buffer) {
+    if (port_idx >= m_ports.size()) return fk::core::Error::InvalidParameter;
+    // AHCI Write logic here
+    (void)start_sector; (void)count; (void)buffer;
+    return fk::core::Error::NotImplemented;
 }
 
 void AHCIController::probe() {

@@ -10,22 +10,10 @@
 // Row helper: 16 entries
 #define R16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p
 
-fk::core::Result<size_t, fk::core::Error> PS2Keyboard::read([[maybe_unused]] uint64_t offset, size_t size, uint8_t* out_buffer) {
-    if (size == 0) return 0;
-    if (!out_buffer) return fk::core::Error::InvalidParameter;
-
-    size_t count = 0;
-    while (count < size) {
-        if (has_key()) {
-            out_buffer[count++] = static_cast<uint8_t>(pop_key());
-            // Return immediately if we have at least one character
-            if (count > 0) return count;
-        } else {
-            if (count > 0) return count;
-            SchedulerManager::the().yield();
-        }
-    }
-    return count;
+fk::core::Result<size_t, fk::core::Error> PS2Keyboard::read([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* out_buffer) {
+    // We no longer support direct reading from the keyboard driver to avoid de-sync.
+    // Use /dev/console or /dev/ttyX instead.
+    return fk::core::Error::PermissionDenied;
 }
 
 fk::core::Result<size_t, fk::core::Error> PS2Keyboard::write(uint64_t, size_t, const uint8_t*) {
@@ -133,9 +121,6 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
   if (c) {
     // Notify TerminalManager
     fkernel::terminal::TerminalManager::the().handle_input(c);
-    
-    // Also keep local buffer for direct reads from /dev/keyboard
-    push_char(c);
   } else {
     // fk::algorithms::kdebug("KEYBOARD", "Unmapped keycode: 0x%X", keycode);
   }

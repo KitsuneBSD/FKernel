@@ -1,35 +1,32 @@
 #pragma once
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
-#include <Kernel/Driver/Vga/vga_adapter.h>
-#include <LibC/string.h>
-
-#include <Kernel/Driver/Keyboard/ps2_keyboard.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Driver/Terminal/terminal_manager.h>
 
 namespace fkernel {
 
-class ConsoleNode final : public CharacterDevice {
+/// @brief /dev/tty - A proxy device that always points to the current active TTY
+class CurrentTTYNode final : public CharacterDevice {
 public:
-    ConsoleNode() {
-        set_name("console");
+    CurrentTTYNode() {
+        set_name("tty");
     }
-    virtual ~ConsoleNode() override = default;
+    virtual ~CurrentTTYNode() override = default;
 
     virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size, uint8_t* buffer) override {
-        auto* active = fkernel::terminal::TerminalManager::the().active_terminal();
-        if (!active) return 0;
+        auto* active = terminal::TerminalManager::the().active_terminal();
+        if (!active) return fk::core::Error::NotFound;
         return active->read(offset, size, buffer);
     }
 
     virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t offset, size_t size, const uint8_t* buffer) override {
-        auto* active = fkernel::terminal::TerminalManager::the().active_terminal();
-        if (!active) return 0;
+        auto* active = terminal::TerminalManager::the().active_terminal();
+        if (!active) return fk::core::Error::NotFound;
         return active->write(offset, size, buffer);
     }
 
     virtual fk::core::Result<int, fk::core::Error> ioctl(uint64_t request, uint64_t arg) override {
-        auto* active = fkernel::terminal::TerminalManager::the().active_terminal();
+        auto* active = terminal::TerminalManager::the().active_terminal();
         if (!active) return fk::core::Error::NotFound;
         return active->ioctl(request, arg);
     }
