@@ -127,6 +127,11 @@ void TerminalManager::switch_to(int index) {
   
   if (m_active_terminal_index == index) return;
 
+  // Unmap previous terminal if needed
+  if (m_active_terminal_index != -1) {
+      // In a more complex system, we would save the state of the current terminal
+  }
+
   m_active_terminal_index = index;
   auto* terminal = m_vga_terminals[index].get();
   
@@ -135,10 +140,10 @@ void TerminalManager::switch_to(int index) {
   
   fk::algorithms::klog("TERMINAL MANAGER", "Switched to tty%d", index);
   
-  // In a real OS, we would trigger a screen redraw here
-  // For now, let's just clear and show terminal name
+  // 1. Redraw/Sync Display: Clear screen and show terminal state
+  // In a real system, we'd restore the character buffer of this terminal to the VGA adapter.
   terminal->clear();
-  char msg[32];
+  char msg[64];
   snprintf(msg, sizeof(msg), "\n--- Switched to TTY%d ---\n", index);
   terminal->write(0, strlen(msg), reinterpret_cast<const uint8_t*>(msg));
 }

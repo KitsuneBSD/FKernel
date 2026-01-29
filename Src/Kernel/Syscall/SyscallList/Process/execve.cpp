@@ -45,7 +45,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
     }
   }
 
-  auto res = VirtualFileSystem::the().open(path.c_str(), 0);
+  auto res = fkernel::VirtualFileSystem::the().open(path.c_str(), 0);
   if (res.is_error()) {
     fk::algorithms::kwarn("SYSCALL", "sys_execve: Failed to open %s: %d", path.c_str(), (int)res.error());
     return fkernel::return_error(res.error());
@@ -75,7 +75,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
       // Recurse with /bin/sh
       // Note: We need to resolve /bin/sh to its absolute path if it isn't already.
       // For now, assume it's at /bin/sh.
-      auto sh_res = VirtualFileSystem::the().open("/bin/sh", 0);
+      auto sh_res = fkernel::VirtualFileSystem::the().open("/bin/sh", 0);
       if (sh_res.is_error()) {
           fk::algorithms::kwarn("SYSCALL", "sys_execve: Script detected but /bin/sh not found!");
           return fkernel::return_error(fk::core::Error::NotFound);

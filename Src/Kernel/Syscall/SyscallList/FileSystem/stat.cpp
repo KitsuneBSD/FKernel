@@ -1,13 +1,10 @@
-#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Posix/sys/stat.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <LibC/stdio.h>
+#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Scheduler/scheduler.h>
 #include <LibC/string.h>
-#include <LibFK/Algorithms/log.h>
+
+using namespace fkernel;
 
 extern "C" {
 

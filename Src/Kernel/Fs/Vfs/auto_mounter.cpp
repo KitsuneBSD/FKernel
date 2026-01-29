@@ -25,7 +25,7 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
     snprintf(mount_path, sizeof(mount_path), "/mnt/%s", device_name);
     
     // Ensure mount directory exists
-    auto mkdir_res = VirtualFileSystem::the().mkdir("/mnt", 0755);
+    auto mkdir_res = fkernel::VirtualFileSystem::the().mkdir("/mnt", 0755);
     if (mkdir_res.is_error() && mkdir_res.error() != fk::core::Error::PermissionDenied) {
         // If it's not a "PermissionDenied" (which TmpFs uses for AlreadyExists),
         // we might have a real issue. But let's try to proceed anyway if /mnt exists.
@@ -35,7 +35,7 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
     // Try FAT12
     auto fat12_res = Fat12FileSystem::create(device);
     if (fat12_res.is_ok()) {
-        auto mount_res = VirtualFileSystem::the().mount(mount_path, fat12_res.value());
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat12_res.value());
         if (mount_res.is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT12) at %s", device->name().c_str(), mount_path);
             return;
@@ -47,7 +47,7 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
 // Try FAT16
     auto fat16_res = Fat16FileSystem::create(device);
     if (fat16_res.is_ok()) {
-        auto mount_res = VirtualFileSystem::the().mount(mount_path, fat16_res.value());
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat16_res.value());
         if (mount_res.is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT16) at %s", device->name().c_str(), mount_path);
             return;
@@ -59,7 +59,7 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
     // Try FAT32
     auto fat32_res = Fat32FileSystem::create(device);
     if (fat32_res.is_ok()) {
-        auto mount_res = VirtualFileSystem::the().mount(mount_path, fat32_res.value());
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat32_res.value());
         if (mount_res.is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT32) at %s", device->name().c_str(), mount_path);
             return;

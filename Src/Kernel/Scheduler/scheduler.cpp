@@ -7,6 +7,7 @@
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Fs/RamDisk/ram_disk.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Loader/elf_loader.h>
@@ -54,11 +55,11 @@ extern "C" void init_task_entry() {
   }
 
   auto ramdisk = ramdisk_res.value();
-  VirtualFileSystem::the().mount("/", ramdisk);
+  fkernel::VirtualFileSystem::the().mount("/", ramdisk);
 
   // Load init process from ELF via VFS to resolve symlinks
-  auto init_node_res = VirtualFileSystem::the().resolve_path("/sbin/init");
-  if (init_node_res.is_error()) {
+  auto init_dentry_res = fkernel::VirtualFileSystem::the().resolve_path("/sbin/init");
+  if (init_dentry_res.is_error()) {
     fk::algorithms::kerror("INIT", "Could not find /sbin/init in VFS");
   }
 
@@ -67,10 +68,11 @@ extern "C" void init_task_entry() {
   VirtualMemoryManager::the().switch_address_space(new_cr3);
   SchedulerManager::the().current()->cr3 = new_cr3;
 
-  auto entry_res = fkernel::ElfLoader::load(init_node_res.value());
+  auto entry_res = fkernel::ElfLoader::load(init_dentry_res.value()->top_node());
 
   if (entry_res.is_error()) {
-    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF");
+    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF (Error %d)", (int)entry_res.error());
+    while(1) asm volatile("hlt");
   }
 
   uintptr_t entry = entry_res.value();
@@ -153,7 +155,7 @@ void SchedulerManager::initialize() {
   init->memory_regions.mmap_end = 0x40000000;
 
   // Populate FDs 0, 1, 2. We use tty0 instead of console for better input support.
-  auto console_res = VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
+  auto console_res = fkernel::VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
   if (console_res.is_ok()) {
     init->add_file_descriptor(console_res.value()); // 0
     init->add_file_descriptor(console_res.value()); // 1
@@ -164,7 +166,7 @@ void SchedulerManager::initialize() {
 
   init->dump_file_descriptors();
 
-  // Migrate logs: disable Display, keep Serial and DebugFS
+  // Migrate logs: keep Serial and DebugFS
   fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
                                   fk::algorithms::LogTarget::DebugFS);
 

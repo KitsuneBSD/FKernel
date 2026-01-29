@@ -1,5 +1,7 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
+#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibC/string.h>
 
@@ -13,17 +15,18 @@ uint64_t sys_chdir(uint64_t path_ptr, uint64_t, uint64_t, uint64_t, uint64_t,
 
   const char *path = (const char *)path_ptr;
   if (!path)
-    return -static_cast<int>(fk::core::Error::InvalidParameter);
+    return fkernel::return_error(fk::core::Error::InvalidParameter);
 
-  auto res = VirtualFileSystem::the().resolve_path(path);
+  auto res = fkernel::VirtualFileSystem::the().resolve_path(path);
   if (res.is_error())
-    return -static_cast<int>(res.error());
+    return fkernel::return_error(res.error());
 
-  auto node = res.value();
-  if (!node->is_directory())
-    return -static_cast<int>(fk::core::Error::NotADirectory);
+  auto dentry = res.value();
+  auto node = dentry->top_node();
+  if (!node || !node->is_directory())
+    return fkernel::return_error(fk::core::Error::NotADirectory);
 
-  fk::text::String full_path = node->get_path();
+  fk::text::String full_path = dentry->get_path();
   if (full_path.is_empty()) {
       current_task->cwd.assign("/", 1);
   } else {

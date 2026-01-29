@@ -2,6 +2,7 @@
 #include <LibFK/Utilities/Memory.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/new.h>
+#include <LibC/string.h>
 
 namespace fkernel {
 
@@ -45,26 +46,43 @@ void RamDiskNode::parse_tar() {
 
         const char* final_filename = safe_filename;
         // Strip leading ./ or /
-        if (final_filename[0] == '.' && final_filename[1] == '/') {
-            final_filename += 2;
-        } else if (final_filename[0] == '/') {
-            final_filename += 1;
+        while (final_filename[0] == '.' && final_filename[1] == '/') final_filename += 2;
+        while (final_filename[0] == '/') final_filename += 1;
+
+        if (final_filename[0] == '\0') {
+            ptr += 512 + ((file_size + 511) & ~511u);
+            continue;
         }
 
         if (header->typeflag[0] == '0' || header->typeflag[0] == '\0') {
             auto file_node_res = fk::make_ref<RamFileNode>(data_ptr, file_size);
             if (!file_node_res.is_error()) {
                 auto file_node = file_node_res.value();
-                file_node->set_name(final_filename);
+                
+                const char* name_ptr = strrchr(final_filename, '/', 100);
+                if (name_ptr) name_ptr++;
+                else name_ptr = final_filename;
+                
+                file_node->set_name(name_ptr);
                 file_node->set_parent(fk::RefPtr<Node>(this));
                 m_files.push_back({final_filename, file_node});
-                fk::algorithms::klog("RAMDISK", "Loaded file: %s (%zu bytes)", final_filename, file_size);
+                fk::algorithms::klog("RAMDISK", "Loaded file: %s (%zu bytes) as '%s'", final_filename, file_size, name_ptr);
                 files_loaded++;
             }
         } else if (header->typeflag[0] == '5') {
-            // Directory entry in TAR - we don't strictly need to create nodes for these 
-            // in our current flat RamDiskNode, but let's log it.
-            fk::algorithms::klog("RAMDISK", "Found directory: %s", final_filename);
+            // Explicit directory entry
+            // Strip trailing slash if present for consistency
+            size_t len = strlen(final_filename);
+            char temp[256];
+            if (len > 0 && final_filename[len - 1] == '/') {
+                strncpy(temp, final_filename, len - 1);
+                temp[len - 1] = '\0';
+            } else {
+                strncpy(temp, final_filename, sizeof(temp) - 1);
+                temp[sizeof(temp) - 1] = '\0';
+            }
+            m_directories.push_back(temp);
+            fk::algorithms::klog("RAMDISK", "Found explicit directory: %s", temp);
         } else if (header->typeflag[0] == '2') {
             // Symbolic link
             char link_target[100];
@@ -74,10 +92,15 @@ void RamDiskNode::parse_tar() {
             auto symlink_node_res = fk::make_ref<RamSymlinkNode>(link_target);
             if (!symlink_node_res.is_error()) {
                 auto symlink_node = symlink_node_res.value();
-                symlink_node->set_name(final_filename);
+                
+                const char* name_ptr = strrchr(final_filename, '/', 100);
+                if (name_ptr) name_ptr++;
+                else name_ptr = final_filename;
+                
+                symlink_node->set_name(name_ptr);
                 symlink_node->set_parent(fk::RefPtr<Node>(this));
                 m_files.push_back({final_filename, symlink_node});
-                fk::algorithms::klog("RAMDISK", "Loaded symlink: %s -> %s", final_filename, link_target);
+                fk::algorithms::klog("RAMDISK", "Loaded symlink: %s -> %s as '%s'", final_filename, link_target, name_ptr);
                 files_loaded++;
             }
         }
@@ -95,19 +118,16 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
     }
 
     const char* clean_name = (name[0] == '/') ? name + 1 : name;
-    fk::algorithms::kdebug("RAMDISK", "lookup: name='%s' (clean='%s'), prefix='%s'", name, clean_name, m_prefix.c_str());
     char full_lookup[512];
     if (m_prefix.is_empty()) {
         strncpy(full_lookup, clean_name, sizeof(full_lookup) - 1);
-        full_lookup[sizeof(full_lookup) - 1] = '\0';
     } else {
-        // Ensure m_prefix ends with /
-        if (m_prefix.c_str()[m_prefix.length() - 1] == '/') {
-            snprintf(full_lookup, sizeof(full_lookup), "%s%s", m_prefix.c_str(), clean_name);
-        } else {
-            snprintf(full_lookup, sizeof(full_lookup), "%s/%s", m_prefix.c_str(), clean_name);
-        }
+        snprintf(full_lookup, sizeof(full_lookup), "%s%s", m_prefix.c_str(), clean_name);
     }
+    full_lookup[sizeof(full_lookup) - 1] = '\0';
+
+    fk::algorithms::kdebug("RAMDISK", "lookup: name='%s', full_lookup='%s', prefix='%s'", 
+                         name, full_lookup, m_prefix.c_str());
 
     for (auto& entry : m_files) {
         if (entry.name == full_lookup) {
@@ -116,29 +136,36 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
         }
     }
 
+    // Check if this is an implied directory (it's a prefix for other files)
     char dir_prefix[512];
-    if (full_lookup[0] == '\0') {
-        dir_prefix[0] = '\0';
-    } else {
-        snprintf(dir_prefix, sizeof(dir_prefix), "%s/", full_lookup);
-    }
+    snprintf(dir_prefix, sizeof(dir_prefix), "%s/", full_lookup);
 
     bool found_prefix = false;
-    if (dir_prefix[0] != '\0') {
-        for (auto& entry : m_files) {
-            if (strncmp(entry.name.c_str(), dir_prefix, strlen(dir_prefix)) == 0) {
-                found_prefix = true;
-                break;
-            }
+    for (auto& entry : m_files) {
+        if (strncmp(entry.name.c_str(), dir_prefix, strlen(dir_prefix)) == 0) {
+            found_prefix = true;
+            break;
         }
     }
 
-    if (found_prefix) {
+    bool is_explicit_dir = false;
+    for (const auto& dir : m_directories) {
+        if (dir == full_lookup) {
+            is_explicit_dir = true;
+            break;
+        }
+    }
+
+    if (found_prefix || is_explicit_dir) {
         auto dir_node_res = fk::make_ref<RamDiskNode>(m_start, m_end);
         if (dir_node_res.is_error()) return dir_node_res.error();
         auto dir_node = dir_node_res.value();
-        dir_node->set_name(clean_name); // Set the component name
+        dir_node->set_name(clean_name);
+        
+        // Copy m_files and m_directories to the new directory node so it can find its own children
         for (auto& f : m_files) dir_node->m_files.push_back(f);
+        for (auto& d : m_directories) dir_node->m_directories.push_back(d);
+        
         dir_node->m_prefix = dir_prefix;
         dir_node->set_parent(fk::RefPtr<Node>(this));
         return fk::RefPtr<Node>(dir_node);
@@ -148,11 +175,8 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
 }
 
 fk::core::Result<void, fk::core::Error> RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
-    fk::containers::Vector<fk::text::String> added_names;
     size_t prefix_len = m_prefix.length();
-
-    fk::algorithms::klog("RAMDISK", "list_dir: prefix='%s' (len %zu), m_files size: %zu", 
-                         m_prefix.c_str(), prefix_len, m_files.size());
+    fk::algorithms::klog("RAMDISK", "list_dir: prefix='%s', files count: %zu", m_prefix.c_str(), m_files.size());
 
     for (auto& entry : m_files) {
         if (prefix_len > 0 && strncmp(entry.name.c_str(), m_prefix.c_str(), prefix_len) != 0)
@@ -161,23 +185,35 @@ fk::core::Result<void, fk::core::Error> RamDiskNode::list_dir(fk::containers::Ve
         const char* relative_name = entry.name.c_str() + prefix_len;
         if (relative_name[0] == '\0') continue;
 
-        // Get the first component of the relative name
         char component[256];
         const char* slash = strchr(relative_name, '/', 256);
+        bool is_dir = false;
+
         if (slash) {
             size_t len = slash - relative_name;
-            if (len >= sizeof(component)) len = sizeof(component) - 1;
+            if (len == 0) { // Entry started with / but we already skipped prefix
+                relative_name++;
+                slash = strchr(relative_name, '/', 256);
+                if (slash) len = slash - relative_name;
+                else {
+                    strncpy(component, relative_name, sizeof(component) - 1);
+                    is_dir = false;
+                    goto skip_slash_logic;
+                }
+            }
             strncpy(component, relative_name, len);
             component[len] = '\0';
+            is_dir = true;
         } else {
             strncpy(component, relative_name, sizeof(component) - 1);
             component[sizeof(component) - 1] = '\0';
+            is_dir = false;
         }
 
-        // Check if already added
+    skip_slash_logic:
         bool already_added = false;
-        for (auto& added : added_names) {
-            if (added == component) {
+        for (auto& existing : entries) {
+            if (strcmp(existing.name, component) == 0) {
                 already_added = true;
                 break;
             }
@@ -185,17 +221,57 @@ fk::core::Result<void, fk::core::Error> RamDiskNode::list_dir(fk::containers::Ve
 
         if (!already_added) {
             DirectoryEntry de;
-            fk::memory::set(&de, 0, sizeof(de));
+            memset(&de, 0, sizeof(de));
             strncpy(de.name, component, sizeof(de.name) - 1);
-            de.name[sizeof(de.name) - 1] = '\0';
-            de.type = slash ? 1 : 0; // 1 for Dir, 0 for File (simplified)
-            
-            fk::algorithms::klog("RAMDISK", "  entry: '%s' (type %u)", de.name, de.type);
-            
+            if (is_dir) {
+                de.type = 1; // DT_DIR
+            } else {
+                if (entry.node->is_symlink()) de.type = 2; // DT_LNK
+                else de.type = 0; // DT_REG
+            }
             entries.push_back(de);
-            added_names.push_back(component);
         }
     }
+
+    // Add explicit directories that might be empty (not implied by files)
+    for (const auto& dir_path : m_directories) {
+        if (prefix_len > 0 && strncmp(dir_path.c_str(), m_prefix.c_str(), prefix_len) != 0)
+            continue;
+
+        const char* relative_name = dir_path.c_str() + prefix_len;
+        if (relative_name[0] == '\0') continue;
+
+        char component[256];
+        const char* slash = strchr(relative_name, '/', 256);
+        
+        if (slash) {
+            // Should not happen if m_directories contains clean paths, but safe to handle
+            size_t len = slash - relative_name;
+            strncpy(component, relative_name, len);
+            component[len] = '\0';
+        } else {
+            strncpy(component, relative_name, sizeof(component) - 1);
+            component[sizeof(component) - 1] = '\0';
+        }
+
+        bool already_added = false;
+        for (auto& existing : entries) {
+            if (strcmp(existing.name, component) == 0) {
+                already_added = true;
+                break;
+            }
+        }
+
+        if (!already_added) {
+            DirectoryEntry de;
+            memset(&de, 0, sizeof(de));
+            strncpy(de.name, component, sizeof(de.name) - 1);
+            de.type = 1; // DT_DIR
+            entries.push_back(de);
+        }
+    }
+
+    fk::algorithms::klog("RAMDISK", "list_dir complete: %zu entries found", entries.size());
     return {};
 }
 

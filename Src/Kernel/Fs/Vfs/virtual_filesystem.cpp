@@ -12,6 +12,7 @@
 #include <Kernel/Fs/TmpFs/tmp_fs.h>
 #include <Kernel/Fs/Vfs/definitions.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Result.h>
@@ -19,50 +20,51 @@
 #include <LibFK/Utilities/Memory.h>
 #include <LibFK/Utilities/pair.h>
 
+namespace fkernel {
+
 void VirtualFileSystem::initialize() {
   auto &vfs = the();
 
+  // 1. Setup Root Dentry with TmpFs root node
   auto root_node = fk::make_ref<TmpFsDirectoryNode>().value();
   root_node->set_is_root(true);
   vfs.mount_root(root_node);
 
-  root_node->mkdir("dev", 0755);
-  root_node->mkdir("proc", 0755);
-  root_node->mkdir("debug", 0755);
-  root_node->mkdir("mnt", 0755);
+  // 2. Create base system directories in the TmpFs layer
+  (void)vfs.mkdir("/dev", 0755);
+  (void)vfs.mkdir("/proc", 0755);
+  (void)vfs.mkdir("/debug", 0755);
+  (void)vfs.mkdir("/mnt", 0755);
 
+  // 3. Mount specialized filesystems
   auto &devfs = fkernel::DevFs::the();
   devfs.set_name("dev");
-  devfs.set_parent(root_node);
-  vfs.mount("/dev", fk::RefPtr<Node>(&devfs));
+  (void)vfs.mount("/dev", fk::RefPtr<Node>(&devfs));
 
+  auto proc_res = fk::make_ref<ProcFsNode>();
+  if (proc_res) {
+    proc_res.value()->set_name("proc");
+    (void)vfs.mount("/proc", proc_res.value());
+  }
+
+  auto debugfs_res = fk::make_ref<fkernel::DebugFsNode>();
+  if (debugfs_res) {
+    debugfs_res.value()->set_name("debug");
+    (void)vfs.mount("/debug", debugfs_res.value());
+  }
+
+  // 4. Initialize Core Drivers
   auto& driver_manager = fkernel::DriverManager::the();
   driver_manager.register_device(fk::make_ref<fkernel::SerialNode>().value());
   driver_manager.register_device(fk::make_ref<fkernel::ConsoleNode>().value());
   driver_manager.register_device(fk::make_ref<fkernel::NullDevice>().value());
   driver_manager.register_device(fk::make_ref<fkernel::ZeroDevice>().value());
 
-  // /dev/tty should point to the current tty, let's link it to tty0 for now
+  // 5. Initialize Terminal System
   vfs.symlink("/dev/tty", "tty0");
-
-  // Initialize terminal manager (will create default TTYs dynamically)
   fkernel::terminal::TerminalManager::the().initialize();
 
-  auto proc_res = fk::make_ref<ProcFsNode>();
-  if (proc_res) {
-    proc_res.value()->set_name("proc");
-    proc_res.value()->set_parent(root_node);
-    vfs.mount("/proc", proc_res.value());
-  }
-
-  auto debugfs_res = fk::make_ref<fkernel::DebugFsNode>();
-  if (debugfs_res) {
-    debugfs_res.value()->set_name("debug");
-    debugfs_res.value()->set_parent(root_node);
-    vfs.mount("/debug", debugfs_res.value());
-  }
-
-  fk::algorithms::klog("VFS", "Initialized VFS");
+  fk::algorithms::klog("VFS", "Initialized VFS with Dentry Cache");
 }
 
 VirtualFileSystem &VirtualFileSystem::the() {
@@ -70,173 +72,91 @@ VirtualFileSystem &VirtualFileSystem::the() {
   return instance;
 }
 
-void VirtualFileSystem::mount_root(fk::RefPtr<Node> node) { m_root = node; }
+void VirtualFileSystem::mount_root(fk::RefPtr<Node> node) {
+    if (!m_root) {
+        m_root = Dentry::create("", nullptr).value();
+    }
+    m_root->push_node(node);
+}
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::mount(const char *path, fk::RefPtr<Node> node) {
-  if (!path || !node)
-    return fk::core::Error::InvalidParameter;
+  if (!path || !node) return fk::core::Error::InvalidParameter;
 
-  auto target_res = resolve_path(path);
-  if (target_res.is_error())
-    return target_res.error();
+  auto dentry_res = resolve_path(path);
+  if (dentry_res.is_error()) return dentry_res.error();
 
-  m_mounts.push_back({path, node, target_res.value()});
+  auto dentry = dentry_res.value();
+  dentry->push_node(node);
+  
+  fk::algorithms::klog("VFS", "Mounted node at %s (Stack size: %zu)", path, dentry->nodes().size());
   return {};
 }
 
-fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-VirtualFileSystem::resolve_path(const char *path, int depth) {
-  if (depth > 8)
-    return fk::core::Error::IOError;
-  if (!path || !m_root)
-    return fk::core::Error::InvalidParameter;
+fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
+VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int depth) {
+  if (depth > 8) return fk::core::Error::IOError;
+  if (!path || !m_root) return fk::core::Error::InvalidParameter;
 
-  fk::algorithms::kdebug("VFS", "resolve_path: '%s' (depth %d)", path, depth);
-
-  fk::RefPtr<Node> current = m_root;
+  fk::RefPtr<Dentry> current = m_root;
   const char *ptr = path;
 
-  if (path[0] != '/') {
-    auto *task = SchedulerManager::the().current();
-    if (task && !task->cwd.empty()) {
-      auto cwd_res = resolve_path(task->cwd.c_str(), depth + 1);
-      if (cwd_res.is_ok())
-        current = cwd_res.value();
-    }
+  if (path[0] == '/') {
+      // Absolute path, start from root
+      while (*ptr == '/') ptr++;
+  } else if (base) {
+      current = base;
+  } else {
+      // Relative path, start from CWD
+      auto *task = SchedulerManager::the().current();
+      if (task && !task->cwd.empty()) {
+          auto cwd_res = resolve_path(task->cwd.c_str(), nullptr, depth + 1);
+          if (cwd_res.is_ok()) current = cwd_res.value();
+      }
   }
 
   while (*ptr) {
-    while (*ptr == '/')
-      ptr++;
-    if (!*ptr)
-      break;
-
     char name[256];
     size_t i = 0;
-    while (*ptr && *ptr != '/' && i < 255)
-      name[i++] = *ptr++;
+    while (*ptr && *ptr != '/' && i < 255) name[i++] = *ptr++;
     name[i] = '\0';
 
-    if (name[0] == '\0' || strcmp(name, ".") == 0)
-      continue;
-
-    if (strcmp(name, "..") == 0) {
-      // Crossing mount border upwards
-      fk::RefPtr<Node> target_node = nullptr;
-      for (auto &m : m_mounts) {
-        if (m.source == current) {
-          target_node = m.target;
-          break;
-        }
-      }
-
-      if (target_node && target_node->parent()) {
-          current = target_node->parent();
-      } else if (current->parent()) {
-          current = current->parent();
-      }
-      continue;
+    if (name[0] == '\0' || strcmp(name, ".") == 0) {
+        while (*ptr == '/') ptr++;
+        continue;
     }
 
-    // Check if current node is a mount point's target, if so, switch to source
-    // (Crossing border downwards into a mount)
-    for (auto &m : m_mounts) {
-      if (m.target == current) {
-        current = m.source;
-        break;
-      }
-    }
-
-    auto lookup_res = current->lookup(name);
-    if (lookup_res.is_error()) {
-      // Fallback: If this is a mount source (like RamDisk on /), 
-      // check if the underlying target (TmpFs root) has the entry.
-      // This allows seeing /dev, /proc etc from the root mount.
-      fk::RefPtr<Node> underlying = nullptr;
-      for (auto &m : m_mounts) {
-        if (m.source == current) {
-          underlying = m.target;
-          break;
-        }
-      }
-
-      if (underlying) {
-          lookup_res = underlying->lookup(name);
-      }
-
-      if (lookup_res.is_error()) {
-          return lookup_res.error();
-      }
-    }
-    current = lookup_res.value();
-
-    // Check if the RESOLVED node is a mount point's target
-    for (auto &m : m_mounts) {
-      if (m.target == current) {
-        current = m.source;
-        break;
-      }
-    }
+    auto next_res = current->lookup(name);
+    if (next_res.is_error()) return next_res.error();
+    current = next_res.value();
 
     // Handle Symlinks
     int symlink_depth = 0;
-    while (current->is_symlink() && symlink_depth < 8) {
-      auto link_res = current->read_link();
-      if (link_res.is_error())
-        return link_res.error();
-      
-      fk::text::String link = link_res.value();
-      fk::algorithms::kdebug("VFS", "traversing symlink '%s' -> '%s'", current->name().c_str(), link.c_str());
-      
-      if (link.c_str()[0] == '/') {
-        auto sub_res = resolve_path(link.c_str(), depth + 1);
-        if (sub_res.is_error())
-          return sub_res.error();
-        current = sub_res.value();
-      } else {
-        // Relative link: resolve from the parent of the symlink
-        auto parent = current->parent();
-        if (!parent) parent = m_root;
+    while (current->top_node() && current->top_node()->is_symlink() && symlink_depth < 8) {
+        auto link_res = current->top_node()->read_link();
+        if (link_res.is_error()) return link_res.error();
         
-        // This is a bit recursive, but we need to resolve the link target 
-        // starting from 'parent'.
-        // We can't just call resolve_path because it starts from root/cwd.
-        // We'll temporarily use a hack: construct full path if possible, 
-        // or a new helper.
-        
-        // Better: iterate components of 'link' manually starting from 'parent'
-        fk::RefPtr<Node> sym_current = parent;
-        const char* sptr = link.c_str();
-        while (*sptr) {
-            while (*sptr == '/') sptr++;
-            if (!*sptr) break;
-            char sname[256];
-            size_t si = 0;
-            while (*sptr && *sptr != '/' && si < 255) sname[si++] = *sptr++;
-            sname[si] = '\0';
-
-            if (strcmp(sname, ".") == 0) continue;
-            if (strcmp(sname, "..") == 0) {
-                if (sym_current->parent()) sym_current = sym_current->parent();
-                continue;
-            }
-            auto sl_res = sym_current->lookup(sname);
-            if (sl_res.is_error()) return sl_res.error();
-            sym_current = sl_res.value();
-            // Nested symlinks in the relative path are NOT handled here for simplicity,
-            // but standard Unix allows them.
+        fk::text::String link = link_res.value();
+        if (link.c_str()[0] == '/') {
+            auto sub_res = resolve_path(link.c_str(), nullptr, depth + 1);
+            if (sub_res.is_error()) return sub_res.error();
+            current = sub_res.value();
+        } else {
+            // Resolve relative to parent dentry
+            auto sub_res = resolve_path(link.c_str(), current->parent(), depth + 1);
+            if (sub_res.is_error()) return sub_res.error();
+            current = sub_res.value();
         }
-        current = sym_current;
-      }
-      symlink_depth++;
+        symlink_depth++;
     }
+
+    while (*ptr == '/') ptr++;
   }
 
   return current;
 }
 
-fk::core::Result<fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>, fk::core::Error>
+fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
 VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
     if (!path || path[0] == '\0') return fk::core::Error::InvalidParameter;
 
@@ -248,36 +168,37 @@ VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
     fk::text::String name;
 
     if (!last_slash) {
-        // No slash, parent is CWD
         name = path;
         auto *task = SchedulerManager::the().current();
-        auto cwd_res = resolve_path(task ? task->cwd.c_str() : "/", depth + 1);
+        auto cwd_res = resolve_path(task ? task->cwd.c_str() : "/", nullptr, depth + 1);
         if (cwd_res.is_error()) return cwd_res.error();
-        return fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>(cwd_res.value(), name);
+        return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(cwd_res.value(), name);
     }
 
     if (last_slash == parent_path) {
-        // Parent is root
         name = last_slash + 1;
-        return fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>(m_root, name);
+        return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(m_root, name);
     }
 
     *last_slash = '\0';
     name = last_slash + 1;
-    auto parent_res = resolve_path(parent_path, depth + 1);
+    auto parent_res = resolve_path(parent_path, nullptr, depth + 1);
     if (parent_res.is_error()) return parent_res.error();
-    return fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>(parent_res.value(), name);
+    return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(parent_res.value(), name);
 }
 
 fk::core::Result<fk::RefPtr<FileDescription>, fk::core::Error>
 VirtualFileSystem::open(const char *path, int flags) {
-  auto node_result = resolve_path(path);
-  if (node_result.is_error())
-    return node_result.error();
-  auto node = node_result.value();
-  if ((flags & O_DIRECTORY) && !node->is_directory())
-    return fk::core::Error::NotADirectory;
-  return fk::make_ref<FileDescription>(node, flags).value();
+  auto dentry_res = resolve_path(path);
+  if (dentry_res.is_error()) return dentry_res.error();
+  
+  auto dentry = dentry_res.value();
+  auto node = dentry->top_node();
+  
+  if (!node) return fk::core::Error::NotFound;
+  if ((flags & O_DIRECTORY) && !node->is_directory()) return fk::core::Error::NotADirectory;
+  
+  return fk::make_ref<FileDescription>(dentry, flags).value();
 }
 
 fk::core::Result<void, fk::core::Error>
@@ -285,10 +206,13 @@ VirtualFileSystem::mkdir(const char *path, int mode) {
   auto parent_res = resolve_path_to_parent(path);
   if (parent_res.is_error()) return parent_res.error();
   
-  if (!parent_res.value().first)
-    return fk::core::Error::NotFound;
+  auto parent_dentry = parent_res.value().first;
+  auto name = parent_res.value().second;
 
-  TRY(parent_res.value().first->mkdir(parent_res.value().second.c_str(), mode));
+  auto node = parent_dentry->top_node();
+  if (!node) return fk::core::Error::NotFound;
+
+  TRY(node->mkdir(name.c_str(), mode));
   return {};
 }
 
@@ -297,82 +221,65 @@ VirtualFileSystem::symlink(const char *path, const char *target) {
   auto parent_res = resolve_path_to_parent(path);
   if (parent_res.is_error()) return parent_res.error();
   
-  TRY(parent_res.value().first->symlink(parent_res.value().second.c_str(), target));
+  auto parent_dentry = parent_res.value().first;
+  auto name = parent_res.value().second;
+
+  auto node = parent_dentry->top_node();
+  if (!node) return fk::core::Error::NotFound;
+
+  TRY(node->symlink(name.c_str(), target));
   return {};
 }
 
 fk::core::Result<void, fk::core::Error>
-VirtualFileSystem::readdir(const char *path,
-                           fk::containers::Vector<DirectoryEntry> &entries) {
-  auto node_res = resolve_path(path);
-  if (node_res.is_error())
-    return node_res.error();
-  (void)node_res.value()->list_dir(entries);
+VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEntry> &entries) {
+  auto dentry_res = resolve_path(path);
+  if (dentry_res.is_error()) return dentry_res.error();
+  
+  auto dentry = dentry_res.value();
+  
+  // Logical Union View: Merge entries from ALL nodes in the stack
+  for (auto& node : dentry->nodes()) {
+      fk::containers::Vector<DirectoryEntry> layer_entries;
+      (void)node->list_dir(layer_entries);
+      for (auto& entry : layer_entries) {
+          add_directory_entry(entries, entry);
+      }
+  }
+  
+  // Also add cached children (which might represent sub-mounts)
+  for (auto& child : dentry->children()) {
+      DirectoryEntry de;
+      strncpy(de.name, child->name().c_str(), sizeof(de.name) - 1);
+      de.type = child->top_node()->is_directory() ? 1 : 0;
+      add_directory_entry(entries, de);
+  }
+
   return {};
 }
 
 fk::core::Result<size_t, fk::core::Error>
-VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
-                           uint8_t *buffer, size_t max_bytes) {
-  if (!buffer)
-    return fk::core::Error::InvalidParameter;
-
-  fk::algorithms::klog("VFS", "readdir: node='%s', max_bytes=%zu, offset=%lu", 
-                       description->node()->name().c_str(), max_bytes, description->offset());
+VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buffer, size_t max_bytes) {
+  if (!buffer) return fk::core::Error::InvalidParameter;
 
   fk::containers::Vector<DirectoryEntry> entries;
+  DirectoryEntry dot; strcpy(dot.name, "."); dot.type = 1; add_directory_entry(entries, dot);
+  DirectoryEntry dotdot; strcpy(dotdot.name, ".."); dotdot.type = 1; add_directory_entry(entries, dotdot);
 
-  DirectoryEntry dot;
-  strcpy(dot.name, ".");
-  dot.type = 1;
-  entries.push_back(dot);
-  DirectoryEntry dotdot;
-  strcpy(dotdot.name, "..");
-  dotdot.type = 1;
-  entries.push_back(dotdot);
-
-  (void)description->node()->list_dir(entries);
-
-  fk::algorithms::klog("VFS", "readdir: entries after list_dir: %zu", entries.size());
-
-  // Add mount points if we are at the right level
-  fk::text::String current_path = description->node()->get_path();
-  if (!current_path.is_empty()) {
-    char path_buf[512];
-    strncpy(path_buf, current_path.c_str(), 510);
-    path_buf[510] = '\0';
-    size_t path_len = strlen(path_buf);
-    if (path_len > 0 && path_buf[path_len - 1] != '/') {
-      path_buf[path_len] = '/';
-      path_buf[path_len + 1] = '\0';
-      path_len++;
-    }
-
-    for (auto &m : m_mounts) {
-      if (m.path == "/" || m.path.length() <= path_len)
-        continue;
-
-      const char *m_path_str = m.path.c_str();
-      if (strncmp(m_path_str, path_buf, path_len) == 0) {
-        const char *rel = m_path_str + path_len;
-        if (rel[0] != '\0' && !strchr(rel, '/', 256)) {
-          bool exists = false;
-          for (auto &e : entries) {
-            if (strcmp(e.name, rel) == 0) {
-              exists = true;
-              break;
-            }
-          }
-          if (!exists) {
-            DirectoryEntry de;
-            fk::memory::set(&de, 0, sizeof(de));
-            strncpy(de.name, rel, sizeof(de.name) - 1);
-            de.type = 1;
-            entries.push_back(de);
-          }
-        }
+  auto dentry = description->dentry();
+  for (auto& node : dentry->nodes()) {
+      fk::containers::Vector<DirectoryEntry> layer_entries;
+      (void)node->list_dir(layer_entries);
+      for (auto& entry : layer_entries) {
+          add_directory_entry(entries, entry);
       }
-    }
+  }
+
+  for (auto& child : dentry->children()) {
+      DirectoryEntry de;
+      strncpy(de.name, child->name().c_str(), sizeof(de.name) - 1);
+      de.type = child->top_node() && child->top_node()->is_directory() ? 1 : 0;
+      add_directory_entry(entries, de);
   }
 
   uint64_t bytes_written = 0;
@@ -383,21 +290,14 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
     size_t name_len = strlen(entry.name);
     size_t reclen = (offsetof(linux_dirent64, d_name) + name_len + 1 + 7) & ~7;
 
-    if (bytes_written + reclen > max_bytes)
-      break;
+    if (bytes_written + reclen > max_bytes) break;
 
     auto *dirent = reinterpret_cast<linux_dirent64 *>(buffer + bytes_written);
-    dirent->d_ino = i + 1; // Dummy inode
-    dirent->d_off = i + 1;
-    dirent->d_reclen = static_cast<uint16_t>(reclen);
+    dirent->d_ino = i + 1; dirent->d_off = i + 1; dirent->d_reclen = static_cast<uint16_t>(reclen);
     uint8_t dt_type = DT_UNKNOWN;
-    if (entry.type == 0)
-      dt_type = DT_REG;
-    else if (entry.type == 1)
-      dt_type = DT_DIR;
-    else if (entry.type == 2)
-      dt_type = DT_LNK;
-
+    if (entry.type == 0) dt_type = DT_REG;
+    else if (entry.type == 1) dt_type = DT_DIR;
+    else if (entry.type == 2) dt_type = DT_LNK;
     dirent->d_type = dt_type;
     fk::memory::copy(dirent->d_name, entry.name, name_len);
     dirent->d_name[name_len] = '\0';
@@ -409,14 +309,22 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description,
   return bytes_written;
 }
 
+void VirtualFileSystem::add_directory_entry(fk::containers::Vector<DirectoryEntry>& entries, const DirectoryEntry& entry) {
+    for (auto& existing : entries) {
+        if (strcmp(existing.name, entry.name) == 0) return;
+    }
+    entries.push_back(entry);
+}
+
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::stat(const char *path, struct stat *buf) {
-  auto node_res = resolve_path(path);
-  if (node_res.is_error())
-    return node_res.error();
-  auto node = node_res.value();
-  fk::memory::set(buf, 0, sizeof(struct stat));
+  auto dentry_res = resolve_path(path);
+  if (dentry_res.is_error()) return dentry_res.error();
+  
+  auto node = dentry_res.value()->top_node();
+  if (!node) return fk::core::Error::NotFound;
 
+  fk::memory::set(buf, 0, sizeof(struct stat));
   buf->st_dev = 1;
   buf->st_size = node->size();
   buf->st_blksize = 4096;
@@ -427,8 +335,7 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
   if (node->is_directory()) {
     buf->st_mode = S_IFDIR | 0755;
     buf->st_nlink = 2;
-    if (buf->st_size == 0)
-      buf->st_size = 4096;
+    if (buf->st_size == 0) buf->st_size = 4096;
   } else if (node->is_symlink()) {
     buf->st_mode = S_IFLNK | 0777;
     buf->st_nlink = 1;
@@ -443,24 +350,16 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
     buf->st_nlink = 1;
   }
 
-  fk::algorithms::klog("VFS", "stat: path='%s' is_dir=%s mode=0%o size=%zu",
-                       path, node->is_directory() ? "yes" : "no", buf->st_mode,
-                       (size_t)buf->st_size);
-
   return {};
 }
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::unmount(const char *path) {
-  if (!path)
-    return fk::core::Error::InvalidParameter;
-  for (size_t i = 0; i < m_mounts.size(); ++i) {
-    if (m_mounts[i].path == path) {
-      for (size_t j = i + 1; j < m_mounts.size(); ++j)
-        m_mounts[j - 1] = fk::types::move(m_mounts[j]);
-      m_mounts.pop_back();
-      return {};
-    }
-  }
-  return fk::core::Error::NotFound;
+  auto dentry_res = resolve_path(path);
+  if (dentry_res.is_error()) return dentry_res.error();
+  
+  dentry_res.value()->pop_node();
+  return {};
 }
+
+} // namespace fkernel

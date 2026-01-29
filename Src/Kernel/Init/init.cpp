@@ -18,7 +18,7 @@ void init() {
   PciManager::the().initialize();
 
   // Initialize VFS BEFORE storage detection to allow auto-mounting
-  VirtualFileSystem::the().initialize();
+  fkernel::VirtualFileSystem::initialize();
 
   // Auto-register all available drivers
   fkernel::DriverRegistry::initialize();
