@@ -510,35 +510,31 @@ Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
   // Check all queues for ANY child
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     auto &proc = m_processors[i];
-    if (proc.current_task && proc.current_task->identity.ppid == ppid)
+    if (proc.current_task && proc.current_task->is_valid() && proc.current_task->identity.ppid == ppid)
       return proc.current_task;
 
     for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
       Task& task = *it;
-      ASSERT(task.is_valid());
-      if (task.identity.ppid == ppid)
+      if (task.is_valid() && task.identity.ppid == ppid)
         return &task;
     }
   }
 
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
     Task& task = *it;
-    ASSERT(task.is_valid());
-    if (task.identity.ppid == ppid)
+    if (task.is_valid() && task.identity.ppid == ppid)
       return &task;
   }
 
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
     Task& task = *it;
-    ASSERT(task.is_valid());
-    if (task.identity.ppid == ppid)
+    if (task.is_valid() && task.identity.ppid == ppid)
       return &task;
   }
 
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
     Task& task = *it;
-    ASSERT(task.is_valid());
-    if (task.identity.ppid == ppid)
+    if (task.is_valid() && task.identity.ppid == ppid)
       return &task;
   }
 

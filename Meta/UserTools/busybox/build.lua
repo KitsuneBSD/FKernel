@@ -66,6 +66,33 @@ local function create_all_links()
   mlink("../usr/bin/busybox", "bin/rmdir")
   mlink("../usr/bin/busybox", "bin/ls")
   mlink("../usr/bin/busybox", "bin/vi")
+  mlink("../usr/bin/busybox", "bin/cp")
+  mlink("../usr/bin/busybox", "bin/mv")
+  mlink("../usr/bin/busybox", "bin/mkdir")
+  mlink("../usr/bin/busybox", "bin/grep")
+  mlink("../usr/bin/busybox", "bin/sed")
+  mlink("../usr/bin/busybox", "bin/awk")
+  mlink("../usr/bin/busybox", "bin/find")
+  mlink("../usr/bin/busybox", "bin/chmod")
+  mlink("../usr/bin/busybox", "bin/chown")
+  mlink("../usr/bin/busybox", "bin/ln")
+  mlink("../usr/bin/busybox", "bin/sleep")
+  mlink("../usr/bin/busybox", "bin/uname")
+  mlink("../usr/bin/busybox", "bin/id")
+  mlink("../usr/bin/busybox", "bin/whoami")
+  mlink("../usr/bin/busybox", "bin/env")
+  mlink("../usr/bin/busybox", "bin/touch")
+  mlink("../usr/bin/busybox", "bin/tail")
+  mlink("../usr/bin/busybox", "bin/head")
+  mlink("../usr/bin/busybox", "bin/wc")
+  mlink("../usr/bin/busybox", "bin/sort")
+  mlink("../usr/bin/busybox", "bin/uniq")
+  mlink("../usr/bin/busybox", "bin/basename")
+  mlink("../usr/bin/busybox", "bin/dirname")
+  mlink("../usr/bin/busybox", "bin/du")
+  mlink("../usr/bin/busybox", "bin/df")
+  mlink("../usr/bin/busybox", "bin/true")
+  mlink("../usr/bin/busybox", "bin/false")
   
   -- Essentials
   mlink("../usr/bin/busybox", "bin/echo")
@@ -138,7 +165,13 @@ local desired_configs = {
   
   -- Requested Tools
   "CONFIG_CAT", "CONFIG_RM", "CONFIG_RMDIR", "CONFIG_LS",
-  "CONFIG_VI", 
+  "CONFIG_VI", "CONFIG_CP", "CONFIG_MV", "CONFIG_MKDIR",
+  "CONFIG_GREP", "CONFIG_SED", "CONFIG_AWK", "CONFIG_FIND",
+  "CONFIG_CHMOD", "CONFIG_CHOWN", "CONFIG_LN", "CONFIG_SLEEP",
+  "CONFIG_UNAME", "CONFIG_ID", "CONFIG_WHOAMI", "CONFIG_ENV",
+  "CONFIG_TOUCH", "CONFIG_TAIL", "CONFIG_HEAD", "CONFIG_WC",
+  "CONFIG_SORT", "CONFIG_UNIQ", "CONFIG_BASENAME", "CONFIG_DIRNAME",
+  "CONFIG_DU", "CONFIG_DF", "CONFIG_TRUE", "CONFIG_FALSE",
   
   -- Essentials (implicit shell support)
   "CONFIG_ECHO",

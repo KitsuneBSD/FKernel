@@ -52,6 +52,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
       }
 
       if (!has_children) {
+          fk::algorithms::kdebug("SYSCALL", "wait4: No children for PID %lu, returning ECHILD", current_task->identity.id.value());
           return fkernel::return_error(fk::core::Error::NoChildProcesses);
       }
 
