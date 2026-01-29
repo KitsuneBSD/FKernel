@@ -12,8 +12,9 @@ public:
     constexpr ProcessId() : m_id(INVALID) {}
     
     constexpr explicit ProcessId(uint64_t id) : m_id(id) {
-        // PID 0 is Idle, so it's valid. But we check for our new INVALID constant.
-        ASSERT(id < 0xFFFFFFFF || id == INVALID);
+        // PIDs are limited to 31 bits to avoid confusion with signed values
+        // INVALID (all bits set) is allowed as a sentinel.
+        ASSERT(id < 0x80000000 || id == INVALID);
     }
 
     uint64_t value() const { 

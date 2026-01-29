@@ -10,13 +10,16 @@ public:
     constexpr VirtualAddress() : m_address(0) {}
     constexpr explicit VirtualAddress(uintptr_t address) : m_address(address) {
         if (address != 0) {
-            ASSERT(is_canonical());
+            // Check for canonical address form (bits 48-63 must match bit 47)
+            bool is_canonical = (((int64_t)address >> 47) == 0) || (((int64_t)address >> 47) == -1);
+            ASSERT(is_canonical && "Attempted to create a non-canonical VirtualAddress");
         }
     }
 
     uintptr_t as_uintptr() const { return m_address; }
     void* as_ptr() const { return reinterpret_cast<void*>(m_address); }
 
+    explicit operator bool() const { return m_address != 0; }
     bool is_null() const { return m_address == 0; }
     bool is_page_aligned() const { return (m_address & 0xFFF) == 0; }
 
