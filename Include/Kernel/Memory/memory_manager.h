@@ -5,6 +5,7 @@
 #endif
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 /**
  * @class MemoryManager
@@ -30,6 +31,7 @@ private:
 
   BlockHeader *m_heap_head = nullptr;
   bool m_heap_initialized = false;
+  fk::synchronization::Spinlock m_heap_lock;
 
 public:
   /** @return The singleton instance. */

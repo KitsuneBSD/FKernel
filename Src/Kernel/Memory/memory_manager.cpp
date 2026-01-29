@@ -66,6 +66,7 @@ void* MemoryManager::allocate(size_t size) {
     if (!m_heap_initialized) return nullptr;
 
     uint64_t flags = save_and_disable_interrupts();
+    m_heap_lock.lock();
 
     // Align size to 16 bytes
     size = (size + 15) & ~15;
@@ -97,12 +98,14 @@ void* MemoryManager::allocate(size_t size) {
             void* ptr = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(current) + sizeof(BlockHeader));
             memset(ptr, 0, size);
             
+            m_heap_lock.unlock();
             restore_interrupts(flags);
             return ptr;
         }
         current = current->next;
     }
 
+    m_heap_lock.unlock();
     restore_interrupts(flags);
     fk::algorithms::kerror("MEMORY", "Kernel Heap: Out of memory! Requested: %zu", size);
     return nullptr;
@@ -116,6 +119,7 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     }
 
     uint64_t flags = save_and_disable_interrupts();
+    m_heap_lock.lock();
 
     BlockHeader* header = reinterpret_cast<BlockHeader*>(
         reinterpret_cast<uint8_t*>(ptr) - sizeof(BlockHeader)
@@ -123,11 +127,13 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
 
     if (header->magic != BlockHeader::MAGIC) {
         fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption (realloc) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
+        m_heap_lock.unlock();
         restore_interrupts(flags);
         while(1) asm volatile("hlt");
     }
 
     size_t old_size = header->size;
+    m_heap_lock.unlock();
     restore_interrupts(flags);
 
     if (size <= old_size) return ptr;
@@ -145,6 +151,7 @@ void MemoryManager::free(void* ptr) {
     if (!ptr) return;
 
     uint64_t flags = save_and_disable_interrupts();
+    m_heap_lock.lock();
 
     BlockHeader* header = reinterpret_cast<BlockHeader*>(
         reinterpret_cast<uint8_t*>(ptr) - sizeof(BlockHeader)
@@ -152,6 +159,7 @@ void MemoryManager::free(void* ptr) {
 
     if (header->magic != BlockHeader::MAGIC) {
         fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption (free) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
+        m_heap_lock.unlock();
         restore_interrupts(flags);
         while(1) asm volatile("hlt");
         return;
@@ -159,6 +167,7 @@ void MemoryManager::free(void* ptr) {
 
     if (header->is_free) {
         fk::algorithms::kwarn("MEMORY", "Kernel Heap: Block at %p is already free!", ptr);
+        m_heap_lock.unlock();
         restore_interrupts(flags);
         return;
     }
@@ -173,6 +182,7 @@ void MemoryManager::free(void* ptr) {
         }
     }
 
+    m_heap_lock.unlock();
     restore_interrupts(flags);
 }
 
