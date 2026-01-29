@@ -1,13 +1,17 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
+#include <LibFK/Core/Assertions.h>
 
 namespace fk {
 
 class PhysicalAddress {
 public:
     constexpr PhysicalAddress() : m_address(0) {}
-    constexpr explicit PhysicalAddress(uintptr_t address) : m_address(address) {}
+    constexpr explicit PhysicalAddress(uintptr_t address) : m_address(address) {
+        // x86_64 physical addresses are limited to 52 bits
+        ASSERT((address >> 52) == 0);
+    }
 
     uintptr_t as_uintptr() const { return m_address; }
 

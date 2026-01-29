@@ -1,13 +1,17 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
+#include <LibFK/Core/Assertions.h>
 
 namespace fk {
 
 class ProcessId {
 public:
     constexpr ProcessId() : m_id(0) {}
-    constexpr explicit ProcessId(uint64_t id) : m_id(id) {}
+    constexpr explicit ProcessId(uint64_t id) : m_id(id) {
+        // PID 0 is allowed (Idle Task), but we can restrict max value
+        ASSERT(id < 0xFFFFFFFF);
+    }
 
     uint64_t value() const { return m_id; }
     bool is_valid() const { return m_id != 0; }
