@@ -53,7 +53,7 @@ uint64_t sys_open(uint64_t path_ptr, uint64_t flags, uint64_t, uint64_t,
       path = absolute_path;
   }
 
-  auto result = VirtualFileSystem::the().open(path, (int)flags);
+  auto result = fkernel::VirtualFileSystem::the().open(path, (int)flags);
   if (result.is_error()) {
     return fkernel::return_error(result.error());
   }

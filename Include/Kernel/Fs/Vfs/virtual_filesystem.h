@@ -11,17 +11,13 @@
 
 #include <Kernel/Posix/sys/stat.h>
 
-class VirtualFileSystem {
-public:
-  struct Mount {
-    fk::text::String path;
-    fk::RefPtr<Node> source;
-    fk::RefPtr<Node> target;
-  };
+namespace fkernel {
 
+class Dentry;
+
+class VirtualFileSystem {
 private:
-  fk::RefPtr<Node> m_root;
-  fk::containers::Vector<Mount> m_mounts;
+  fk::RefPtr<Dentry> m_root;
   VirtualFileSystem() = default;
 
 public:
@@ -52,10 +48,14 @@ public:
 
   fk::core::Result<void, fk::core::Error> unmount(const char* path);
 
-  fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-  resolve_path(const char *path, int depth = 0);
+  fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
+  resolve_path(const char *path, fk::RefPtr<Dentry> base = nullptr, int depth = 0);
 
 private:
-  fk::core::Result<fk::utilities::Pair<fk::RefPtr<Node>, fk::text::String>, fk::core::Error>
+  fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
   resolve_path_to_parent(const char *path, int depth = 0);
+
+  void add_directory_entry(fk::containers::Vector<DirectoryEntry>& entries, const DirectoryEntry& entry);
 };
+
+} // namespace fkernel

@@ -3,6 +3,7 @@
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/dentry.h>
 #include <LibFK/Algorithms/log.h>
 
 namespace fkernel::elf_domains {
@@ -79,7 +80,9 @@ InterpreterDomain::check_interpreter_needed(const fk::containers::Vector<Elf64_P
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
 InterpreterDomain::resolve_interpreter_path(const fk::text::String& path) {
-    return VirtualFileSystem::the().resolve_path(path.c_str());
+    auto dentry_res = VirtualFileSystem::the().resolve_path(path.c_str());
+    if (dentry_res.is_error()) return dentry_res.error();
+    return dentry_res.value()->top_node();
 }
 
 fk::core::Result<void, fk::core::Error>

@@ -58,13 +58,15 @@ VGATerminal& VGATerminal::the() {
 }
 
 void VGATerminal::on_char(char c) {
+    bool is_active = (TerminalManager::the().active_terminal() == this);
+
     // 1. Trata Backspace
     if (c == '\b') {
         if (!m_raw_mode) {
             if (m_line_chars > 0) {
                 m_input_queue.remove_last();
                 m_line_chars--;
-                if (m_echo_enabled) {
+                if (m_echo_enabled && is_active) {
                     vga::the().put_char('\b');
                 }
             }
@@ -79,7 +81,7 @@ void VGATerminal::on_char(char c) {
     if (c == '\n' || c == '\r') {
         c = '\n'; // Normaliza para \n
         m_line_chars = 0;
-        if (m_echo_enabled && !m_raw_mode) {
+        if (m_echo_enabled && !m_raw_mode && is_active) {
             vga::the().put_char('\n');
         }
         m_input_queue.enqueue(c);
@@ -87,7 +89,7 @@ void VGATerminal::on_char(char c) {
     }
 
     // 3. Caracteres Normais
-    if (m_echo_enabled && !m_raw_mode) {
+    if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
     }
 
@@ -214,9 +216,15 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
 
 fk::core::Result<size_t, fk::core::Error> VGATerminal::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
     if (!buffer) return fk::core::Error::InvalidParameter;
-    for (size_t i = 0; i < size; ++i) {
-        vga::the().put_char(static_cast<char>(buffer[i]));
+    
+    // Only the active terminal should output to the screen
+    if (TerminalManager::the().active_terminal() == this) {
+        for (size_t i = 0; i < size; ++i) {
+            vga::the().put_char(static_cast<char>(buffer[i]));
+        }
     }
+    
+    // In a real system, we'd also write to an internal buffer so it can be restored later
     return size;
 }
 

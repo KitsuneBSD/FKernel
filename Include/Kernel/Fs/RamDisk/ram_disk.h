@@ -60,7 +60,15 @@ public:
     virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> lookup(const char* name) override;
     virtual fk::core::Result<void, fk::core::Error> list_dir(fk::containers::Vector<DirectoryEntry>& entries) override;
     virtual bool is_directory() const override { return true; }
-    virtual fk::text::String get_path() const override { return m_prefix.is_empty() ? "/" : m_prefix; }
+    virtual fk::text::String get_path() const override { 
+        if (m_prefix.is_empty()) return "/";
+        fk::text::String p = "/";
+        const char* pref = m_prefix.c_str();
+        size_t len = strlen(pref);
+        if (len > 0 && pref[len-1] == '/') len--;
+        for(size_t i=0; i<len; ++i) p.push_back(pref[i]);
+        return p;
+    }
 
 private:
     void parse_tar();
@@ -74,6 +82,7 @@ private:
     uintptr_t m_end;
     fk::text::String m_prefix{""};
     fk::containers::Vector<Entry> m_files;
+    fk::containers::Vector<fk::text::String> m_directories;
 };
 
 } // namespace fkernel

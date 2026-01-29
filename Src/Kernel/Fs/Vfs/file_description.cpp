@@ -1,23 +1,20 @@
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <LibFK/Algorithms/log.h>
 
-FileDescription::FileDescription(fk::RefPtr<Node> node, int flags)
-    : m_node(node), m_flags(flags) {}
+FileDescription::FileDescription(fk::RefPtr<fkernel::Dentry> dentry, int flags)
+    : m_dentry(dentry), m_flags(flags) {}
 
 FileDescription::~FileDescription() {}
 
-fk::RefPtr<Node> FileDescription::node() const { return m_node; }
+fk::RefPtr<fkernel::Dentry> FileDescription::dentry() const { return m_dentry; }
+fk::RefPtr<Node> FileDescription::node() const { return m_dentry ? m_dentry->top_node() : nullptr; }
 
 fk::core::Result<size_t, fk::core::Error>
 FileDescription::read(size_t size, uint8_t *buffer) {
-  /*
-  fk::algorithms::klog("FILE_DESCRIPTION",
-                       "FileDescription::read starting. this=%p, node=%p", this,
-                       m_node.get());
-  */
-
+  auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;
   }
@@ -44,6 +41,7 @@ FileDescription::read(size_t size, uint8_t *buffer) {
 
 fk::core::Result<size_t, fk::core::Error>
 FileDescription::write(size_t size, const uint8_t *buffer) {
+  auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;
   }
@@ -72,6 +70,7 @@ FileDescription::write(size_t size, const uint8_t *buffer) {
 
 fk::core::Result<uint64_t, fk::core::Error>
 FileDescription::seek(uint64_t offset, SeekMode mode) {
+  auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;
   }
@@ -101,6 +100,7 @@ FileDescription::seek(uint64_t offset, SeekMode mode) {
 
 fk::core::Result<int, fk::core::Error>
 FileDescription::ioctl(uint64_t request, uint64_t arg) {
+  auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;
   }

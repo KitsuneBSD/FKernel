@@ -1,9 +1,9 @@
-#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/Vfs/definitions.h>
+#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Syscall/syscall_utils.h>
+
+using namespace fkernel;
 
 extern "C" {
 

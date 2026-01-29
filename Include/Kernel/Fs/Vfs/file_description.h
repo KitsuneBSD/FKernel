@@ -6,16 +6,17 @@
 #include <LibFK/Memory/ref_ptr.h>
 
 class Node;
+namespace fkernel { class Dentry; }
 
 class FileDescription : public fk::memory::RefCounted<FileDescription> {
-  fk::RefPtr<Node> m_node;
+  fk::RefPtr<fkernel::Dentry> m_dentry;
   uint64_t m_current_offset{0};
   int m_flags{0};
 
 public:
   virtual ~FileDescription() override;
 
-  FileDescription(fk::RefPtr<Node> node, int flags);
+  FileDescription(fk::RefPtr<fkernel::Dentry> dentry, int flags);
 
   fk::core::Result<size_t, fk::core::Error> read(size_t size, uint8_t *buffer);
   fk::core::Result<size_t, fk::core::Error> write(size_t size,
@@ -27,5 +28,6 @@ public:
   uint64_t offset() const { return m_current_offset; }
   void set_offset(uint64_t offset) { m_current_offset = offset; }
 
+  fk::RefPtr<fkernel::Dentry> dentry() const;
   fk::RefPtr<Node> node() const;
 };
