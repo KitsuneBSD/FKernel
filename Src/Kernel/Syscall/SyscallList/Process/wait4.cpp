@@ -29,6 +29,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
       }
 
       if (task) {
+          ASSERT(task->is_valid());
           if (status_ptr) {
               int* status = reinterpret_cast<int*>(status_ptr);
               *status = (task->exit_status << 8); 

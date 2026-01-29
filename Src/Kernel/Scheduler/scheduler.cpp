@@ -173,6 +173,7 @@ void SchedulerManager::initialize() {
 }
 
 void SchedulerManager::add_task(Task *task) {
+  ASSERT(task && task->is_valid());
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
@@ -515,10 +516,12 @@ Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
 }
 
 void SchedulerManager::reap_zombie(Task *task) {
+  ASSERT(task && task->is_valid());
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
   m_zombie_queue.remove(task);
+  task->invalidate();
   // In a real kernel, we would free the task memory and its resources here.
   // For now, we'll just keep it out of the queues.
   // delete task; // TODO: Implement safe task deletion

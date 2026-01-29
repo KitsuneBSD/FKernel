@@ -45,10 +45,16 @@ struct TaskIpc {
 };
 
 struct Task {
+  static constexpr uint32_t MAGIC = 0x5441534B; // "TASK"
+  uint32_t m_magic{MAGIC};
+
   TaskIdentity identity;
   TaskMemory memory;
   TaskFiles files;
   TaskIpc ipc;
+
+  bool is_valid() const { return m_magic == MAGIC; }
+  void invalidate() { m_magic = 0; }
 
   TaskState state;
   CpuContext context;
