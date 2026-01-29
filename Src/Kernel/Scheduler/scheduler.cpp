@@ -134,8 +134,6 @@ void SchedulerManager::initialize() {
     *idle =
         create_a_new_task(0, "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
 
-    idle->gs_base = (uint64_t)&g_cpu_block;
-
     m_processors[i].idle_task = idle;
     m_processors[i].current_task = idle;
   }
@@ -143,10 +141,6 @@ void SchedulerManager::initialize() {
   // Create Init task on CPU 0
   Task *init = new Task();
   *init = create_a_new_task(1, "init", init_task_entry, false, 5, 1, 0, 0);
-
-  // x86_64: Initialize GS base to point to the CPU block for the first task
-  // In a multi-core kernel, this would be the block for the specific CPU.
-  init->gs_base = (uint64_t)&g_cpu_block;
 
   // Set initial memory regions for demand paging
   init->memory_regions.heap_start = 0x10000000;
@@ -379,11 +373,16 @@ void SchedulerManager::schedule() {
       prev_task->saved_rip = g_cpu_block.saved_rip;
       prev_task->saved_rflags = g_cpu_block.saved_rflags;
 
+      // Save user segment bases (FS is active, GS user is in KERNEL_GS_BASE while in kernel)
+      prev_task->fs_base = CPU::the().read_msr(MSR_FS_BASE);
+      prev_task->gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
+
       g_cpu_block.kernel_stack = next_task->kernel_stack_top;
       g_cpu_block.user_rsp = next_task->user_rsp;
       g_cpu_block.saved_rip = next_task->saved_rip;
       g_cpu_block.saved_rflags = next_task->saved_rflags;
 
+      // Restore user segment bases
       CPU::the().write_msr(MSR_FS_BASE, next_task->fs_base);
       CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->gs_base);
 
