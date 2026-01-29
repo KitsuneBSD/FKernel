@@ -11,7 +11,7 @@ uint64_t sys_set_tid_address(uint64_t tidptr, uint64_t, uint64_t, uint64_t, uint
 
     task->clear_child_tid = tidptr;
     
-    return task->id;
+    return task->identity.id.value();
 }
 
 }

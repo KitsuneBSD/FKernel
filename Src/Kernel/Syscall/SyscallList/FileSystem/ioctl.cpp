@@ -44,7 +44,7 @@ uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64
       }
       
       if (request == TIOCGPGRP && arg) {
-          *reinterpret_cast<int*>(arg) = static_cast<int>(task->id); // Simplified
+          *reinterpret_cast<int*>(arg) = static_cast<int>(task->identity.id.value()); // Simplified
       }
 
       return 0; // Pretend success

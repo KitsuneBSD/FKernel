@@ -17,18 +17,18 @@ uint64_t sys_close(uint64_t fd_u64, uint64_t, uint64_t, uint64_t, uint64_t,
 
   fk::algorithms::kdebug("SYSCALL", "sys_close: fd=%d", fd);
 
-  if (fd < 0 || fd >= (int)current_task->file_descriptors.size())
+  if (fd < 0 || fd >= (int)current_task->files.descriptors.size())
     return -static_cast<int>(fk::core::Error::InvalidHandle);
 
-  if (!current_task->file_descriptors[fd]) {
+  if (!current_task->files.descriptors[fd]) {
     fk::algorithms::kwarn("SYSCALL", "sys_close: fd %d not open", fd);
     return -static_cast<int>(fk::core::Error::InvalidHandle);
   }
 
-  auto desc = current_task->file_descriptors[fd];
+  auto desc = current_task->files.descriptors[fd];
   fk::algorithms::klog("SYSCALL", "sys_close: fd=%d, desc=%p", fd, desc.get());
 
-  current_task->file_descriptors[fd] = nullptr;
+  current_task->files.descriptors[fd] = nullptr;
   fk::algorithms::klog("SYSCALL", "sys_close: success");
   return 0;
 }

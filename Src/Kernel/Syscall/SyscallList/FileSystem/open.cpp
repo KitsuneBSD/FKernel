@@ -34,10 +34,10 @@ uint64_t sys_open(uint64_t path_ptr, uint64_t flags, uint64_t, uint64_t,
 
   char absolute_path[512];
   if (path[0] != '/') {
-      size_t cwd_len = strlen(current_task->cwd.c_str());
+      size_t cwd_len = strlen(current_task->files.cwd.c_str());
       if (cwd_len >= 512) return fkernel::return_error(fk::core::Error::IOError);
       
-      strcpy(absolute_path, current_task->cwd.c_str());
+      strcpy(absolute_path, current_task->files.cwd.c_str());
       if (cwd_len > 0 && absolute_path[cwd_len-1] != '/') {
           if (cwd_len + 1 < 512) {
               strcat(absolute_path, "/");

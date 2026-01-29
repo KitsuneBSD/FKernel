@@ -66,7 +66,7 @@ extern "C" void init_task_entry() {
   // Create new address space for init
   uintptr_t new_cr3 = VirtualMemoryManager::the().create_address_space();
   VirtualMemoryManager::the().switch_address_space(new_cr3);
-  SchedulerManager::the().current()->cr3 = new_cr3;
+  SchedulerManager::the().current()->memory.cr3 = new_cr3;
 
   auto entry_res = fkernel::ElfLoader::load(init_dentry_res.value()->top_node());
 
@@ -132,7 +132,7 @@ void SchedulerManager::initialize() {
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     Task *idle = new Task();
     *idle =
-        create_a_new_task(0, "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
+        create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
 
     m_processors[i].idle_task = idle;
     m_processors[i].current_task = idle;
@@ -140,13 +140,13 @@ void SchedulerManager::initialize() {
 
   // Create Init task on CPU 0
   Task *init = new Task();
-  *init = create_a_new_task(1, "init", init_task_entry, false, 5, 1, 0, 0);
+  *init = create_a_new_task(fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
 
   // Set initial memory regions for demand paging
-  init->memory_regions.heap_start = 0x10000000;
-  init->memory_regions.heap_break = 0x10000000;
-  init->memory_regions.mmap_start = 0x40000000;
-  init->memory_regions.mmap_end = 0x40000000;
+  init->memory.regions.heap_start = 0x10000000;
+  init->memory.regions.heap_break = 0x10000000;
+  init->memory.regions.mmap_start = 0x40000000;
+  init->memory.regions.mmap_end = 0x40000000;
 
   // Populate FDs 0, 1, 2. We use tty0 instead of console for better input support.
   auto console_res = fkernel::VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
@@ -298,8 +298,8 @@ Task *SchedulerManager::pick_next() {
     proc.run_queue.pop_front();
 
     /*
-    if (next->id > 1) {
-        fk::algorithms::kdebug("SCHEDULER", "Scheduling task %lu (%s)", next->id, next->name.c_str());
+    if (next->identity.id.value() > 1) {
+        fk::algorithms::kdebug("SCHEDULER", "Scheduling task %lu (%s)", next->identity.id.value(), next->identity.name.c_str());
     }
     */
 
@@ -362,11 +362,11 @@ void SchedulerManager::schedule() {
     if (prev_task && prev_task != next_task) {
       fk::algorithms::klog(
           "SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
-          prev_task->name.c_str(), prev_task, (void *)prev_task->stack_pointer,
-          next_task->name.c_str(), next_task, (void *)next_task->stack_pointer);
+          prev_task->identity.name.c_str(), prev_task, (void *)prev_task->stack_pointer,
+          next_task->identity.name.c_str(), next_task, (void *)next_task->stack_pointer);
 
-      if (next_task->cr3 != 0 && next_task->cr3 != prev_task->cr3) {
-        VirtualMemoryManager::the().switch_address_space(next_task->cr3);
+      if (next_task->memory.cr3 != 0 && next_task->memory.cr3 != prev_task->memory.cr3) {
+        VirtualMemoryManager::the().switch_address_space(next_task->memory.cr3);
       }
 
       prev_task->user_rsp = g_cpu_block.user_rsp;
@@ -438,75 +438,75 @@ void SchedulerManager::print_all_tasks() {
   }
 }
 
-Task *SchedulerManager::find_task(TaskId id) {
+Task *SchedulerManager::find_task(fk::ProcessId id) {
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     auto &proc = m_processors[i];
-    if (proc.current_task && proc.current_task->id == id)
+    if (proc.current_task && proc.current_task->identity.id == id)
       return proc.current_task;
-    if (proc.idle_task && proc.idle_task->id == id)
+    if (proc.idle_task && proc.idle_task->identity.id == id)
       return proc.idle_task;
 
     for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
       Task &t = *it;
-      if (t.id == id)
+      if (t.identity.id == id)
         return &t;
     }
   }
 
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
     Task &t = *it;
-    if (t.id == id)
+    if (t.identity.id == id)
       return &t;
   }
 
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
     Task &t = *it;
-    if (t.id == id)
+    if (t.identity.id == id)
       return &t;
   }
 
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
     Task &t = *it;
-    if (t.id == id)
+    if (t.identity.id == id)
       return &t;
   }
 
   return nullptr;
 }
 
-Task *SchedulerManager::find_terminated_child(TaskId ppid) {
+Task *SchedulerManager::find_terminated_child(fk::ProcessId ppid) {
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-    if (it->ppid == ppid && it->terminated)
+    if (it->identity.ppid == ppid && it->terminated)
       return &*it;
   }
   return nullptr;
 }
 
-Task *SchedulerManager::find_any_child(TaskId ppid) {
+Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
   // Check all queues for ANY child
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     auto &proc = m_processors[i];
-    if (proc.current_task && proc.current_task->ppid == ppid)
+    if (proc.current_task && proc.current_task->identity.ppid == ppid)
       return proc.current_task;
 
     for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
-      if (it->ppid == ppid)
+      if (it->identity.ppid == ppid)
         return &*it;
     }
   }
 
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
-    if (it->ppid == ppid)
+    if (it->identity.ppid == ppid)
       return &*it;
   }
 
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-    if (it->ppid == ppid)
+    if (it->identity.ppid == ppid)
       return &*it;
   }
 
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
-    if (it->ppid == ppid)
+    if (it->identity.ppid == ppid)
       return &*it;
   }
 

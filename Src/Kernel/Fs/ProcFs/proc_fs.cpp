@@ -24,7 +24,7 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
   // In a real system we'd have a task list.
   
   for (uint64_t pid = 1; pid < 1000; ++pid) {
-    if (scheduler.find_task(pid)) {
+    if (scheduler.find_task(fk::ProcessId(pid))) {
       DirectoryEntry de;
       char pid_str[32];
       snprintf(pid_str, sizeof(pid_str), "%lu", pid);
@@ -74,7 +74,7 @@ void ProcProcessNode::ensure_cached() {
   if (!m_cached.is_empty()) return;
   // Build a small status string
   uint64_t pid = m_pid;
-  Task* t = SchedulerManager::the().find_task(pid);
+  Task* t = SchedulerManager::the().find_task(fk::ProcessId(pid));
   fk::text::String buf;
   if (!t) {
     buf = "(process not found)\n";
@@ -89,7 +89,8 @@ void ProcProcessNode::ensure_cached() {
       case TaskState::Stopped: state = "Stopped"; break;
       case TaskState::Zombie: state = "Zombie"; break;
     }
-    int n = snprintf(tmp, sizeof(tmp), "Name: %s\nPID: %lu\nState: %s\n", t->name.c_str(), t->id, state);
+    int n = snprintf(tmp, sizeof(tmp), "Name: %s\nPID: %lu\nState: %s\n", 
+                     t->identity.name.c_str(), t->identity.id.value(), state);
     if (n > 0) buf = fk::text::String(tmp);
   }
 

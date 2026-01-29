@@ -21,36 +21,36 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     auto *parent = SchedulerManager::the().current();
     if (!parent) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
-    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu forking...", parent->id);
+    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu forking...", parent->identity.id.value());
 
     // 1. Create child task
     Task *child = new Task();
     if (!child) return fkernel::return_error(fk::core::Error::OutOfMemory);
 
     // 2. Clone metadata
-    child->id = SchedulerManager::the().generate_pid();
-    child->ppid = parent->id;
-    child->name = parent->name;
+    child->identity.id = SchedulerManager::the().generate_pid();
+    child->identity.ppid = parent->identity.id;
+    child->identity.name = parent->identity.name;
     child->state = TaskState::Ready;
     child->priority = parent->priority;
     child->cpu_affinity = parent->cpu_affinity;
     child->is_a_kernel_task = parent->is_a_kernel_task;
-    child->cwd = parent->cwd;
-    child->vfork_parent_id = parent->id; // Mark as vfork child
+    child->files.cwd = parent->files.cwd;
+    child->vfork_parent_id = parent->identity.id; // Mark as vfork child
 
     // 2.5 Initialize IPC CSpace for child
-    child->cspace = new fkernel::ipc::CSpace();
+    child->ipc.cspace = new fkernel::ipc::CSpace();
     auto *signal_notification = new fkernel::ipc::Notification();
-    child->cspace->install(fkernel::ipc::Capability(
+    child->ipc.cspace->install(fkernel::ipc::Capability(
         signal_notification, fkernel::ipc::CapabilityType::Notification));
     fkernel::ipc::GlobalEndpointManager::the().register_notification(
-        child->id, signal_notification);
+        child->identity.id.value(), signal_notification);
 
-    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu cloned, cspace initialized", child->id);
+    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu cloned, cspace initialized", child->identity.id.value());
 
     // 3. Clone file descriptors
-    for (size_t i = 0; i < parent->file_descriptors.size(); ++i) {
-        child->file_descriptors.push_back(parent->file_descriptors[i]);
+    for (size_t i = 0; i < parent->files.descriptors.size(); ++i) {
+        child->files.descriptors.push_back(parent->files.descriptors[i]);
     }
     child->dump_file_descriptors();
 
@@ -65,9 +65,9 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     memcpy(child_stack_mem, reinterpret_cast<void*>(parent->kernel_stack_top - STACK_SIZE), STACK_SIZE);
 
     // 5. Shared Address Space (vfork semantic)
-    child->cr3 = parent->cr3;
+    child->memory.cr3 = parent->memory.cr3;
     child->is_vfork_sharing_address_space = true;
-    child->memory_regions = parent->memory_regions;
+    child->memory.regions = parent->memory.regions;
 
     // 6. Setup context
     child->user_rsp = regs->rsp;
@@ -96,10 +96,11 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     // 7. Add child to scheduler and BLOCK parent
     SchedulerManager::the().add_task(child);
     
-    fk::algorithms::klog("SYSCALL", "sys_vfork: Blocking parent %lu until child %lu execs/exits", parent->id, child->id);
+    fk::algorithms::klog("SYSCALL", "sys_vfork: Blocking parent %lu until child %lu execs/exits", 
+                         parent->identity.id.value(), child->identity.id.value());
     parent->vfork_waiting = true;
     SchedulerManager::the().block_current();
     SchedulerManager::the().schedule();
 
-    return child->id;
+    return child->identity.id.value();
 }

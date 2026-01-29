@@ -13,11 +13,11 @@ uint64_t sys_getcwd(uint64_t buf_ptr, uint64_t size, uint64_t, uint64_t,
   if (!current_task)
     return fkernel::return_error(fk::core::Error::PermissionDenied);
 
-  if (!buf_ptr || size < current_task->cwd.size() + 1)
+  if (!buf_ptr || size < current_task->files.cwd.size() + 1)
     return fkernel::return_error(fk::core::Error::InvalidParameter);
 
   char *buf = (char *)buf_ptr;
-  strcpy(buf, current_task->cwd.c_str());
+  strcpy(buf, current_task->files.cwd.c_str());
 
   return buf_ptr; // Linux returns buf pointer on success
 }

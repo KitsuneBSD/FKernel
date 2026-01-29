@@ -34,32 +34,32 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
     return fkernel::return_error(fk::core::Error::OutOfMemory);
 
   // 2. Clone metadata
-  child->id = SchedulerManager::the().generate_pid();
-  child->ppid = parent->id;
-  child->name = parent->name;
+  child->identity.id = SchedulerManager::the().generate_pid();
+  child->identity.ppid = parent->identity.id;
+  child->identity.name = parent->identity.name;
   child->state = TaskState::Ready;
   child->priority = parent->priority;
   child->cpu_affinity = parent->cpu_affinity;
   child->is_a_kernel_task = parent->is_a_kernel_task;
-  child->cwd = parent->cwd;
+  child->files.cwd = parent->files.cwd;
   child->clear_child_tid = 0;
 
   // 2.5 Initialize IPC CSpace for child
-  child->cspace = new fkernel::ipc::CSpace();
+  child->ipc.cspace = new fkernel::ipc::CSpace();
   auto *signal_notification = new fkernel::ipc::Notification();
-  child->cspace->install(fkernel::ipc::Capability(
+  child->ipc.cspace->install(fkernel::ipc::Capability(
       signal_notification, fkernel::ipc::CapabilityType::Notification));
   fkernel::ipc::GlobalEndpointManager::the().register_notification(
-      child->id, signal_notification);
+      child->identity.id.value(), signal_notification);
 
   child->time_slice_ticks = 5;
   child->wake_up_time_ticks = 0;
-  child->signal_state.mask = parent->signal_state.mask;
+  child->ipc.signals.mask = parent->ipc.signals.mask;
 
-  child->memory_regions.heap_start = parent->memory_regions.heap_start;
-  child->memory_regions.heap_break = parent->memory_regions.heap_break;
-  child->memory_regions.mmap_start = parent->memory_regions.mmap_start;
-  child->memory_regions.mmap_end = parent->memory_regions.mmap_end;
+  child->memory.regions.heap_start = parent->memory.regions.heap_start;
+  child->memory.regions.heap_break = parent->memory.regions.heap_break;
+  child->memory.regions.mmap_start = parent->memory.regions.mmap_start;
+  child->memory.regions.mmap_end = parent->memory.regions.mmap_end;
 
   // 2.5. Inherit syscall return state
   child->user_rsp = regs->rsp;
@@ -67,8 +67,8 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->saved_rflags = regs->rflags;
 
   // 3. Clone File Descriptors
-  for (size_t i = 0; i < parent->file_descriptors.size(); ++i) {
-    child->file_descriptors.push_back(parent->file_descriptors[i]);
+  for (size_t i = 0; i < parent->files.descriptors.size(); ++i) {
+    child->files.descriptors.push_back(parent->files.descriptors[i]);
   }
   child->dump_file_descriptors();
 
@@ -88,7 +88,7 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   memcpy(child_stack_mem, parent_stack_bottom, STACK_SIZE);
 
   // 5. Setup Address Space
-  child->cr3 = VirtualMemoryManager::the().clone_address_space(parent->cr3);
+  child->memory.cr3 = VirtualMemoryManager::the().clone_address_space(parent->memory.cr3);
 
   // 6. Setup child's context for switch_context
   // Calculate RSP relative to stack top
@@ -125,8 +125,8 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   SchedulerManager::the().add_task(child);
 
   fk::algorithms::klog("SYSCALL", "Forked child PID %lu from parent PID %lu",
-                       child->id, parent->id);
+                       child->identity.id.value(), parent->identity.id.value());
 
-  return child->id;
+  return child->identity.id.value();
 }
 }

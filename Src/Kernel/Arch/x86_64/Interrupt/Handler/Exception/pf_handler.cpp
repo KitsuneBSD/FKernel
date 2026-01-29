@@ -16,11 +16,11 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
         bool valid = false;
         
         // 1. Heap range
-        if (cr2 >= task->memory_regions.heap_start && cr2 < task->memory_regions.heap_break) {
+        if (cr2 >= task->memory.regions.heap_start && cr2 < task->memory.regions.heap_break) {
             valid = true;
         }
         // 2. Mmap range
-        else if (cr2 >= task->memory_regions.mmap_start && cr2 < task->memory_regions.mmap_end) {
+        else if (cr2 >= task->memory.regions.mmap_start && cr2 < task->memory.regions.mmap_end) {
             valid = true;
         }
         // 3. User stack (expand range to cover typical user stack locations)
@@ -33,7 +33,7 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
             uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
             
             fk::algorithms::kdebug("DEMAND PAGING", "Task %lu: Mapping page %p -> %p (CR2=%p, RIP=%p)", 
-                                   task->id, (void*)vaddr, (void*)phys, (void*)cr2, (void*)frame->rip);
+                                   task->identity.id.value(), (void*)vaddr, (void*)phys, (void*)cr2, (void*)frame->rip);
 
             // Map as RW User
             VirtualMemoryManager::the().map_page(vaddr, phys, PageFlags::Present | PageFlags::Writable | PageFlags::User);
@@ -54,7 +54,7 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
         (frame->error_code & 4) ? "User" : "Kernel",
         (frame->error_code & 16) ? "Instruction Fetch" : "Data Access",
         (void*)frame->rip, (void*)frame->rsp, (void*)cr2,
-        task ? task->id : 0
+        task ? task->identity.id.value() : 0
     );
 
     halt_forever();

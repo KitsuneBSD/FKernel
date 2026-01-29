@@ -29,10 +29,10 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
 
   if (path[0] != '/') {
     // Resolve relative path using CWD
-    size_t cwd_len = strlen(current_task->cwd.c_str());
+    size_t cwd_len = strlen(current_task->files.cwd.c_str());
     if (cwd_len >= 512) return fkernel::return_error(fk::core::Error::IOError);
     
-    strcpy(absolute_path, current_task->cwd.c_str());
+    strcpy(absolute_path, current_task->files.cwd.c_str());
     
     if (cwd_len > 0 && absolute_path[cwd_len - 1] != '/') {
       if (cwd_len + 1 < 512) {

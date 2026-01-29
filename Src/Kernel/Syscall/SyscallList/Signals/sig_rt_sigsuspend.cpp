@@ -15,7 +15,7 @@ uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
   auto* task = SchedulerManager::the().current();
   if (!task) return -1;
 
-  fk::algorithms::klog("SYSCALL", "sigsuspend: PID %lu blocking", task->id);
+  fk::algorithms::klog("SYSCALL", "sigsuspend: PID %lu blocking", task->identity.id.value());
   SchedulerManager::the().block_current();
   SchedulerManager::the().schedule();
 

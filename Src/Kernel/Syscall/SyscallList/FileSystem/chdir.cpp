@@ -28,9 +28,9 @@ uint64_t sys_chdir(uint64_t path_ptr, uint64_t, uint64_t, uint64_t, uint64_t,
 
   fk::text::String full_path = dentry->get_path();
   if (full_path.is_empty()) {
-      current_task->cwd.assign("/", 1);
+      current_task->files.cwd.assign("/", 1);
   } else {
-      current_task->cwd.assign(full_path.c_str(), full_path.length());
+      current_task->files.cwd.assign(full_path.c_str(), full_path.length());
   }
 
   return 0;

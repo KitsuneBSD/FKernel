@@ -90,16 +90,16 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   // 2. Load the new binary into a fresh address space
   uintptr_t new_cr3 = VirtualMemoryManager::the().create_address_space();
   VirtualMemoryManager::the().switch_address_space(new_cr3);
-  task->cr3 = new_cr3;
+  task->memory.cr3 = new_cr3;
 
   // If we are a vfork child, unblock the parent now that we have our own address space
-  if (task->vfork_parent_id != 0) {
+  if (task->vfork_parent_id.is_valid()) {
       auto* parent = SchedulerManager::the().find_task(task->vfork_parent_id);
       if (parent && parent->vfork_waiting) {
           parent->vfork_waiting = false;
           SchedulerManager::the().wake_task(parent);
       }
-      task->vfork_parent_id = 0;
+      task->vfork_parent_id = fk::ProcessId(0);
   }
 
   auto entry_res = fkernel::ElfLoader::load(node);

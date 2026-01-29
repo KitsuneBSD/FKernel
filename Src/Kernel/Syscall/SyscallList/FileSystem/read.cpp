@@ -16,13 +16,13 @@ uint64_t sys_read(uint64_t fd_u64, uint64_t buf_ptr, uint64_t count, uint64_t,
   if (!current_task)
     return -1;
 
-  if (fd < 0 || (size_t)fd >= current_task->file_descriptors.size()) {
-    fk::algorithms::kwarn("SYSCALL", "sys_read: FD %d out of range (size: %zu)",
-                          fd, current_task->file_descriptors.size());
+  if (fd < 0 || (size_t)fd >= current_task->files.descriptors.size()) {
+    fk::algorithms::kwarn("SYSCALL", "sys_read: invalid fd %d (size: %zu)",
+                          fd, current_task->files.descriptors.size());
     return -static_cast<int>(fk::core::Error::InvalidHandle);
   }
 
-  auto &desc = current_task->file_descriptors[fd];
+  auto &desc = current_task->files.descriptors[fd];
   if (!desc) {
     fk::algorithms::kwarn("SYSCALL", "sys_read: FD %d exists but is NULL", fd);
     return -static_cast<int>(fk::core::Error::InvalidHandle);

@@ -8,17 +8,18 @@ uint64_t sys_exit(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t, uint6
     auto* current = SchedulerManager::the().current();
     if (!current) return -1;
 
-    fk::algorithms::klog("SYSCALL", "Process %lu exiting with status %lu", current->id, status);
+    fk::algorithms::klog("SYSCALL", "Process %lu exiting with status %lu", 
+                         current->identity.id.value(), status);
     
     current->terminated = true;
     current->exit_status = (int)status;
 
-    auto* parent = SchedulerManager::the().find_task(current->ppid);
+    auto* parent = SchedulerManager::the().find_task(current->identity.ppid);
     if (parent) {
-        if (parent->vfork_waiting && current->vfork_parent_id == parent->id) {
+        if (parent->vfork_waiting && current->vfork_parent_id == parent->identity.id) {
             parent->vfork_waiting = false;
         }
-        fk::algorithms::klog("SYSCALL", "Waking parent PID %lu", parent->id);
+        fk::algorithms::klog("SYSCALL", "Waking parent PID %lu", parent->identity.id.value());
         SchedulerManager::the().wake_task(parent);
     }
 
