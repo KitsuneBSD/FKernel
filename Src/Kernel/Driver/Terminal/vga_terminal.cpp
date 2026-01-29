@@ -104,7 +104,7 @@ void VGATerminal::clear() {
     vga::the().clear();
 }
 
-VGATerminal::VGATerminal(int index) : m_index(index) {
+VGATerminal::VGATerminal(int index) : m_index(index), m_ansi_parser(*this) {
     char name_buf[16];
     if (index == -1) {
         set_name("tty");
@@ -162,6 +162,17 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uin
     }
 }
 
+fk::core::Result<size_t, fk::core::Error> VGATerminal::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
+    if (!buffer) return fk::core::Error::InvalidParameter;
+    
+    // Only the active terminal should output to the screen
+    if (TerminalManager::the().active_terminal() == this) {
+        m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
+    }
+    
+    return size;
+}
+
 struct winsize {
     uint16_t ws_row;
     uint16_t ws_col;
@@ -214,18 +225,80 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
     return fk::core::Error::NotImplemented;
 }
 
-fk::core::Result<size_t, fk::core::Error> VGATerminal::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
-    if (!buffer) return fk::core::Error::InvalidParameter;
-    
-    // Only the active terminal should output to the screen
-    if (TerminalManager::the().active_terminal() == this) {
-        for (size_t i = 0; i < size; ++i) {
-            vga::the().put_char(static_cast<char>(buffer[i]));
-        }
+// --- AnsiDelegate Implementation ---
+
+void VGATerminal::put_char(char c) {
+    vga::the().put_char(c);
+}
+
+void VGATerminal::move_cursor(uint16_t row, uint16_t col) {
+    // ANSI uses 1-based coordinates
+    vga::the().set_cursor_pos(col - 1, row - 1);
+}
+
+void VGATerminal::move_cursor_up(uint16_t rows) {
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    if (y >= rows) y -= rows; else y = 0;
+    vga::the().set_cursor_pos(x, y);
+}
+
+void VGATerminal::move_cursor_down(uint16_t rows) {
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    y += rows;
+    if (y >= m_rows) y = m_rows - 1;
+    vga::the().set_cursor_pos(x, y);
+}
+
+void VGATerminal::move_cursor_forward(uint16_t cols) {
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    x += cols;
+    if (x >= m_cols) x = m_cols - 1;
+    vga::the().set_cursor_pos(x, y);
+}
+
+void VGATerminal::move_cursor_back(uint16_t cols) {
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    if (x >= cols) x -= cols; else x = 0;
+    vga::the().set_cursor_pos(x, y);
+}
+
+void VGATerminal::set_colors(uint8_t fg, uint8_t bg) {
+    vga::the().set_color(static_cast<Color>(fg), static_cast<Color>(bg));
+}
+
+void VGATerminal::clear_screen(uint8_t mode) {
+    if (mode == 2) {
+        vga::the().clear();
     }
-    
-    // In a real system, we'd also write to an internal buffer so it can be restored later
-    return size;
+    // Mode 0 and 1 (start/end) can be implemented if needed
+}
+
+void VGATerminal::clear_line(uint8_t mode) {
+    // Basic implementation: just overwrite with spaces if needed
+    // In text mode we could do this easily.
+    (void)mode;
+}
+
+void VGATerminal::set_scroll_region(uint16_t top, uint16_t bottom) {
+    // VGA/Display currently doesn't support limited scroll regions easily
+    (void)top; (void)bottom;
+}
+
+void VGATerminal::save_cursor() {
+    m_saved_cursor_x = static_cast<uint16_t>(vga::the().get_cursor_x());
+    m_saved_cursor_y = static_cast<uint16_t>(vga::the().get_cursor_y());
+}
+
+void VGATerminal::restore_cursor() {
+    vga::the().set_cursor_pos(m_saved_cursor_x, m_saved_cursor_y);
+}
+
+void VGATerminal::show_cursor(bool visible) {
+    vga::the().show_cursor(visible);
 }
 
 } // namespace terminal

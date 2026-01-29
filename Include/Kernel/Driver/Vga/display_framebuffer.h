@@ -66,6 +66,12 @@ public:
   void write_ansi_n(const char *str, size_t size) override;
   void clear() override;
   void set_color(Color fg, Color bg) override;
+  
+  void set_cursor_pos(uint32_t x, uint32_t y) override;
+  uint32_t get_cursor_x() const override { return cursor_x; }
+  uint32_t get_cursor_y() const override { return cursor_y; }
+  void show_cursor(bool visible) override;
+
   uint32_t get_width() const override {
     return fb_width / (m_current_font.width * m_current_font.scale);
   }
