@@ -39,7 +39,7 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
       id.value(), signal_notification);
 
   Task task{
-      .identity = { .id = id, .ppid = fk::ProcessId(0), .name = name },
+      .identity = { .id = id, .ppid = fk::ProcessId(), .name = name },
       .memory = { .cr3 = read_on_cr3(), .regions = {} },
       .files = { .cwd = "/", .descriptors = {} },
       .ipc = { .cspace = cspace, .signals = {} },
@@ -60,7 +60,7 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
       .wake_up_time_ticks = 0,
       .clear_child_tid = 0,
       .vfork_waiting = false,
-      .vfork_parent_id = fk::ProcessId(0),
+      .vfork_parent_id = fk::ProcessId(),
       .fs_base = 0,
       .gs_base = 0,
       .is_vfork_sharing_address_space = false,

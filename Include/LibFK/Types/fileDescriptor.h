@@ -7,19 +7,26 @@ namespace fk {
 
 class FileDescriptor {
 public:
-    constexpr FileDescriptor() : m_fd(-1) {}
-    constexpr explicit FileDescriptor(int fd) : m_fd(fd) {
-        ASSERT(fd >= -1 && fd < 1024); // Kernel FD limit
+    static constexpr uint32_t INVALID = 0xFFFFFFFF;
+
+    constexpr FileDescriptor() : m_fd(INVALID) {}
+    
+    constexpr explicit FileDescriptor(uint32_t fd) : m_fd(fd) {
+        ASSERT(fd < 1024); // Kernel limit
     }
 
-    int value() const { return m_fd; }
-    bool is_valid() const { return m_fd >= 0; }
+    uint32_t value() const { 
+        ASSERT(is_valid());
+        return m_fd; 
+    }
+
+    bool is_valid() const { return m_fd != INVALID; }
 
     bool operator==(const FileDescriptor& other) const { return m_fd == other.m_fd; }
     bool operator!=(const FileDescriptor& other) const { return m_fd != other.m_fd; }
 
 private:
-    int m_fd;
+    uint32_t m_fd;
 };
 
 } // namespace fk

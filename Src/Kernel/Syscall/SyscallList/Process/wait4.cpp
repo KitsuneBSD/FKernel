@@ -37,7 +37,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
           uint64_t child_id = task->identity.id.value();
           fk::algorithms::klog("SYSCALL", "wait4: Reaping zombie PID %lu", child_id);
           
-          task->identity.ppid = fk::ProcessId(0); 
+          task->identity.ppid = fk::ProcessId(); 
           return child_id;
       }
 

@@ -99,7 +99,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
           parent->vfork_waiting = false;
           SchedulerManager::the().wake_task(parent);
       }
-      task->vfork_parent_id = fk::ProcessId(0);
+      task->vfork_parent_id = fk::ProcessId();
   }
 
   auto entry_res = fkernel::ElfLoader::load(node);
