@@ -7,7 +7,7 @@ extern "C" {
 uint64_t sys_gettid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return 1;
-    return task->id;
+    return task->identity.id.value();
 }
 
 }

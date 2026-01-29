@@ -14,15 +14,16 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
   auto* current_task = SchedulerManager::the().current();
   if (!current_task) return -1;
 
-  fk::algorithms::klog("SYSCALL", "wait4: PID %lu waiting for child PID %ld (options=%lu)", current_task->id, pid, options);
+  fk::algorithms::klog("SYSCALL", "wait4: PID %lu waiting for child PID %ld (options=%lu)", 
+                       current_task->identity.id.value(), pid, options);
 
   while (true) {
       Task* task = nullptr;
       if (pid == -1) {
-          task = SchedulerManager::the().find_terminated_child(current_task->id);
+          task = SchedulerManager::the().find_terminated_child(current_task->identity.id);
       } else {
-          task = SchedulerManager::the().find_task(pid);
-          if (task && (!task->terminated || task->ppid != current_task->id)) {
+          task = SchedulerManager::the().find_task(fk::ProcessId(pid));
+          if (task && (!task->terminated || task->identity.ppid != current_task->identity.id)) {
               task = nullptr;
           }
       }
@@ -30,43 +31,38 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
       if (task) {
           if (status_ptr) {
               int* status = reinterpret_cast<int*>(status_ptr);
-              // Shift the exit status to match standard Linux/POSIX wait status format
-              // where the low 8 bits of status are the exit code shifted by 8.
-              // Actually, simplified: just store it.
               *status = (task->exit_status << 8); 
           }
           
-          uint64_t child_id = task->id;
+          uint64_t child_id = task->identity.id.value();
           fk::algorithms::klog("SYSCALL", "wait4: Reaping zombie PID %lu", child_id);
           
-          // Simple reap: let's not worry about memory for now, but mark it
-          task->ppid = 0; 
+          task->identity.ppid = fk::ProcessId(0); 
           return child_id;
       }
 
       // No zombie found. Should we block?
-      // Check if ANY child exists
       bool has_children = false;
       if (pid == -1) {
-          has_children = SchedulerManager::the().find_any_child(current_task->id) != nullptr;
+          has_children = SchedulerManager::the().find_any_child(current_task->identity.id) != nullptr;
       } else {
-          Task* t = SchedulerManager::the().find_task(pid);
-          has_children = (t && t->ppid == current_task->id);
+          Task* t = SchedulerManager::the().find_task(fk::ProcessId(pid));
+          has_children = (t && t->identity.ppid == current_task->identity.id);
       }
 
       if (!has_children) {
           return fkernel::return_error(fk::core::Error::NoChildProcesses);
       }
 
-      if (options & 1) { // WNOHANG (assuming 1 is WNOHANG)
+      if (options & 1) { // WNOHANG
           fk::algorithms::klog("SYSCALL", "wait4: WNOHANG returning 0");
           return 0;
       }
 
-      // Block until a child wakes us up (sys_exit does this)
-      fk::algorithms::klog("SYSCALL", "wait4: No zombie yet, blocking PID %lu", current_task->id);
+      fk::algorithms::klog("SYSCALL", "wait4: No zombie yet, blocking PID %lu", 
+                           current_task->identity.id.value());
       SchedulerManager::the().block_current();
-      SchedulerManager::the().schedule(); // Trigger reschedule and switch context
+      SchedulerManager::the().schedule(); 
   }
 }
 }

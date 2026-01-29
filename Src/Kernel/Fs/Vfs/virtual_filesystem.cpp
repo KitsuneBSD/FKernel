@@ -110,8 +110,8 @@ VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int d
   } else {
       // Relative path, start from CWD
       auto *task = SchedulerManager::the().current();
-      if (task && !task->cwd.empty()) {
-          auto cwd_res = resolve_path(task->cwd.c_str(), nullptr, depth + 1);
+      if (task && !task->files.cwd.empty()) {
+          auto cwd_res = resolve_path(task->files.cwd.c_str(), nullptr, depth + 1);
           if (cwd_res.is_ok()) current = cwd_res.value();
       }
   }
@@ -171,7 +171,7 @@ VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
     if (!last_slash) {
         name = path;
         auto *task = SchedulerManager::the().current();
-        auto cwd_res = resolve_path(task ? task->cwd.c_str() : "/", nullptr, depth + 1);
+        auto cwd_res = resolve_path(task ? task->files.cwd.c_str() : "/", nullptr, depth + 1);
         if (cwd_res.is_error()) return cwd_res.error();
         return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(cwd_res.value(), name);
     }

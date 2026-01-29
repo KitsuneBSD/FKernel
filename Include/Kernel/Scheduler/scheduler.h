@@ -29,7 +29,7 @@ public:
         return instance;
     }
 
-    uint64_t generate_pid() { return m_next_pid++; }
+    fk::ProcessId generate_pid() { return fk::ProcessId(m_next_pid++); }
 
     void initialize();
     void add_task(Task* task);
@@ -43,9 +43,9 @@ public:
 
     // Debugging / introspection helpers
     void print_all_tasks();
-    Task* find_task(TaskId id);
-    Task* find_terminated_child(TaskId ppid);
-    Task* find_any_child(TaskId ppid);
+    Task* find_task(fk::ProcessId id);
+    Task* find_terminated_child(fk::ProcessId ppid);
+    Task* find_any_child(fk::ProcessId ppid);
 
     Task* pick_next();
     

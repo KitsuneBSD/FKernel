@@ -21,7 +21,7 @@ uint64_t sys_dup2(uint64_t oldfd_u64, uint64_t newfd_u64, uint64_t, uint64_t,
     // Vamos simplificar: se o slot já existe, sobrescrevemos.
     if (newfd < 0 || newfd >= 32) return -static_cast<int>(fk::core::Error::InvalidParameter);
 
-    current->file_descriptors[newfd] = desc;
+    current->files.descriptors[newfd] = desc;
     return newfd;
 }
 }

@@ -11,7 +11,7 @@ uint64_t sys_kill(uint64_t pid, uint64_t sig, uint64_t, uint64_t, uint64_t,
   using namespace fkernel::ipc;
 
   Notification *notification =
-      GlobalEndpointManager::the().get_notification(pid);
+      GlobalEndpointManager::the().get_notification(fk::ProcessId(pid).value());
   if (!notification) {
     return (uint64_t)-static_cast<int>(fk::core::Error::NotFound);
   }

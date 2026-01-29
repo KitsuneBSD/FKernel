@@ -10,7 +10,7 @@
 
 extern "C" void task_trampoline();
 
-Task create_a_new_task(TaskId id, const fk::text::fixed_string<64> &name,
+Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
                        void (*entry)(), bool kernel_task, uint8_t priority,
                        uint64_t cpu_affinity, uint64_t arg1, uint64_t arg2) {
   const size_t STACK_SIZE = 16 * fk::types::KiB;
@@ -19,14 +19,6 @@ Task create_a_new_task(TaskId id, const fk::text::fixed_string<64> &name,
   uint64_t stack_top = reinterpret_cast<uint64_t>(stack_mem) + STACK_SIZE;
 
   // Setup initial stack for switch_context
-  // switch_context expects:
-  // [RIP (task_trampoline)]
-  // [R15]
-  // [R14]
-  // [R13]
-  // [R12]
-  // [RBP]
-  // [RBX] <- stack_pointer
   uint64_t *stack = reinterpret_cast<uint64_t *>(stack_top);
   *(--stack) = reinterpret_cast<uint64_t>(task_trampoline);
   *(--stack) = 0;                                 // rbx
@@ -44,25 +36,37 @@ Task create_a_new_task(TaskId id, const fk::text::fixed_string<64> &name,
 
   // Also register in global manager for sys_kill access
   fkernel::ipc::GlobalEndpointManager::the().register_notification(
-      id, signal_notification);
+      id.value(), signal_notification);
 
   Task task{
-      .id = id,
-      .name = name,
+      .identity = { .id = id, .ppid = fk::ProcessId(0), .name = name },
+      .memory = { .cr3 = read_on_cr3(), .regions = {} },
+      .files = { .cwd = "/", .descriptors = {} },
+      .ipc = { .cspace = cspace, .signals = {} },
       .state = TaskState::Ready,
       .context = GetContextForNewTask(reinterpret_cast<uint64_t>(stack),
                                       kernel_task, arg1, arg2),
       .stack_pointer = reinterpret_cast<uint64_t>(stack),
       .kernel_stack_top = stack_top,
-      .cr3 = read_on_cr3(),
+      .user_rsp = 0,
+      .saved_rip = 0,
+      .saved_rflags = 0,
       .priority = priority,
       .cpu_affinity = cpu_affinity,
       .is_a_kernel_task = kernel_task,
-      .cspace = cspace,
+      .terminated = false,
+      .exit_status = 0,
+      .time_slice_ticks = 0,
+      .wake_up_time_ticks = 0,
+      .clear_child_tid = 0,
+      .vfork_waiting = false,
+      .vfork_parent_id = fk::ProcessId(0),
+      .fs_base = 0,
+      .gs_base = 0,
+      .is_vfork_sharing_address_space = false,
       .run_node = {},
       .wait_node = {},
       .sleep_node = {},
-      .file_descriptors = {},
   };
 
   return task;
@@ -72,38 +76,38 @@ void Task::print_info() const {
   fk::algorithms::kdebug("TASK INFO",
                          "Task ID: %lu, Name: %s, State: %u, Priority: %u, CPU "
                          "Affinity: %lu, Is Kernel Task: %s",
-                         id, name.c_str(), static_cast<uint8_t>(state),
+                         identity.id.value(), identity.name.c_str(), static_cast<uint8_t>(state),
                          priority, cpu_affinity,
                          is_a_kernel_task ? "Yes" : "No");
 }
 
 int Task::add_file_descriptor(
     fk::RefPtr<FileDescription> description) {
-  for (size_t i = 0; i < file_descriptors.size(); ++i) {
-    if (!file_descriptors[i]) {
-      file_descriptors[i] = description;
-      fk::algorithms::klog("TASK", "Task %lu: Added FD %zu -> %s", id, i, description->node()->name().c_str());
+  for (size_t i = 0; i < files.descriptors.size(); ++i) {
+    if (!files.descriptors[i]) {
+      files.descriptors[i] = description;
+      fk::algorithms::klog("TASK", "Task %lu: Added FD %zu -> %s", identity.id.value(), i, description->node()->name().c_str());
       return static_cast<int>(i);
     }
   }
 
   // No empty slots? Add to the end.
-  if (file_descriptors.is_full()) {
-    fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", id);
+  if (files.descriptors.is_full()) {
+    fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", identity.id.value());
     return -24; // -EMFILE
   }
 
-  int fd = static_cast<int>(file_descriptors.size());
-  file_descriptors.push_back(description);
-  fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", id, fd, description->node()->name().c_str());
+  int fd = static_cast<int>(files.descriptors.size());
+  files.descriptors.push_back(description);
+  fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", identity.id.value(), fd, description->node()->name().c_str());
   return fd;
 }
 
 void Task::dump_file_descriptors() const {
-    fk::algorithms::klog("TASK", "FD table for Task %lu (%s):", id, name.c_str());
-    for (size_t i = 0; i < file_descriptors.size(); ++i) {
-        if (file_descriptors[i]) {
-            auto node = file_descriptors[i]->node();
+    fk::algorithms::klog("TASK", "FD table for Task %lu (%s):", identity.id.value(), identity.name.c_str());
+    for (size_t i = 0; i < files.descriptors.size(); ++i) {
+        if (files.descriptors[i]) {
+            auto node = files.descriptors[i]->node();
             const char* type = "unknown";
             if (node->is_character_device()) type = "char";
             else if (node->is_block_device()) type = "block";
@@ -112,8 +116,6 @@ void Task::dump_file_descriptors() const {
 
             fk::algorithms::klog("TASK", "  [%zu] -> %s (type: %s, ptr: %p)", 
                                  i, node->name().c_str(), type, node.get());
-        } else {
-            // fk::algorithms::klog("TASK", "  [%zu] -> empty", i);
         }
     }
 }
@@ -126,24 +128,21 @@ int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min
   }
 
   // Find first available FD >= min_fd
-  for (int i = min_fd; i < static_cast<int>(file_descriptors.capacity()); ++i) {
-    if (i >= static_cast<int>(file_descriptors.size())) {
+  for (int i = min_fd; i < static_cast<int>(files.descriptors.capacity()); ++i) {
+    if (i >= static_cast<int>(files.descriptors.size())) {
       // Pad with NULLs to fill the gap up to i
-      while (static_cast<int>(file_descriptors.size()) < i) {
-          file_descriptors.push_back({});
+      while (static_cast<int>(files.descriptors.size()) < i) {
+          files.descriptors.push_back({});
       }
-      // Fix: Take a local copy before push_back because if the vector
-      // reallocates, the reference to file_descriptors[old_fd] becomes invalid.
-      // The `description` variable is already a local copy, so we use that.
-      file_descriptors.push_back(description);
-      int new_fd = file_descriptors.size() - 1;
+      files.descriptors.push_back(description);
+      int new_fd = files.descriptors.size() - 1;
 
       fk::algorithms::klog("TASK", "dup_file_descriptor: Duplicated FD %d -> %d (new slot %d)", old_fd, new_fd, i);
       return new_fd;
     }
 
-    if (!file_descriptors[i]) {
-      file_descriptors[i] = description;
+    if (!files.descriptors[i]) {
+      files.descriptors[i] = description;
       fk::algorithms::klog("TASK", "dup_file_descriptor: Duplicated FD %d -> %d (existing empty slot)", old_fd, i);
       return i;
     }
@@ -153,15 +152,15 @@ int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min
 }
 
 fk::RefPtr<FileDescription> Task::get_file_descriptor(int fd) {
-  if (fd < 0 || fd >= static_cast<int>(file_descriptors.size())) {
+  if (fd < 0 || fd >= static_cast<int>(files.descriptors.size())) {
     return {};
   }
-  return file_descriptors[fd];
+  return files.descriptors[fd];
 }
 
 void Task::close_file_descriptor(int fd) {
-  if (fd < 0 || fd >= static_cast<int>(file_descriptors.size())) {
+  if (fd < 0 || fd >= static_cast<int>(files.descriptors.size())) {
     return;
   }
-  file_descriptors[fd] = nullptr;
+  files.descriptors[fd] = nullptr;
 }

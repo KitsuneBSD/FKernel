@@ -11,11 +11,11 @@ namespace fkernel {
 namespace ipc {
 
 void SignalDelivery::handle_pending_signals(Task *task) {
-  if (!task || task->is_a_kernel_task || !task->cspace)
+  if (!task || task->is_a_kernel_task || !task->ipc.cspace)
     return;
 
   // Signal Notification is at handle 0 by convention
-  Capability cap = task->cspace->get(0);
+  Capability cap = task->ipc.cspace->get(0);
   if (cap.type() != CapabilityType::Notification)
     return;
 
@@ -34,7 +34,7 @@ void SignalDelivery::handle_pending_signals(Task *task) {
     }
   }
 
-  if (sig == 0 || task->signal_state.trampoline == 0)
+  if (sig == 0 || task->ipc.signals.trampoline == 0)
     return;
 
   // Save context on user stack and redirect to trampoline
@@ -45,6 +45,11 @@ void SignalDelivery::handle_pending_signals(Task *task) {
   // In a real kernel, we would push the whole SigContext
   *(--user_stack) = task->context.rip;
   *(--user_stack) = task->context.rflags;
+
+  // 3. Update task context to jump to trampoline
+  task->context.rsp = reinterpret_cast<uint64_t>(user_stack);
+  task->context.rip = task->ipc.signals.trampoline;
+  task->context.rdi = sig; // First argument to trampoline
 
   // 4. If this is the current task, we MUST also update g_cpu_block (accessed via gs)
   // because syscall_stub_post_dispatch restores from there.

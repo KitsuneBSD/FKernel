@@ -15,10 +15,10 @@ uint64_t sys_lseek(uint64_t fd_u64, uint64_t offset, uint64_t whence, uint64_t,
   if (!current_task)
     return -1;
 
-  if (fd < 0 || fd >= (int)current_task->file_descriptors.size())
+  if (fd < 0 || fd >= (int)current_task->files.descriptors.size())
     return -static_cast<int>(fk::core::Error::InvalidHandle);
 
-  auto &desc = current_task->file_descriptors[fd];
+  auto &desc = current_task->files.descriptors[fd];
   if (!desc)
     return -static_cast<int>(fk::core::Error::InvalidHandle);
 

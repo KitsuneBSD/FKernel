@@ -199,7 +199,7 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
     char log_buf[256];
     int log_len = snprintf(log_buf, sizeof(log_buf),
                            "[SYSCALL] Task %lu: %lu (args: %p, %p, %p) -> %p\n",
-                           task ? task->id : 0, num, (void *)arg1, (void *)arg2,
+                           task ? task->identity.id.value() : 0, num, (void *)arg1, (void *)arg2,
                            (void *)arg3, (void *)result);
 
     auto syscall_log = fkernel::SyscallLogNode::the();
