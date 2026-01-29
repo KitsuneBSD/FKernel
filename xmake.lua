@@ -138,8 +138,6 @@ if is_mode("debug") then
   if is_arch("x86_64", "x64") then
     add_cxflags(flags.x86_64.cxx)
   end
-
-  --TODO: add tests load on the kernel if this mode is setted
 end
 
 if is_mode("release") then
@@ -189,7 +187,7 @@ target_end()
 target("FKernelUEFI")
 set_kind("binary")
 set_toolchains("FKernel_Compiling")
-set_filename("FKernel.efi")
+set_filename("FKernelUEFI.elf")
 
 add_defines("FKERNEL_UEFI_APPLICATION")
 add_includedirs("Include")
@@ -202,6 +200,7 @@ local uefi_flags = {
     "-fno-stack-protector",
     "-fno-use-cxa-atexit",
     "-fno-pic",
+    "-fshort-wchar",
     "-fno-omit-frame-pointer",
     "-nostdlib",
     "-nostdinc",
@@ -212,16 +211,15 @@ local uefi_flags = {
     "-Wno-constant-conversion",
     "-Wno-c++11-narrowing",
     "--target=x86_64-efi",
-    "-mcmodel=large",
+    "-fPIC",
     "-mno-red-zone",
     "-mno-sse",
     "-mno-avx",
   },
   ld = {
     "-nostdlib",
+    "-shared",
     "-e efi_main",
-    "-Bsymbolic",
-    "-z max-page-size=0x1000",
     "-T Config/uefi_linker.ld",
   }
 }
@@ -229,19 +227,19 @@ local uefi_flags = {
 add_cxflags(uefi_flags.cxx, { force = true })
 add_ldflags(uefi_flags.ld, { force = true })
 
+-- UEFI-specific source files
 add_files("Src/Kernel/Boot/Uefi/**.cpp")
 add_files("Src/LibC/**.c")
-add_files("Src/LibC/**.cpp")
+add_files("Src/LibC/**.cpp") 
 add_files("Src/LibFK/**.cpp")
 
 add_files(kernel_non_architecture_related)
 
 if is_arch("x86_64", "x64") then
   add_files("Src/Kernel/Arch/x86_64/**.cpp")
-  add_files("Src/Kernel/Arch/x86_64/**.asm")
 end
 
--- Architecture-specific UEFI files
+-- Architecture-specific UEFI flags
 if is_arch("x86_64", "x64") then
   add_asflags("-f elf64", { force = true })
 end
@@ -249,23 +247,30 @@ end
 -- Create custom UEFI linker script
 after_build(function(target)
   local efi_file = target:targetfile()
+  local bin_file = "build/FKernel.bin.tmp"
   local coff_file = "build/FKernel.efi"
 
-  -- Convert ELF64 to PE/COFF64 for UEFI compatibility
+  -- 1. Convert ELF64 to Flat Binary
   local objcopy_cmd = string.format(
-    "objcopy -O pe-x86-64 '%s' '%s'",
-    efi_file, coff_file
+    "objcopy -O binary '%s' '%s'",
+    efi_file, bin_file
   )
 
-  print("Converting UEFI application to COFF...")
+  print("Converting kernel to flat binary...")
   os.exec(objcopy_cmd)
   
+  -- 2. Use our Lua patcher to add UEFI headers
+  print("Patching UEFI headers...")
+  os.execv("lua", {"Meta/x86_64-tools/efi_patcher.lua", bin_file, coff_file})
+  
   if os.exists(coff_file) then
-    print("UEFI application successfully converted: " .. coff_file)
+    print("UEFI application successfully generated: " .. coff_file)
     os.execv("file", {coff_file})
   else
-    os.raise("Failed to convert UEFI application to COFF format")
+    os.raise("Failed to generate UEFI application")
   end
+  
+  os.rm(bin_file)
 end)
 
 task("setup-hda")
@@ -317,35 +322,6 @@ set_menu({
   description = "Run the FKernel in UEFI mode using QEMU",
 })
 on_run(function()
-  -- 1. Build UEFI target
-  os.exec("xmake build FKernelUEFI")
-  
-  -- 2. Prepare ESP directory
-  local esp_dir = "build/esp"
-  local boot_dir = esp_dir .. "/EFI/BOOT"
-  os.mkdir(boot_dir)
-  
-  -- 3. Copy kernel as BOOTX64.EFI
-  os.cp("build/FKernel.efi", boot_dir .. "/BOOTX64.EFI")
-  
-  -- 4. Find OVMF
-  local ovmf = "/usr/share/edk2/x64/OVMF.4m.fd"
-  if not os.exists(ovmf) then
-    ovmf = "/usr/share/ovmf/OVMF.fd" -- fallback
-  end
-  
-  -- 5. Run QEMU
-  local qemu_cmd = {
-    "qemu-system-x86_64",
-    "-bios", ovmf,
-    "-drive", "file=fat:rw:" .. esp_dir .. ",format=raw",
-    "-net", "none",
-    "-m", "512M",
-    "-serial", "stdio",
-    "-no-reboot"
-  }
-  
-  print("Starting FKernel in UEFI mode...")
-  os.execv(qemu_cmd[1], qemu_cmd)
+  os.execv("lua", { "Meta/x86_64-tools/run_uefi.lua" })
 end)
 task_end()

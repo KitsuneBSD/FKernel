@@ -5,6 +5,7 @@
 #include <Kernel/Boot/Uefi/uefi_loader.h>
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Boot/kernel_entry.h>
+#include <Kernel/Driver/SerialPort/serial_port.h>
 #include <LibC/stdio.h>
 #include <LibFK/Core/Assertions.h>
 
@@ -12,8 +13,9 @@ using namespace uefi;
 
 extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle,
                                EFI_SYSTEM_TABLE *system_table) {
-  // Note: Serial and VGA initialization will happen in kernel_entry
-  // We can't use them here as we're still in UEFI boot services
+  // Initialize serial early for kprintf debugging
+  serial::init();
+  kprintf("UEFI efi_main started\n");
 
   // Get GOP framebuffer
   boot::FramebufferInfo framebuffer_info = uefi::initialize_gop(system_table);
@@ -21,14 +23,8 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle,
     // GOP not available or failed - will fall back to VGA text mode in kernel
   }
 
-  // Load kernel using Simple File System Protocol
-  uint64_t kernel_entry = 0;
-  const uint16_t kernel_filename[] = { 'k', 'e', 'r', 'n', 'e', 'l', '.', 'e', 'l', 'f', 0 };
-  
-  if (!uefi::load_kernel_uefi_file(system_table, kernel_filename, kernel_entry)) {
-    kprintf("ERROR: Failed to load kernel via UEFI file system!\n");
-    return EFI_LOAD_ERROR;
-  }
+  // Note: We no longer load an external 'kernel.elf' because this binary 
+  // already contains the full kernel code (Unified UEFI Kernel).
 
   // Collect EFI Memory Map
   size_t memory_map_size = 0;
@@ -58,29 +54,33 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle,
       system_table, image_handle, framebuffer_info, memory_map,
       descriptor_count, descriptor_size, acpi_info);
 
-  // Set up virtual address map for runtime services
-  // This must be done before ExitBootServices()
-  status = (*system_table->RuntimeServices->SetVirtualAddressMap)(
-      memory_map_size, descriptor_size, descriptor_version, memory_map);
+  // Exit Boot Services
+  // We must get a fresh memory map right before exiting to ensure map_key is valid
+  status = uefi::collect_memory_map(system_table->BootServices, memory_map_size,
+                                     memory_map, map_key, descriptor_size, descriptor_version);
   if (status != EFI_SUCCESS) {
-    kprintf("ERROR: Failed to set virtual address map!\n");
+    kprintf("ERROR: Failed to refresh memory map!\n");
     return status;
   }
 
-  // Exit Boot Services
-  status =
-      (*system_table->BootServices->ExitBootServices)(image_handle, map_key);
+  status = (*system_table->BootServices->ExitBootServices)(image_handle, map_key);
   if (status != EFI_SUCCESS) {
-    kprintf("ERROR: Failed to exit boot services!\n");
+    kprintf("ERROR: Failed to exit boot services! (Map key might be outdated)\n");
     return status;
   }
+
+  // Set up virtual address map for runtime services
+  // This must be done AFTER ExitBootServices() according to UEFI spec
+  status = (*system_table->RuntimeServices->SetVirtualAddressMap)(
+      memory_map_size, descriptor_size, descriptor_version, memory_map);
+  
+  // Note: We can't easily kprintf here if SetVirtualAddressMap fails because
+  // boot services are gone, but we can try to proceed to kernel_entry.
 
   // Mark boot services as no longer available
   boot::BootInfo::the().set_efi_boot_services_unavailable();
 
   // Call unified kernel entry point
-  // Note: We're already in long mode when UEFI calls us
-  // Use fully qualified name to avoid conflict with local variable
   ::kernel_entry();
 
   // Should never reach here
