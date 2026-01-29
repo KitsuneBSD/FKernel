@@ -230,6 +230,16 @@ struct alignas(TAG_ALIGN) TagFramebuffer : Tag {
 static_assert(alignof(TagFramebuffer) == 8,
               "TagFramebuffer must be aligned to 8 bytes");
 
+struct alignas(TAG_ALIGN) TagVBE : Tag {
+  uint16_t vbe_control_info[256];
+  uint16_t vbe_mode_info[128];
+  uint16_t vbe_mode;
+  uint16_t vbe_interface_seg;
+  uint16_t vbe_interface_off;
+  uint16_t vbe_interface_len;
+};
+static_assert(alignof(TagVBE) == 8, "TagVBE must be aligned to 8 bytes");
+
 /**
  * @brief EFI 32-bit system table tag
  */
