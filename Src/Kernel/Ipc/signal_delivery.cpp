@@ -1,7 +1,11 @@
 #include <Kernel/Ipc/cspace.h>
 #include <Kernel/Ipc/notification.h>
 #include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Hardware/Cpu/cpu_block.h>
+#include <Kernel/Scheduler/scheduler.h>
 #include <LibC/string.h>
+
+extern CpuControlBlock g_cpu_block;
 
 namespace fkernel {
 namespace ipc {
@@ -42,10 +46,13 @@ void SignalDelivery::handle_pending_signals(Task *task) {
   *(--user_stack) = task->context.rip;
   *(--user_stack) = task->context.rflags;
 
-  // 3. Update task context to jump to trampoline
-  task->context.rsp = reinterpret_cast<uint64_t>(user_stack);
-  task->context.rip = task->signal_state.trampoline;
-  task->context.rdi = sig; // First argument to trampoline
+  // 4. If this is the current task, we MUST also update g_cpu_block (accessed via gs)
+  // because syscall_stub_post_dispatch restores from there.
+  if (SchedulerManager::the().current() == task) {
+      g_cpu_block.user_rsp = task->context.rsp;
+      g_cpu_block.saved_rip = task->context.rip;
+      // We don't strictly need to update saved_rflags here, but it's safer
+  }
 }
 
 } // namespace ipc
