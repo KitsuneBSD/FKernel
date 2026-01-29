@@ -2,6 +2,6 @@
 
 /**
  * @brief Unified kernel entry point
- * Called after BootInfo is initialized (either from Multiboot2 or UEFI)
+ * Called after BootInfo is initialized
  */
 extern "C" void kernel_entry();

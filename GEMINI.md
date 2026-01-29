@@ -187,13 +187,6 @@ Include/
 │   │   ├── Stages
 │   │   │   ├── early_init.h
 │   │   │   └── init.h
-│   │   └── Uefi
-│   │       ├── block_io.h
-│   │       ├── elf_loader.h
-│   │       ├── fat.h
-│   │       ├── gop.h
-│   │       ├── uefi_loader.h
-│   │       └── uefi_types.h
 │   ├── Clock
 │   │   ├── ClockController
 │   │   │   ├── cmos.h
@@ -492,15 +485,8 @@ Src/
 │   ├── Boot
 │   │   ├── boot_info.cpp
 │   │   ├── kernel_entry.cpp
-│   │   ├── Multiboot
-│   │   │   └── kmain.cpp
-│   │   └── Uefi
-│   │       ├── block_io.cpp
-│   │       ├── elf_loader.cpp
-│   │       ├── fat.cpp
-│   │       ├── gop.cpp
-│   │       ├── kmain.cpp
-│   │       └── uefi_loader.cpp
+│   │   └── Multiboot
+│   │       └── kmain.cpp
 │   ├── Clock
 │   │   ├── ClockController
 │   │   │   ├── cmos.cpp

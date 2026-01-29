@@ -20,7 +20,6 @@ struct ModuleInfo {
 enum class BootMode : uint32_t {
   Unknown = 0,
   Multiboot2 = 1,  ///< Legacy BIOS boot (via Multiboot2)
-  Uefi = 2,        ///< Native UEFI boot
 };
 
 /**
@@ -74,14 +73,11 @@ public:
 
 /**
  * @brief Boot information structure
- * Provides unified interface for both Multiboot2 and UEFI boots
+ * Provides unified interface for Multiboot2 boot
  */
 class BootInfo {
 private:
   BootMode m_boot_mode{BootMode::Unknown};
-  void *m_efi_system_table{nullptr};
-  void *m_efi_image_handle{nullptr};
-  bool m_efi_boot_services_available{false};
   
   // Unified framebuffer info
   bool m_has_framebuffer{false};
@@ -99,8 +95,6 @@ private:
   // Raw boot data for late iterator creation
   void* m_raw_mb_ptr{nullptr};
   void* m_raw_mmap_ptr{nullptr};
-  size_t m_raw_mmap_count{0};
-  size_t m_raw_mmap_desc_size{0};
 
   // Internal initialization flags
   bool m_initialized{false};
@@ -120,24 +114,6 @@ public:
   void initialize_from_multiboot2(void *mb_ptr);
 
   /**
-   * @brief Initialize from UEFI boot
-   * @param efi_system_table EFI System Table pointer
-   * @param efi_image_handle EFI Image Handle
-   * @param framebuffer_info Framebuffer information from GOP
-   * @param memory_map Raw EFI memory map descriptors
-   * @param descriptor_count Number of descriptors in the map
-   * @param descriptor_size Size of each descriptor
-   * @param acpi_info ACPI table information
-   */
-  void initialize_from_uefi(void *efi_system_table,
-                            void *efi_image_handle,
-                            const FramebufferInfo &framebuffer_info,
-                            void *memory_map,
-                            size_t descriptor_count,
-                            size_t descriptor_size,
-                            const AcpiTableInfo &acpi_info);
-
-  /**
    * @brief Creates iterators for memory map after heap is initialized
    */
   void create_iterators();
@@ -148,38 +124,9 @@ public:
   BootMode get_boot_mode() const { return m_boot_mode; }
 
   /**
-   * @brief Check if booting in UEFI mode
-   */
-  bool is_uefi_boot() const { return m_boot_mode == BootMode::Uefi; }
-
-  /**
    * @brief Check if booting in Multiboot2 mode
    */
   bool is_multiboot2_boot() const { return m_boot_mode == BootMode::Multiboot2; }
-
-  /**
-   * @brief Get EFI system table pointer (only valid for UEFI boot)
-   */
-  void *get_efi_system_table() const { return m_efi_system_table; }
-
-  /**
-   * @brief Get EFI image handle (only valid for UEFI boot)
-   */
-  void *get_efi_image_handle() const { return m_efi_image_handle; }
-
-  /**
-   * @brief Check if EFI boot services are available
-   */
-  bool are_efi_boot_services_available() const {
-    return m_efi_boot_services_available;
-  }
-
-  /**
-   * @brief Mark EFI boot services as no longer available (after ExitBootServices)
-   */
-  void set_efi_boot_services_unavailable() {
-    m_efi_boot_services_available = false;
-  }
 
   /**
    * @brief Framebuffer helpers

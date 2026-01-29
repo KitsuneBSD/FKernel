@@ -31,7 +31,7 @@ void DisplayFramebuffer::initialize_framebuffer() {
 
     select_best_font();
 
-    // Mapear o framebuffer (UEFI/MB2) se o MemoryManager estiver pronto
+    // Mapear o framebuffer (MB2) se o MemoryManager estiver pronto
     if (MemoryManager::the().is_initialized()) {
       uintptr_t fb_addr = reinterpret_cast<uintptr_t>(framebuffer);
       size_t fb_size = fb_height * fb_pitch;
