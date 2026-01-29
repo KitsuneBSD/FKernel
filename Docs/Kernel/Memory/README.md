@@ -67,5 +67,5 @@ The kernel heap provides a `kmalloc`/`kfree` style interface for dynamic allocat
 
 1.  **Early Boot:** `setup_page_tables.asm` sets up a basic identity mapping.
 2.  **Early Init:** `MemoryManager::the().initialize_heap()` sets up the linked-list heap.
-3.  **Physical Memory:** `PhysicalMemoryManager::initialize()` scans the Multiboot2/UEFI memory map and populates zones.
+3.  **Physical Memory:** `PhysicalMemoryManager::initialize()` scans the Multiboot2 memory map and populates zones.
 4.  **Virtual Memory:** `VirtualMemoryManager::initialize()` creates the final kernel PML4 and switches CR3.

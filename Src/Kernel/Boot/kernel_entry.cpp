@@ -10,7 +10,7 @@ extern char __heap_end[];
 
 /**
  * @brief Unified kernel entry point
- * Works for both Multiboot2 and UEFI boot
+ * Works for Multiboot2 boot
  * BootInfo must be initialized before calling this
  */
 extern "C" void kernel_entry() {
@@ -22,8 +22,7 @@ extern "C" void kernel_entry() {
   assert(boot::BootInfo::the().is_initialized() && "BootInfo not initialized!");
 
   kprintf("FKernel starting...\n");
-  kprintf("Boot mode: %s\n", boot::BootInfo::the().is_uefi_boot() ? "UEFI"
-                             : boot::BootInfo::the().is_multiboot2_boot()
+  kprintf("Boot mode: %s\n", boot::BootInfo::the().is_multiboot2_boot()
                                  ? "Multiboot2"
                                  : "Unknown");
 

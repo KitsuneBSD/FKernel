@@ -54,7 +54,7 @@ local flags = {
 }
 
 local kernel_non_architecture_related = {
-  "Src/Kernel/Boot/**.cpp|Uefi/**.cpp",
+  "Src/Kernel/Boot/**.cpp",
   "Src/Kernel/Clock/**.cpp",
   "Src/Kernel/Driver/**.cpp",
   "Src/Kernel/Hardware/**.cpp",
@@ -183,96 +183,6 @@ end)
 
 target_end()
 
--- UEFI Application Target for real hardware boot
-target("FKernelUEFI")
-set_kind("binary")
-set_toolchains("FKernel_Compiling")
-set_filename("FKernelUEFI.elf")
-
-add_defines("FKERNEL_UEFI_APPLICATION")
-add_includedirs("Include")
-
-local uefi_flags = {
-  cxx = {
-    "-ffreestanding",
-    "-fno-exceptions",
-    "-fno-rtti",
-    "-fno-stack-protector",
-    "-fno-use-cxa-atexit",
-    "-fno-pic",
-    "-fshort-wchar",
-    "-fno-omit-frame-pointer",
-    "-nostdlib",
-    "-nostdinc",
-    "-D__fkernel__",
-    "-U__linux__",
-    "-U__linux",
-    "-Ulinux",
-    "-Wno-constant-conversion",
-    "-Wno-c++11-narrowing",
-    "--target=x86_64-efi",
-    "-fPIC",
-    "-mno-red-zone",
-    "-mno-sse",
-    "-mno-avx",
-  },
-  ld = {
-    "-nostdlib",
-    "-shared",
-    "-e efi_main",
-    "-T Config/uefi_linker.ld",
-  }
-}
-
-add_cxflags(uefi_flags.cxx, { force = true })
-add_ldflags(uefi_flags.ld, { force = true })
-
--- UEFI-specific source files
-add_files("Src/Kernel/Boot/Uefi/**.cpp")
-add_files("Src/LibC/**.c")
-add_files("Src/LibC/**.cpp") 
-add_files("Src/LibFK/**.cpp")
-
-add_files(kernel_non_architecture_related)
-
-if is_arch("x86_64", "x64") then
-  add_files("Src/Kernel/Arch/x86_64/**.cpp")
-end
-
--- Architecture-specific UEFI flags
-if is_arch("x86_64", "x64") then
-  add_asflags("-f elf64", { force = true })
-end
-
--- Create custom UEFI linker script
-after_build(function(target)
-  local efi_file = target:targetfile()
-  local bin_file = "build/FKernel.bin.tmp"
-  local coff_file = "build/FKernel.efi"
-
-  -- 1. Convert ELF64 to Flat Binary
-  local objcopy_cmd = string.format(
-    "objcopy -O binary '%s' '%s'",
-    efi_file, bin_file
-  )
-
-  print("Converting kernel to flat binary...")
-  os.exec(objcopy_cmd)
-  
-  -- 2. Use our Lua patcher to add UEFI headers
-  print("Patching UEFI headers...")
-  os.execv("lua", {"Meta/x86_64-tools/efi_patcher.lua", bin_file, coff_file})
-  
-  if os.exists(coff_file) then
-    print("UEFI application successfully generated: " .. coff_file)
-    os.execv("file", {coff_file})
-  else
-    os.raise("Failed to generate UEFI application")
-  end
-  
-  os.rm(bin_file)
-end)
-
 task("setup-hda")
 set_menu({
   usage = "xmake setup-hda",
@@ -313,15 +223,5 @@ set_menu({
 
 on_run(function()
   os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
-end)
-task_end()
-
-task("run-uefi")
-set_menu({
-  usage = "xmake run-uefi",
-  description = "Run the FKernel in UEFI mode using QEMU",
-})
-on_run(function()
-  os.execv("lua", { "Meta/x86_64-tools/run_uefi.lua" })
 end)
 task_end()

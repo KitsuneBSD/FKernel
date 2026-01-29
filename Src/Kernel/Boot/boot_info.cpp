@@ -1,6 +1,5 @@
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <Kernel/Boot/Multiboot/multiboot_interpreter.h>
-#include <Kernel/Boot/Uefi/uefi_loader.h>
 #include <Kernel/Boot/boot_info.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Assertions.h>
@@ -72,49 +71,7 @@ void BootInfo::initialize_from_multiboot2(void *mb_ptr) {
   multiboot2::MultibootParser parser(mb_ptr);
 
   m_boot_mode = BootMode::Multiboot2;
-
-  // Check for 64-bit EFI boot (via Multiboot2)
-  auto efi64_tag =
-      parser.find_tag<multiboot2::TagEFI64>(multiboot2::TagType::EFI64);
-  if (efi64_tag) {
-    m_efi_system_table = reinterpret_cast<void *>(efi64_tag->efi_system_table);
-    fk::algorithms::klog("BOOT", "Detected 64-bit EFI boot (via Multiboot2)");
-    fk::algorithms::klog("BOOT", "  EFI System Table: %p", m_efi_system_table);
-  }
-  // Check for 32-bit EFI boot (via Multiboot2)
-  else if (auto efi32_tag = parser.find_tag<multiboot2::TagEFI32>(
-               multiboot2::TagType::EFI32)) {
-    m_efi_system_table = reinterpret_cast<void *>(efi32_tag->efi_system_table);
-    fk::algorithms::klog("BOOT", "Detected 32-bit EFI boot (via Multiboot2)");
-    fk::algorithms::klog("BOOT", "  EFI System Table: %p", m_efi_system_table);
-  } else {
-    fk::algorithms::klog("BOOT", "Detected legacy BIOS boot (Multiboot2)");
-  }
-
-  // Check for EFI 64-bit image handle
-  auto efi64_image_tag = parser.find_tag<multiboot2::TagEFI64ImageHandle>(
-      multiboot2::TagType::EFI64ImageHandle);
-  if (efi64_image_tag) {
-    m_efi_image_handle =
-        reinterpret_cast<void *>(efi64_image_tag->efi_image_handle);
-    fk::algorithms::klog("BOOT", "  EFI Image Handle: %p", m_efi_image_handle);
-  }
-  // Check for EFI 32-bit image handle
-  else if (auto efi32_image_tag =
-               parser.find_tag<multiboot2::TagEFI32ImageHandle>(
-                   multiboot2::TagType::EFI32ImageHandle)) {
-    m_efi_image_handle =
-        reinterpret_cast<void *>(efi32_image_tag->efi_image_handle);
-    fk::algorithms::klog("BOOT", "  EFI Image Handle: %p", m_efi_image_handle);
-  }
-
-  // Check for EFI boot services availability
-  auto efi_boot_services_tag = parser.find_tag<multiboot2::TagEFIBootServices>(
-      multiboot2::TagType::EFIBootServices);
-  if (efi_boot_services_tag) {
-    m_efi_boot_services_available = true;
-    fk::algorithms::klog("BOOT", "  EFI Boot Services available");
-  }
+  fk::algorithms::klog("BOOT", "Detected legacy BIOS boot (Multiboot2)");
 
   // Get memory map
   auto mmap_tag =
@@ -164,39 +121,6 @@ void BootInfo::initialize_from_multiboot2(void *mb_ptr) {
   fk::algorithms::klog("BOOT", "BootInfo initialized from Multiboot2");
 }
 
-void BootInfo::initialize_from_uefi(void *efi_system_table,
-                                    void *efi_image_handle,
-                                    const FramebufferInfo &framebuffer_info,
-                                    void *memory_map, size_t descriptor_count,
-                                    size_t descriptor_size,
-                                    const AcpiTableInfo &acpi_info) {
-  assert(!m_initialized && "BootInfo already initialized!");
-
-  m_boot_mode = BootMode::Uefi;
-  m_efi_system_table = efi_system_table;
-  m_efi_image_handle = efi_image_handle;
-  m_efi_boot_services_available = false; // Set to false after ExitBootServices
-  m_has_framebuffer = framebuffer_info.addr != 0;
-  m_framebuffer_info = framebuffer_info;
-
-  m_raw_mmap_ptr = memory_map;
-  m_raw_mmap_count = descriptor_count;
-  m_raw_mmap_desc_size = descriptor_size;
-
-  m_acpi_info = acpi_info;
-
-  m_initialized = true;
-  fk::algorithms::klog("BOOT", "BootInfo initialized from UEFI");
-  fk::algorithms::klog("BOOT", "  EFI System Table: %p", m_efi_system_table);
-  fk::algorithms::klog("BOOT", "  EFI Image Handle: %p", m_efi_image_handle);
-  if (m_has_framebuffer) {
-    fk::algorithms::klog("BOOT", "  Framebuffer: addr=%p pitch=%u %ux%u bpp=%u",
-                         reinterpret_cast<void *>(m_framebuffer_info.addr),
-                         m_framebuffer_info.pitch, m_framebuffer_info.width,
-                         m_framebuffer_info.height, m_framebuffer_info.bpp);
-  }
-}
-
 void BootInfo::create_iterators() {
   assert(m_initialized);
   if (m_memory_map_iterator)
@@ -223,12 +147,6 @@ void BootInfo::create_iterators() {
                                (void *)(uintptr_t)mod->mod_end);
         }
       }
-    }
-  } else if (m_boot_mode == BootMode::Uefi) {
-    if (m_raw_mmap_ptr) {
-      m_memory_map_iterator = new uefi::UefiMemoryMapIterator(
-          (uefi::EFI_MEMORY_DESCRIPTOR *)m_raw_mmap_ptr, m_raw_mmap_count,
-          m_raw_mmap_desc_size);
     }
   }
 
