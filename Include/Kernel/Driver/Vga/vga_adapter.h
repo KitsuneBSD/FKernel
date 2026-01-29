@@ -57,6 +57,26 @@ public:
     Display::the().clear();
   }
 
+  /// Set cursor position
+  void set_cursor_pos(uint32_t x, uint32_t y) {
+    Display::the().set_cursor_pos(x, y);
+  }
+
+  /// Get cursor X position
+  uint32_t get_cursor_x() const {
+    return Display::the().get_cursor_x();
+  }
+
+  /// Get cursor Y position
+  uint32_t get_cursor_y() const {
+    return Display::the().get_cursor_y();
+  }
+
+  /// Show or hide cursor
+  void show_cursor(bool visible) {
+    Display::the().show_cursor(visible);
+  }
+
 private:
   vga() = default;
 };

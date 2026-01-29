@@ -455,6 +455,18 @@ void DisplayFramebuffer::set_color(Color fg, Color bg) {
   current_bg = bg;
 }
 
+void DisplayFramebuffer::set_cursor_pos(uint32_t x, uint32_t y) {
+    erase_cursor();
+    cursor_x = x;
+    cursor_y = y;
+    draw_cursor();
+}
+
+void DisplayFramebuffer::show_cursor(bool visible) {
+    if (visible) draw_cursor();
+    else erase_cursor();
+}
+
 void DisplayFramebuffer::write_ansi(const char *str) {
   write_ansi_n(str, strlen(str));
 }

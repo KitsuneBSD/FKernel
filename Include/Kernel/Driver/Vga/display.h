@@ -41,6 +41,18 @@ public:
   /// Set foreground and background colors
   virtual void set_color(Color fg, Color bg) = 0;
 
+  /// Move cursor to specific position
+  virtual void set_cursor_pos(uint32_t x, uint32_t y) = 0;
+
+  /// Get cursor X position
+  virtual uint32_t get_cursor_x() const = 0;
+
+  /// Get cursor Y position
+  virtual uint32_t get_cursor_y() const = 0;
+
+  /// Show or hide cursor
+  virtual void show_cursor(bool visible) = 0;
+
   /// Get display width (in characters for text mode, in pixels for EFI)
   virtual uint32_t get_width() const = 0;
 
@@ -104,6 +116,12 @@ public:
   void write_ansi_n(const char *str, size_t size) override;
   void clear() override;
   void set_color(Color fg, Color bg) override;
+  
+  void set_cursor_pos(uint32_t x, uint32_t y) override;
+  uint32_t get_cursor_x() const override { return col; }
+  uint32_t get_cursor_y() const override { return row; }
+  void show_cursor(bool visible) override;
+
   uint32_t get_width() const override { return WIDTH; }
   uint32_t get_height() const override { return HEIGHT; }
 

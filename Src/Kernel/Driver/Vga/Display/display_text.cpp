@@ -48,6 +48,26 @@ void DisplayText::set_color(Color fg, Color bg) {
   color = static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4);
 }
 
+void DisplayText::set_cursor_pos(uint32_t x, uint32_t y) {
+    col = x;
+    row = y;
+    if (col >= WIDTH) col = WIDTH - 1;
+    if (row >= HEIGHT) row = HEIGHT - 1;
+    update_cursor();
+}
+
+void DisplayText::show_cursor(bool visible) {
+    if (visible) enable_cursor();
+    else {
+        // VGA doesn't have a simple "hide" bit without risk, 
+        // a common trick is to move it off-screen
+        outb(0x3D4, 0x0F);
+        outb(0x3D5, 0xFF);
+        outb(0x3D4, 0x0E);
+        outb(0x3D5, 0xFF);
+    }
+}
+
 void DisplayText::put_codepoint(uint32_t codepoint) {
     put_char(static_cast<char>(codepoint));
 }
