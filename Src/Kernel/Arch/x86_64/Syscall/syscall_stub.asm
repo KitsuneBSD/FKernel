@@ -43,7 +43,11 @@ syscall_stub:
     push r9
 
     ; Prepare C arguments
-    push rsp     ; Arg8: Pointer to PtRegs
+    ; RAX contains syscall number, RDI..R9 contains args 1-6
+    lea r11, [rsp] ; Pointer to PtRegs
+    
+    sub rsp, 8   ; Align stack to 16 bytes
+    push r11     ; Arg8: Pointer to PtRegs
     push r9      ; Arg7: Arg6
     
     mov r9, r8   ; Arg5
@@ -62,7 +66,7 @@ syscall_stub_post_dispatch:
     ; RAX now contains return value
     
     ; Cleanup Stack
-    add rsp, 16  ; Remove Arg7 + Arg8
+    add rsp, 24  ; Remove Arg7 + Arg8 + Padding
     
     ; Restore Registers
     pop r9

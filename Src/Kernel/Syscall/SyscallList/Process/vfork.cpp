@@ -84,12 +84,12 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
 
     uint64_t* context = reinterpret_cast<uint64_t*>(child_stack_ptr);
     *(--context) = (uint64_t)fork_child_trampoline;
-    *(--context) = regs->r15;
-    *(--context) = regs->r14;
-    *(--context) = regs->r13;
-    *(--context) = regs->r12;
-    *(--context) = regs->rbp;
     *(--context) = regs->rbx;
+    *(--context) = regs->rbp;
+    *(--context) = regs->r12;
+    *(--context) = regs->r13;
+    *(--context) = regs->r14;
+    *(--context) = regs->r15;
 
     child->stack_pointer = reinterpret_cast<uint64_t>(context);
 

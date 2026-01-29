@@ -49,7 +49,7 @@ task_trampoline:
 
 fork_child_trampoline:
     xor rax, rax ; return 0 for child
-    ; The syscall_stub_post_dispatch expects to cleanup 16 bytes of arguments (Arg7/Arg8)
+    ; The syscall_stub_post_dispatch expects to cleanup 24 bytes of arguments/padding
     ; from the stack before restoring registers. We must match this layout.
-    sub rsp, 16
+    sub rsp, 24
     jmp syscall_stub_post_dispatch
