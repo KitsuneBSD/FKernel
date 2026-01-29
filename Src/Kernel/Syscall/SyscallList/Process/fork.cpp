@@ -1,6 +1,7 @@
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
@@ -65,6 +66,10 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->user_rsp = regs->rsp;
   child->saved_rip = regs->rip;
   child->saved_rflags = regs->rflags;
+
+  // Inherit user segment bases
+  child->fs_base = CPU::the().read_msr(MSR_FS_BASE);
+  child->gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
 
   // 3. Clone File Descriptors
   for (size_t i = 0; i < parent->files.descriptors.size(); ++i) {
