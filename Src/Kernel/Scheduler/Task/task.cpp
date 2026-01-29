@@ -67,6 +67,7 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
       .run_node = {},
       .wait_node = {},
       .sleep_node = {},
+      .zombie_node = {},
   };
 
   return task;
