@@ -478,8 +478,10 @@ Task *SchedulerManager::find_task(fk::ProcessId id) {
 
 Task *SchedulerManager::find_terminated_child(fk::ProcessId ppid) {
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-    if (it->identity.ppid == ppid && it->terminated)
-      return &*it;
+    Task& task = *it;
+    ASSERT(task.is_valid() && "Corrupted task in zombie queue!");
+    if (task.identity.ppid == ppid && task.terminated)
+      return &task;
   }
   return nullptr;
 }
@@ -492,24 +494,32 @@ Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
       return proc.current_task;
 
     for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
-      if (it->identity.ppid == ppid)
-        return &*it;
+      Task& task = *it;
+      ASSERT(task.is_valid());
+      if (task.identity.ppid == ppid)
+        return &task;
     }
   }
 
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
-    if (it->identity.ppid == ppid)
-      return &*it;
+    Task& task = *it;
+    ASSERT(task.is_valid());
+    if (task.identity.ppid == ppid)
+      return &task;
   }
 
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-    if (it->identity.ppid == ppid)
-      return &*it;
+    Task& task = *it;
+    ASSERT(task.is_valid());
+    if (task.identity.ppid == ppid)
+      return &task;
   }
 
   for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
-    if (it->identity.ppid == ppid)
-      return &*it;
+    Task& task = *it;
+    ASSERT(task.is_valid());
+    if (task.identity.ppid == ppid)
+      return &task;
   }
 
   return nullptr;

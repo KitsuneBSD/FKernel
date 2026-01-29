@@ -47,6 +47,8 @@ public:
       return;
 
     auto &node = obj->*NodeMember;
+    ASSERT(node.prev == nullptr && node.next == nullptr && "Node already in a list!");
+
     node.prev = m_tail;
     node.next = nullptr;
 
@@ -65,6 +67,8 @@ public:
       return;
 
     auto &node = obj->*NodeMember;
+    ASSERT(node.prev == nullptr && node.next == nullptr && "Node already in a list!");
+
     node.prev = nullptr;
     node.next = m_head;
 

@@ -17,7 +17,7 @@ private:
 
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_wait_queue;
     fk::containers::IntrusiveList<Task, &Task::sleep_node> m_sleep_queue;
-    fk::containers::IntrusiveList<Task, &Task::wait_node> m_zombie_queue;
+    fk::containers::IntrusiveList<Task, &Task::zombie_node> m_zombie_queue;
 
     bool m_is_initialized = false;
     uint64_t m_default_quantum = 5;

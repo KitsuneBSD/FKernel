@@ -91,6 +91,7 @@ struct Task {
   fk::containers::IntrusiveListNode<Task> run_node;
   fk::containers::IntrusiveListNode<Task> wait_node;
   fk::containers::IntrusiveListNode<Task> sleep_node;
+  fk::containers::IntrusiveListNode<Task> zombie_node;
 
   int add_file_descriptor(fk::RefPtr<FileDescription> description);
   int dup_file_descriptor(int old_fd, bool cloexec = false, int min_fd = 0);
