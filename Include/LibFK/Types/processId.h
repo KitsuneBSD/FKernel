@@ -7,14 +7,21 @@ namespace fk {
 
 class ProcessId {
 public:
-    constexpr ProcessId() : m_id(0) {}
+    static constexpr uint64_t INVALID = 0xFFFFFFFFFFFFFFFF;
+
+    constexpr ProcessId() : m_id(INVALID) {}
+    
     constexpr explicit ProcessId(uint64_t id) : m_id(id) {
-        // PID 0 is allowed (Idle Task), but we can restrict max value
-        ASSERT(id < 0xFFFFFFFF);
+        // PID 0 is Idle, so it's valid. But we check for our new INVALID constant.
+        ASSERT(id < 0xFFFFFFFF || id == INVALID);
     }
 
-    uint64_t value() const { return m_id; }
-    bool is_valid() const { return m_id != 0; }
+    uint64_t value() const { 
+        ASSERT(is_valid());
+        return m_id; 
+    }
+
+    bool is_valid() const { return m_id != INVALID; }
 
     bool operator==(const ProcessId& other) const { return m_id == other.m_id; }
     bool operator!=(const ProcessId& other) const { return m_id != other.m_id; }
