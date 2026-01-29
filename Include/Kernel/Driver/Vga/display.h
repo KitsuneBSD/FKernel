@@ -5,6 +5,7 @@
 #include <LibFK/Core/Error.h>
 #include <LibFK/Core/Result.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 #include <Kernel/Driver/Vga/Types/color.h>
 #include <Kernel/Driver/Vga/Types/framebuffer_info.h>
@@ -19,6 +20,12 @@
 class Display {
 public:
   virtual ~Display() = default;
+
+  /// Global lock for display operations
+  static fk::synchronization::Spinlock& lock() {
+      static fk::synchronization::Spinlock s_lock;
+      return s_lock;
+  }
 
   /// Write a single character to the display
   virtual void put_char(char c) = 0;

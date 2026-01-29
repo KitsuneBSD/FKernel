@@ -4,6 +4,7 @@
 #include <LibFK/Core/Result.h>
 #include <LibFK/Container/circular_buffer.h>
 #include <LibFK/Terminal/ansi_parser.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
 namespace terminal {
@@ -66,8 +67,9 @@ private:
   static constexpr size_t INPUT_QUEUE_SIZE = 1024;
   fk::containers::CircularBuffer<char, INPUT_QUEUE_SIZE> m_input_queue;
 
-  // ANSI Parser
+  // ANSI Parser and Synchronization
   fk::terminal::AnsiParser m_ansi_parser;
+  fk::synchronization::Spinlock m_lock;
 
   // Terminal state
   bool m_raw_mode{false};

@@ -58,6 +58,7 @@ VGATerminal& VGATerminal::the() {
 }
 
 void VGATerminal::on_char(char c) {
+    fk::synchronization::ScopedLock lock(m_lock);
     bool is_active = (TerminalManager::the().active_terminal() == this);
 
     // 1. Trata Backspace
@@ -165,6 +166,7 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uin
 fk::core::Result<size_t, fk::core::Error> VGATerminal::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
     if (!buffer) return fk::core::Error::InvalidParameter;
     
+    fk::synchronization::ScopedLock lock(m_lock);
     // Only the active terminal should output to the screen
     if (TerminalManager::the().active_terminal() == this) {
         m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
@@ -200,6 +202,7 @@ struct termios {
 #define ECHO   0000010
 
 fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint64_t arg) {
+    fk::synchronization::ScopedLock lock(m_lock);
     switch (request) {
         case TIOCGWINSZ: {
             auto* ws = reinterpret_cast<winsize*>(arg);

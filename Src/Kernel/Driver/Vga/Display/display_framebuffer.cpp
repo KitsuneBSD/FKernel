@@ -267,6 +267,7 @@ void DisplayFramebuffer::scroll() {
 }
 
 void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
+  fk::synchronization::ScopedLock lock(Display::lock());
   erase_cursor();
   uint32_t font_w = m_current_font.width * m_current_font.scale;
   uint32_t font_h = m_current_font.height * m_current_font.scale;
@@ -429,6 +430,7 @@ void DisplayFramebuffer::write(const char *str) {
 }
 
 void DisplayFramebuffer::clear() {
+  fk::synchronization::ScopedLock lock(Display::lock());
   erase_cursor();
   uint8_t *target = framebuffer;
   if (!target)
@@ -451,11 +453,13 @@ void DisplayFramebuffer::clear() {
 }
 
 void DisplayFramebuffer::set_color(Color fg, Color bg) {
+  fk::synchronization::ScopedLock lock(Display::lock());
   current_fg = fg;
   current_bg = bg;
 }
 
 void DisplayFramebuffer::set_cursor_pos(uint32_t x, uint32_t y) {
+    fk::synchronization::ScopedLock lock(Display::lock());
     erase_cursor();
     cursor_x = x;
     cursor_y = y;
