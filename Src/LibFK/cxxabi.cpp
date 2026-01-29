@@ -8,8 +8,10 @@ typedef void (*atexit_fn_t)();
  *
  * Does nothing and always returns 0.
  */
-extern "C"
-int atexit(atexit_fn_t func) {
+extern "C" {
+  void *__dso_handle = nullptr;
+
+  int atexit(atexit_fn_t func) {
   (void)func; // ignorar o ponteiro
   return 0;
 }
@@ -37,3 +39,16 @@ extern "C" void __cxa_pure_virtual() {
  * __cxa_finalize stub
  */
 void __cxa_finalize(void *f) { (void)f; }
+
+extern "C" int __cxa_guard_acquire(uint64_t *guard) {
+  return !(*guard & 0xFF);
+}
+
+extern "C" void __cxa_guard_release(uint64_t *guard) {
+  *guard |= 0xFF;
+}
+
+extern "C" void __cxa_guard_abort(uint64_t *guard) {
+  (void)guard;
+}
+}
