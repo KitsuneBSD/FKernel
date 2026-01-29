@@ -65,8 +65,6 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->user_rsp = regs->rsp;
   child->saved_rip = regs->rip;
   child->saved_rflags = regs->rflags;
-  child->fs_base = parent->fs_base;
-  child->gs_base = parent->gs_base;
 
   // 3. Clone File Descriptors
   for (size_t i = 0; i < parent->file_descriptors.size(); ++i) {
