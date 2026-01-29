@@ -54,7 +54,7 @@ local flags = {
 }
 
 local kernel_non_architecture_related = {
-  "Src/Kernel/Boot/**.cpp",
+  "Src/Kernel/Boot/**.cpp|Uefi/**.cpp",
   "Src/Kernel/Clock/**.cpp",
   "Src/Kernel/Driver/**.cpp",
   "Src/Kernel/Hardware/**.cpp",
@@ -96,9 +96,9 @@ end
 toolchain_end()
 
 option("initrd_mode")
-    set_default("busybox")
-    set_values("busybox", "openrc")
-    set_description("Select initrd system style")
+set_default("busybox")
+set_values("busybox", "openrc")
+set_description("Select initrd system style")
 
 target("FKernel")
 set_kind("binary")
@@ -191,11 +191,9 @@ set_kind("binary")
 set_toolchains("FKernel_Compiling")
 set_filename("FKernel.efi")
 
--- UEFI-specific configuration
 add_defines("FKERNEL_UEFI_APPLICATION")
 add_includedirs("Include")
 
--- UEFI build flags
 local uefi_flags = {
   cxx = {
     "-ffreestanding",
@@ -221,12 +219,9 @@ local uefi_flags = {
   },
   ld = {
     "-nostdlib",
-    "-pie",
     "-e efi_main",
-    "-shared",
     "-Bsymbolic",
     "-z max-page-size=0x1000",
-    "--subsystem=10",  -- EFI_APPLICATION subsystem
     "-T Config/uefi_linker.ld",
   }
 }
@@ -234,27 +229,43 @@ local uefi_flags = {
 add_cxflags(uefi_flags.cxx, { force = true })
 add_ldflags(uefi_flags.ld, { force = true })
 
--- UEFI-specific source files
 add_files("Src/Kernel/Boot/Uefi/**.cpp")
 add_files("Src/LibC/**.c")
-add_files("Src/LibC/**.cpp") 
+add_files("Src/LibC/**.cpp")
 add_files("Src/LibFK/**.cpp")
+
+add_files(kernel_non_architecture_related)
+
+if is_arch("x86_64", "x64") then
+  add_files("Src/Kernel/Arch/x86_64/**.cpp")
+  add_files("Src/Kernel/Arch/x86_64/**.asm")
+end
 
 -- Architecture-specific UEFI files
 if is_arch("x86_64", "x64") then
   add_asflags("-f elf64", { force = true })
-  -- Note: UEFI apps don't need the kernel's assembly entry points
-  -- They enter directly at efi_main
 end
 
 -- Create custom UEFI linker script
 after_build(function(target)
-  -- Create a PE/COFF header fixup if needed
   local efi_file = target:targetfile()
-  print("UEFI application built: " .. efi_file)
+  local coff_file = "build/FKernel.efi"
+
+  -- Convert ELF64 to PE/COFF64 for UEFI compatibility
+  local objcopy_cmd = string.format(
+    "objcopy -O pe-x86-64 '%s' '%s'",
+    efi_file, coff_file
+  )
+
+  print("Converting UEFI application to COFF...")
+  os.exec(objcopy_cmd)
   
-  -- Copy to build directory with standard name
-  os.cp(efi_file, "build/FKernel.efi")
+  if os.exists(coff_file) then
+    print("UEFI application successfully converted: " .. coff_file)
+    os.execv("file", {coff_file})
+  else
+    os.raise("Failed to convert UEFI application to COFF format")
+  end
 end)
 
 task("setup-hda")
@@ -273,7 +284,7 @@ set_menu({
   description = "Compile and package the initrd (BusyBox or OpenRC)",
 })
 on_run(function()
-  os.execv("lua", {"Meta/x86_64-tools/mount_mockos.lua", "--only-initrd"})
+  os.execv("lua", { "Meta/x86_64-tools/mount_mockos.lua", "--only-initrd" })
 end)
 task_end()
 
@@ -297,5 +308,44 @@ set_menu({
 
 on_run(function()
   os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
+end)
+task_end()
+
+task("run-uefi")
+set_menu({
+  usage = "xmake run-uefi",
+  description = "Run the FKernel in UEFI mode using QEMU",
+})
+on_run(function()
+  -- 1. Build UEFI target
+  os.exec("xmake build FKernelUEFI")
+  
+  -- 2. Prepare ESP directory
+  local esp_dir = "build/esp"
+  local boot_dir = esp_dir .. "/EFI/BOOT"
+  os.mkdir(boot_dir)
+  
+  -- 3. Copy kernel as BOOTX64.EFI
+  os.cp("build/FKernel.efi", boot_dir .. "/BOOTX64.EFI")
+  
+  -- 4. Find OVMF
+  local ovmf = "/usr/share/edk2/x64/OVMF.4m.fd"
+  if not os.exists(ovmf) then
+    ovmf = "/usr/share/ovmf/OVMF.fd" -- fallback
+  end
+  
+  -- 5. Run QEMU
+  local qemu_cmd = {
+    "qemu-system-x86_64",
+    "-bios", ovmf,
+    "-drive", "file=fat:rw:" .. esp_dir .. ",format=raw",
+    "-net", "none",
+    "-m", "512M",
+    "-serial", "stdio",
+    "-no-reboot"
+  }
+  
+  print("Starting FKernel in UEFI mode...")
+  os.execv(qemu_cmd[1], qemu_cmd)
 end)
 task_end()

@@ -3,6 +3,7 @@
 #include <Kernel/Boot/Uefi/uefi_types.h>
 #include <Kernel/Boot/boot_info.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Core/Assertions.h>
 
 namespace uefi {
 
@@ -20,11 +21,42 @@ private:
 public:
   UefiMemoryMapIterator(EFI_MEMORY_DESCRIPTOR *descriptors,
                         size_t descriptor_count,
-                        size_t descriptor_size);
+                        size_t descriptor_size)
+    : m_descriptors(descriptors),
+      m_descriptor_count(descriptor_count),
+      m_descriptor_size(descriptor_size),
+      m_current_index(0) {}
   
-  bool has_next() const override;
-  boot::MemoryMapEntry next() override;
-  void reset() override;
+  bool has_next() const override {
+    return m_current_index < m_descriptor_count;
+  }
+
+  boot::MemoryMapEntry next() override {
+    assert(has_next() && "UefiMemoryMapIterator: No more entries!");
+    
+    EFI_MEMORY_DESCRIPTOR *desc = reinterpret_cast<EFI_MEMORY_DESCRIPTOR *>(
+        reinterpret_cast<uint8_t *>(m_descriptors) + (m_current_index * m_descriptor_size));
+    
+    boot::MemoryMapEntry entry;
+    entry.base_addr = desc->PhysicalStart;
+    entry.length = desc->NumberOfPages * 4096; // Convert pages to bytes
+    entry.type = static_cast<uint32_t>(desc->Type);
+    
+    // Determine if memory is available
+    entry.is_available = (desc->Type == static_cast<uint32_t>(EFI_MEMORY_TYPE::EfiConventionalMemory) ||
+                          desc->Type == static_cast<uint32_t>(EFI_MEMORY_TYPE::EfiLoaderCode) ||
+                          desc->Type == static_cast<uint32_t>(EFI_MEMORY_TYPE::EfiLoaderData) ||
+                          desc->Type == static_cast<uint32_t>(EFI_MEMORY_TYPE::EfiBootServicesCode) ||
+                          desc->Type == static_cast<uint32_t>(EFI_MEMORY_TYPE::EfiBootServicesData) ||
+                          desc->Type == static_cast<uint32_t>(EFI_MEMORY_TYPE::EfiACPIReclaimMemory));
+    
+    m_current_index++;
+    return entry;
+  }
+
+  void reset() override {
+    m_current_index = 0;
+  }
 };
 
 /**
