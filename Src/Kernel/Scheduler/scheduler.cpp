@@ -222,6 +222,7 @@ void SchedulerManager::zombify_current() {
     Task *task = proc.current_task;
     task->state = TaskState::Blocked;
     task->terminated = true;
+    m_zombie_queue.push_back(task);
     proc.need_resched = true;
   }
 
@@ -511,4 +512,16 @@ Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
   }
 
   return nullptr;
+}
+
+void SchedulerManager::reap_zombie(Task *task) {
+  bool intr_state = InterruptController::the().get_interrupt_state();
+  InterruptController::the().disable_interrupt();
+
+  m_zombie_queue.remove(task);
+  // In a real kernel, we would free the task memory and its resources here.
+  // For now, we'll just keep it out of the queues.
+  // delete task; // TODO: Implement safe task deletion
+
+  if (intr_state) InterruptController::the().enable_interrupt();
 }

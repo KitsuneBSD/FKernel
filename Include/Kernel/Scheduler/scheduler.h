@@ -46,6 +46,7 @@ public:
     Task* find_task(fk::ProcessId id);
     Task* find_terminated_child(fk::ProcessId ppid);
     Task* find_any_child(fk::ProcessId ppid);
+    void reap_zombie(Task* task);
 
     Task* pick_next();
     
