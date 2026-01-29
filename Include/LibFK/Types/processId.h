@@ -22,6 +22,8 @@ public:
     }
 
     bool is_valid() const { return m_id != INVALID; }
+    bool is_root() const { return m_id == 1; }
+    bool is_idle() const { return m_id == 0; }
 
     bool operator==(const ProcessId& other) const { return m_id == other.m_id; }
     bool operator!=(const ProcessId& other) const { return m_id != other.m_id; }
