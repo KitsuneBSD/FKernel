@@ -266,6 +266,7 @@ void SchedulerManager::yield() {
 }
 
 void SchedulerManager::wake_task(Task *task) {
+  ASSERT(task && task->is_valid());
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
@@ -287,6 +288,25 @@ void SchedulerManager::wake_task(Task *task) {
   m_processors[target_cpu].run_queue.push_back(task);
 
   if (intr_state) InterruptController::the().enable_interrupt();
+}
+
+void SchedulerManager::terminate_current(int status) {
+    Task* current = this->current();
+    if (!current) return;
+
+    current->terminated = true;
+    current->exit_status = status;
+
+    auto* parent = find_task(current->identity.ppid);
+    if (parent) {
+        if (parent->vfork_waiting && current->vfork_parent_id == parent->identity.id) {
+            parent->vfork_waiting = false;
+        }
+        wake_task(parent);
+    }
+
+    zombify_current();
+    schedule();
 }
 
 Task *SchedulerManager::pick_next() {

@@ -38,6 +38,7 @@ public:
     void sleep_current(uint64_t ticks);
     void yield();
     void wake_task(Task* task);
+    void terminate_current(int status);
     void on_tick();
     void schedule();
 
