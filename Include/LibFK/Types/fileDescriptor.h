@@ -12,7 +12,8 @@ public:
     constexpr FileDescriptor() : m_fd(INVALID) {}
     
     constexpr explicit FileDescriptor(uint32_t fd) : m_fd(fd) {
-        ASSERT(fd < 1024); // Kernel limit
+        // FDs are limited to 1024. INVALID is allowed as sentinel.
+        ASSERT(fd < 1024 || fd == INVALID);
     }
 
     uint32_t value() const { 
