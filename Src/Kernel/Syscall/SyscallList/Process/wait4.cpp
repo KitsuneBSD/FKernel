@@ -10,19 +10,16 @@ extern "C" {
 
 uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
                     [[maybe_unused]] uint64_t rusage_ptr, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
-  int64_t pid = (int64_t)pid_val;
+  fk::ProcessId pid = fk::ProcessId::from_signed(static_cast<int64_t>(pid_val));
   auto* current_task = SchedulerManager::the().current();
   if (!current_task) return -1;
 
-  fk::algorithms::kdebug("SYSCALL", "wait4: PID %lu waiting for child PID %ld (options=%lu)", 
-                       current_task->identity.id.value(), pid, options);
-
   while (true) {
       Task* task = nullptr;
-      if (pid == -1) {
+      if (pid.is_any()) {
           task = SchedulerManager::the().find_terminated_child(current_task->identity.id);
       } else {
-          task = SchedulerManager::the().find_task(fk::ProcessId(pid));
+          task = SchedulerManager::the().find_task(pid);
           if (task && (!task->terminated || task->identity.ppid != current_task->identity.id)) {
               task = nullptr;
           }
@@ -44,25 +41,22 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
 
       // No zombie found. Should we block?
       bool has_children = false;
-      if (pid == -1) {
+      if (pid.is_any()) {
           has_children = SchedulerManager::the().find_any_child(current_task->identity.id) != nullptr;
       } else {
-          Task* t = SchedulerManager::the().find_task(fk::ProcessId(pid));
+          Task* t = SchedulerManager::the().find_task(pid);
           has_children = (t && t->identity.ppid == current_task->identity.id);
       }
 
       if (!has_children) {
-          fk::algorithms::kdebug("SYSCALL", "wait4: No children for PID %lu, returning ECHILD", current_task->identity.id.value());
           return fkernel::return_error(fk::core::Error::NoChildProcesses);
       }
 
       if (options & 1) { // WNOHANG
-          fk::algorithms::kdebug("SYSCALL", "wait4: WNOHANG returning 0");
           return 0;
       }
 
-      fk::algorithms::kdebug("SYSCALL", "wait4: No zombie yet, blocking PID %lu", 
-                           current_task->identity.id.value());
+      // Block until a child wakes us up (sys_exit does this)
       SchedulerManager::the().block_current();
       SchedulerManager::the().schedule(); 
   }
