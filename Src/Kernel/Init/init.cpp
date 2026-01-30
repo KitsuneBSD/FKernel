@@ -36,6 +36,11 @@ void init() {
     // Teste com mensagem visível
     Display::the().write("[SYSTEM] FKernel VESA + BusyBox rodando!\n");
     Display::the().flush();
+    
+    // Finalize display initialization after system is stable
+    if (DisplayFramebuffer* fb_display = static_cast<DisplayFramebuffer*>(&Display::the())) {
+      fb_display->finalize_initialization();
+    }
   }
 
   // Initialize Driver Framework

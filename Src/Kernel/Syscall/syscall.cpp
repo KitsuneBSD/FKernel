@@ -112,6 +112,8 @@ uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
 uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                         uint64_t, PtRegs*);
 uint64_t sys_pipe(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_poll(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_select(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_kqueue(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_kevent(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_tty_create_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -179,6 +181,8 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IPC_CALL, sys_ipc_call);
   SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
   SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
+  SyscallManager::the().register_syscall(SYS_POLL, sys_poll);
+  SyscallManager::the().register_syscall(SYS_SELECT, sys_select);
   SyscallManager::the().register_syscall(SYS_KQUEUE, sys_kqueue);
   SyscallManager::the().register_syscall(SYS_KEVENT, sys_kevent);
   SyscallManager::the().register_syscall(SYS_TTY_CREATE, sys_tty_create_kernel);

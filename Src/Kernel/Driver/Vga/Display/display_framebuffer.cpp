@@ -53,7 +53,7 @@ void DisplayFramebuffer::initialize_framebuffer() {
     fb_pitch = vesa::VESADriver::the().get_pitch();
     fb_bpp = vesa::VESADriver::the().get_bpp();
 
-    select_best_font();
+     select_best_font();
 
     // Mapear o framebuffer (VESA) se o MemoryManager estiver pronto
     if (MemoryManager::the().is_initialized()) {
@@ -61,13 +61,13 @@ void DisplayFramebuffer::initialize_framebuffer() {
       size_t fb_size = fb_height * fb_pitch;
       for (uintptr_t addr = fb_addr; addr < fb_addr + fb_size; addr += 4096) {
         MemoryManager::the().map_page(addr, addr,
-                                      PageFlags::Present | PageFlags::Writable |
-                                          PageFlags::WriteThrough);
+                                          PageFlags::Present | PageFlags::Writable |
+                                              PageFlags::WriteThrough);
       }
     }
 
-    // Allocate back buffer for double buffering
-    allocate_back_buffer();
+    // Defer back buffer allocation to later in initialization
+    // allocate_back_buffer(); // Will be called later after system is stable
   } else {
     framebuffer = nullptr;
   }
@@ -732,8 +732,21 @@ void DisplayFramebuffer::allocate_back_buffer() {
     double_buffering_enabled = true;
     fk::algorithms::klog("DISPLAY", "Double buffering enabled: %zu bytes", buffer_size);
     
-    // Initialize back buffer with current framebuffer content
-    memcpy(back_buffer, framebuffer, buffer_size);
+    // SAFELY initialize back buffer with zeros first
+    memset(back_buffer, 0, buffer_size);
+    
+    // Only copy from framebuffer if it's safe to access
+    // Check if MemoryManager is initialized and framebuffer is mapped
+    if (MemoryManager::the().is_initialized() && framebuffer) {
+      // Try to validate framebuffer accessibility with a small test read first
+      volatile uint8_t test_byte = *framebuffer;
+      (void)test_byte; // Suppress unused variable warning
+      
+      // If test read succeeded, copy framebuffer content
+      memcpy(back_buffer, framebuffer, buffer_size);
+    } else {
+      fk::algorithms::kwarn("DISPLAY", "Framebuffer not accessible, using blank back buffer");
+    }
   } else {
     double_buffering_enabled = false;
     back_buffer = nullptr;
@@ -763,6 +776,17 @@ void DisplayFramebuffer::swap_buffers() {
 
   // Skip VSync for immediate response - prioritize keyboard echo over tear-free
   // Interactive use benefits more from responsiveness than perfect vsync
+  
+  // Enhanced safety check: ensure all buffers are valid and accessible
+  if (!framebuffer || fb_height == 0 || fb_pitch == 0) {
+    return;
+  }
+  
+  // Validate framebuffer accessibility before copying
+  volatile uint8_t test_byte = *framebuffer;
+  (void)test_byte; // Suppress unused variable warning
+  test_byte = *back_buffer; // Test back buffer accessibility too
+  (void)test_byte;
   
   // Copy back buffer to front buffer immediately
   size_t buffer_size = fb_height * fb_pitch;
@@ -817,12 +841,26 @@ void DisplayFramebuffer::update_dirty_rectangles() {
 }
 
 uint8_t* DisplayFramebuffer::get_render_buffer() {
-  return double_buffering_enabled ? back_buffer : framebuffer;
+  if (double_buffering_enabled && back_buffer) {
+    return back_buffer;
+  }
+  
+  // If double buffering is disabled, ensure framebuffer is accessible
+  if (!framebuffer) {
+    return nullptr; // Prevent null pointer access
+  }
+  
+  return framebuffer;
 }
 
 void DisplayFramebuffer::flush() {
   if (!double_buffering_enabled || !back_buffer) {
     return; // Direct rendering - no flush needed
+  }
+
+  // Safety check: ensure display is properly initialized
+  if (!framebuffer || fb_width == 0 || fb_height == 0) {
+    return;
   }
 
   // Immediate flush for keyboard echo, but only when dirty
@@ -840,4 +878,9 @@ void DisplayFramebuffer::next_frame() {
   m_dirty_rect.y = 0;
   m_dirty_rect.width = 0;
   m_dirty_rect.height = 0;
+}
+
+void DisplayFramebuffer::finalize_initialization() {
+  // Allocate back buffer now that system is fully initialized and stable
+  allocate_back_buffer();
 }

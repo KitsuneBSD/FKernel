@@ -76,6 +76,9 @@ public:
   /// Advance to next frame (with double buffering)
   void next_frame();
 
+  /// Finalize initialization (allocate back buffer after system is stable)
+  void finalize_initialization();
+
   void put_char(char c) override;
   void put_codepoint(uint32_t codepoint) override;
   void write(const char *str) override;

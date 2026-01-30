@@ -96,8 +96,8 @@ void VGATerminal::on_char(char c) {
     // 3. Caracteres Normais
     if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
-        // Don't flush on every character - accumulate in back buffer
-        // Display::the().flush();
+        // Flush immediately for responsive keyboard echo with double buffering
+        Display::the().flush();
     }
 
     if (!m_raw_mode) {
@@ -293,9 +293,36 @@ void terminal::VGATerminal::clear_screen(uint8_t mode) {
 }
 
 void terminal::VGATerminal::clear_line(uint8_t mode) {
-    // Basic implementation: just overwrite with spaces if needed
-    // In text mode we could do this easily.
-    (void)mode;
+    uint32_t current_x = Display::the().get_cursor_x();
+    uint32_t current_y = Display::the().get_cursor_y();
+    
+    // Save current cursor position
+    uint32_t saved_x = current_x;
+    uint32_t saved_y = current_y;
+    
+    switch (mode) {
+        case 0: // Clear from cursor to end of line
+            for (uint32_t i = current_x; i < m_cols; i++) {
+                Display::the().set_cursor_pos(i, current_y);
+                Display::the().put_char(' ');
+            }
+            break;
+        case 1: // Clear from beginning to cursor
+            for (uint32_t i = 0; i <= current_x; i++) {
+                Display::the().set_cursor_pos(i, current_y);
+                Display::the().put_char(' ');
+            }
+            break;
+        case 2: // Clear entire line
+            for (uint32_t i = 0; i < m_cols; i++) {
+                Display::the().set_cursor_pos(i, current_y);
+                Display::the().put_char(' ');
+            }
+            break;
+    }
+    
+    // Restore cursor position
+    Display::the().set_cursor_pos(saved_x, saved_y);
 }
 
 void terminal::VGATerminal::set_scroll_region(uint16_t top, uint16_t bottom) {
@@ -313,7 +340,84 @@ void terminal::VGATerminal::restore_cursor() {
 }
 
 void terminal::VGATerminal::show_cursor(bool visible) {
-    vga::the().show_cursor(visible);
+    Display::the().show_cursor(visible);
+}
+
+uint32_t terminal::VGATerminal::get_cursor_x() {
+    return Display::the().get_cursor_x();
+}
+
+uint32_t terminal::VGATerminal::get_cursor_y() {
+    return Display::the().get_cursor_y();
+}
+
+// Additional methods for vi compatibility
+void terminal::VGATerminal::insert_chars(uint16_t count) {
+    uint32_t x = Display::the().get_cursor_x();
+    uint32_t y = Display::the().get_cursor_y();
+    
+    // For now, just move cursor right by count (simplified implementation)
+    // Full implementation would require shifting existing characters
+    Display::the().set_cursor_pos(x + count, y);
+}
+
+void terminal::VGATerminal::delete_chars(uint16_t count) {
+    uint32_t x = Display::the().get_cursor_x();
+    uint32_t y = Display::the().get_cursor_y();
+    
+    // For now, just overwrite with spaces (simplified implementation)
+    // Full implementation would require shifting remaining characters
+    for (uint16_t i = 0; i < count && (x + i) < m_cols; i++) {
+        Display::the().set_cursor_pos(x + i, y);
+        Display::the().put_char(' ');
+    }
+    
+    // Restore cursor position
+    Display::the().set_cursor_pos(x, y);
+}
+
+void terminal::VGATerminal::insert_lines(uint16_t count) {
+    // For now, just move cursor down by count (simplified implementation)
+    // Full implementation would require shifting lines down
+    uint32_t x = Display::the().get_cursor_x();
+    uint32_t y = Display::the().get_cursor_y();
+    Display::the().set_cursor_pos(x, y + count);
+}
+
+void terminal::VGATerminal::delete_lines(uint16_t count) {
+    // For now, just clear current lines (simplified implementation)
+    // Full implementation would require shifting lines up
+    uint32_t x = Display::the().get_cursor_x();
+    uint32_t y = Display::the().get_cursor_y();
+    
+    for (uint16_t i = 0; i < count && (y + i) < m_rows; i++) {
+        Display::the().set_cursor_pos(0, y + i);
+        for (uint32_t j = 0; j < m_cols; j++) {
+            Display::the().put_char(' ');
+        }
+    }
+    
+    // Restore cursor position
+    Display::the().set_cursor_pos(x, y);
+}
+
+void terminal::VGATerminal::scroll_up(uint16_t count) {
+    // For now, just move cursor up by count (simplified implementation)
+    // Full implementation would require scrolling the content
+    uint32_t x = Display::the().get_cursor_x();
+    uint32_t y = Display::the().get_cursor_y();
+    
+    if (y >= count) {
+        Display::the().set_cursor_pos(x, y - count);
+    }
+}
+
+void terminal::VGATerminal::scroll_down(uint16_t count) {
+    // For now, just move cursor down by count (simplified implementation)
+    // Full implementation would require scrolling the content
+    uint32_t x = Display::the().get_cursor_x();
+    uint32_t y = Display::the().get_cursor_y();
+    Display::the().set_cursor_pos(x, y + count);
 }
 
 } // namespace terminal
