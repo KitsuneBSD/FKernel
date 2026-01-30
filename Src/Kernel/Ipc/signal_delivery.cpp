@@ -1,6 +1,7 @@
 #include <Kernel/Ipc/cspace.h>
 #include <Kernel/Ipc/notification.h>
 #include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/ipc_log_node.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibC/string.h>
@@ -11,19 +12,30 @@ namespace fkernel {
 namespace ipc {
 
 void SignalDelivery::handle_pending_signals(Task *task) {
-  if (!task || task->control.lifecycle.is_a_kernel_task || !task->resources.ipc.cspace)
+  if (!task || task->control.lifecycle.is_a_kernel_task || !task->resources.ipc.cspace) {
+    if (task) {
+      uint32_t task_id = task->control.identity.id.value();
+      IpcLogNode::the()->log_signal_delivery(task_id, -1, 0); // Invalid task/kernel task
+    }
     return;
+  }
+
+  uint32_t task_id = task->control.identity.id.value();
 
   // Signal Notification is at handle 0 by convention
   Capability cap = task->resources.ipc.cspace->get(0);
-  if (cap.type() != CapabilityType::Notification)
+  if (cap.type() != CapabilityType::Notification) {
+    IpcLogNode::the()->log_signal_delivery(task_id, -2, 0); // Not a notification
     return;
+  }
 
   Notification *notification = static_cast<Notification *>(cap.object());
   uint64_t pending = notification->poll();
 
-  if (pending == 0)
+  if (pending == 0) {
+    IpcLogNode::the()->log_signal_delivery(task_id, 0, 0); // No pending signals
     return;
+  }
 
   // Find the first signal bit set
   int sig = 0;
@@ -34,8 +46,12 @@ void SignalDelivery::handle_pending_signals(Task *task) {
     }
   }
 
-  if (sig == 0 || task->resources.ipc.signals.trampoline == 0)
+  if (sig == 0 || task->resources.ipc.signals.trampoline == 0) {
+    IpcLogNode::the()->log_signal_delivery(task_id, sig, task->resources.ipc.signals.trampoline);
     return;
+  }
+
+  IpcLogNode::the()->log_signal_delivery(task_id, sig, task->resources.ipc.signals.trampoline);
 
   // Save context on user stack and redirect to trampoline
   uint64_t *user_stack = reinterpret_cast<uint64_t *>(task->resources.context.user_rsp);

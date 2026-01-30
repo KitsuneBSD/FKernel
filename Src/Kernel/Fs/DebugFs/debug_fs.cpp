@@ -76,6 +76,9 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> DebugFsNode::lookup(const ch
     if (strcmp(name, "syscalls") == 0) {
         return fk::RefPtr<Node>(SyscallLogNode::the());
     }
+    if (strcmp(name, "ipc") == 0) {
+        return fk::RefPtr<Node>(IpcLogNode::the());
+    }
     return fk::core::Error::NotFound;
 }
 
@@ -89,6 +92,11 @@ fk::core::Result<void, fk::core::Error> DebugFsNode::list_dir(fk::containers::Ve
     strcpy(syscalls_de.name, "syscalls");
     syscalls_de.type = 0;
     entries.push_back(syscalls_de);
+
+    DirectoryEntry ipc_de;
+    strcpy(ipc_de.name, "ipc");
+    ipc_de.type = 0;
+    entries.push_back(ipc_de);
 
     return {};
 }
