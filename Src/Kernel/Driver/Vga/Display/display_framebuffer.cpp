@@ -4,9 +4,10 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
+#include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/heap_malloc.h>
 #include <LibFK/Text/string.h>
+#include <LibC/stddef.h>
 
 DisplayFramebuffer::DisplayFramebuffer()
     : cursor_x(0), cursor_y(0), m_current_font(Vga::default_font) {
@@ -38,9 +39,12 @@ void DisplayFramebuffer::initialize_framebuffer() {
       for (uintptr_t addr = fb_addr; addr < fb_addr + fb_size; addr += 4096) {
         MemoryManager::the().map_page(addr, addr,
                                       PageFlags::Present | PageFlags::Writable |
-                                          PageFlags::CacheDisabled);
+                                          PageFlags::WriteThrough);
       }
     }
+
+    // Allocate back buffer for double buffering
+    allocate_back_buffer();
   } else if (vesa::VESADriver::the().is_available() &&
              vesa::VESADriver::the().get_framebuffer() != nullptr) {
     framebuffer = vesa::VESADriver::the().get_framebuffer();
@@ -58,9 +62,12 @@ void DisplayFramebuffer::initialize_framebuffer() {
       for (uintptr_t addr = fb_addr; addr < fb_addr + fb_size; addr += 4096) {
         MemoryManager::the().map_page(addr, addr,
                                       PageFlags::Present | PageFlags::Writable |
-                                          PageFlags::CacheDisabled);
+                                          PageFlags::WriteThrough);
       }
     }
+
+    // Allocate back buffer for double buffering
+    allocate_back_buffer();
   } else {
     framebuffer = nullptr;
   }
@@ -68,9 +75,55 @@ void DisplayFramebuffer::initialize_framebuffer() {
 
 fk::core::Result<void, fk::core::Error>
 DisplayFramebuffer::set_vesa_mode(uint16_t mode) {
+  // Free existing back buffer before changing mode
+  free_back_buffer();
+  
   auto res = vesa::VESADriver::the().set_mode(mode);
   if (res.is_ok()) {
-    initialize_framebuffer();
+    // Initialize framebuffer without double buffering allocation
+    // (it will be allocated at the end of initialize_framebuffer)
+    if (boot::BootInfo::the().has_framebuffer()) {
+      auto fb = boot::BootInfo::the().get_framebuffer_info();
+      framebuffer = reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(fb.addr));
+      fb_width = fb.width;
+      fb_height = fb.height;
+      fb_pitch = fb.pitch;
+      fb_bpp = fb.bpp;
+      select_best_font();
+      
+      // Mapear o framebuffer (MB2) se o MemoryManager estiver pronto
+      if (MemoryManager::the().is_initialized()) {
+        uintptr_t fb_addr = reinterpret_cast<uintptr_t>(framebuffer);
+        size_t fb_size = fb_height * fb_pitch;
+        for (uintptr_t addr = fb_addr; addr < fb_addr + fb_size; addr += 4096) {
+          MemoryManager::the().map_page(addr, addr,
+                                            PageFlags::Present | PageFlags::Writable |
+                                                PageFlags::WriteThrough);
+        }
+      }
+    } else if (vesa::VESADriver::the().is_available() &&
+               vesa::VESADriver::the().get_framebuffer() != nullptr) {
+      framebuffer = vesa::VESADriver::the().get_framebuffer();
+      fb_width = vesa::VESADriver::the().get_width();
+      fb_height = vesa::VESADriver::the().get_height();
+      fb_pitch = vesa::VESADriver::the().get_pitch();
+      fb_bpp = vesa::VESADriver::the().get_bpp();
+      select_best_font();
+      
+      // Mapear o framebuffer (VESA) se o MemoryManager estiver pronto
+      if (MemoryManager::the().is_initialized()) {
+        uintptr_t fb_addr = reinterpret_cast<uintptr_t>(framebuffer);
+        size_t fb_size = fb_height * fb_pitch;
+        for (uintptr_t addr = fb_addr; addr < fb_addr + fb_size; addr += 4096) {
+          MemoryManager::the().map_page(addr, addr,
+                                            PageFlags::Present | PageFlags::Writable |
+                                                PageFlags::WriteThrough);
+        }
+      }
+    }
+    
+    // Now allocate the back buffer
+    allocate_back_buffer();
     clear();
   }
   return res;
@@ -79,9 +132,35 @@ DisplayFramebuffer::set_vesa_mode(uint16_t mode) {
 fk::core::Result<void, fk::core::Error>
 DisplayFramebuffer::set_resolution(uint32_t width, uint32_t height,
                                    uint32_t bpp) {
+  // Free existing back buffer before changing resolution
+  free_back_buffer();
+  
   auto res = vesa::VESADriver::the().set_resolution(width, height, bpp);
   if (res.is_ok()) {
-    initialize_framebuffer();
+    // Re-initialize framebuffer manually to avoid double allocation
+    if (vesa::VESADriver::the().is_available() &&
+        vesa::VESADriver::the().get_framebuffer() != nullptr) {
+      framebuffer = vesa::VESADriver::the().get_framebuffer();
+      fb_width = vesa::VESADriver::the().get_width();
+      fb_height = vesa::VESADriver::the().get_height();
+      fb_pitch = vesa::VESADriver::the().get_pitch();
+      fb_bpp = vesa::VESADriver::the().get_bpp();
+      select_best_font();
+      
+      // Re-map framebuffer pages if needed
+      if (MemoryManager::the().is_initialized()) {
+        uintptr_t fb_addr = reinterpret_cast<uintptr_t>(framebuffer);
+        size_t fb_size = fb_height * fb_pitch;
+        for (uintptr_t addr = fb_addr; addr < fb_addr + fb_size; addr += 4096) {
+          MemoryManager::the().map_page(addr, addr,
+                                            PageFlags::Present | PageFlags::Writable |
+                                                PageFlags::WriteThrough);
+        }
+      }
+    }
+    
+    // Allocate back buffer after framebuffer is set up
+    allocate_back_buffer();
     clear();
   }
   return res;
@@ -189,9 +268,14 @@ uint32_t DisplayFramebuffer::color_to_pixel(Color c) const {
 
 void DisplayFramebuffer::render_char(uint32_t x, uint32_t y, char c,
                                      uint32_t fg_color, uint32_t bg_color) {
-  uint8_t *target = framebuffer;
+  uint8_t *target = get_render_buffer();
   if (!target)
     return;
+
+  // Mark this area as dirty for double buffering
+  uint32_t font_w = m_current_font.width * m_current_font.scale;
+  uint32_t font_h = m_current_font.height * m_current_font.scale;
+  mark_dirty(x, y, font_w, font_h);
 
   const Vga::Font &font = m_current_font;
   if (!font.data)
@@ -233,7 +317,7 @@ void DisplayFramebuffer::render_char(uint32_t x, uint32_t y, char c,
 }
 
 void DisplayFramebuffer::scroll() {
-  uint8_t *target = framebuffer;
+  uint8_t *target = get_render_buffer();
   if (!target)
     return;
 
@@ -264,9 +348,17 @@ void DisplayFramebuffer::scroll() {
   }
 
   cursor_y = max_rows - 1;
+  
+  // Mark entire screen as dirty after scroll
+  if (double_buffering_enabled) {
+    mark_dirty(0, 0, fb_width, fb_height);
+  }
 }
 
 void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
+  // For now, render directly - command batching would need
+  // deferral and flush mechanism which is complex
+  
   fk::synchronization::ScopedLock lock(Display::lock());
   erase_cursor();
   uint32_t font_w = m_current_font.width * m_current_font.scale;
@@ -350,7 +442,8 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
 }
 
 void DisplayFramebuffer::draw_cursor() {
-  if (!framebuffer) return;
+  uint8_t *target = get_render_buffer();
+  if (!target) return;
   uint32_t font_w = m_current_font.width * m_current_font.scale;
   uint32_t font_h = m_current_font.height * m_current_font.scale;
   uint32_t px_start = cursor_x * font_w;
@@ -361,14 +454,18 @@ void DisplayFramebuffer::draw_cursor() {
     for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
       uint32_t offset = y * fb_pitch + x * (fb_bpp / 8);
       if (fb_bpp == 32) {
-        *reinterpret_cast<uint32_t *>(framebuffer + offset) = color;
+        *reinterpret_cast<uint32_t *>(target + offset) = color;
       }
     }
   }
+  
+  // Mark cursor area as dirty
+  mark_dirty(px_start, py_start, font_w, 2);
 }
 
 void DisplayFramebuffer::erase_cursor() {
-  if (!framebuffer) return;
+  uint8_t *target = get_render_buffer();
+  if (!target) return;
   uint32_t font_w = m_current_font.width * m_current_font.scale;
   uint32_t font_h = m_current_font.height * m_current_font.scale;
   uint32_t px_start = cursor_x * font_w;
@@ -379,10 +476,13 @@ void DisplayFramebuffer::erase_cursor() {
     for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
       uint32_t offset = y * fb_pitch + x * (fb_bpp / 8);
       if (fb_bpp == 32) {
-        *reinterpret_cast<uint32_t *>(framebuffer + offset) = color;
+        *reinterpret_cast<uint32_t *>(target + offset) = color;
       }
     }
   }
+  
+  // Mark cursor area as dirty
+  mark_dirty(px_start, py_start, font_w, 2);
 }
 
 void DisplayFramebuffer::put_char(char c) {
@@ -432,7 +532,7 @@ void DisplayFramebuffer::write(const char *str) {
 void DisplayFramebuffer::clear() {
   fk::synchronization::ScopedLock lock(Display::lock());
   erase_cursor();
-  uint8_t *target = framebuffer;
+  uint8_t *target = get_render_buffer();
   if (!target)
     return;
   uint32_t bg_pixel = color_to_pixel(current_bg);
@@ -450,6 +550,11 @@ void DisplayFramebuffer::clear() {
   }
   cursor_x = 0;
   cursor_y = 0;
+  
+  // Mark entire screen as dirty
+  if (double_buffering_enabled) {
+    mark_dirty(0, 0, fb_width, fb_height);
+  }
 }
 
 void DisplayFramebuffer::set_color(Color fg, Color bg) {
@@ -604,4 +709,132 @@ void DisplayFramebuffer::write_ansi_n(const char *str, size_t size) {
       put_codepoint(codepoint);
     }
   }
+}
+
+// Double buffering implementation
+void DisplayFramebuffer::allocate_back_buffer() {
+  // Only allocate if we don't already have a back buffer
+  if (back_buffer) {
+    return; // Already allocated
+  }
+  
+  if (!framebuffer || fb_width == 0 || fb_height == 0) {
+    double_buffering_enabled = false;
+    return;
+  }
+
+  size_t buffer_size = fb_height * fb_pitch;
+  
+  // Allocate from kernel memory manager
+  back_buffer = static_cast<uint8_t*>(MemoryManager::the().allocate(buffer_size));
+  
+  if (back_buffer) {
+    double_buffering_enabled = true;
+    fk::algorithms::klog("DISPLAY", "Double buffering enabled: %zu bytes", buffer_size);
+    
+    // Initialize back buffer with current framebuffer content
+    memcpy(back_buffer, framebuffer, buffer_size);
+  } else {
+    double_buffering_enabled = false;
+    back_buffer = nullptr;
+    fk::algorithms::kwarn("DISPLAY", "Failed to allocate back buffer, using direct rendering");
+  }
+}
+
+void DisplayFramebuffer::free_back_buffer() {
+  if (back_buffer) {
+    MemoryManager::the().free(back_buffer);
+    back_buffer = nullptr;
+    double_buffering_enabled = false;
+    fk::algorithms::klog("DISPLAY", "Back buffer freed");
+  }
+}
+
+void DisplayFramebuffer::wait_vblank() {
+  // Simple VBlank detection by polling VGA status register
+  // Port 0x3DA: Input Status Register 1
+  // Bit 3: Vertical Retrace (1 = in vertical retrace, 0 = display period)
+  
+  // Wait for start of VBlank
+  while (!(inb(0x3DA) & 0x08)) {
+    // Minimal delay to prevent excessive polling
+  }
+  
+  // Wait for end of VBlank to ensure we're in display period  
+  while (inb(0x3DA) & 0x08) {
+    // Minimal delay to prevent excessive polling
+  }
+}
+
+void DisplayFramebuffer::swap_buffers() {
+  if (!double_buffering_enabled || !back_buffer) {
+    return;
+  }
+
+  // Wait for VBlank to prevent tearing
+  wait_vblank();
+
+  // Copy back buffer to front buffer
+  size_t buffer_size = fb_height * fb_pitch;
+  memcpy(framebuffer, back_buffer, buffer_size);
+}
+
+void DisplayFramebuffer::mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+  if (!m_dirty_rect.dirty) {
+    m_dirty_rect.x = x;
+    m_dirty_rect.y = y;
+    m_dirty_rect.width = width;
+    m_dirty_rect.height = height;
+    m_dirty_rect.dirty = true;
+  } else {
+    // Expand rectangle to include new area
+    uint32_t right1 = m_dirty_rect.x + m_dirty_rect.width;
+    uint32_t right2 = x + width;
+    uint32_t bottom1 = m_dirty_rect.y + m_dirty_rect.height;
+    uint32_t bottom2 = y + height;
+    
+    m_dirty_rect.x = (x < m_dirty_rect.x) ? x : m_dirty_rect.x;
+    m_dirty_rect.y = (y < m_dirty_rect.y) ? y : m_dirty_rect.y;
+    m_dirty_rect.width = ((right2 > right1) ? right2 : right1) - m_dirty_rect.x;
+    m_dirty_rect.height = ((bottom2 > bottom1) ? bottom2 : bottom1) - m_dirty_rect.y;
+  }
+}
+
+void DisplayFramebuffer::update_dirty_rectangles() {
+  if (!m_dirty_rect.dirty || !double_buffering_enabled) {
+    return;
+  }
+
+  // Copy only the dirty region
+  uint8_t *src = back_buffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
+  uint8_t *dst = framebuffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
+  
+  for (uint32_t y = 0; y < m_dirty_rect.height; ++y) {
+    memcpy(dst, src, m_dirty_rect.width * (fb_bpp / 8));
+    src += fb_pitch;
+    dst += fb_pitch;
+  }
+
+  m_dirty_rect.dirty = false;
+}
+
+uint8_t* DisplayFramebuffer::get_render_buffer() {
+  return double_buffering_enabled ? back_buffer : framebuffer;
+}
+
+void DisplayFramebuffer::flush() {
+  if (double_buffering_enabled && back_buffer) {
+    // Always do full buffer swap to ensure content appears
+    swap_buffers();
+  }
+  // For direct rendering mode, flush is a no-op
+}
+
+void DisplayFramebuffer::next_frame() {
+  // Reset dirty tracking for next frame
+  m_dirty_rect.dirty = false;
+  m_dirty_rect.x = 0;
+  m_dirty_rect.y = 0;
+  m_dirty_rect.width = 0;
+  m_dirty_rect.height = 0;
 }

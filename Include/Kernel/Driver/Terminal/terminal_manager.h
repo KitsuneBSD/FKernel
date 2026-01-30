@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Driver/Terminal/vga_terminal.h>
+#include "Kernel/Driver/Terminal/vga_terminal.h"
 #include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/optional.h>
@@ -55,9 +55,12 @@ public:
     // Input handling from keyboard driver
     void handle_input(char c);
 
-    // Active terminal management
-    void switch_to(int index);
-    VGATerminal* active_terminal() const;
+     // Active terminal management
+     void switch_to(int index);
+     VGATerminal* active_terminal() const;
+     
+     // Force terminal 0 to be active (for userspace visibility)
+     void force_tty0_active();
     
 private:
     TerminalManager() = default;

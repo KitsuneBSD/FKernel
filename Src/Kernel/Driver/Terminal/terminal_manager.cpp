@@ -153,5 +153,20 @@ VGATerminal* TerminalManager::active_terminal() const {
   return m_vga_terminals[m_active_terminal_index].get();
 }
 
+// Global function for external access
+void force_tty0_active() {
+  TerminalManager::the().force_tty0_active();
+}
+
+void TerminalManager::force_tty0_active() {
+  if (m_vga_terminals.is_empty()) return;
+  if (m_vga_terminals.size() > 0) {
+    m_active_terminal_index = 0;
+    auto* terminal = m_vga_terminals[0].get();
+    VGATerminal::set_active(terminal);
+    fk::algorithms::klog("TERMINAL MANAGER", "Forced tty0 to be active for userspace visibility");
+  }
+}
+
 } // namespace terminal
 } // namespace fkernel
