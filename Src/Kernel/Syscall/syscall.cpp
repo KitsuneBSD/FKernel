@@ -200,11 +200,13 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
 
   // Log to SyscallLogNode (DebugFS) instead of console
   if (MemoryManager::the().is_heap_initialized()) {
-    char log_buf[256];
+    char log_buf[512];
     int log_len = snprintf(log_buf, sizeof(log_buf),
-                           "[SYSCALL] Task %lu: %lu (args: %p, %p, %p) -> %p\n",
-                           task ? task->control.identity.id.value() : 0, num, (void *)arg1, (void *)arg2,
-                           (void *)arg3, (void *)result);
+                           "[SYSCALL] Task %lu (%s): %lu (args: %p, %p, %p, %p, %p, %p) -> %p\n",
+                           task ? task->control.identity.id.value() : 0, 
+                           task ? task->control.identity.name.c_str() : "unknown",
+                           num, (void *)arg1, (void *)arg2, (void *)arg3, 
+                           (void *)arg4, (void *)arg5, (void *)arg6, (void *)result);
 
     auto syscall_log = fkernel::SyscallLogNode::the();
     if (syscall_log)
@@ -212,7 +214,7 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
   }
 
   if (task && !task->is_a_kernel_task()) {
-    fkernel::ipc::SignalDelivery::handle_pending_signals(task);
+    fkernel::ipc::SignalDelivery::handle_pending_signals(task, regs);
   }
 
   return result;

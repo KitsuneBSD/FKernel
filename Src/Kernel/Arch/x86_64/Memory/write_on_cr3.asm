@@ -1,4 +1,8 @@
+section .rodata
+    cr3_align_error_msg db "CR3 write error: Address not 4KiB aligned", 0
+
 section .text
+extern kernel_panic_log
 global write_on_cr3
 
 ; Replace the current PML4 / PDPT table by writing to CR3
@@ -8,7 +12,7 @@ write_on_cr3:
 
     ; verify 4KiB alignment
     test rdi, 0xFFF
-    jnz .ud2_exception
+    jnz .alignment_error
 
     ; mask out lower 12 bits (safety)
     and rdi, 0xFFFFFFFFFFFFF000
@@ -19,5 +23,7 @@ write_on_cr3:
     sti                     ; re-enable interrupts
     ret
 
-.ud2_exception:
+.alignment_error:
+    mov rdi, cr3_align_error_msg
+    call kernel_panic_log
     ud2                     ; invalid instruction triggers #UD

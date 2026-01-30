@@ -1,6 +1,7 @@
 #include <Kernel/Ipc/notification.h>
 #include <Kernel/Ipc/ipc_log_node.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <LibFK/Algorithms/log.h>
 
 namespace fkernel {
 namespace ipc {
@@ -19,10 +20,12 @@ void Notification::signal(uint64_t bits) {
     uint64_t delivered_bits = m_pending_bits;
     m_pending_bits = 0;
 
+    fk::algorithms::klog("IPC", "Notification signal: waking Task %u with bits 0x%lx", task_id, delivered_bits);
     IpcLogNode::the()->log_notification_operation("signal_wake", task_id, delivered_bits);
     SchedulerManager::the().wake_task(&task);
   } else {
     // No task waiting, just store bits
+    fk::algorithms::klog("IPC", "Notification signal: queuing bits 0x%lx", bits);
     IpcLogNode::the()->log_notification_operation("signal_queue", 0, bits);
   }
 }
@@ -37,10 +40,12 @@ uint64_t Notification::wait() {
     if (m_pending_bits != 0) {
       uint64_t bits = m_pending_bits;
       m_pending_bits = 0;
+      fk::algorithms::klog("IPC", "Task %u wait: immediate success with bits 0x%lx", task_id, bits);
       IpcLogNode::the()->log_notification_operation("wait_immediate", task_id, bits);
       return bits;
     }
 
+    fk::algorithms::klog("IPC", "Task %u wait: blocking", task_id);
     IpcLogNode::the()->log_notification_operation("wait_blocked", task_id, m_pending_bits);
     m_waiting_tasks.append(*current);
     scheduler.block_current();
@@ -48,6 +53,7 @@ uint64_t Notification::wait() {
 
   // Result will be set in rax by signal()
   uint64_t result = current->registers().rax;
+  fk::algorithms::klog("IPC", "Task %u wait: woken up with bits 0x%lx", task_id, result);
   IpcLogNode::the()->log_notification_operation("wait_woken", task_id, result);
   return result;
 }
@@ -57,6 +63,9 @@ uint64_t Notification::poll() {
   uint64_t bits = m_pending_bits;
   m_pending_bits = 0;
   
+  if (bits != 0) {
+      fk::algorithms::klog("IPC", "Notification poll: found bits 0x%lx", bits);
+  }
   IpcLogNode::the()->log_notification_operation("poll", 0, bits);
   return bits;
 }

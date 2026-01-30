@@ -59,6 +59,7 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
   task.resources.memory = { .cr3 = read_on_cr3() };
   task.resources.files.cwd = "/";
   task.resources.ipc.cspace = cspace;
+  task.resources.ipc.signal_notification = signal_notification;
   task.resources.context = {
       .registers = GetContextForNewTask(reinterpret_cast<uint64_t>(stack), kernel_task, arg1, arg2),
       .stack_pointer = reinterpret_cast<uint64_t>(stack),

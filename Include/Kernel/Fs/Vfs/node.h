@@ -10,6 +10,7 @@
 #include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
+#include <Kernel/Fs/Vfs/definitions.h>
 
 struct DirectoryEntry {
   char name[256];
@@ -60,6 +61,8 @@ public:
   virtual bool is_symlink() const { return false; }
   virtual bool is_block_device() const { return false; }
   virtual bool is_character_device() const { return false; }
+  virtual short poll() const { return POLLIN | POLLOUT; }
+
   virtual fk::core::Result<fk::text::String, fk::core::Error> read_link() {
     return fk::core::Error::NotASymlink;
   }

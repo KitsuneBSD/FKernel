@@ -45,9 +45,9 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   child->resources.files.cwd = parent->resources.files.cwd;
   child->control.lifecycle.clear_child_tid = 0;
 
-  // 2.5 Initialize IPC CSpace for child
   child->resources.ipc.cspace = new fkernel::ipc::CSpace();
   auto *signal_notification = new fkernel::ipc::Notification();
+  child->resources.ipc.signal_notification = signal_notification;
   child->resources.ipc.cspace->install(fkernel::ipc::Capability(
       signal_notification, fkernel::ipc::CapabilityType::Notification));
   fkernel::ipc::GlobalEndpointManager::the().register_notification(
@@ -55,12 +55,22 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
 
   child->control.lifecycle.time_slice_ticks = 5;
   child->control.lifecycle.wake_up_time_ticks = 0;
-  child->resources.ipc.signals.mask = parent->resources.ipc.signals.mask;
+  
+  // Clone Signal State
+  child->resources.ipc.signals.blocked = parent->resources.ipc.signals.blocked;
+  child->resources.ipc.signals.pending = 0; // Signals are not inherited
+  child->resources.ipc.signals.trampoline = parent->resources.ipc.signals.trampoline;
+  for (int i = 0; i < NSIG; ++i) {
+      child->resources.ipc.signals.actions[i] = parent->resources.ipc.signals.actions[i];
+  }
 
   child->resources.memory.regions.heap_start = parent->resources.memory.regions.heap_start;
   child->resources.memory.regions.heap_break = parent->resources.memory.regions.heap_break;
   child->resources.memory.regions.mmap_start = parent->resources.memory.regions.mmap_start;
   child->resources.memory.regions.mmap_end = parent->resources.memory.regions.mmap_end;
+  for (size_t i = 0; i < parent->resources.memory.regions.list.size(); ++i) {
+      child->resources.memory.regions.list.push_back(parent->resources.memory.regions.list[i]);
+  }
 
   // 2.5. Inherit syscall return state
   child->resources.context.user_rsp = regs->rsp;

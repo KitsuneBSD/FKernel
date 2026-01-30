@@ -32,11 +32,41 @@ fk::core::Result<int, fk::core::Error> KQueueNode::kevent(const struct kevent* c
 
     // Wait for events if eventlist is provided
     if (nevents > 0) {
-        // Simplified: just return first triggered event or yield
-        // In a real kqueue, nodes would notify the kqueue of state changes.
-        // For now, we'll just simulate a non-blocking check of registered FDs if we had the logic.
-        // We'll return 0 for now to avoid hangs.
-        return 0;
+        int triggered = 0;
+        auto* current = SchedulerManager::the().current();
+        if (!current) return 0;
+
+        for (const auto& reg : m_registered_events) {
+            if (!reg.enabled) continue;
+            if (triggered >= nevents) break;
+
+            int fd = static_cast<int>(reg.event.ident);
+            // Basic validation of FD against current process
+            if (fd < 0 || static_cast<size_t>(fd) >= current->resources.files.descriptors.size()) continue;
+
+            auto& desc = current->resources.files.descriptors[fd];
+            if (!desc) continue;
+
+            auto node = desc->node();
+            if (!node) continue;
+
+            short events = node->poll();
+            bool event_triggered = false;
+
+            // Check filters
+            if (reg.event.filter == EVFILT_READ && (events & POLLIN)) {
+                event_triggered = true;
+            } else if (reg.event.filter == EVFILT_WRITE && (events & POLLOUT)) {
+                event_triggered = true;
+            }
+
+            if (event_triggered) {
+                eventlist[triggered] = reg.event;
+                // TODO: Set .data to bytes available if possible
+                triggered++;
+            }
+        }
+        return triggered;
     }
 
     return 0;

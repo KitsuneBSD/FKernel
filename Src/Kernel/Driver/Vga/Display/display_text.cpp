@@ -151,15 +151,27 @@ void DisplayText::write(const char *str) {
 }
 
 void DisplayText::clear() {
-  fk::synchronization::ScopedLock lock(Display::lock());
-  for (size_t r = 0; r < HEIGHT; ++r) {
-    for (size_t c = 0; c < WIDTH; ++c) {
-      buffer[r * WIDTH + c] = (static_cast<uint16_t>(color) << 8) | ' ';
-    }
-  }
+  clear_rect(0, 0, WIDTH, HEIGHT);
   row = 0;
   col = 0;
   update_cursor();
+}
+
+void DisplayText::clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+  fk::synchronization::ScopedLock lock(Display::lock());
+  for (size_t r = y; r < y + height && r < HEIGHT; ++r) {
+    for (size_t c = x; c < x + width && c < WIDTH; ++c) {
+      buffer[r * WIDTH + c] = (static_cast<uint16_t>(color) << 8) | ' ';
+    }
+  }
+}
+
+void DisplayText::copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) {
+  fk::synchronization::ScopedLock lock(Display::lock());
+  // Simplified: only support full-width line copying for now as used by terminal
+  if (width == WIDTH && src_x == 0 && dst_x == 0) {
+      memmove((void*)&buffer[dst_y * WIDTH], (void*)&buffer[src_y * WIDTH], height * WIDTH * 2);
+  }
 }
 
 void DisplayText::write_ansi(const char *str) {

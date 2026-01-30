@@ -530,15 +530,25 @@ void DisplayFramebuffer::write(const char *str) {
 }
 
 void DisplayFramebuffer::clear() {
+  clear_rect(0, 0, fb_width, fb_height);
+  cursor_x = 0;
+  cursor_y = 0;
+}
+
+void DisplayFramebuffer::clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
   fk::synchronization::ScopedLock lock(Display::lock());
   erase_cursor();
   uint8_t *target = get_render_buffer();
   if (!target)
     return;
   uint32_t bg_pixel = color_to_pixel(current_bg);
-  for (uint32_t y = 0; y < fb_height; ++y) {
-    for (uint32_t x = 0; x < fb_width; ++x) {
-      uint32_t offset = y * fb_pitch + x * (fb_bpp / 8);
+  
+  uint32_t end_y = (y + height > fb_height) ? fb_height : y + height;
+  uint32_t end_x = (x + width > fb_width) ? fb_width : x + width;
+
+  for (uint32_t py = y; py < end_y; ++py) {
+    for (uint32_t px = x; px < end_x; ++px) {
+      uint32_t offset = py * fb_pitch + px * (fb_bpp / 8);
       if (fb_bpp == 32) {
         *reinterpret_cast<uint32_t *>(target + offset) = bg_pixel;
       } else if (fb_bpp == 24) {
@@ -548,12 +558,35 @@ void DisplayFramebuffer::clear() {
       }
     }
   }
-  cursor_x = 0;
-  cursor_y = 0;
   
-  // Mark entire screen as dirty
   if (double_buffering_enabled) {
-    mark_dirty(0, 0, fb_width, fb_height);
+    mark_dirty(x, y, width, height);
+  }
+}
+
+void DisplayFramebuffer::copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) {
+  fk::synchronization::ScopedLock lock(Display::lock());
+  uint8_t *target = get_render_buffer();
+  if (!target) return;
+
+  uint32_t bpp_bytes = fb_bpp / 8;
+  
+  // Use memmove for safe overlapping copies
+  if (src_x == 0 && dst_x == 0 && width == fb_width) {
+      // Optimized for full lines
+      memmove(target + dst_y * fb_pitch, target + src_y * fb_pitch, height * fb_pitch);
+  } else {
+      // Rectangular copy
+      for (uint32_t i = 0; i < height; ++i) {
+          uint32_t sy = (dst_y < src_y) ? i : (height - 1 - i);
+          memmove(target + (dst_y + sy) * fb_pitch + dst_x * bpp_bytes,
+                  target + (src_y + sy) * fb_pitch + src_x * bpp_bytes,
+                  width * bpp_bytes);
+      }
+  }
+
+  if (double_buffering_enabled) {
+      mark_dirty(dst_x, dst_y, width, height);
   }
 }
 

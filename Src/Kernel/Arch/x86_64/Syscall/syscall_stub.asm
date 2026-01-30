@@ -14,6 +14,10 @@ syscall_stub:
 
     swapgs ; Switch to kernel GS
 
+    ; Validation: Check if syscall number is within bounds
+    cmp rax, 512
+    jae invalid_syscall_handler
+
     ; Save user context to per-cpu data
     mov [gs:8], rsp   ; user_rsp
     mov [gs:16], rcx  ; saved_rip
@@ -93,11 +97,88 @@ syscall_stub_post_dispatch:
     
     swapgs
     
-    o64 sysret   ; Return to user mode (RCX->RIP, R11->RFLAGS)
-
-section .bss
-    global syscall_user_rsp
-    syscall_user_rsp: resq 1
+        o64 sysret   ; Return to user mode (RCX->RIP, R11->RFLAGS)
     
-    global syscall_kernel_stack
-    syscall_kernel_stack: resq 1
+    
+    
+    extern syscall_validation_log
+    
+    invalid_syscall_handler:
+    
+        ; Restore user GS before calling log or returning (optional but safer if log panics)
+    
+        ; Actually, we are in kernel GS here (swapgs happened).
+    
+        ; We need to log and return error -ENOSYS (which is -38)
+    
+        
+    
+        ; Save volatile registers before calling C function
+    
+        push rax
+    
+        push rdi
+    
+        push rsi
+    
+        push rdx
+    
+        push rcx
+    
+        push r8
+    
+        push r9
+    
+        push r10
+    
+        push r11
+    
+        
+    
+        mov rdi, rax ; Pass syscall number
+    
+        call syscall_validation_log
+    
+        
+    
+        pop r11
+    
+        pop r10
+    
+        pop r9
+    
+        pop r8
+    
+        pop rcx
+    
+        pop rdx
+    
+        pop rsi
+    
+        pop rdi
+    
+        pop rax
+    
+        
+    
+        mov rax, -38 ; -ENOSYS
+    
+        swapgs       ; Restore user GS
+    
+        o64 sysret
+    
+    
+    
+    section .bss
+    
+        global syscall_user_rsp
+    
+        syscall_user_rsp: resq 1
+    
+        
+    
+        global syscall_kernel_stack
+    
+        syscall_kernel_stack: resq 1
+    
+    
