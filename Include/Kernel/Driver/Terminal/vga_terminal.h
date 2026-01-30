@@ -53,6 +53,16 @@ public:
   virtual void save_cursor() override;
   virtual void restore_cursor() override;
   virtual void show_cursor(bool visible) override;
+  virtual uint32_t get_cursor_x() override;
+  virtual uint32_t get_cursor_y() override;
+  
+  // Additional methods for vi compatibility
+  virtual void insert_chars(uint16_t count) override;
+  virtual void delete_chars(uint16_t count) override;
+  virtual void insert_lines(uint16_t count) override;
+  virtual void delete_lines(uint16_t count) override;
+  virtual void scroll_up(uint16_t count) override;
+  virtual void scroll_down(uint16_t count) override;
 
   // Public access to index
   int index() const { return m_index; }

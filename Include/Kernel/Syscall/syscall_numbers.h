@@ -60,6 +60,8 @@ enum SyscallNumber : uint64_t {
     SYS_EXIT_GROUP = 231,
     SYS_GETDENTS = 78,
     SYS_READDIR = 78, 
+    SYS_POLL = 7,
+    SYS_SELECT = 23,
     SYS_KQUEUE = 362,
     SYS_KEVENT = 363,
     SYS_IPC_SEND = 400,

@@ -146,15 +146,144 @@ void AnsiParser::handle_csi(char c) {
         }
 
         case 'h': { // DECSET - Private Mode Set
-            if (m_is_private && m_parameters.size() > 0 && m_parameters[0] == 25) {
-                m_delegate.show_cursor(true);
+            if (m_is_private && m_parameters.size() > 0) {
+                switch (m_parameters[0]) {
+                    case 1:  // Application cursor keys
+                        // TODO: Implement application cursor mode
+                        break;
+                    case 7:  // Auto-wrap mode
+                        // TODO: Implement wrap mode
+                        break;
+                    case 25: // Show cursor
+                        m_delegate.show_cursor(true);
+                        break;
+                    case 47: // Use alternate screen buffer
+                        // TODO: Implement alternate screen buffer
+                        break;
+                    case 1047: // Use alternate screen buffer (xterm)
+                        // TODO: Implement alternate screen buffer
+                        break;
+                    case 1048: // Save cursor (xterm)
+                        m_delegate.save_cursor();
+                        break;
+                    case 1049: // Save cursor + use alt screen buffer
+                        m_delegate.save_cursor();
+                        // TODO: Implement alternate screen buffer
+                        break;
+                }
             }
             break;
         }
 
         case 'l': { // DECRST - Private Mode Reset
-            if (m_is_private && m_parameters.size() > 0 && m_parameters[0] == 25) {
-                m_delegate.show_cursor(false);
+            if (m_is_private && m_parameters.size() > 0) {
+                switch (m_parameters[0]) {
+                    case 1:  // Application cursor keys
+                        // TODO: Reset to normal cursor mode
+                        break;
+                    case 7:  // Auto-wrap mode
+                        // TODO: Reset wrap mode
+                        break;
+                    case 25: // Hide cursor
+                        m_delegate.show_cursor(false);
+                        break;
+                    case 47: // Use normal screen buffer
+                        // TODO: Implement alternate screen buffer
+                        break;
+                    case 1047: // Use normal screen buffer (xterm)
+                        // TODO: Implement alternate screen buffer
+                        break;
+                    case 1048: // Restore cursor (xterm)
+                        m_delegate.restore_cursor();
+                        break;
+                    case 1049: // Restore cursor + use normal screen buffer
+                        m_delegate.restore_cursor();
+                        // TODO: Implement alternate screen buffer
+                        break;
+                }
+            }
+            break;
+        }
+
+        case 'I': { // ICH - Insert Character
+            uint16_t count = (m_parameters.size() > 0) ? m_parameters[0] : 1;
+            m_delegate.insert_chars(count);
+            break;
+        }
+
+        case 'P': { // DCH - Delete Character
+            uint16_t count = (m_parameters.size() > 0) ? m_parameters[0] : 1;
+            m_delegate.delete_chars(count);
+            break;
+        }
+
+        case 'M': { // DL - Delete Line
+            uint16_t count = (m_parameters.size() > 0) ? m_parameters[0] : 1;
+            m_delegate.delete_lines(count);
+            break;
+        }
+
+        case 'L': { // IL - Insert Line
+            uint16_t count = (m_parameters.size() > 0) ? m_parameters[0] : 1;
+            m_delegate.insert_lines(count);
+            break;
+        }
+
+        case 'S': { // SU - Scroll Up
+            uint16_t count = (m_parameters.size() > 0) ? m_parameters[0] : 1;
+            m_delegate.scroll_up(count);
+            break;
+        }
+
+        case 'T': { // SD - Scroll Down  
+            uint16_t count = (m_parameters.size() > 0) ? m_parameters[0] : 1;
+            m_delegate.scroll_down(count);
+            break;
+        }
+
+        case 'c': { // DA - Device Attributes
+            // Report as VT100 with options
+            if (m_parameters.size() == 0 || m_parameters[0] == 0) {
+                // Send response: ESC [ ? 1 ; 2 c  (VT100 with processor option)
+                // For now, we'll just handle it silently
+                // TODO: Implement response mechanism for device capability queries
+            }
+            break;
+        }
+
+        case 'n': { // DSR - Device Status Report
+            if (m_parameters.size() == 0 || m_parameters[0] == 5) {
+                // Send response: ESC [ 0 n (Ready)
+                // TODO: Implement response mechanism for device status
+            } else if (m_parameters.size() > 0 && m_parameters[0] == 6) {
+                // Send cursor position response: ESC [ y ; x R
+                uint32_t x = m_delegate.get_cursor_x() + 1; // Convert to 1-based
+                uint32_t y = m_delegate.get_cursor_y() + 1;
+                // TODO: Implement response mechanism for cursor position reports
+                (void)x; (void)y; // Suppress unused warnings
+            }
+            break;
+        }
+
+        case 's': { // SC - Save Cursor (ANSI alternative to ESC 7)
+            m_delegate.save_cursor();
+            break;
+        }
+
+        case 'u': { // RC - Restore Cursor (ANSI alternative to ESC 8)
+            m_delegate.restore_cursor();
+            break;
+        }
+
+        case 't': { // Window manipulation - simplified
+            if (m_parameters.size() > 0) {
+                switch (m_parameters[0]) {
+                    case 18: // Report window size
+                        // TODO: Implement window size report
+                        break;
+                    default:
+                        break;
+                }
             }
             break;
         }

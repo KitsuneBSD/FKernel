@@ -50,6 +50,7 @@ local function create_etc_configs()
   if profile then
     profile:write("export PATH=/bin:/sbin:/usr/bin:/usr/sbin\n")
     profile:write("export PS1='# '\n")
+    profile:write("export TERM=vt100\n")
     profile:close()
   end
 end
