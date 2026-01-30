@@ -16,7 +16,9 @@ class DisplayFramebuffer : public Display {
  private:
   uint8_t *framebuffer = nullptr;    // Front buffer (visible)
   uint8_t *back_buffer = nullptr;      // Back buffer (rendering)
+  uint8_t *saved_buffer = nullptr;     // Backup for alternate screen
   bool double_buffering_enabled = false;
+  uint64_t m_last_flush_tick = 0;
   
   // Command Queue for batched rendering (TODO: implement)
   static constexpr size_t QUEUE_SIZE =
@@ -78,6 +80,9 @@ public:
 
   /// Finalize initialization (allocate back buffer after system is stable)
   void finalize_initialization();
+
+  void save_screen() override;
+  void restore_screen() override;
 
   void put_char(char c) override;
   void put_codepoint(uint32_t codepoint) override;

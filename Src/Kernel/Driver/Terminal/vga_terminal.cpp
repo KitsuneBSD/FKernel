@@ -176,10 +176,7 @@ fk::synchronization::ScopedLock lock(m_lock);
     // Only active terminal should output to screen
     if (TerminalManager::the().active_terminal() == this) {
         m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
-        // Smart flush: only for larger writes to avoid flooding
-        if (size > 1) {
-            Display::the().flush();
-        }
+        Display::the().flush();
     }
     
     return size;
@@ -359,6 +356,14 @@ void terminal::VGATerminal::restore_cursor() {
     vga::the().set_cursor_pos(m_saved_cursor_x, m_saved_cursor_y);
 }
 
+void terminal::VGATerminal::save_screen() {
+    Display::the().save_screen();
+}
+
+void terminal::VGATerminal::restore_screen() {
+    Display::the().restore_screen();
+}
+
 void terminal::VGATerminal::show_cursor(bool visible) {
     Display::the().show_cursor(visible);
 }
@@ -410,6 +415,16 @@ void terminal::VGATerminal::delete_chars(uint16_t count) {
     }
 }
 
+void terminal::VGATerminal::erase_chars(uint16_t count) {
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    uint32_t char_w = Display::the().get_width() / m_cols;
+    uint32_t char_h = Display::the().get_height() / m_rows;
+
+    uint32_t to_clear = (x + count > m_cols) ? (m_cols - x) : count;
+    Display::the().clear_rect(x * char_w, y * char_h, to_clear * char_w, char_h);
+}
+
 void terminal::VGATerminal::insert_lines(uint16_t count) {
     uint32_t y = vga::the().get_cursor_y();
     uint32_t char_h = Display::the().get_height() / m_rows;
@@ -449,16 +464,37 @@ void terminal::VGATerminal::scroll_up(uint16_t count) {
 }
 
 void terminal::VGATerminal::scroll_down(uint16_t count) {
+
     uint32_t char_h = Display::the().get_height() / m_rows;
+
     if (count < m_rows) {
+
         Display::the().copy_rect(0, 0, 
+
                                 0, count * char_h, 
+
                                 Display::the().get_width(), (m_rows - count) * char_h);
+
         Display::the().clear_rect(0, 0, Display::the().get_width(), count * char_h);
+
     } else {
+
         vga::the().clear();
+
     }
+
 }
 
+
+
+void terminal::VGATerminal::set_line_drawing_mode(bool enabled) {
+
+    m_line_drawing_mode = enabled;
+
+}
+
+
+
 } // namespace terminal
+
 } // namespace fkernel

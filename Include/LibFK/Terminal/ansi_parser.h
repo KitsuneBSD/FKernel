@@ -25,6 +25,8 @@ public:
     virtual void set_scroll_region(uint16_t top, uint16_t bottom) = 0;
     virtual void save_cursor() = 0;
     virtual void restore_cursor() = 0;
+    virtual void save_screen() = 0;
+    virtual void restore_screen() = 0;
     virtual void show_cursor(bool visible) = 0;
     virtual uint32_t get_cursor_x() = 0;
     virtual uint32_t get_cursor_y() = 0;
@@ -35,10 +37,14 @@ public:
     // Additional methods for vi compatibility
     virtual void insert_chars(uint16_t count) = 0;
     virtual void delete_chars(uint16_t count) = 0;
+    virtual void erase_chars(uint16_t count) = 0; // ECH
     virtual void insert_lines(uint16_t count) = 0;
     virtual void delete_lines(uint16_t count) = 0;
     virtual void scroll_up(uint16_t count) = 0;
     virtual void scroll_down(uint16_t count) = 0;
+
+    // Line drawing and Charset
+    virtual void set_line_drawing_mode(bool enabled) = 0;
 };
 
 /**
@@ -49,6 +55,7 @@ public:
     enum class State {
         Normal,
         Escaped,
+        Escaped_Select_G0,
         CSI, // Control Sequence Introducer: Esc [
         OSC, // Operating System Command: Esc ]
     };

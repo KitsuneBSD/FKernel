@@ -22,6 +22,10 @@ void AnsiParser::process_char(char c) {
         case State::Normal:
             if (c == '\033') {
                 m_state = State::Escaped;
+            } else if (c == 0x0E) { // SO (Shift Out) -> G1
+                m_delegate.set_line_drawing_mode(true);
+            } else if (c == 0x0F) { // SI (Shift In) -> G0
+                m_delegate.set_line_drawing_mode(false);
             } else {
                 m_delegate.put_char(c);
             }
@@ -32,15 +36,32 @@ void AnsiParser::process_char(char c) {
                 m_state = State::CSI;
             } else if (c == ']') {
                 m_state = State::OSC;
+            } else if (c == '(') {
+                m_state = State::Escaped_Select_G0;
             } else if (c == '7') {
                 m_delegate.save_cursor();
                 m_state = State::Normal;
             } else if (c == '8') {
                 m_delegate.restore_cursor();
                 m_state = State::Normal;
+            } else if (c == 'H') { // HTS - Set Tab Stop
+                // TODO: Implement tab stops in delegate
+                m_state = State::Normal;
+            } else if (c == 'M') { // RI - Reverse Index (Scroll Up)
+                m_delegate.scroll_down(1);
+                m_state = State::Normal;
             } else {
                 m_state = State::Normal;
             }
+            break;
+
+        case State::Escaped_Select_G0:
+            if (c == '0') { // Special Graphics
+                m_delegate.set_line_drawing_mode(true);
+            } else if (c == 'B') { // US ASCII
+                m_delegate.set_line_drawing_mode(false);
+            }
+            m_state = State::Normal;
             break;
 
         case State::CSI:
@@ -63,8 +84,10 @@ void AnsiParser::process_char(char c) {
             break;
 
         case State::OSC:
-            if (c == '\a' || c == '\033') {
+            if (c == '\a' || (c == '\\' && m_has_parameter)) { // OSC end: BEL or Esc \ (ST)
                 m_state = State::Normal;
+            } else if (c == '\033') {
+                m_has_parameter = true; // Mark that we saw Esc
             }
             break;
     }
@@ -90,7 +113,7 @@ void AnsiParser::handle_csi(char c) {
             break;
         }
         case 'H':
-        case 'f': {
+        case 'f': { // CUP - Cursor Position
             uint16_t row = (m_parameters.size() > 0) ? m_parameters[0] : 1;
             uint16_t col = (m_parameters.size() > 1) ? m_parameters[1] : 1;
             m_delegate.move_cursor(row, col);
@@ -100,9 +123,14 @@ void AnsiParser::handle_csi(char c) {
         case 'B': m_delegate.move_cursor_down(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
         case 'C': m_delegate.move_cursor_forward(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
         case 'D': m_delegate.move_cursor_back(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
+        case 'G': m_delegate.move_cursor(m_delegate.get_cursor_y() + 1, m_parameters.size() > 0 ? m_parameters[0] : 1); break; // CHA
+        case 'd': m_delegate.move_cursor(m_parameters.size() > 0 ? m_parameters[0] : 1, m_delegate.get_cursor_x() + 1); break; // VPA
+        
         case 'J': m_delegate.clear_screen(m_parameters.size() > 0 ? m_parameters[0] : 0); break;
         case 'K': m_delegate.clear_line(m_parameters.size() > 0 ? m_parameters[0] : 0); break;
-        case 'r': {
+        case 'X': m_delegate.erase_chars(m_parameters.size() > 0 ? m_parameters[0] : 1); break; // ECH
+        
+        case 'r': { // DECSTBM - Set Scrolling Region
             uint16_t top = (m_parameters.size() > 0) ? m_parameters[0] : 1;
             uint16_t bottom = (m_parameters.size() > 1) ? m_parameters[1] : 0;
             m_delegate.set_scroll_region(top, bottom);
@@ -116,6 +144,7 @@ void AnsiParser::handle_csi(char c) {
                     case 1047:
                     case 1049:
                         m_delegate.save_cursor();
+                        m_delegate.save_screen();
                         m_delegate.clear_screen(2);
                         break;
                 }
@@ -129,18 +158,21 @@ void AnsiParser::handle_csi(char c) {
                     case 47:
                     case 1047:
                     case 1049:
+                        m_delegate.restore_screen();
                         m_delegate.restore_cursor();
                         break;
                 }
             }
             break;
         }
-        case 'I': m_delegate.insert_chars(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
-        case 'P': m_delegate.delete_chars(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
-        case 'M': m_delegate.delete_lines(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
-        case 'L': m_delegate.insert_lines(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
-        case 'S': m_delegate.scroll_up(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
-        case 'T': m_delegate.scroll_down(m_parameters.size() > 0 ? m_parameters[0] : 1); break;
+        
+        case '@': m_delegate.insert_chars(m_parameters.size() > 0 ? m_parameters[0] : 1); break; // ICH
+        case 'P': m_delegate.delete_chars(m_parameters.size() > 0 ? m_parameters[0] : 1); break; // DCH
+        case 'M': m_delegate.delete_lines(m_parameters.size() > 0 ? m_parameters[0] : 1); break; // DL
+        case 'L': m_delegate.insert_lines(m_parameters.size() > 0 ? m_parameters[0] : 1); break; // IL
+        case 'S': m_delegate.scroll_up(m_parameters.size() > 0 ? m_parameters[0] : 1); break;    // SU
+        case 'T': m_delegate.scroll_down(m_parameters.size() > 0 ? m_parameters[0] : 1); break;  // SD
+        
         case 'c': if (m_parameters.is_empty() || m_parameters[0] == 0) m_delegate.respond("\033[?1;2c"); break;
         case 'n': {
             if (m_parameters.is_empty() || m_parameters[0] == 5) m_delegate.respond("\033[0n");
