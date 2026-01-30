@@ -69,8 +69,8 @@ void VGATerminal::on_char(char c) {
                 m_line_chars--;
                 if (m_echo_enabled && is_active) {
                     vga::the().put_char('\b');
-                    // Flush for immediate backspace visibility
-                    Display::the().flush();
+                    // Don't flush on every keystroke - let dirty rectangles handle it
+                    // Display::the().flush();
                 }
             }
         } else {
@@ -86,7 +86,7 @@ void VGATerminal::on_char(char c) {
         m_line_chars = 0;
         if (m_echo_enabled && !m_raw_mode && is_active) {
             vga::the().put_char('\n');
-            // Flush for immediate newline visibility
+            // Flush on newlines for better responsiveness
             Display::the().flush();
         }
         m_input_queue.enqueue(c);
@@ -96,8 +96,8 @@ void VGATerminal::on_char(char c) {
     // 3. Caracteres Normais
     if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
-        // Flush for immediate character visibility
-        Display::the().flush();
+        // Don't flush on every character - accumulate in back buffer
+        // Display::the().flush();
     }
 
     if (!m_raw_mode) {
@@ -176,8 +176,10 @@ fk::synchronization::ScopedLock lock(m_lock);
     // Only active terminal should output to screen
     if (TerminalManager::the().active_terminal() == this) {
         m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
-        // Flush display to make characters visible for framebuffer displays
-        Display::the().flush();
+        // Smart flush: only for larger writes to avoid flooding
+        if (size > 1) {
+            Display::the().flush();
+        }
     }
     
     return size;
@@ -240,8 +242,8 @@ fk::core::Result<int, fk::core::Error> terminal::VGATerminal::ioctl(uint64_t req
 
 void terminal::VGATerminal::put_char(char c) {
     vga::the().put_char(c);
-    // Ensure immediate visibility for framebuffer displays
-    Display::the().flush();
+    // Let the write() method handle flushing - don't flush here
+    // Display::the().flush();
 }
 
 void terminal::VGATerminal::move_cursor(uint16_t row, uint16_t col) {
