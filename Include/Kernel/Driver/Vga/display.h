@@ -51,8 +51,11 @@ public:
   /// Copy a rectangle of pixels from one location to another (for scrolling)
   virtual void copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) = 0;
 
-  /// Set foreground and background colors
+  /// Set foreground and background colors (4-bit palette)
   virtual void set_color(Color fg, Color bg) = 0;
+
+  /// Set foreground and background colors (24-bit RGB)
+  virtual void set_colors_rgb(uint32_t fg, uint32_t bg) = 0;
 
   /// Move cursor to specific position
   virtual void set_cursor_pos(uint32_t x, uint32_t y) = 0;
@@ -137,6 +140,7 @@ public:
   void clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
   void copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) override;
   void set_color(Color fg, Color bg) override;
+  void set_colors_rgb(uint32_t fg, uint32_t bg) override { (void)fg; (void)bg; }
   
   void set_cursor_pos(uint32_t x, uint32_t y) override;
   uint32_t get_cursor_x() const override { return col; }

@@ -29,6 +29,8 @@ public:
     virtual fk::core::Result<void, fk::core::Error>
     list_dir(fk::containers::Vector<DirectoryEntry>& entries) override;
 
+    virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> lookup(const char* name) override;
+
     fk::core::Result<size_t, fk::core::Error>
     read_from_cluster_chain(uint32_t first_cluster, uint64_t offset, size_t size, uint8_t* buffer);
 

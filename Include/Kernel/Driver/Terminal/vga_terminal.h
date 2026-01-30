@@ -47,6 +47,7 @@ public:
   virtual void move_cursor_forward(uint16_t cols) override;
   virtual void move_cursor_back(uint16_t cols) override;
   virtual void set_colors(uint8_t fg, uint8_t bg) override;
+  virtual void set_colors_rgb(uint32_t fg, uint32_t bg) override;
   virtual void clear_screen(uint8_t mode) override;
   virtual void clear_line(uint8_t mode) override;
   virtual void set_scroll_region(uint16_t top, uint16_t bottom) override;
@@ -57,6 +58,8 @@ public:
   virtual void show_cursor(bool visible) override;
   virtual uint32_t get_cursor_x() override;
   virtual uint32_t get_cursor_y() override;
+  virtual uint16_t get_width() override;
+  virtual uint16_t get_height() override;
   virtual void respond(const char* data) override;
   
   // Additional methods for vi compatibility

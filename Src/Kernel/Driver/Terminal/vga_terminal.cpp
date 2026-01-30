@@ -282,6 +282,10 @@ void terminal::VGATerminal::set_colors(uint8_t fg, uint8_t bg) {
     vga::the().set_color(static_cast<Color>(fg), static_cast<Color>(bg));
 }
 
+void terminal::VGATerminal::set_colors_rgb(uint32_t fg, uint32_t bg) {
+    Display::the().set_colors_rgb(fg, bg);
+}
+
 void terminal::VGATerminal::clear_screen(uint8_t mode) {
     uint32_t y = vga::the().get_cursor_y();
 
@@ -374,6 +378,14 @@ uint32_t terminal::VGATerminal::get_cursor_x() {
 
 uint32_t terminal::VGATerminal::get_cursor_y() {
     return Display::the().get_cursor_y();
+}
+
+uint16_t terminal::VGATerminal::get_width() {
+    return m_cols;
+}
+
+uint16_t terminal::VGATerminal::get_height() {
+    return m_rows;
 }
 
 void terminal::VGATerminal::respond(const char* data) {

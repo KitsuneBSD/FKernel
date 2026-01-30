@@ -37,6 +37,9 @@ class DisplayFramebuffer : public Display {
 
   Color current_fg = Color::LightGray;
   Color current_bg = Color::Black;
+  uint32_t current_fg_rgb = 0xAAAAAA;
+  uint32_t current_bg_rgb = 0x000000;
+  bool use_rgb_color = false;
 
   // Dirty rectangle tracking for efficient updates
   struct DirtyRect {
@@ -93,6 +96,7 @@ public:
   void clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
   void copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) override;
   void set_color(Color fg, Color bg) override;
+  void set_colors_rgb(uint32_t fg, uint32_t bg) override;
   
   void set_cursor_pos(uint32_t x, uint32_t y) override;
   uint32_t get_cursor_x() const override { return cursor_x; }
