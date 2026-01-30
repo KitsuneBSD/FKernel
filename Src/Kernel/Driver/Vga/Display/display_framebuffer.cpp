@@ -751,19 +751,9 @@ void DisplayFramebuffer::free_back_buffer() {
 }
 
 void DisplayFramebuffer::wait_vblank() {
-  // Simple VBlank detection by polling VGA status register
-  // Port 0x3DA: Input Status Register 1
-  // Bit 3: Vertical Retrace (1 = in vertical retrace, 0 = display period)
-  
-  // Wait for start of VBlank
-  while (!(inb(0x3DA) & 0x08)) {
-    // Minimal delay to prevent excessive polling
-  }
-  
-  // Wait for end of VBlank to ensure we're in display period  
-  while (inb(0x3DA) & 0x08) {
-    // Minimal delay to prevent excessive polling
-  }
+  // Skip VSync for immediate keyboard echo responsiveness
+  // VSync causes animation lag that breaks typing experience
+  // Direct rendering is better for interactive use
 }
 
 void DisplayFramebuffer::swap_buffers() {
@@ -771,10 +761,10 @@ void DisplayFramebuffer::swap_buffers() {
     return;
   }
 
-  // Wait for VBlank to prevent tearing
-  wait_vblank();
-
-  // Copy back buffer to front buffer
+  // Skip VSync for immediate response - prioritize keyboard echo over tear-free
+  // Interactive use benefits more from responsiveness than perfect vsync
+  
+  // Copy back buffer to front buffer immediately
   size_t buffer_size = fb_height * fb_pitch;
   memcpy(framebuffer, back_buffer, buffer_size);
 }
@@ -805,14 +795,22 @@ void DisplayFramebuffer::update_dirty_rectangles() {
     return;
   }
 
-  // Copy only the dirty region
-  uint8_t *src = back_buffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
-  uint8_t *dst = framebuffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
-  
-  for (uint32_t y = 0; y < m_dirty_rect.height; ++y) {
-    memcpy(dst, src, m_dirty_rect.width * (fb_bpp / 8));
-    src += fb_pitch;
-    dst += fb_pitch;
+  // For keyboard echo, use fast full buffer copy to avoid complexity
+  // Single character updates benefit more from simplicity than optimization
+  if (m_dirty_rect.width < 100 && m_dirty_rect.height < 100) {
+    // Small area (typing) - do immediate full swap for simplicity
+    size_t buffer_size = fb_height * fb_pitch;
+    memcpy(framebuffer, back_buffer, buffer_size);
+  } else {
+    // Large area - use dirty rectangle optimization
+    uint8_t *src = back_buffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
+    uint8_t *dst = framebuffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
+    
+    for (uint32_t y = 0; y < m_dirty_rect.height; ++y) {
+      memcpy(dst, src, m_dirty_rect.width * (fb_bpp / 8));
+      src += fb_pitch;
+      dst += fb_pitch;
+    }
   }
 
   m_dirty_rect.dirty = false;
@@ -823,11 +821,16 @@ uint8_t* DisplayFramebuffer::get_render_buffer() {
 }
 
 void DisplayFramebuffer::flush() {
-  if (double_buffering_enabled && back_buffer) {
-    // Always do full buffer swap to ensure content appears
-    swap_buffers();
+  if (!double_buffering_enabled || !back_buffer) {
+    return; // Direct rendering - no flush needed
   }
-  // For direct rendering mode, flush is a no-op
+
+  // Immediate flush for keyboard echo, but only when dirty
+  // This maintains responsiveness while reducing unnecessary swaps
+  if (m_dirty_rect.dirty) {
+    swap_buffers();
+    m_dirty_rect.dirty = false;
+  }
 }
 
 void DisplayFramebuffer::next_frame() {
