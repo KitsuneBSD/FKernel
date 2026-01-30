@@ -9,9 +9,13 @@
 #include <LibFK/Synchronization/spinlock.h>
 #include <Kernel/Hardware/Cpu/cpu_context.h>
 #include <Kernel/Scheduler/Task/task_state.h>
+#include <Kernel/Posix/signal_defs.h>
+#include <Kernel/Memory/VirtualMemory/memory_region.h>
+#include <LibFK/Container/vector.h>
 
 namespace fkernel::ipc {
     class CSpace;
+    class Notification;
 }
 
 /**
@@ -33,6 +37,7 @@ struct TaskMemory {
         uintptr_t heap_break{0};
         uintptr_t mmap_start{0};
         uintptr_t mmap_end{0};
+        fk::containers::Vector<::fkernel::MemoryRegion> list;
     } regions{};
 };
 
@@ -50,10 +55,12 @@ struct TaskFiles {
 struct TaskIpc {
     ::fkernel::ipc::CSpace *cspace{nullptr};
     struct {
-        uint64_t mask{0};
-        uint64_t pending{0};
+        uint32_t pending{0};
+        uint32_t blocked{0};
+        sigaction actions[NSIG];
         uintptr_t trampoline{0};
     } signals{};
+    ::fkernel::ipc::Notification *signal_notification{nullptr};
 };
 
 /**
@@ -145,6 +152,7 @@ struct Task {
     const TaskIpc& ipc() const { return resources.ipc; }
 
     bool is_a_kernel_task() const { return control.lifecycle.is_a_kernel_task; }
+    bool has_pending_signals() const { return (resources.ipc.signals.pending & ~resources.ipc.signals.blocked) != 0; }
 
     int add_file_descriptor(fk::RefPtr<FileDescription> description);
     int dup_file_descriptor(int old_fd, bool cloexec = false, int min_fd = 0);

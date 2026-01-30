@@ -45,6 +45,12 @@ public:
   /// Clear the display
   virtual void clear() = 0;
 
+  /// Clear a specific rectangle on the screen
+  virtual void clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) = 0;
+
+  /// Copy a rectangle of pixels from one location to another (for scrolling)
+  virtual void copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) = 0;
+
   /// Set foreground and background colors
   virtual void set_color(Color fg, Color bg) = 0;
 
@@ -122,6 +128,8 @@ public:
   void write_ansi(const char *str) override;
   void write_ansi_n(const char *str, size_t size) override;
   void clear() override;
+  void clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
+  void copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint32_t dst_y, uint32_t width, uint32_t height) override;
   void set_color(Color fg, Color bg) override;
   
   void set_cursor_pos(uint32_t x, uint32_t y) override;

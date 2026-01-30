@@ -1,6 +1,7 @@
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Scheduler/scheduler.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -270,4 +271,116 @@ void VirtualMemoryManager::switch_address_space(uintptr_t cr3) {
   m_pml4_phys = cr3;
   m_pml4 = reinterpret_cast<PageTable *>(cr3);
   write_on_cr3(reinterpret_cast<void *>(cr3));
+}
+
+uint64_t* VirtualMemoryManager::get_pte(uintptr_t virt, bool create) {
+    size_t pml4_idx = (virt >> 39) & 0x1FF;
+    size_t pdpt_idx = (virt >> 30) & 0x1FF;
+    size_t pd_idx = (virt >> 21) & 0x1FF;
+    size_t pt_idx = (virt >> 12) & 0x1FF;
+
+    if (!(m_pml4->entries[pml4_idx] & static_cast<uint64_t>(PageFlags::Present))) {
+        if (!create) return nullptr;
+        return nullptr;
+    }
+    
+    PageTable *pdpt = reinterpret_cast<PageTable *>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
+    if (!(pdpt->entries[pdpt_idx] & static_cast<uint64_t>(PageFlags::Present))) return nullptr;
+
+    PageTable *pd = reinterpret_cast<PageTable *>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
+    if (!(pd->entries[pd_idx] & static_cast<uint64_t>(PageFlags::Present))) return nullptr;
+
+    PageTable *pt = reinterpret_cast<PageTable *>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
+    return &pt->entries[pt_idx];
+}
+
+void VirtualMemoryManager::unmap_page_range(uintptr_t start, uintptr_t end) {
+    for (uintptr_t addr = start; addr < end; addr += PAGE_SIZE) {
+        uint64_t* pte_ptr = get_pte(addr);
+        
+        if (pte_ptr && (*pte_ptr & static_cast<uint64_t>(PageFlags::Present))) {
+            uint64_t frame = *pte_ptr & 0x000FFFFFFFFFF000;
+            
+            // Check if user page (bit 2)
+            if (*pte_ptr & static_cast<uint64_t>(PageFlags::User)) {
+                PhysicalMemoryManager::the().free_page(frame);
+            }
+
+            *pte_ptr = 0;
+            invlpg(addr);
+        }
+    }
+}
+
+fk::core::Result<int, fk::core::Error> VirtualMemoryManager::munmap(uintptr_t addr, size_t length) {
+    if (addr % PAGE_SIZE != 0 || length == 0) {
+        return fk::core::Error::InvalidParameter;
+    }
+
+    uintptr_t aligned_end = (addr + length + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+
+    // 1. Unmap from page tables
+    unmap_page_range(addr, aligned_end);
+
+    // 2. Update memory regions
+    auto* current_task = SchedulerManager::the().current();
+    if (!current_task) return fk::core::Error::PermissionDenied;
+
+    auto& regions = current_task->resources.memory.regions.list;
+    
+    for (size_t i = 0; i < regions.size(); ) {
+        auto& region = regions[i];
+        uintptr_t r_start = region.start;
+        uintptr_t r_end = region.end;
+
+        // Case 1: Fully outside
+        if (r_end <= addr || r_start >= aligned_end) {
+            i++;
+            continue;
+        }
+
+        // Case 2: Fully inside -> Remove
+        if (r_start >= addr && r_end <= aligned_end) {
+            // Manual erase: shift left
+            for (size_t j = i; j < regions.size() - 1; ++j) {
+                regions[j] = fk::types::move(regions[j + 1]);
+            }
+            regions.pop_back();
+            continue; // Don't increment i
+        }
+
+        // Case 3: Cut head -> Shrink end
+        if (r_start < addr && r_end <= aligned_end && r_end > addr) {
+            region.end = addr;
+            i++;
+            continue;
+        }
+
+        // Case 4: Cut tail -> Shrink start
+        if (r_start >= addr && r_start < aligned_end && r_end > aligned_end) {
+            region.start = aligned_end;
+            i++;
+            continue;
+        }
+
+        // Case 5: Split
+        if (r_start < addr && r_end > aligned_end) {
+            ::fkernel::MemoryRegion right_part = region;
+            right_part.start = aligned_end;
+            region.end = addr;
+            
+            // Manual insert: push back and then shift
+            regions.push_back(fk::types::move(right_part));
+            // The split region i is already correct (pre-split part).
+            // The new region is at the end, which is fine for simple accounting.
+            i++;
+            continue; 
+        }
+        
+        i++;
+    }
+
+    return 0;
 }

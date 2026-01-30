@@ -8,6 +8,7 @@
 #include <Kernel/Fs/RamDisk/ram_disk.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Fs/DevFs/dev_fs.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Loader/elf_loader.h>
@@ -26,7 +27,33 @@ extern "C" void enter_user_mode(uintptr_t rip, uintptr_t rsp);
 
 extern "C" uint64_t syscall_kernel_stack;
 
+extern "C" void init_task_entry();
+
 extern "C" void idle_task_entry() {
+  static bool s_init_spawned = false;
+  
+  if (APIC::the().get_id() == 0 && !s_init_spawned) {
+      s_init_spawned = true;
+      
+      // Create Init task on CPU 0
+      Task *init = new Task();
+      *init = create_a_new_task(fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
+
+      // Set initial memory regions for demand paging
+      init->resources.memory.regions.heap_start = 0x10000000;
+      init->resources.memory.regions.heap_break = 0x10000000;
+      init->resources.memory.regions.mmap_start = 0x40000000;
+      init->resources.memory.regions.mmap_end = 0x40000000;
+
+      // Migrate logs
+      fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
+                                      fk::algorithms::LogTarget::DebugFS);
+
+      SchedulerManager::the().add_task(init);
+      // Note: m_next_pid handling should be updated in initialize if needed, 
+      // but since we hardcoded PID 1 here, we just need to ensure next generated PID is 2.
+  }
+
   while (true) {
     asm volatile("hlt");
   }
@@ -56,6 +83,23 @@ extern "C" void init_task_entry() {
 
   auto ramdisk = ramdisk_res.value();
   fkernel::VirtualFileSystem::the().mount("/", ramdisk);
+
+  // Remount DevFs to ensure /dev is populated in the new root
+  auto& devfs = fkernel::DevFs::the();
+  // Ensure /dev exists (if RamDisk didn't create it, we might fail to mount, but usually it exists)
+  // For now, assume /dev exists in initrd or VFS handles it.
+  fkernel::VirtualFileSystem::the().mount("/dev", fk::RefPtr<Node>(&devfs));
+
+  // Populate FDs 0, 1, 2 for Init process
+  auto console_res = fkernel::VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
+  if (console_res.is_ok()) {
+    auto* current = SchedulerManager::the().current();
+    current->add_file_descriptor(console_res.value()); // 0: stdin
+    current->add_file_descriptor(console_res.value()); // 1: stdout
+    current->add_file_descriptor(console_res.value()); // 2: stderr
+  } else {
+    fk::algorithms::kerror("INIT", "Failed to open /dev/tty0 for init process!");
+  }
 
   // Load init process from ELF via VFS to resolve symlinks
   auto init_dentry_res = fkernel::VirtualFileSystem::the().resolve_path("/sbin/init");
@@ -134,35 +178,10 @@ void SchedulerManager::initialize() {
         create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
 
     m_processors[i].idle_task = idle;
-    m_processors[i].current_task = idle;
+    m_processors[i].current_task = nullptr;
   }
 
-  // Create Init task on CPU 0
-  Task *init = new Task();
-  *init = create_a_new_task(fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
-
-  // Set initial memory regions for demand paging
-  init->resources.memory.regions.heap_start = 0x10000000;
-  init->resources.memory.regions.heap_break = 0x10000000;
-  init->resources.memory.regions.mmap_start = 0x40000000;
-  init->resources.memory.regions.mmap_end = 0x40000000;
-
-  // Populate FDs 0, 1, 2.
-  auto console_res = fkernel::VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
-  if (console_res.is_ok()) {
-    init->add_file_descriptor(console_res.value()); // 0
-    init->add_file_descriptor(console_res.value()); // 1
-    init->add_file_descriptor(console_res.value()); // 2
-  }
-
-  init->dump_file_descriptors();
-
-  // Migrate logs
-  fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
-                                  fk::algorithms::LogTarget::DebugFS);
-
-  add_task(init);
-  m_next_pid = 2; // Init is PID 1
+  m_next_pid = 2; // Init will be PID 1 (created by idle), next is 2
 
   fk::algorithms::klog(
       "SCHEDULER MANAGER",
@@ -405,22 +424,32 @@ void SchedulerManager::schedule() {
     Task *prev_task = proc.current_task;
     Task *next_task = pick_next();
 
-    if (prev_task && prev_task != next_task) {
-      fk::algorithms::klog(
-          "SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
-          prev_task->control.identity.name.c_str(), prev_task, (void *)prev_task->resources.context.stack_pointer,
-          next_task->control.identity.name.c_str(), next_task, (void *)next_task->resources.context.stack_pointer);
+    if (next_task && prev_task != next_task) {
+      if (prev_task) {
+          fk::algorithms::klog(
+              "SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
+              prev_task->control.identity.name.c_str(), prev_task, (void *)prev_task->resources.context.stack_pointer,
+              next_task->control.identity.name.c_str(), next_task, (void *)next_task->resources.context.stack_pointer);
+      } else {
+          fk::algorithms::klog(
+              "SCHEDULER", "Switch: (Boot) -> %s (%p, SP=%p)",
+              next_task->control.identity.name.c_str(), next_task, (void *)next_task->resources.context.stack_pointer);
+      }
 
-      if (next_task->resources.memory.cr3 != 0 && next_task->resources.memory.cr3 != prev_task->resources.memory.cr3) {
+      if (prev_task && next_task->resources.memory.cr3 != 0 && next_task->resources.memory.cr3 != prev_task->resources.memory.cr3) {
+        VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
+      } else if (!prev_task && next_task->resources.memory.cr3 != 0) {
         VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
       }
 
-      prev_task->resources.context.user_rsp = g_cpu_block.user_rsp;
-      prev_task->resources.context.saved_rip = g_cpu_block.saved_rip;
-      prev_task->resources.context.saved_rflags = g_cpu_block.saved_rflags;
+      if (prev_task) {
+        prev_task->resources.context.user_rsp = g_cpu_block.user_rsp;
+        prev_task->resources.context.saved_rip = g_cpu_block.saved_rip;
+        prev_task->resources.context.saved_rflags = g_cpu_block.saved_rflags;
 
-      prev_task->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
-      prev_task->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
+        prev_task->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
+        prev_task->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
+      }
 
       g_cpu_block.kernel_stack = next_task->resources.context.kernel_stack_top;
       g_cpu_block.user_rsp = next_task->resources.context.user_rsp;
@@ -431,7 +460,13 @@ void SchedulerManager::schedule() {
       CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->resources.context.gs_base);
 
       GDTController::the().set_kernel_stack(next_task->resources.context.kernel_stack_top);
-      switch_context(&prev_task->resources.context.stack_pointer, next_task->resources.context.stack_pointer);
+      
+      if (prev_task) {
+          switch_context(&prev_task->resources.context.stack_pointer, next_task->resources.context.stack_pointer);
+      } else {
+          uint64_t dummy_stack_ptr;
+          switch_context(&dummy_stack_ptr, next_task->resources.context.stack_pointer);
+      }
     }
   }
 

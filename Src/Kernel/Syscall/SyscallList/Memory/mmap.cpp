@@ -33,4 +33,12 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t prot, u
     return target_addr;
 }
 
+uint64_t sys_munmap(uint64_t addr, uint64_t length, [[maybe_unused]] uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*) {
+    auto result = VirtualMemoryManager::the().munmap(addr, length);
+    if (result.is_error()) {
+        return fkernel::return_error(result.error());
+    }
+    return 0;
+}
+
 }

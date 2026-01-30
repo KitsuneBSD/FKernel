@@ -286,10 +286,30 @@ void terminal::VGATerminal::set_colors(uint8_t fg, uint8_t bg) {
 }
 
 void terminal::VGATerminal::clear_screen(uint8_t mode) {
-    if (mode == 2) {
-        vga::the().clear();
+    uint32_t y = vga::the().get_cursor_y();
+
+    switch (mode) {
+        case 0: // Clear from cursor to end of screen
+            clear_line(0); // Clear rest of current line
+            if (y + 1 < m_rows) {
+                Display::the().clear_rect(0, (y + 1) * Display::the().get_height() / m_rows, 
+                                         Display::the().get_width(), 
+                                         Display::the().get_height() - (y + 1) * Display::the().get_height() / m_rows);
+            }
+            break;
+        case 1: // Clear from beginning of screen to cursor
+            if (y > 0) {
+                Display::the().clear_rect(0, 0, Display::the().get_width(), 
+                                         y * Display::the().get_height() / m_rows);
+            }
+            clear_line(1); // Clear beginning of current line
+            break;
+        case 2: // Clear entire screen
+        case 3: // Clear entire screen including scrollback
+            vga::the().clear();
+            vga::the().set_cursor_pos(0, 0);
+            break;
     }
-    // Mode 0 and 1 (start/end) can be implemented if needed
 }
 
 void terminal::VGATerminal::clear_line(uint8_t mode) {
@@ -353,71 +373,83 @@ uint32_t terminal::VGATerminal::get_cursor_y() {
 
 // Additional methods for vi compatibility
 void terminal::VGATerminal::insert_chars(uint16_t count) {
-    uint32_t x = Display::the().get_cursor_x();
-    uint32_t y = Display::the().get_cursor_y();
-    
-    // For now, just move cursor right by count (simplified implementation)
-    // Full implementation would require shifting existing characters
-    Display::the().set_cursor_pos(x + count, y);
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    uint32_t char_w = Display::the().get_width() / m_cols;
+    uint32_t char_h = Display::the().get_height() / m_rows;
+
+    if (x + count < m_cols) {
+        Display::the().copy_rect(x * char_w, y * char_h, 
+                                (x + count) * char_w, y * char_h, 
+                                (m_cols - x - count) * char_w, char_h);
+    }
+    Display::the().clear_rect(x * char_w, y * char_h, count * char_w, char_h);
 }
 
 void terminal::VGATerminal::delete_chars(uint16_t count) {
-    uint32_t x = Display::the().get_cursor_x();
-    uint32_t y = Display::the().get_cursor_y();
-    
-    // For now, just overwrite with spaces (simplified implementation)
-    // Full implementation would require shifting remaining characters
-    for (uint16_t i = 0; i < count && (x + i) < m_cols; i++) {
-        Display::the().set_cursor_pos(x + i, y);
-        Display::the().put_char(' ');
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    uint32_t char_w = Display::the().get_width() / m_cols;
+    uint32_t char_h = Display::the().get_height() / m_rows;
+
+    if (x + count < m_cols) {
+        Display::the().copy_rect((x + count) * char_w, y * char_h, 
+                                x * char_w, y * char_h, 
+                                (m_cols - x - count) * char_w, char_h);
+        Display::the().clear_rect((m_cols - count) * char_w, y * char_h, count * char_w, char_h);
+    } else {
+        Display::the().clear_rect(x * char_w, y * char_h, (m_cols - x) * char_w, char_h);
     }
-    
-    // Restore cursor position
-    Display::the().set_cursor_pos(x, y);
 }
 
 void terminal::VGATerminal::insert_lines(uint16_t count) {
-    // For now, just move cursor down by count (simplified implementation)
-    // Full implementation would require shifting lines down
-    uint32_t x = Display::the().get_cursor_x();
-    uint32_t y = Display::the().get_cursor_y();
-    Display::the().set_cursor_pos(x, y + count);
+    uint32_t y = vga::the().get_cursor_y();
+    uint32_t char_h = Display::the().get_height() / m_rows;
+
+    if (y + count < m_rows) {
+        Display::the().copy_rect(0, y * char_h, 
+                                0, (y + count) * char_h, 
+                                Display::the().get_width(), (m_rows - y - count) * char_h);
+    }
+    Display::the().clear_rect(0, y * char_h, Display::the().get_width(), count * char_h);
 }
 
 void terminal::VGATerminal::delete_lines(uint16_t count) {
-    // For now, just clear current lines (simplified implementation)
-    // Full implementation would require shifting lines up
-    uint32_t x = Display::the().get_cursor_x();
-    uint32_t y = Display::the().get_cursor_y();
-    
-    for (uint16_t i = 0; i < count && (y + i) < m_rows; i++) {
-        Display::the().set_cursor_pos(0, y + i);
-        for (uint32_t j = 0; j < m_cols; j++) {
-            Display::the().put_char(' ');
-        }
+    uint32_t y = vga::the().get_cursor_y();
+    uint32_t char_h = Display::the().get_height() / m_rows;
+
+    if (y + count < m_rows) {
+        Display::the().copy_rect(0, (y + count) * char_h, 
+                                0, y * char_h, 
+                                Display::the().get_width(), (m_rows - y - count) * char_h);
+        Display::the().clear_rect(0, (m_rows - count) * char_h, Display::the().get_width(), count * char_h);
+    } else {
+        Display::the().clear_rect(0, y * char_h, Display::the().get_width(), (m_rows - y) * char_h);
     }
-    
-    // Restore cursor position
-    Display::the().set_cursor_pos(x, y);
 }
 
 void terminal::VGATerminal::scroll_up(uint16_t count) {
-    // For now, just move cursor up by count (simplified implementation)
-    // Full implementation would require scrolling the content
-    uint32_t x = Display::the().get_cursor_x();
-    uint32_t y = Display::the().get_cursor_y();
-    
-    if (y >= count) {
-        Display::the().set_cursor_pos(x, y - count);
+    uint32_t char_h = Display::the().get_height() / m_rows;
+    if (count < m_rows) {
+        Display::the().copy_rect(0, count * char_h, 
+                                0, 0, 
+                                Display::the().get_width(), (m_rows - count) * char_h);
+        Display::the().clear_rect(0, (m_rows - count) * char_h, Display::the().get_width(), count * char_h);
+    } else {
+        vga::the().clear();
     }
 }
 
 void terminal::VGATerminal::scroll_down(uint16_t count) {
-    // For now, just move cursor down by count (simplified implementation)
-    // Full implementation would require scrolling the content
-    uint32_t x = Display::the().get_cursor_x();
-    uint32_t y = Display::the().get_cursor_y();
-    Display::the().set_cursor_pos(x, y + count);
+    uint32_t char_h = Display::the().get_height() / m_rows;
+    if (count < m_rows) {
+        Display::the().copy_rect(0, 0, 
+                                0, count * char_h, 
+                                Display::the().get_width(), (m_rows - count) * char_h);
+        Display::the().clear_rect(0, 0, Display::the().get_width(), count * char_h);
+    } else {
+        vga::the().clear();
+    }
 }
 
 } // namespace terminal

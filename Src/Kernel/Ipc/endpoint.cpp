@@ -1,6 +1,7 @@
 #include <Kernel/Ipc/endpoint.h>
 #include <Kernel/Ipc/ipc_log_node.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <LibFK/Algorithms/log.h>
 
 namespace fkernel {
 namespace ipc {
@@ -9,6 +10,8 @@ void Endpoint::deliver_message(Task &sender, Task &receiver, MessageInfo info) {
   uint32_t sender_id = sender.control.identity.id.value();
   uint32_t receiver_id = receiver.control.identity.id.value();
   
+  fk::algorithms::klog("IPC", "Delivering message from Task %u to %u (Info: 0x%lx)", 
+                       sender_id, receiver_id, info.raw());
   IpcLogNode::the()->log_endpoint_operation("deliver_message", sender_id, receiver_id, info.raw());
 
   // 1. Copy Short Message (Registers)
@@ -35,6 +38,7 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info) {
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
     if (m_receivers.empty()) {
+      fk::algorithms::klog("IPC", "Task %u blocked on send", sender_id);
       IpcLogNode::the()->log_endpoint_operation("send_blocked", sender_id, 0, info.raw());
       m_senders.push_back(current);
       scheduler.block_current();
@@ -45,6 +49,7 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info) {
     m_receivers.remove(receiver);
     uint32_t receiver_id = receiver->control.identity.id.value();
 
+    fk::algorithms::klog("IPC", "Task %u sent immediate message to %u", sender_id, receiver_id);
     IpcLogNode::the()->log_endpoint_operation("send_immediate", sender_id, receiver_id, info.raw());
     deliver_message(*current, *receiver, info);
     scheduler.wake_task(receiver);
@@ -61,6 +66,7 @@ fk::core::Result<MessageInfo> Endpoint::receive() {
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
     if (m_senders.empty()) {
+      fk::algorithms::klog("IPC", "Task %u blocked on receive", receiver_id);
       IpcLogNode::the()->log_endpoint_operation("receive_blocked", receiver_id, 0, 0);
       m_receivers.push_back(current);
       scheduler.block_current();
@@ -72,6 +78,7 @@ fk::core::Result<MessageInfo> Endpoint::receive() {
     uint32_t sender_id = sender->control.identity.id.value();
 
     MessageInfo info(sender->registers().rax); // Assuming info was in rax
+    fk::algorithms::klog("IPC", "Task %u received immediate message from %u", receiver_id, sender_id);
     IpcLogNode::the()->log_endpoint_operation("receive_immediate", receiver_id, sender_id, info.raw());
     deliver_message(*sender, *current, info);
 

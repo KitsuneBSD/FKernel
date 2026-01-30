@@ -53,3 +53,10 @@ struct [[gnu::packed]] bsd_dirent {
 #define DT_LNK 10
 #define DT_SOCK 12
 #define DT_WHT 14
+
+static constexpr short POLLIN = 0x001;
+static constexpr short POLLPRI = 0x002;
+static constexpr short POLLOUT = 0x004;
+static constexpr short POLLERR = 0x008;
+static constexpr short POLLHUP = 0x010;
+static constexpr short POLLNVAL = 0x020;

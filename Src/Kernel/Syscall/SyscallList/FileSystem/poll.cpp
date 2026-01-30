@@ -12,11 +12,6 @@ struct pollfd {
     short revents;
 };
 
-// Poll events mapping to kqueue filters
-constexpr short POLLIN = 0x001;
-constexpr short POLLOUT = 0x004;
-constexpr short POLLNVAL = 0x020;
-
 extern "C" {
 uint64_t sys_poll(uint64_t fds_ptr, uint64_t nfds_u64, [[maybe_unused]] uint64_t timeout_ms,
                   uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {

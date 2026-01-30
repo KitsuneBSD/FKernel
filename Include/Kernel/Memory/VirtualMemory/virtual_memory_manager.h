@@ -78,4 +78,13 @@ public:
 
   /** @brief Switches the current CPU address space by updating CR3. */
   void switch_address_space(uintptr_t cr3);
+
+  /** @brief Unmaps a region of virtual memory. */
+  fk::core::Result<int, fk::core::Error> munmap(uintptr_t addr, size_t length);
+
+  /** @brief Gets the PTE for a virtual address. */
+  uint64_t* get_pte(uintptr_t virt, bool create = false);
+
+private:
+  void unmap_page_range(uintptr_t start, uintptr_t end);
 };
