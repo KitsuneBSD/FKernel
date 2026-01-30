@@ -23,15 +23,15 @@ private:
 public:
     explicit ElfLoaderCore(fk::RefPtr<Node> node);
     
-    fk::core::Result<uintptr_t, fk::core::Error> execute_load();
+    ElfLoadOperationResult execute_load();
     
-    fk::core::Result<uintptr_t, fk::core::Error> execute_load_with_base(uintptr_t load_base);
+    ElfLoadOperationResult execute_load_with_base(uintptr_t load_base);
     
 private:
     fk::core::Result<void, fk::core::Error> parse_and_validate();
     fk::core::Result<void, fk::core::Error> handle_interpreter();
     fk::core::Result<void, fk::core::Error> load_segments();
-    fk::core::Result<uintptr_t, fk::core::Error> calculate_entry_point();
+    ElfLoadOperationResult calculate_entry_point();
     
     fk::containers::Vector<elf_domains::MemoryRegion> 
     extract_memory_regions(const fk::containers::Vector<Elf64_Phdr>& headers);

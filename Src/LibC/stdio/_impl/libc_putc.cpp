@@ -7,7 +7,10 @@
 #include <LibFK/Memory/heap_malloc.h>
 #include <LibFK/Algorithms/log.h>
 
+#include <LibFK/Synchronization/spinlock.h>
+
 static uint32_t g_log_targets = fk::algorithms::LogTarget::Display | fk::algorithms::LogTarget::DebugFS | fk::algorithms::LogTarget::Serial;
+static fk::synchronization::Spinlock g_log_lock;
 
 void fk::algorithms::set_log_targets(uint32_t targets) {
     g_log_targets = targets;
@@ -19,6 +22,7 @@ uint32_t fk::algorithms::get_log_targets() {
 
 extern "C" void libc_puts(char *c) {
   ASSERT(c != NULL);
+  fk::synchronization::ScopedLockIRQ lock(g_log_lock);
 
   if (g_log_targets & fk::algorithms::LogTarget::Serial) {
     serial::write(c);

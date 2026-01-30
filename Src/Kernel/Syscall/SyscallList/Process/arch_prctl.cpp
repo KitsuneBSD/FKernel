@@ -24,11 +24,11 @@ extern "C" uint64_t sys_arch_prctl(uint64_t code, uint64_t addr, uint64_t,
 
   case 0x1002: // ARCH_SET_FS
     if (task)
-      task->fs_base = addr;
+      task->resources.context.fs_base = addr;
     CPU::the().write_msr(MSR_FS_BASE, addr);
     return 0;
     case 0x1001: // ARCH_SET_GS
-      if (task) task->gs_base = addr;
+      if (task) task->resources.context.gs_base = addr;
       CPU::the().write_msr(MSR_KERNEL_GS_BASE, addr);
       return 0;
     case 0x1003: // ARCH_GET_FS

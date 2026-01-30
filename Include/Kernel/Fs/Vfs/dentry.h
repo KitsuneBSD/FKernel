@@ -6,6 +6,8 @@
 #include <LibFK/Memory/ref_ptr.h>
 #include <LibFK/Text/string.h>
 
+#include <LibFK/Synchronization/spinlock.h>
+
 namespace fkernel {
 
 class Dentry : public fk::memory::RefCounted<Dentry> {
@@ -31,6 +33,7 @@ public:
     Dentry(fk::text::String name, fk::RefPtr<Dentry> parent);
 
 private:
+    mutable fk::synchronization::Spinlock m_lock;
     fk::text::String m_name;
     fk::RefPtr<Dentry> m_parent;
     fk::containers::Vector<fk::RefPtr<Node>> m_nodes;

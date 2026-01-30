@@ -83,6 +83,7 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
                                     PageFlags flags) {
   assert((virt % PAGE_SIZE) == 0);
   assert((phys % PAGE_SIZE) == 0);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   size_t pml4_idx = (virt >> 39) & 0x1FF;
   size_t pdpt_idx = (virt >> 30) & 0x1FF;
@@ -153,24 +154,11 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
   pt->entries[pt_idx] = phys | static_cast<uint64_t>(flags) |
                         static_cast<uint64_t>(PageFlags::Present);
 
-  //   fk::algorithms::kdebug("VMM", "Mapped %p -> %p (flags: 0x%lx)",
-  //   (void*)virt, (void*)phys, (uint64_t)flags);
-
   if (changed_parents) {
     flush_tlb();
   } else {
     invlpg(virt);
   }
-
-  /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::kdebug(
-      "VIRTUAL MEMORY MANAGER",
-      "Map page: virt=%p phys=%p flags=%lx",
-      virt,
-      phys,
-      static_cast<uint64_t>(flags)
-  );
-  */
 }
 
 uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
@@ -182,8 +170,6 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
   size_t pt_idx = (virt >> 12) & 0x1FF;
 
   if (!(m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::Present)) {
-    // fk::algorithms::kwarn("VIRTUAL MEMORY MANAGER", "Translate fail: no
-    // PML4");
     return 0;
   }
 
@@ -191,8 +177,6 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
                                                   0x000FFFFFFFFFF000);
 
   if (!(pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present)) {
-    // fk::algorithms::kwarn("VIRTUAL MEMORY MANAGER", "Translate fail: no
-    // PDPT");
     return 0;
   }
 
@@ -200,7 +184,6 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
                                                 0x000FFFFFFFFFF000);
 
   if (!(pd->entries[pd_idx] & (uint64_t)PageFlags::Present)) {
-    // fk::algorithms::kwarn("VIRTUAL MEMORY MANAGER", "Translate fail: no PD");
     return 0;
   }
 
@@ -208,67 +191,29 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
       reinterpret_cast<PageTable *>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
 
   if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present)) {
-    // fk::algorithms::kwarn("VIRTUAL MEMORY MANAGER", "Translate fail: no PT");
     return 0;
   }
 
-      uintptr_t phys =
+  uintptr_t phys = (pt->entries[pt_idx] & 0x000FFFFFFFFFF000) + (virt & 0xFFF);
+  return phys;
+}
 
-          (pt->entries[pt_idx] & 0x000FFFFFFFFFF000) + (virt & 0xFFF);
+fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flags(uintptr_t virt) {
+  size_t pml4_idx = (virt >> 39) & 0x1FF;
+  size_t pdpt_idx = (virt >> 30) & 0x1FF;
+  size_t pd_idx   = (virt >> 21) & 0x1FF;
+  size_t pt_idx   = (virt >> 12) & 0x1FF;
 
-  /*TODO: Apply this log when we work with LogLevel
+  if (!(m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
+  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
+  if (!(pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
+  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
+  if (!(pd->entries[pd_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
+  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
+  if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
 
-      fk::algorithms::kdebug(
-
-          "VIRTUAL MEMORY MANAGER",
-
-          "Translate: virt=%p -> phys=%p",
-
-          virt,
-
-          phys
-
-      );
-
-  */
-
-      return phys;
-
-  }
-
-  
-
-  fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flags(uintptr_t virt) {
-
-      size_t pml4_idx = (virt >> 39) & 0x1FF;
-
-      size_t pdpt_idx = (virt >> 30) & 0x1FF;
-
-      size_t pd_idx   = (virt >> 21) & 0x1FF;
-
-      size_t pt_idx   = (virt >> 12) & 0x1FF;
-
-  
-
-      if (!(m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
-
-      PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
-
-      if (!(pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
-
-      PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
-
-      if (!(pd->entries[pd_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
-
-      PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
-
-      if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present)) return fk::core::Error::NotFound;
-
-  
-
-      return static_cast<PageFlags>(pt->entries[pt_idx] & ~0x000FFFFFFFFFF000ULL);
-
-  }
+  return static_cast<PageFlags>(pt->entries[pt_idx] & ~0x000FFFFFFFFFF000ULL);
+}
 
 uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
   uintptr_t new_phys = PhysicalMemoryManager::the().alloc_page();
@@ -310,13 +255,12 @@ uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
 }
 
 uintptr_t VirtualMemoryManager::create_address_space() {
-  // Create a new address space by cloning the current one but WITHOUT user
-  // pages. This keeps the kernel mappings.
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
   return clone_table_recursive(m_pml4_phys, 4, false);
 }
 
 uintptr_t VirtualMemoryManager::clone_address_space(uintptr_t source_cr3) {
-  // Deep copy for fork()
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
   return clone_table_recursive(source_cr3, 4, true);
 }
 

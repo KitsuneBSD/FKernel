@@ -35,45 +35,45 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
     return fkernel::return_error(fk::core::Error::OutOfMemory);
 
   // 2. Clone metadata
-  child->identity.id = SchedulerManager::the().generate_pid();
-  child->identity.ppid = parent->identity.id;
-  child->identity.name = parent->identity.name;
-  child->state = TaskState::Ready;
-  child->priority = parent->priority;
-  child->cpu_affinity = parent->cpu_affinity;
-  child->is_a_kernel_task = parent->is_a_kernel_task;
-  child->files.cwd = parent->files.cwd;
-  child->clear_child_tid = 0;
+  child->control.identity.id = SchedulerManager::the().generate_pid();
+  child->control.identity.ppid = parent->control.identity.id;
+  child->control.identity.name = parent->control.identity.name;
+  child->control.lifecycle.state = TaskState::Ready;
+  child->control.lifecycle.priority = parent->control.lifecycle.priority;
+  child->control.lifecycle.cpu_affinity = parent->control.lifecycle.cpu_affinity;
+  child->control.lifecycle.is_a_kernel_task = parent->control.lifecycle.is_a_kernel_task;
+  child->resources.files.cwd = parent->resources.files.cwd;
+  child->control.lifecycle.clear_child_tid = 0;
 
   // 2.5 Initialize IPC CSpace for child
-  child->ipc.cspace = new fkernel::ipc::CSpace();
+  child->resources.ipc.cspace = new fkernel::ipc::CSpace();
   auto *signal_notification = new fkernel::ipc::Notification();
-  child->ipc.cspace->install(fkernel::ipc::Capability(
+  child->resources.ipc.cspace->install(fkernel::ipc::Capability(
       signal_notification, fkernel::ipc::CapabilityType::Notification));
   fkernel::ipc::GlobalEndpointManager::the().register_notification(
-      child->identity.id.value(), signal_notification);
+      child->control.identity.id.value(), signal_notification);
 
-  child->time_slice_ticks = 5;
-  child->wake_up_time_ticks = 0;
-  child->ipc.signals.mask = parent->ipc.signals.mask;
+  child->control.lifecycle.time_slice_ticks = 5;
+  child->control.lifecycle.wake_up_time_ticks = 0;
+  child->resources.ipc.signals.mask = parent->resources.ipc.signals.mask;
 
-  child->memory.regions.heap_start = parent->memory.regions.heap_start;
-  child->memory.regions.heap_break = parent->memory.regions.heap_break;
-  child->memory.regions.mmap_start = parent->memory.regions.mmap_start;
-  child->memory.regions.mmap_end = parent->memory.regions.mmap_end;
+  child->resources.memory.regions.heap_start = parent->resources.memory.regions.heap_start;
+  child->resources.memory.regions.heap_break = parent->resources.memory.regions.heap_break;
+  child->resources.memory.regions.mmap_start = parent->resources.memory.regions.mmap_start;
+  child->resources.memory.regions.mmap_end = parent->resources.memory.regions.mmap_end;
 
   // 2.5. Inherit syscall return state
-  child->user_rsp = regs->rsp;
-  child->saved_rip = regs->rip;
-  child->saved_rflags = regs->rflags;
+  child->resources.context.user_rsp = regs->rsp;
+  child->resources.context.saved_rip = regs->rip;
+  child->resources.context.saved_rflags = regs->rflags;
 
   // Inherit user segment bases
-  child->fs_base = CPU::the().read_msr(MSR_FS_BASE);
-  child->gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
+  child->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
+  child->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
 
   // 3. Clone File Descriptors
-  for (size_t i = 0; i < parent->files.descriptors.size(); ++i) {
-    child->files.descriptors.push_back(parent->files.descriptors[i]);
+  for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
+    child->resources.files.descriptors.push_back(parent->resources.files.descriptors[i]);
   }
   child->dump_file_descriptors();
 
@@ -84,37 +84,25 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
       delete child;
       return fkernel::return_error(fk::core::Error::OutOfMemory);
   }
-  child->kernel_stack_top =
+  child->resources.context.kernel_stack_top =
       reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
 
   // Clone the WHOLE 16KB kernel stack
   void *parent_stack_bottom =
-      reinterpret_cast<void *>(parent->kernel_stack_top - STACK_SIZE);
+      reinterpret_cast<void *>(parent->resources.context.kernel_stack_top - STACK_SIZE);
   memcpy(child_stack_mem, parent_stack_bottom, STACK_SIZE);
 
   // 5. Setup Address Space
-  child->memory.cr3 = VirtualMemoryManager::the().clone_address_space(parent->memory.cr3);
+  child->resources.memory.cr3 = VirtualMemoryManager::the().clone_address_space(parent->resources.memory.cr3);
 
   // 6. Setup child's context for switch_context
-  // Calculate RSP relative to stack top
   uintptr_t parent_stack_ptr = reinterpret_cast<uintptr_t>(regs);
-  uintptr_t stack_offset = parent->kernel_stack_top - parent_stack_ptr;
-  uintptr_t child_stack_ptr = child->kernel_stack_top - stack_offset;
+  uintptr_t stack_offset = parent->resources.context.kernel_stack_top - parent_stack_ptr;
+  uintptr_t child_stack_ptr = child->resources.context.kernel_stack_top - stack_offset;
 
   PtRegs* child_regs = reinterpret_cast<PtRegs*>(child_stack_ptr);
   child_regs->rax = 0; // Return 0 for child in fork()
 
-  // We need to push callee-saved registers for switch_context
-  // Layout after switch_context (push rbx...r15):
-  // [PtRegs]
-  // [ret_addr (fork_child_trampoline)]
-  // [r15]
-  // [r14]
-  // [r13]
-  // [r12]
-  // [rbp]
-  // [rbx]  <- RSP
-  
   uint64_t* context = reinterpret_cast<uint64_t*>(child_stack_ptr);
   *(--context) = (uint64_t)fork_child_trampoline;
   *(--context) = regs->rbx;
@@ -124,14 +112,14 @@ sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2,
   *(--context) = regs->r14;
   *(--context) = regs->r15;
 
-  child->stack_pointer = reinterpret_cast<uint64_t>(context);
+  child->resources.context.stack_pointer = reinterpret_cast<uint64_t>(context);
 
   // 7. Add to scheduler
   SchedulerManager::the().add_task(child);
 
   fk::algorithms::klog("SYSCALL", "Forked child PID %lu from parent PID %lu",
-                       child->identity.id.value(), parent->identity.id.value());
+                       child->control.identity.id.value(), parent->control.identity.id.value());
 
-  return child->identity.id.value();
+  return child->control.identity.id.value();
 }
 }

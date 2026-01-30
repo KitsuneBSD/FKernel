@@ -22,17 +22,12 @@ uint64_t sys_newfstatat(uint64_t dirfd, uint64_t path_ptr, uint64_t statbuf_ptr,
     if (path[0] == '/') {
         strncpy(absolute_path, path, 511);
     } else {
-        // Handle dirfd (simplified: if AT_FDCWD, use current cwd)
-        // AT_FDCWD is -100 in Linux
         if (static_cast<int>(dirfd) == -100) {
-            snprintf(absolute_path, 512, "%s/%s", current_task->files.cwd.c_str(), path);
+            snprintf(absolute_path, 512, "%s/%s", current_task->resources.files.cwd.c_str(), path);
         } else {
-            // Real implementation would look up dirfd
             snprintf(absolute_path, 512, "/%s", path); 
         }
     }
-
-    fk::algorithms::klog("SYSCALL", "sys_newfstatat: dirfd=%ld path=%s", (long)dirfd, absolute_path);
 
     auto res = VirtualFileSystem::the().stat(absolute_path, buf);
     if (res.is_error()) return fkernel::return_error(res.error());

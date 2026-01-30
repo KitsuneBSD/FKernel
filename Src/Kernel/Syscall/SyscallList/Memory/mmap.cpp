@@ -24,8 +24,8 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t prot, u
 
     uintptr_t target_addr = addr;
     if (target_addr == 0) {
-        target_addr = task->memory.regions.mmap_end;
-        task->memory.regions.mmap_end += (len + 0xFFF) & ~0xFFFULL;
+        target_addr = task->memory().regions.mmap_end;
+        task->memory().regions.mmap_end += (len + 0xFFF) & ~0xFFFULL;
     }
 
     // No need to map anything here. The PF handler will take care of it.

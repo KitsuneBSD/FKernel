@@ -4,6 +4,7 @@
 #include <LibFK/Types/types.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 #include <Kernel/Scheduler/Task/task.h>
 #include <Kernel/Hardware/Cpu/processor.h>
@@ -12,6 +13,7 @@ class SchedulerManager {
 private:
     SchedulerManager();
 
+    fk::synchronization::Spinlock m_lock;
     fkernel::Processor m_processors[32];
     uint32_t m_processor_count = 1;
 

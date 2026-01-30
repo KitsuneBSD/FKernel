@@ -4,6 +4,8 @@
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_zone.h>
 
+#include <LibFK/Synchronization/spinlock.h>
+
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
@@ -14,6 +16,7 @@
  */
 class PhysicalMemoryManager {
 private:
+  fk::synchronization::Spinlock m_lock;
   PhysicalZone m_zones[MAX_PHYSICAL_ZONES]; ///< Array of available memory zones.
   size_t m_zone_count{0};
 

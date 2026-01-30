@@ -17,11 +17,9 @@ uint64_t sys_dup2(uint64_t oldfd_u64, uint64_t newfd_u64, uint64_t, uint64_t,
 
     if (oldfd == newfd) return newfd;
 
-    // Em nosso sistema, o add_file_descriptor em um índice específico ainda não existe.
-    // Vamos simplificar: se o slot já existe, sobrescrevemos.
     if (newfd < 0 || newfd >= 32) return -static_cast<int>(fk::core::Error::InvalidParameter);
 
-    current->files.descriptors[newfd] = desc;
+    current->resources.files.descriptors[newfd] = desc;
     return newfd;
 }
 }

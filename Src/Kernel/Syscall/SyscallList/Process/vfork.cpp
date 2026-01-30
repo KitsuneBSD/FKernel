@@ -22,36 +22,36 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     auto *parent = SchedulerManager::the().current();
     if (!parent) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
-    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu forking...", parent->identity.id.value());
+    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu forking...", parent->control.identity.id.value());
 
     // 1. Create child task
     Task *child = new Task();
     if (!child) return fkernel::return_error(fk::core::Error::OutOfMemory);
 
     // 2. Clone metadata
-    child->identity.id = SchedulerManager::the().generate_pid();
-    child->identity.ppid = parent->identity.id;
-    child->identity.name = parent->identity.name;
-    child->state = TaskState::Ready;
-    child->priority = parent->priority;
-    child->cpu_affinity = parent->cpu_affinity;
-    child->is_a_kernel_task = parent->is_a_kernel_task;
-    child->files.cwd = parent->files.cwd;
-    child->vfork_parent_id = parent->identity.id; // Mark as vfork child
+    child->control.identity.id = SchedulerManager::the().generate_pid();
+    child->control.identity.ppid = parent->control.identity.id;
+    child->control.identity.name = parent->control.identity.name;
+    child->control.lifecycle.state = TaskState::Ready;
+    child->control.lifecycle.priority = parent->control.lifecycle.priority;
+    child->control.lifecycle.cpu_affinity = parent->control.lifecycle.cpu_affinity;
+    child->control.lifecycle.is_a_kernel_task = parent->control.lifecycle.is_a_kernel_task;
+    child->resources.files.cwd = parent->resources.files.cwd;
+    child->control.lifecycle.vfork_parent_id = parent->control.identity.id; // Mark as vfork child
 
     // 2.5 Initialize IPC CSpace for child
-    child->ipc.cspace = new fkernel::ipc::CSpace();
+    child->resources.ipc.cspace = new fkernel::ipc::CSpace();
     auto *signal_notification = new fkernel::ipc::Notification();
-    child->ipc.cspace->install(fkernel::ipc::Capability(
+    child->resources.ipc.cspace->install(fkernel::ipc::Capability(
         signal_notification, fkernel::ipc::CapabilityType::Notification));
     fkernel::ipc::GlobalEndpointManager::the().register_notification(
-        child->identity.id.value(), signal_notification);
+        child->control.identity.id.value(), signal_notification);
 
-    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu cloned, cspace initialized", child->identity.id.value());
+    fk::algorithms::klog("SYSCALL", "sys_vfork: Task %lu cloned, cspace initialized", child->control.identity.id.value());
 
     // 3. Clone file descriptors
-    for (size_t i = 0; i < parent->files.descriptors.size(); ++i) {
-        child->files.descriptors.push_back(parent->files.descriptors[i]);
+    for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
+        child->resources.files.descriptors.push_back(parent->resources.files.descriptors[i]);
     }
     child->dump_file_descriptors();
 
@@ -62,28 +62,27 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
         delete child;
         return fkernel::return_error(fk::core::Error::OutOfMemory);
     }
-    child->kernel_stack_top = reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
-    memcpy(child_stack_mem, reinterpret_cast<void*>(parent->kernel_stack_top - STACK_SIZE), STACK_SIZE);
+    child->resources.context.kernel_stack_top = reinterpret_cast<uint64_t>(child_stack_mem) + STACK_SIZE;
+    memcpy(child_stack_mem, reinterpret_cast<void*>(parent->resources.context.kernel_stack_top - STACK_SIZE), STACK_SIZE);
 
     // 5. Shared Address Space (vfork semantic)
-    child->memory.cr3 = parent->memory.cr3;
-    child->is_vfork_sharing_address_space = true;
-    child->memory.regions = parent->memory.regions;
+    child->resources.memory.cr3 = parent->resources.memory.cr3;
+    child->control.lifecycle.is_vfork_sharing_address_space = true;
+    child->resources.memory.regions = parent->resources.memory.regions;
 
     // 6. Setup context
-    child->user_rsp = regs->rsp;
-    child->saved_rip = regs->rip;
-    child->saved_rflags = regs->rflags;
+    child->resources.context.user_rsp = regs->rsp;
+    child->resources.context.saved_rip = regs->rip;
+    child->resources.context.saved_rflags = regs->rflags;
 
     // Inherit user segment bases
-    // FS is active, GS user is in KERNEL_GS_BASE while we are in kernel
-    child->fs_base = CPU::the().read_msr(MSR_FS_BASE);
-    child->gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
+    child->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
+    child->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
 
     // Calculate RSP relative to stack top
     uintptr_t parent_stack_ptr = reinterpret_cast<uintptr_t>(regs);
-    uintptr_t stack_offset = parent->kernel_stack_top - parent_stack_ptr;
-    uintptr_t child_stack_ptr = child->kernel_stack_top - stack_offset;
+    uintptr_t stack_offset = parent->resources.context.kernel_stack_top - parent_stack_ptr;
+    uintptr_t child_stack_ptr = child->resources.context.kernel_stack_top - stack_offset;
 
     PtRegs* child_regs = reinterpret_cast<PtRegs*>(child_stack_ptr);
     child_regs->rax = 0; // Return 0 for child
@@ -97,16 +96,16 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     *(--context) = regs->r14;
     *(--context) = regs->r15;
 
-    child->stack_pointer = reinterpret_cast<uint64_t>(context);
+    child->resources.context.stack_pointer = reinterpret_cast<uint64_t>(context);
 
     // 7. Add child to scheduler and BLOCK parent
     SchedulerManager::the().add_task(child);
     
     fk::algorithms::klog("SYSCALL", "sys_vfork: Blocking parent %lu until child %lu execs/exits", 
-                         parent->identity.id.value(), child->identity.id.value());
-    parent->vfork_waiting = true;
+                         parent->control.identity.id.value(), child->control.identity.id.value());
+    parent->control.lifecycle.vfork_waiting = true;
     SchedulerManager::the().block_current();
     SchedulerManager::the().schedule();
 
-    return child->identity.id.value();
+    return child->control.identity.id.value();
 }

@@ -11,11 +11,11 @@ namespace fkernel {
 namespace ipc {
 
 void SignalDelivery::handle_pending_signals(Task *task) {
-  if (!task || task->is_a_kernel_task || !task->ipc.cspace)
+  if (!task || task->control.lifecycle.is_a_kernel_task || !task->resources.ipc.cspace)
     return;
 
   // Signal Notification is at handle 0 by convention
-  Capability cap = task->ipc.cspace->get(0);
+  Capability cap = task->resources.ipc.cspace->get(0);
   if (cap.type() != CapabilityType::Notification)
     return;
 
@@ -34,29 +34,30 @@ void SignalDelivery::handle_pending_signals(Task *task) {
     }
   }
 
-  if (sig == 0 || task->ipc.signals.trampoline == 0)
+  if (sig == 0 || task->resources.ipc.signals.trampoline == 0)
     return;
 
   // Save context on user stack and redirect to trampoline
-  // 1. Point to user stack
-  uint64_t *user_stack = reinterpret_cast<uint64_t *>(task->context.rsp);
+  uint64_t *user_stack = reinterpret_cast<uint64_t *>(task->resources.context.user_rsp);
 
   // 2. Push current context (Simplified: just RIP and RFLAGS for now)
-  // In a real kernel, we would push the whole SigContext
-  *(--user_stack) = task->context.rip;
-  *(--user_stack) = task->context.rflags;
+  *(--user_stack) = task->resources.context.saved_rip;
+  *(--user_stack) = task->resources.context.saved_rflags;
 
   // 3. Update task context to jump to trampoline
-  task->context.rsp = reinterpret_cast<uint64_t>(user_stack);
-  task->context.rip = task->ipc.signals.trampoline;
-  task->context.rdi = sig; // First argument to trampoline
+  task->resources.context.user_rsp = reinterpret_cast<uint64_t>(user_stack);
+  task->resources.context.saved_rip = task->resources.ipc.signals.trampoline;
+  
+  // Note: We don't have a direct way to set RDI in TaskContext yet, 
+  // but we can update the saved PtRegs if it's currently in a syscall.
+  // This is a bit tricky since we don't always have a PtRegs pointer here.
+  // For now, signals are only delivered on syscall return, so we can 
+  // rely on the g_cpu_block update.
 
   // 4. If this is the current task, we MUST also update g_cpu_block (accessed via gs)
-  // because syscall_stub_post_dispatch restores from there.
   if (SchedulerManager::the().current() == task) {
-      g_cpu_block.user_rsp = task->context.rsp;
-      g_cpu_block.saved_rip = task->context.rip;
-      // We don't strictly need to update saved_rflags here, but it's safer
+      g_cpu_block.user_rsp = task->resources.context.user_rsp;
+      g_cpu_block.saved_rip = task->resources.context.saved_rip;
   }
 }
 

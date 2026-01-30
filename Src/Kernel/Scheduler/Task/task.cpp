@@ -38,36 +38,36 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
   fkernel::ipc::GlobalEndpointManager::the().register_notification(
       id.value(), signal_notification);
 
-  Task task{
-      .identity = { .id = id, .ppid = fk::ProcessId(), .name = name },
-      .memory = { .cr3 = read_on_cr3(), .regions = {} },
-      .files = { .cwd = "/", .descriptors = {} },
-      .ipc = { .cspace = cspace, .signals = {} },
+  Task task;
+  task.magic = Task::MAGIC;
+  task.control.identity = { .id = id, .ppid = fk::ProcessId(), .name = name };
+  task.control.lifecycle = {
       .state = TaskState::Ready,
-      .context = GetContextForNewTask(reinterpret_cast<uint64_t>(stack),
-                                      kernel_task, arg1, arg2),
+      .priority = priority,
+      .cpu_affinity = cpu_affinity,
+      .time_slice_ticks = 0,
+      .wake_up_time_ticks = 0,
+      .is_a_kernel_task = kernel_task,
+      .terminated = false,
+      .exit_status = 0,
+      .clear_child_tid = 0,
+      .vfork_waiting = false,
+      .vfork_parent_id = fk::ProcessId(),
+      .is_vfork_sharing_address_space = false
+  };
+
+  task.resources.memory = { .cr3 = read_on_cr3() };
+  task.resources.files.cwd = "/";
+  task.resources.ipc.cspace = cspace;
+  task.resources.context = {
+      .registers = GetContextForNewTask(reinterpret_cast<uint64_t>(stack), kernel_task, arg1, arg2),
       .stack_pointer = reinterpret_cast<uint64_t>(stack),
       .kernel_stack_top = stack_top,
       .user_rsp = 0,
       .saved_rip = 0,
       .saved_rflags = 0,
-      .priority = priority,
-      .cpu_affinity = cpu_affinity,
-      .is_a_kernel_task = kernel_task,
-      .terminated = false,
-      .exit_status = 0,
-      .time_slice_ticks = 0,
-      .wake_up_time_ticks = 0,
-      .clear_child_tid = 0,
-      .vfork_waiting = false,
-      .vfork_parent_id = fk::ProcessId(),
       .fs_base = 0,
-      .gs_base = 0,
-      .is_vfork_sharing_address_space = false,
-      .run_node = {},
-      .wait_node = {},
-      .sleep_node = {},
-      .zombie_node = {},
+      .gs_base = 0
   };
 
   return task;
@@ -77,38 +77,44 @@ void Task::print_info() const {
   fk::algorithms::kdebug("TASK INFO",
                          "Task ID: %lu, Name: %s, State: %u, Priority: %u, CPU "
                          "Affinity: %lu, Is Kernel Task: %s",
-                         identity.id.value(), identity.name.c_str(), static_cast<uint8_t>(state),
-                         priority, cpu_affinity,
-                         is_a_kernel_task ? "Yes" : "No");
+                         control.identity.id.value(), control.identity.name.c_str(), 
+                         static_cast<uint8_t>(control.lifecycle.state),
+                         control.lifecycle.priority, control.lifecycle.cpu_affinity,
+                         control.lifecycle.is_a_kernel_task ? "Yes" : "No");
 }
 
 int Task::add_file_descriptor(
     fk::RefPtr<FileDescription> description) {
-  for (size_t i = 0; i < files.descriptors.size(); ++i) {
-    if (!files.descriptors[i]) {
-      files.descriptors[i] = description;
-      fk::algorithms::klog("TASK", "Task %lu: Added FD %zu -> %s", identity.id.value(), i, description->node()->name().c_str());
+  fk::synchronization::ScopedLockIRQ lock_task(lock);
+  for (size_t i = 0; i < resources.files.descriptors.size(); ++i) {
+    if (!resources.files.descriptors[i]) {
+      resources.files.descriptors[i] = description;
+      fk::algorithms::klog("TASK", "Task %lu: Added FD %zu -> %s", 
+                           control.identity.id.value(), i, description->node()->name().c_str());
       return static_cast<int>(i);
     }
   }
 
   // No empty slots? Add to the end.
-  if (files.descriptors.is_full()) {
-    fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", identity.id.value());
+  if (resources.files.descriptors.is_full()) {
+    fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", control.identity.id.value());
     return -24; // -EMFILE
   }
 
-  int fd = static_cast<int>(files.descriptors.size());
-  files.descriptors.push_back(description);
-  fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", identity.id.value(), fd, description->node()->name().c_str());
+  int fd = static_cast<int>(resources.files.descriptors.size());
+  resources.files.descriptors.push_back(description);
+  fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", 
+                       control.identity.id.value(), fd, description->node()->name().c_str());
   return fd;
 }
 
 void Task::dump_file_descriptors() const {
-    fk::algorithms::klog("TASK", "FD table for Task %lu (%s):", identity.id.value(), identity.name.c_str());
-    for (size_t i = 0; i < files.descriptors.size(); ++i) {
-        if (files.descriptors[i]) {
-            auto node = files.descriptors[i]->node();
+    fk::synchronization::ScopedLockIRQ lock_task(lock);
+    fk::algorithms::klog("TASK", "FD table for Task %lu (%s):", 
+                         control.identity.id.value(), control.identity.name.c_str());
+    for (size_t i = 0; i < resources.files.descriptors.size(); ++i) {
+        if (resources.files.descriptors[i]) {
+            auto node = resources.files.descriptors[i]->node();
             const char* type = "unknown";
             if (node->is_character_device()) type = "char";
             else if (node->is_block_device()) type = "block";
@@ -122,29 +128,25 @@ void Task::dump_file_descriptors() const {
 }
 
 int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min_fd) {
-  auto description = get_file_descriptor(old_fd);
+  fk::synchronization::ScopedLockIRQ lock_task(lock);
+  auto description = (old_fd < 0 || old_fd >= static_cast<int>(resources.files.descriptors.size())) ? nullptr : resources.files.descriptors[old_fd];
   if (!description) {
     fk::algorithms::kwarn("TASK", "dup_file_descriptor: Source FD %d not found", old_fd);
     return -1; // EBADF
   }
 
-  // Find first available FD >= min_fd
-  for (int i = min_fd; i < static_cast<int>(files.descriptors.capacity()); ++i) {
-    if (i >= static_cast<int>(files.descriptors.size())) {
-      // Pad with NULLs to fill the gap up to i
-      while (static_cast<int>(files.descriptors.size()) < i) {
-          files.descriptors.push_back({});
+  for (int i = min_fd; i < static_cast<int>(resources.files.descriptors.capacity()); ++i) {
+    if (i >= static_cast<int>(resources.files.descriptors.size())) {
+      while (static_cast<int>(resources.files.descriptors.size()) < i) {
+          resources.files.descriptors.push_back({});
       }
-      files.descriptors.push_back(description);
-      int new_fd = files.descriptors.size() - 1;
-
-      fk::algorithms::klog("TASK", "dup_file_descriptor: Duplicated FD %d -> %d (new slot %d)", old_fd, new_fd, i);
+      resources.files.descriptors.push_back(description);
+      int new_fd = resources.files.descriptors.size() - 1;
       return new_fd;
     }
 
-    if (!files.descriptors[i]) {
-      files.descriptors[i] = description;
-      fk::algorithms::klog("TASK", "dup_file_descriptor: Duplicated FD %d -> %d (existing empty slot)", old_fd, i);
+    if (!resources.files.descriptors[i]) {
+      resources.files.descriptors[i] = description;
       return i;
     }
   }
@@ -153,15 +155,16 @@ int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min
 }
 
 fk::RefPtr<FileDescription> Task::get_file_descriptor(int fd) {
-  if (fd < 0 || fd >= static_cast<int>(files.descriptors.size())) {
+  if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size())) {
     return {};
   }
-  return files.descriptors[fd];
+  return resources.files.descriptors[fd];
 }
 
 void Task::close_file_descriptor(int fd) {
-  if (fd < 0 || fd >= static_cast<int>(files.descriptors.size())) {
+  fk::synchronization::ScopedLockIRQ lock_task(lock);
+  if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size())) {
     return;
   }
-  files.descriptors[fd] = nullptr;
+  resources.files.descriptors[fd] = nullptr;
 }

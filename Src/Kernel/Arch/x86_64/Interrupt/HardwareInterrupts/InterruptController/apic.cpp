@@ -26,6 +26,8 @@ constexpr uint32_t APIC_LVT_TIMER_MODE_PERIODIC = 1 << 17;
 // Divisor base (1, 2, 4, 8, 16, 32, 64, 128)
 constexpr uint32_t APIC_TIMER_DIVISOR = 0x3; // divide by 16
 
+APIC* g_apic_ptr = nullptr;
+
 void APIC::write(uint32_t reg, uint32_t value) {
   *reinterpret_cast<volatile uint32_t *>(lapic_base + reg) = value;
 }
@@ -39,6 +41,9 @@ void APIC::initialize() {
     fk::algorithms::kwarn("APIC", "APIC already initialized.");
     return;
   }
+  
+  g_apic_ptr = this;
+  
   /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug("APIC", "Initializing Local APIC...");
   */

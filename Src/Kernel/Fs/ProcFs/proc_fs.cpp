@@ -81,7 +81,7 @@ void ProcProcessNode::ensure_cached() {
   } else {
     char tmp[256];
     const char* state = "Unknown";
-    switch (t->state) {
+    switch (t->control.lifecycle.state) {
       case TaskState::Running: state = "Running"; break;
       case TaskState::Ready: state = "Ready"; break;
       case TaskState::Blocked: state = "Blocked"; break;
@@ -90,7 +90,7 @@ void ProcProcessNode::ensure_cached() {
       case TaskState::Zombie: state = "Zombie"; break;
     }
     int n = snprintf(tmp, sizeof(tmp), "Name: %s\nPID: %lu\nState: %s\n", 
-                     t->identity.name.c_str(), t->identity.id.value(), state);
+                     t->control.identity.name.c_str(), t->control.identity.id.value(), state);
     if (n > 0) buf = fk::text::String(tmp);
   }
 

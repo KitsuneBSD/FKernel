@@ -1,4 +1,6 @@
 #include <Kernel/Loader/elf_loader_core.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
 namespace fkernel {
@@ -11,11 +13,11 @@ ElfLoaderCore::ElfLoaderCore(fk::RefPtr<Node> node)
     , m_memory(node) {
 }
 
-fk::core::Result<uintptr_t, fk::core::Error> ElfLoaderCore::execute_load() {
+ElfLoadOperationResult ElfLoaderCore::execute_load() {
     return execute_load_with_base(0);
 }
 
-fk::core::Result<uintptr_t, fk::core::Error> ElfLoaderCore::execute_load_with_base(uintptr_t load_base) {
+ElfLoadOperationResult ElfLoaderCore::execute_load_with_base(uintptr_t load_base) {
     auto init_res = initialize_context(load_base);
     if (init_res.is_error())
         return init_res.error();
@@ -88,6 +90,15 @@ fk::core::Result<void, fk::core::Error> ElfLoaderCore::load_segments() {
     if (headers_res.is_error())
         return headers_res.error();
     
+    // Always map the first page of the ELF file (containing the header and PHDRs)
+    // Most ELFs have a PT_LOAD that covers this, but we ensure it here just in case.
+    uintptr_t first_page_vaddr = m_context.load_base;
+    uintptr_t first_page_phys = PhysicalMemoryManager::the().alloc_page();
+    VirtualMemoryManager::the().map_page(first_page_vaddr, first_page_phys, 
+                                         PageFlags::Present | PageFlags::User | PageFlags::Writable);
+    auto read_res = m_node->read(0, 4096, reinterpret_cast<uint8_t*>(first_page_vaddr));
+    if (read_res.is_error()) return read_res.error();
+
     auto load_res = m_loader.process_load_segments(headers_res.value(), m_context.load_base);
     if (load_res.is_error())
         return load_res.error();
@@ -95,18 +106,42 @@ fk::core::Result<void, fk::core::Error> ElfLoaderCore::load_segments() {
     return {};
 }
 
-fk::core::Result<uintptr_t, fk::core::Error> ElfLoaderCore::calculate_entry_point() {
+ElfLoadOperationResult ElfLoaderCore::calculate_entry_point() {
+    uintptr_t entry = 0;
     if (m_context.has_interpreter) {
-        return m_context.interpreter_entry;
+        entry = m_context.interpreter_entry;
+    } else {
+        if (m_context.header.e_type == ET_EXEC) {
+            entry = (uintptr_t)m_context.header.e_entry;
+        } else {
+            entry = (uintptr_t)m_context.header.e_entry + m_context.load_base;
+        }
     }
+
+    auto headers_res = m_parser.parse_program_headers(m_context.header);
+    if (headers_res.is_error())
+        return headers_res.error();
     
-    if (m_context.header.e_type == ET_EXEC) {
-        // ET_EXEC: Entry point is used as-is (no base offset)
-        return (uintptr_t)m_context.header.e_entry;
+    auto& headers = headers_res.value();
+    uintptr_t ph_addr = 0;
+    for (const auto& phdr : headers) {
+        if (phdr.p_type == PT_PHDR) {
+            ph_addr = phdr.p_vaddr + m_context.load_base;
+            break;
+        }
     }
-    
-    // ET_DYN: Entry point needs base offset
-    return (uintptr_t)m_context.header.e_entry + m_context.load_base;
+
+    // Fallback: If no PT_PHDR, it usually follows the ELF header
+    if (ph_addr == 0) {
+        ph_addr = m_context.load_base + m_context.header.e_phoff;
+    }
+
+    return ElfLoadResult {
+        .entry = entry,
+        .ph_addr = ph_addr,
+        .ph_num = m_context.header.e_phnum,
+        .ph_ent = m_context.header.e_phentsize
+    };
 }
 
 fk::core::Result<void, fk::core::Error> ElfLoaderCore::initialize_context(uintptr_t load_base) {

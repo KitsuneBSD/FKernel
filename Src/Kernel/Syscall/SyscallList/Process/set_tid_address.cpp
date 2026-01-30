@@ -9,9 +9,9 @@ uint64_t sys_set_tid_address(uint64_t tidptr, uint64_t, uint64_t, uint64_t, uint
     auto* task = SchedulerManager::the().current();
     if (!task) return -1;
 
-    task->clear_child_tid = tidptr;
+    task->control.lifecycle.clear_child_tid = tidptr;
     
-    return task->identity.id.value();
+    return task->control.identity.id.value();
 }
 
 }

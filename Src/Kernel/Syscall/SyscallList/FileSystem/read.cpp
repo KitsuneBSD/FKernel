@@ -7,39 +7,28 @@
 #include <LibFK/Types/types.h>
 
 extern "C" {
-uint64_t sys_read(uint64_t fd_u64, uint64_t buf_ptr, uint64_t count, uint64_t,
-                  uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
+uint64_t sys_read(uint64_t fd_u64, uint64_t buffer_ptr, uint64_t size,
+                  uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   int fd = (int)fd_u64;
-  fk::algorithms::klog("SYSCALL", "sys_read: start (fd=%d, count=%zu)", fd, (size_t)count);
 
   auto *current_task = SchedulerManager::the().current();
   if (!current_task)
     return -1;
 
-  if (fd < 0 || (size_t)fd >= current_task->files.descriptors.size()) {
-    fk::algorithms::kwarn("SYSCALL", "sys_read: invalid fd %d (size: %zu)",
-                          fd, current_task->files.descriptors.size());
+  if (fd < 0 || (size_t)fd >= current_task->resources.files.descriptors.size()) {
     return -static_cast<int>(fk::core::Error::InvalidHandle);
   }
 
-  auto &desc = current_task->files.descriptors[fd];
+  auto &desc = current_task->resources.files.descriptors[fd];
   if (!desc) {
-    fk::algorithms::kwarn("SYSCALL", "sys_read: FD %d exists but is NULL", fd);
     return -static_cast<int>(fk::core::Error::InvalidHandle);
   }
 
-  // fk::algorithms::klog("SYSCALL", "sys_read: calling desc->read (desc ptr: %p)", desc.get());
-  auto res = desc->read((size_t)count, (uint8_t *)buf_ptr);
-  // fk::algorithms::klog("SYSCALL", "sys_read: return from desc->read");
-  if (res.is_error()) {
-    fk::algorithms::kwarn("SYSCALL", "sys_read: failed with error %d",
-                          (int)res.error());
-    return -static_cast<int>(res.error());
+  auto result = desc->read(size, reinterpret_cast<uint8_t *>(buffer_ptr));
+  if (result.is_error()) {
+    return -static_cast<int>(result.error());
   }
 
-  // fk::algorithms::kdebug("Syscall", "sys_read: success read %zu bytes",
-  // res.value());
-  // fk::algorithms::klog("SYSCALL", "sys_read: end (read %zu bytes)", res.value());
-  return res.value();
+  return result.value();
 }
 }

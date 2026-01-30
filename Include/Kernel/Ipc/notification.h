@@ -4,10 +4,13 @@
 #include <Kernel/Scheduler/Task/task.h>
 #include <LibFK/Container/intrusive_list.h>
 
+#include <LibFK/Synchronization/spinlock.h>
+
 namespace fkernel {
 namespace ipc {
 
 class Notification {
+    fk::synchronization::Spinlock m_lock;
     uint64_t m_pending_bits{0};
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_waiting_tasks;
 
