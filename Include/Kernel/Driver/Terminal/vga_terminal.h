@@ -55,6 +55,7 @@ public:
   virtual void show_cursor(bool visible) override;
   virtual uint32_t get_cursor_x() override;
   virtual uint32_t get_cursor_y() override;
+  virtual void respond(const char* data) override;
   
   // Additional methods for vi compatibility
   virtual void insert_chars(uint16_t count) override;
