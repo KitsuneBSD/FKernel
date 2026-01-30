@@ -20,6 +20,7 @@ public:
     virtual void move_cursor_forward(uint16_t cols) = 0;
     virtual void move_cursor_back(uint16_t cols) = 0;
     virtual void set_colors(uint8_t fg, uint8_t bg) = 0;
+    virtual void set_colors_rgb(uint32_t fg, uint32_t bg) = 0;
     virtual void clear_screen(uint8_t mode) = 0; // 0: end, 1: start, 2: all
     virtual void clear_line(uint8_t mode) = 0;   // 0: end, 1: start, 2: all
     virtual void set_scroll_region(uint16_t top, uint16_t bottom) = 0;
@@ -30,6 +31,8 @@ public:
     virtual void show_cursor(bool visible) = 0;
     virtual uint32_t get_cursor_x() = 0;
     virtual uint32_t get_cursor_y() = 0;
+    virtual uint16_t get_width() = 0;
+    virtual uint16_t get_height() = 0;
     
     /// @brief Send a response string back to the terminal input
     virtual void respond(const char* data) = 0;

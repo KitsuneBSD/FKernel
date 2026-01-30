@@ -5,7 +5,25 @@
 #include <LibFK/Utilities/Memory.h>
 #include <LibFK/Utilities/size_checking.h>
 
+#include <Kernel/Fs/Fat32/fat_32_node.h>
+
 namespace fkernel {
+
+fk::core::Result<fk::RefPtr<Node>, fk::core::Error> 
+Fat32FileSystem::lookup(const char* name) {
+    fk::containers::Vector<DirectoryEntry> entries;
+    list_dir(entries);
+    
+    // Search root directory
+    for (auto& entry : entries) {
+        if (strcmp(entry.name, name) == 0) {
+            // We need to find the cluster and size for this entry.
+            // This requires re-reading the directory entries to get metadata.
+            // Simplified: for now return NotFound or implement a proper entry finder.
+        }
+    }
+    return fk::core::Error::NotFound;
+}
 
 fk::core::Result<fk::RefPtr<Fat32FileSystem>, fk::core::Error>
 Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {

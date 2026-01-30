@@ -267,6 +267,24 @@ uint32_t DisplayFramebuffer::color_to_pixel(Color c) const {
   return (r << 16) | (g << 8) | b;
 }
 
+uint32_t rgb_to_pixel_internal(uint32_t rgb) {
+    uint8_t r = (rgb >> 16) & 0xFF;
+    uint8_t g = (rgb >> 8) & 0xFF;
+    uint8_t b = rgb & 0xFF;
+
+    if (boot::BootInfo::the().has_framebuffer()) {
+        auto fb = boot::BootInfo::the().get_framebuffer_info();
+        if (fb.red_mask > 0) {
+            uint32_t pixel = 0;
+            pixel |= ((r >> (8 - fb.red_mask)) << fb.red_pos);
+            pixel |= ((g >> (8 - fb.green_mask)) << fb.green_pos);
+            pixel |= ((b >> (8 - fb.blue_mask)) << fb.blue_pos);
+            return pixel;
+        }
+    }
+    return rgb;
+}
+
 void DisplayFramebuffer::render_char(uint32_t x, uint32_t y, char c,
                                      uint32_t fg_color, uint32_t bg_color) {
   uint8_t *target = get_render_buffer();
@@ -379,11 +397,13 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
     return;
   }
 
+  uint32_t fg = use_rgb_color ? rgb_to_pixel_internal(current_fg_rgb) : color_to_pixel(current_fg);
+  uint32_t bg = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
+
   if (codepoint == '\t') {
     uint32_t next_tab = (cursor_x + 8) & ~7;
     while (cursor_x < next_tab && cursor_x < get_width()) {
-      render_char(cursor_x * font_w, cursor_y * font_h, ' ',
-                  color_to_pixel(current_fg), color_to_pixel(current_bg));
+      render_char(cursor_x * font_w, cursor_y * font_h, ' ', fg, bg);
       cursor_x++;
     }
     if (cursor_x >= get_width()) {
@@ -405,15 +425,13 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
       draw_cursor();
       return;
     }
-    render_char(cursor_x * font_w, cursor_y * font_h, ' ',
-                color_to_pixel(current_fg), color_to_pixel(current_bg));
+    render_char(cursor_x * font_w, cursor_y * font_h, ' ', fg, bg);
     draw_cursor();
     return;
   }
 
   if (codepoint == ' ') {
-    render_char(cursor_x * font_w, cursor_y * font_h, ' ',
-                color_to_pixel(current_fg), color_to_pixel(current_bg));
+    render_char(cursor_x * font_w, cursor_y * font_h, ' ', fg, bg);
     cursor_x++;
     if (cursor_x >= get_width()) {
       cursor_x = 0;
@@ -436,8 +454,7 @@ void DisplayFramebuffer::put_codepoint(uint32_t codepoint) {
   }
 
   char c = (codepoint < 128) ? static_cast<char>(codepoint) : '?';
-  render_char(cursor_x * font_w, cursor_y * font_h, c,
-              color_to_pixel(current_fg), color_to_pixel(current_bg));
+  render_char(cursor_x * font_w, cursor_y * font_h, c, fg, bg);
   cursor_x++;
   draw_cursor();
 }
@@ -449,7 +466,7 @@ void DisplayFramebuffer::draw_cursor() {
   uint32_t font_h = m_current_font.height * m_current_font.scale;
   uint32_t px_start = cursor_x * font_w;
   uint32_t py_start = cursor_y * font_h + (font_h - 2); // Linha na base
-  uint32_t color = color_to_pixel(current_fg);
+  uint32_t color = use_rgb_color ? rgb_to_pixel_internal(current_fg_rgb) : color_to_pixel(current_fg);
 
   for (uint32_t y = py_start; y < py_start + 2 && y < fb_height; ++y) {
     for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
@@ -471,7 +488,7 @@ void DisplayFramebuffer::erase_cursor() {
   uint32_t font_h = m_current_font.height * m_current_font.scale;
   uint32_t px_start = cursor_x * font_w;
   uint32_t py_start = cursor_y * font_h + (font_h - 2);
-  uint32_t color = color_to_pixel(current_bg);
+  uint32_t color = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
 
   for (uint32_t y = py_start; y < py_start + 2 && y < fb_height; ++y) {
     for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
@@ -542,7 +559,7 @@ void DisplayFramebuffer::clear_rect(uint32_t x, uint32_t y, uint32_t width, uint
   uint8_t *target = get_render_buffer();
   if (!target)
     return;
-  uint32_t bg_pixel = color_to_pixel(current_bg);
+  uint32_t bg_pixel = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
   
   uint32_t end_y = (y + height > fb_height) ? fb_height : y + height;
   uint32_t end_x = (x + width > fb_width) ? fb_width : x + width;
@@ -595,6 +612,14 @@ void DisplayFramebuffer::set_color(Color fg, Color bg) {
   fk::synchronization::ScopedLock lock(Display::lock());
   current_fg = fg;
   current_bg = bg;
+  use_rgb_color = false;
+}
+
+void DisplayFramebuffer::set_colors_rgb(uint32_t fg, uint32_t bg) {
+    fk::synchronization::ScopedLock lock(Display::lock());
+    current_fg_rgb = fg;
+    current_bg_rgb = bg;
+    use_rgb_color = true;
 }
 
 void DisplayFramebuffer::set_cursor_pos(uint32_t x, uint32_t y) {
