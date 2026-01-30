@@ -52,6 +52,8 @@ public:
   virtual void set_scroll_region(uint16_t top, uint16_t bottom) override;
   virtual void save_cursor() override;
   virtual void restore_cursor() override;
+  virtual void save_screen() override;
+  virtual void restore_screen() override;
   virtual void show_cursor(bool visible) override;
   virtual uint32_t get_cursor_x() override;
   virtual uint32_t get_cursor_y() override;
@@ -60,10 +62,14 @@ public:
   // Additional methods for vi compatibility
   virtual void insert_chars(uint16_t count) override;
   virtual void delete_chars(uint16_t count) override;
+  virtual void erase_chars(uint16_t count) override;
   virtual void insert_lines(uint16_t count) override;
   virtual void delete_lines(uint16_t count) override;
   virtual void scroll_up(uint16_t count) override;
   virtual void scroll_down(uint16_t count) override;
+
+  // Line drawing and Charset
+  virtual void set_line_drawing_mode(bool enabled) override;
 
   // Public access to index
   int index() const { return m_index; }
@@ -85,6 +91,7 @@ private:
   // Terminal state
   bool m_raw_mode{false};
   bool m_echo_enabled{true};
+  bool m_line_drawing_mode{false};
   size_t m_line_chars{0};
   uint16_t m_rows{25};
   uint16_t m_cols{80};

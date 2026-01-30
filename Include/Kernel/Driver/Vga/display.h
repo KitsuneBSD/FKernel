@@ -86,6 +86,12 @@ public:
   /// Flush display updates (for double-buffered displays)
   virtual void flush() = 0;
 
+  /// Save current screen content to a backup buffer
+  virtual void save_screen() = 0;
+
+  /// Restore screen content from backup buffer
+  virtual void restore_screen() = 0;
+
   /**
    * @brief Get the appropriate display backend
    */
@@ -153,4 +159,6 @@ public:
   void flush() override {
     // Text mode has immediate updates, no flush needed
   }
+  void save_screen() override {}
+  void restore_screen() override {}
 };

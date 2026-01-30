@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Driver/Vga/vesa.h>
 #include <Kernel/Driver/Vga/display_framebuffer.h>
 #include <Kernel/Driver/Vga/font.h>
@@ -797,9 +798,10 @@ void DisplayFramebuffer::free_back_buffer() {
 }
 
 void DisplayFramebuffer::wait_vblank() {
-  // Skip VSync for immediate keyboard echo responsiveness
-  // VSync causes animation lag that breaks typing experience
-  // Direct rendering is better for interactive use
+  // VGA Input Status Register 1 (0x3DA for color, 0x3BA for mono)
+  // Bit 3 is high during the vertical retrace interval
+  while (inb(0x3DA) & 8); // Wait for current retrace to end
+  while (!(inb(0x3DA) & 8)); // Wait for new retrace to start
 }
 
 void DisplayFramebuffer::swap_buffers() {
@@ -807,19 +809,12 @@ void DisplayFramebuffer::swap_buffers() {
     return;
   }
 
-  // Skip VSync for immediate response - prioritize keyboard echo over tear-free
-  // Interactive use benefits more from responsiveness than perfect vsync
-  
   // Enhanced safety check: ensure all buffers are valid and accessible
   if (!framebuffer || fb_height == 0 || fb_pitch == 0) {
     return;
   }
   
-  // Validate framebuffer accessibility before copying
-  volatile uint8_t test_byte = *framebuffer;
-  (void)test_byte; // Suppress unused variable warning
-  test_byte = *back_buffer; // Test back buffer accessibility too
-  (void)test_byte;
+  wait_vblank();
   
   // Copy back buffer to front buffer immediately
   size_t buffer_size = fb_height * fb_pitch;
@@ -852,22 +847,37 @@ void DisplayFramebuffer::update_dirty_rectangles() {
     return;
   }
 
-  // For keyboard echo, use fast full buffer copy to avoid complexity
-  // Single character updates benefit more from simplicity than optimization
-  if (m_dirty_rect.width < 100 && m_dirty_rect.height < 100) {
-    // Small area (typing) - do immediate full swap for simplicity
-    size_t buffer_size = fb_height * fb_pitch;
-    memcpy(framebuffer, back_buffer, buffer_size);
+  // 1. Calculate boundaries
+  uint32_t x = m_dirty_rect.x;
+  uint32_t y = m_dirty_rect.y;
+  uint32_t w = m_dirty_rect.width;
+  uint32_t h = m_dirty_rect.height;
+
+  // Clip to framebuffer limits
+  if (x >= fb_width) x = 0;
+  if (y >= fb_height) y = 0;
+  if (x + w > fb_width) w = fb_width - x;
+  if (y + h > fb_height) h = fb_height - y;
+
+  // 2. Fast Path: Full screen or nearly full screen
+  // If the area is large enough, a single full-screen memcpy is faster 
+  // than multiple small line copies due to CPU cache and memory controller overhead.
+  if (w >= fb_width * 0.9 && h >= fb_height * 0.9) {
+      size_t buffer_size = fb_height * fb_pitch;
+      memcpy(framebuffer, back_buffer, buffer_size);
   } else {
-    // Large area - use dirty rectangle optimization
-    uint8_t *src = back_buffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
-    uint8_t *dst = framebuffer + (m_dirty_rect.y * fb_pitch) + (m_dirty_rect.x * (fb_bpp / 8));
-    
-    for (uint32_t y = 0; y < m_dirty_rect.height; ++y) {
-      memcpy(dst, src, m_dirty_rect.width * (fb_bpp / 8));
-      src += fb_pitch;
-      dst += fb_pitch;
-    }
+      // 3. Optimized Path: Small area (Dirty Rectangles)
+      uint32_t bpp_bytes = fb_bpp / 8;
+      uint32_t line_copy_size = w * bpp_bytes;
+      
+      uint8_t *src = back_buffer + (y * fb_pitch) + (x * bpp_bytes);
+      uint8_t *dst = framebuffer + (y * fb_pitch) + (x * bpp_bytes);
+      
+      for (uint32_t i = 0; i < h; ++i) {
+        memcpy(dst, src, line_copy_size);
+        src += fb_pitch;
+        dst += fb_pitch;
+      }
   }
 
   m_dirty_rect.dirty = false;
@@ -896,11 +906,13 @@ void DisplayFramebuffer::flush() {
     return;
   }
 
-  // Immediate flush for keyboard echo, but only when dirty
-  // This maintains responsiveness while reducing unnecessary swaps
   if (m_dirty_rect.dirty) {
-    swap_buffers();
-    m_dirty_rect.dirty = false;
+    uint64_t current_tick = TickManager::the().get_ticks();
+    if (current_tick > m_last_flush_tick) {
+        wait_vblank();
+        m_last_flush_tick = current_tick;
+    }
+    update_dirty_rectangles();
   }
 }
 
@@ -916,4 +928,22 @@ void DisplayFramebuffer::next_frame() {
 void DisplayFramebuffer::finalize_initialization() {
   // Allocate back buffer now that system is fully initialized and stable
   allocate_back_buffer();
+}
+
+void DisplayFramebuffer::save_screen() {
+    if (!back_buffer) return;
+    size_t buffer_size = fb_height * fb_pitch;
+    if (!saved_buffer) {
+        saved_buffer = static_cast<uint8_t*>(MemoryManager::the().allocate(buffer_size));
+    }
+    if (saved_buffer) {
+        memcpy(saved_buffer, back_buffer, buffer_size);
+    }
+}
+
+void DisplayFramebuffer::restore_screen() {
+    if (!back_buffer || !saved_buffer) return;
+    size_t buffer_size = fb_height * fb_pitch;
+    memcpy(back_buffer, saved_buffer, buffer_size);
+    mark_dirty(0, 0, fb_width, fb_height);
 }
