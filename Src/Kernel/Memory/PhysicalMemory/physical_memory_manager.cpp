@@ -203,6 +203,7 @@ PhysicalZone *PhysicalMemoryManager::select_zone(ZoneType preferred) {
 
 uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred) {
   assert(m_is_initialized);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone *pz = select_zone(preferred);
   if (!pz) {
@@ -241,6 +242,7 @@ uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred) {
 void PhysicalMemoryManager::free_page(uintptr_t phys) {
   assert(m_is_initialized);
   assert((phys % FRAME_SIZE) == 0);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone *pz = find_zone_for_paddr(phys);
   assert(pz != nullptr);
@@ -274,6 +276,7 @@ void PhysicalMemoryManager::free_page(uintptr_t phys) {
 uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order,
                                                   ZoneType preferred) {
   assert(m_is_initialized);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone *pz = select_zone(preferred);
   if (!pz) {
@@ -308,6 +311,7 @@ uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order,
 void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
   assert(m_is_initialized);
   assert((phys % FRAME_SIZE) == 0);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone *pz = find_zone_for_paddr(phys);
   assert(pz != nullptr);

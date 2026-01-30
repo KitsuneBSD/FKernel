@@ -5,6 +5,7 @@
 
 #include <LibFK/Core/Error.h>
 #include <LibFK/Core/Result.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 extern "C" void write_on_cr3(void *pml4_virt_addr);
 extern "C" uintptr_t read_on_cr3();
@@ -15,6 +16,7 @@ extern "C" uintptr_t read_on_cr3();
  */
 class VirtualMemoryManager {
 private:
+  fk::synchronization::Spinlock m_lock;
   PageTable *m_pml4 = nullptr; ///< Pointer to the active PML4 table.
   uintptr_t m_pml4_phys = 0;   ///< Physical address of the PML4.
 

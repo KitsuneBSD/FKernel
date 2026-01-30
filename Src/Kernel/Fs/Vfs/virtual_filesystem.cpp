@@ -83,8 +83,9 @@ void VirtualFileSystem::mount_root(fk::RefPtr<Node> node) {
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::mount(const char *path, fk::RefPtr<Node> node) {
   if (!path || !node) return fk::core::Error::InvalidParameter;
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
-  auto dentry_res = resolve_path(path);
+  auto dentry_res = resolve_path_unlocked(path);
   if (dentry_res.is_error()) return dentry_res.error();
 
   auto dentry = dentry_res.value();
@@ -96,6 +97,12 @@ VirtualFileSystem::mount(const char *path, fk::RefPtr<Node> node) {
 
 fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
 VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int depth) {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    return resolve_path_unlocked(path, base, depth);
+}
+
+fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
+VirtualFileSystem::resolve_path_unlocked(const char *path, fk::RefPtr<Dentry> base, int depth) {
   if (depth > 8) return fk::core::Error::IOError;
   if (!path || !m_root) return fk::core::Error::InvalidParameter;
 
@@ -110,8 +117,8 @@ VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int d
   } else {
       // Relative path, start from CWD
       auto *task = SchedulerManager::the().current();
-      if (task && !task->files.cwd.empty()) {
-          auto cwd_res = resolve_path(task->files.cwd.c_str(), nullptr, depth + 1);
+      if (task && !task->resources.files.cwd.empty()) {
+          auto cwd_res = resolve_path_unlocked(task->resources.files.cwd.c_str(), nullptr, depth + 1);
           if (cwd_res.is_ok()) current = cwd_res.value();
       }
   }
@@ -139,12 +146,12 @@ VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int d
         
         fk::text::String link = link_res.value();
         if (link.c_str()[0] == '/') {
-            auto sub_res = resolve_path(link.c_str(), nullptr, depth + 1);
+            auto sub_res = resolve_path_unlocked(link.c_str(), nullptr, depth + 1);
             if (sub_res.is_error()) return sub_res.error();
             current = sub_res.value();
         } else {
             // Resolve relative to parent dentry
-            auto sub_res = resolve_path(link.c_str(), current->parent(), depth + 1);
+            auto sub_res = resolve_path_unlocked(link.c_str(), current->parent(), depth + 1);
             if (sub_res.is_error()) return sub_res.error();
             current = sub_res.value();
         }
@@ -159,6 +166,12 @@ VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int d
 
 fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
 VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    return resolve_path_to_parent_unlocked(path, depth);
+}
+
+fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
+VirtualFileSystem::resolve_path_to_parent_unlocked(const char *path, int depth) {
     if (!path || path[0] == '\0') return fk::core::Error::InvalidParameter;
 
     char parent_path[512];
@@ -171,7 +184,7 @@ VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
     if (!last_slash) {
         name = path;
         auto *task = SchedulerManager::the().current();
-        auto cwd_res = resolve_path(task ? task->files.cwd.c_str() : "/", nullptr, depth + 1);
+        auto cwd_res = resolve_path_unlocked(task ? task->resources.files.cwd.c_str() : "/", nullptr, depth + 1);
         if (cwd_res.is_error()) return cwd_res.error();
         return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(cwd_res.value(), name);
     }
@@ -183,14 +196,15 @@ VirtualFileSystem::resolve_path_to_parent(const char *path, int depth) {
 
     *last_slash = '\0';
     name = last_slash + 1;
-    auto parent_res = resolve_path(parent_path, nullptr, depth + 1);
+    auto parent_res = resolve_path_unlocked(parent_path, nullptr, depth + 1);
     if (parent_res.is_error()) return parent_res.error();
     return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(parent_res.value(), name);
 }
 
 fk::core::Result<fk::RefPtr<FileDescription>, fk::core::Error>
 VirtualFileSystem::open(const char *path, int flags) {
-  auto dentry_res = resolve_path(path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto dentry_res = resolve_path_unlocked(path);
   if (dentry_res.is_error()) return dentry_res.error();
   
   auto dentry = dentry_res.value();
@@ -204,7 +218,8 @@ VirtualFileSystem::open(const char *path, int flags) {
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::mkdir(const char *path, int mode) {
-  auto parent_res = resolve_path_to_parent(path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto parent_res = resolve_path_to_parent_unlocked(path);
   if (parent_res.is_error()) return parent_res.error();
   
   auto parent_dentry = parent_res.value().first;
@@ -219,7 +234,8 @@ VirtualFileSystem::mkdir(const char *path, int mode) {
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::symlink(const char *path, const char *target) {
-  auto parent_res = resolve_path_to_parent(path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto parent_res = resolve_path_to_parent_unlocked(path);
   if (parent_res.is_error()) return parent_res.error();
   
   auto parent_dentry = parent_res.value().first;
@@ -234,7 +250,8 @@ VirtualFileSystem::symlink(const char *path, const char *target) {
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEntry> &entries) {
-  auto dentry_res = resolve_path(path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto dentry_res = resolve_path_unlocked(path);
   if (dentry_res.is_error()) return dentry_res.error();
   
   auto dentry = dentry_res.value();
@@ -262,6 +279,7 @@ VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEnt
 fk::core::Result<size_t, fk::core::Error>
 VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buffer, size_t max_bytes) {
   if (!buffer) return fk::core::Error::InvalidParameter;
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   fk::containers::Vector<DirectoryEntry> entries;
   DirectoryEntry dot; strcpy(dot.name, "."); dot.type = 1; add_directory_entry(entries, dot);
@@ -319,7 +337,8 @@ void VirtualFileSystem::add_directory_entry(fk::containers::Vector<DirectoryEntr
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::stat(const char *path, struct stat *buf) {
-  auto dentry_res = resolve_path(path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto dentry_res = resolve_path_unlocked(path);
   if (dentry_res.is_error()) return dentry_res.error();
   
   auto node = dentry_res.value()->top_node();
@@ -356,7 +375,8 @@ VirtualFileSystem::stat(const char *path, struct stat *buf) {
 
 fk::core::Result<void, fk::core::Error>
 VirtualFileSystem::unmount(const char *path) {
-  auto dentry_res = resolve_path(path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto dentry_res = resolve_path_unlocked(path);
   if (dentry_res.is_error()) return dentry_res.error();
   
   dentry_res.value()->pop_node();

@@ -29,11 +29,9 @@ uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64
   auto description = task->get_file_descriptor(static_cast<int>(fd));
   if (!description) return fkernel::return_error(fk::core::Error::InvalidHandle);
 
-  // Delegate to the underlying node/device
   auto res = description->ioctl(request, arg);
   if (res.is_ok()) return res.value();
 
-  // Basic TTY ioctl stubs fallback if not handled by node
   if (request == TCGETS || request == TCSETS || request == TCSETSW || request == TCSETSF || 
       request == TIOCGWINSZ || request == TIOCSWINSZ || request == TIOCGPGRP || request == TIOCSPGRP) {
       
@@ -44,13 +42,12 @@ uint64_t sys_ioctl(uint64_t fd, uint64_t request, uint64_t arg, uint64_t, uint64
       }
       
       if (request == TIOCGPGRP && arg) {
-          *reinterpret_cast<int*>(arg) = static_cast<int>(task->identity.id.value()); // Simplified
+          *reinterpret_cast<int*>(arg) = static_cast<int>(task->control.identity.id.value());
       }
 
-      return 0; // Pretend success
+      return 0;
   }
 
-  fk::algorithms::kdebug("SYSCALL", "sys_ioctl: Unhandled request 0x%lx for FD %lu", request, fd);
   return fkernel::return_error(res.error());
 }
 }

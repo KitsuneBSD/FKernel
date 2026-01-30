@@ -9,10 +9,10 @@ namespace fkernel {
 
 class ElfLoader {
 public:
-    static fk::core::Result<uintptr_t, fk::core::Error> load(fk::RefPtr<Node> node);
+    static ElfLoadOperationResult load(fk::RefPtr<Node> node);
 
 private:
-    static fk::core::Result<uintptr_t, fk::core::Error> load_with_base(fk::RefPtr<Node> node, uintptr_t load_base);
+    static ElfLoadOperationResult load_with_base(fk::RefPtr<Node> node, uintptr_t load_base);
 };
 
 } // namespace fkernel

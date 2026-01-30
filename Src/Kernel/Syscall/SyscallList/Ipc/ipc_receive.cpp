@@ -9,10 +9,10 @@ extern "C" uint64_t sys_ipc_receive(uint64_t handle, uint64_t, uint64_t,
                                     uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
   using namespace fkernel::ipc;
   auto *task = SchedulerManager::the().current();
-  if (!task || !task->ipc.cspace)
+  if (!task || !task->ipc().cspace)
     return -static_cast<uint64_t>(fk::core::Error::PermissionDenied);
 
-  Capability cap = task->ipc.cspace->get(static_cast<uint32_t>(handle));
+  Capability cap = task->ipc().cspace->get(static_cast<uint32_t>(handle));
   if (cap.type() != CapabilityType::Endpoint)
     return (uint64_t)-1;
 

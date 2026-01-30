@@ -20,24 +20,15 @@ uint64_t sys_open(uint64_t path_ptr, uint64_t flags, uint64_t, uint64_t,
   }
 
   const char *path = (const char *)path_ptr;
-  // Log to DebugFS instead of console
-  if (MemoryManager::the().is_heap_initialized()) {
-      char log_buf[256];
-      int log_len = snprintf(log_buf, sizeof(log_buf), "[SYSCALL] sys_open: path=%s flags=%lx\n", path, (uint64_t)flags);
-      auto syscall_log = fkernel::SyscallLogNode::the();
-      if (syscall_log) syscall_log->append(log_buf, log_len);
-  }
-
-
   if (!path)
     return fkernel::return_error(fk::core::Error::InvalidParameter);
 
   char absolute_path[512];
   if (path[0] != '/') {
-      size_t cwd_len = strlen(current_task->files.cwd.c_str());
+      size_t cwd_len = strlen(current_task->resources.files.cwd.c_str());
       if (cwd_len >= 512) return fkernel::return_error(fk::core::Error::IOError);
       
-      strcpy(absolute_path, current_task->files.cwd.c_str());
+      strcpy(absolute_path, current_task->resources.files.cwd.c_str());
       if (cwd_len > 0 && absolute_path[cwd_len-1] != '/') {
           if (cwd_len + 1 < 512) {
               strcat(absolute_path, "/");

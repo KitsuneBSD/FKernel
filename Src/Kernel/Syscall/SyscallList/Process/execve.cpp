@@ -1,6 +1,7 @@
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Loader/elf_loader.h>
@@ -64,7 +65,6 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   if (magic_read_res.is_ok() && magic_read_res.value() == 2 && magic[0] == '#' && magic[1] == '!') {
       fk::algorithms::klog("SYSCALL", "sys_execve: Detected script (shebang), invoking /bin/sh");
       
-      // Prepend /bin/sh to arguments
       fk::containers::Vector<fk::text::String> script_args;
       script_args.push_back("/bin/sh");
       script_args.push_back(path);
@@ -72,16 +72,12 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
           script_args.push_back(args[i]);
       }
       
-      // Recurse with /bin/sh
-      // Note: We need to resolve /bin/sh to its absolute path if it isn't already.
-      // For now, assume it's at /bin/sh.
       auto sh_res = fkernel::VirtualFileSystem::the().open("/bin/sh", 0);
       if (sh_res.is_error()) {
           fk::algorithms::kwarn("SYSCALL", "sys_execve: Script detected but /bin/sh not found!");
           return fkernel::return_error(fk::core::Error::NotFound);
       }
       
-      // Update variables for the rest of the function to load /bin/sh instead
       path = "/bin/sh";
       args = fk::types::move(script_args);
       node = sh_res.value()->node();
@@ -90,26 +86,28 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   // 2. Load the new binary into a fresh address space
   uintptr_t new_cr3 = VirtualMemoryManager::the().create_address_space();
   VirtualMemoryManager::the().switch_address_space(new_cr3);
-  task->memory.cr3 = new_cr3;
+  task->resources.memory.cr3 = new_cr3;
 
   // If we are a vfork child, unblock the parent now that we have our own address space
-  if (task->vfork_parent_id.is_valid()) {
-      auto* parent = SchedulerManager::the().find_task(task->vfork_parent_id);
-      if (parent && parent->vfork_waiting) {
-          parent->vfork_waiting = false;
+  if (task->control.lifecycle.vfork_parent_id.is_valid()) {
+      auto* parent = SchedulerManager::the().find_task(task->control.lifecycle.vfork_parent_id);
+      if (parent && parent->control.lifecycle.vfork_waiting) {
+          parent->control.lifecycle.vfork_waiting = false;
           SchedulerManager::the().wake_task(parent);
       }
-      task->vfork_parent_id = fk::ProcessId();
+      task->control.lifecycle.vfork_parent_id = fk::ProcessId();
   }
 
   auto entry_res = fkernel::ElfLoader::load(node);
   if (entry_res.is_error())
     return fkernel::return_error(entry_res.error());
-  uintptr_t entry = entry_res.value();
+  
+  fkernel::ElfLoadResult elf_res = entry_res.value();
+  uintptr_t entry = elf_res.entry;
 
-  // 3. Setup the user stack (16KB)
+  // 3. Setup the user stack (32KB)
   constexpr uintptr_t USER_STACK_TOP = 0x7fffffffe000;
-  for (uintptr_t v = USER_STACK_TOP - 0x4000; v < USER_STACK_TOP; v += 0x1000) {
+  for (uintptr_t v = USER_STACK_TOP - 0x8000; v < USER_STACK_TOP; v += 0x1000) {
     uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
     VirtualMemoryManager::the().map_page(
         v, phys, PageFlags::Present | PageFlags::Writable | PageFlags::User);
@@ -124,8 +122,6 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
     return current_user_stack;
   };
 
-  // Push strings to the top of the stack. Strings order doesn't matter for ABI,
-  // as long as pointers point to the right ones. We push them forward.
   fk::containers::Vector<uintptr_t> arg_ptrs;
   for (size_t i = 0; i < args.size(); ++i) {
     arg_ptrs.push_back(push_string(args[i]));
@@ -156,7 +152,6 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   size_t idx = 0;
 
   stack_ptr[idx++] = args.size();
-  // argv[0] is stack_ptr[1]. It must point to the command name string.
   for (size_t i = 0; i < arg_ptrs.size(); ++i)
     stack_ptr[idx++] = arg_ptrs[i];
   stack_ptr[idx++] = 0; // argv NULL
@@ -167,11 +162,11 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
 
   // Auxv (Critical for Musl LibC)
   stack_ptr[idx++] = 3;
-  stack_ptr[idx++] = 0x400040; // AT_PHDR
+  stack_ptr[idx++] = elf_res.ph_addr; // AT_PHDR
   stack_ptr[idx++] = 4;
-  stack_ptr[idx++] = 56; // AT_PHENT
+  stack_ptr[idx++] = elf_res.ph_ent; // AT_PHENT
   stack_ptr[idx++] = 5;
-  stack_ptr[idx++] = 10; // AT_PHNUM
+  stack_ptr[idx++] = elf_res.ph_num; // AT_PHNUM
   stack_ptr[idx++] = 6;
   stack_ptr[idx++] = 4096; // AT_PAGESZ
   stack_ptr[idx++] = 11;
@@ -198,6 +193,10 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   g_cpu_block.saved_rip = entry;
   g_cpu_block.user_rsp = final_rsp;
   g_cpu_block.saved_rflags = 0x202;
+
+  task->resources.context.user_rsp = final_rsp;
+  task->resources.context.saved_rip = entry;
+  task->resources.context.saved_rflags = 0x202;
 
   task->dump_file_descriptors();
 

@@ -199,7 +199,7 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
     char log_buf[256];
     int log_len = snprintf(log_buf, sizeof(log_buf),
                            "[SYSCALL] Task %lu: %lu (args: %p, %p, %p) -> %p\n",
-                           task ? task->identity.id.value() : 0, num, (void *)arg1, (void *)arg2,
+                           task ? task->control.identity.id.value() : 0, num, (void *)arg1, (void *)arg2,
                            (void *)arg3, (void *)result);
 
     auto syscall_log = fkernel::SyscallLogNode::the();
@@ -207,7 +207,7 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
       syscall_log->append(log_buf, log_len);
   }
 
-  if (task && !task->is_a_kernel_task) {
+  if (task && !task->is_a_kernel_task()) {
     fkernel::ipc::SignalDelivery::handle_pending_signals(task);
   }
 

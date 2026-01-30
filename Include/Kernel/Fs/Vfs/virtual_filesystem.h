@@ -11,12 +11,15 @@
 
 #include <Kernel/Posix/sys/stat.h>
 
+#include <LibFK/Synchronization/spinlock.h>
+
 namespace fkernel {
 
 class Dentry;
 
 class VirtualFileSystem {
 private:
+  fk::synchronization::Spinlock m_lock;
   fk::RefPtr<Dentry> m_root;
   VirtualFileSystem() = default;
 
@@ -51,9 +54,15 @@ public:
   fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
   resolve_path(const char *path, fk::RefPtr<Dentry> base = nullptr, int depth = 0);
 
+  fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
+  resolve_path_unlocked(const char *path, fk::RefPtr<Dentry> base = nullptr, int depth = 0);
+
 private:
   fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
   resolve_path_to_parent(const char *path, int depth = 0);
+
+  fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
+  resolve_path_to_parent_unlocked(const char *path, int depth = 0);
 
   void add_directory_entry(fk::containers::Vector<DirectoryEntry>& entries, const DirectoryEntry& entry);
 };

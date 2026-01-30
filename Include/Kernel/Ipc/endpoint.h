@@ -5,10 +5,13 @@
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Core/Result.h>
 
+#include <LibFK/Synchronization/spinlock.h>
+
 namespace fkernel {
 namespace ipc {
 
 class Endpoint {
+  fk::synchronization::Spinlock m_lock;
   fk::containers::IntrusiveList<Task, &Task::wait_node> m_senders;
   fk::containers::IntrusiveList<Task, &Task::wait_node> m_receivers;
 

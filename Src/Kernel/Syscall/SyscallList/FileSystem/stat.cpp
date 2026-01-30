@@ -17,7 +17,6 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
   if (!current_task)
     return fkernel::return_error(fk::core::Error::PermissionDenied);
 
-  // Copy path from user space safely
   char path[512];
   strncpy(path, reinterpret_cast<const char *>(path_ptr), 511);
   path[511] = '\0';
@@ -28,11 +27,10 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
   const char *final_path = path;
 
   if (path[0] != '/') {
-    // Resolve relative path using CWD
-    size_t cwd_len = strlen(current_task->files.cwd.c_str());
+    size_t cwd_len = strlen(current_task->resources.files.cwd.c_str());
     if (cwd_len >= 512) return fkernel::return_error(fk::core::Error::IOError);
     
-    strcpy(absolute_path, current_task->files.cwd.c_str());
+    strcpy(absolute_path, current_task->resources.files.cwd.c_str());
     
     if (cwd_len > 0 && absolute_path[cwd_len - 1] != '/') {
       if (cwd_len + 1 < 512) {
@@ -49,8 +47,6 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
     }
     final_path = absolute_path;
   }
-
-  // fk::algorithms::klog("SYSCALL", "sys_stat: path=%s", final_path);
 
   auto res = VirtualFileSystem::the().stat(final_path, buf);
   if (res.is_error()) {
