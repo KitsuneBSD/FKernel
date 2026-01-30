@@ -371,6 +371,14 @@ uint32_t terminal::VGATerminal::get_cursor_y() {
     return Display::the().get_cursor_y();
 }
 
+void terminal::VGATerminal::respond(const char* data) {
+    if (!data) return;
+    // Inject data into input queue as if typed
+    while (*data) {
+        m_input_queue.enqueue(*data++);
+    }
+}
+
 // Additional methods for vi compatibility
 void terminal::VGATerminal::insert_chars(uint16_t count) {
     uint32_t x = vga::the().get_cursor_x();

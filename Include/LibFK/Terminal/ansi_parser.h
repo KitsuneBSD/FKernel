@@ -29,6 +29,9 @@ public:
     virtual uint32_t get_cursor_x() = 0;
     virtual uint32_t get_cursor_y() = 0;
     
+    /// @brief Send a response string back to the terminal input
+    virtual void respond(const char* data) = 0;
+    
     // Additional methods for vi compatibility
     virtual void insert_chars(uint16_t count) = 0;
     virtual void delete_chars(uint16_t count) = 0;
