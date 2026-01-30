@@ -36,11 +36,8 @@ void early_init() {
   fk::algorithms::klog("EARLY_INIT", "Initializing Memory Manager...");
   MemoryManager::the().initialize();
   
-  // Initialize VESA driver AFTER MemoryManager to ensure correct mapping
-  if (boot::BootInfo::the().has_framebuffer()) {
-      fk::algorithms::klog("EARLY_INIT", "Pre-initializing VESA driver...");
-      DisplayFramebuffer::the(); 
-  }
+  // Note: VESA driver will be initialized later in init.cpp
+  // after MemoryManager is fully ready to avoid double allocation
 
   // Now that we have memory mapping capabilities, we can potentially upgrade 
   // to APIC/IOAPIC if available.

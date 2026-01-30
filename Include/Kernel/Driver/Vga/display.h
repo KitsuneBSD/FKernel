@@ -77,11 +77,11 @@ public:
   virtual fk::core::Result<void, fk::core::Error>
   set_resolution(uint32_t width, uint32_t height, uint32_t bpp) = 0;
 
+  /// Flush display updates (for double-buffered displays)
+  virtual void flush() = 0;
+
   /**
    * @brief Get the appropriate display backend
-   *
-   * Returns a text-mode driver for BIOS boots,
-   * or a framebuffer-based driver for EFI/VESA boots
    */
   static Display &the();
 
@@ -141,5 +141,8 @@ public:
   fk::core::Result<void, fk::core::Error> set_resolution(uint32_t, uint32_t,
                                                          uint32_t) override {
     return fk::core::Error::NotImplemented;
+  }
+  void flush() override {
+    // Text mode has immediate updates, no flush needed
   }
 };

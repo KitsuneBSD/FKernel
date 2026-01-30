@@ -29,6 +29,13 @@ void init() {
   // Priorizar VESA sobre VGA
   if (boot::BootInfo::the().has_framebuffer()) {
     Display::switch_to(DisplayFramebuffer::the());
+    
+    // Garantir que tty0 esteja ativo para userspace
+    fkernel::terminal::TerminalManager::the().force_tty0_active();
+    
+    // Teste com mensagem visível
+    Display::the().write("[SYSTEM] FKernel VESA + BusyBox rodando!\n");
+    Display::the().flush();
   }
 
   // Initialize Driver Framework

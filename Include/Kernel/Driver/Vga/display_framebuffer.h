@@ -14,9 +14,11 @@
 
 class DisplayFramebuffer : public Display {
  private:
-  uint8_t *framebuffer = nullptr;
+  uint8_t *framebuffer = nullptr;    // Front buffer (visible)
+  uint8_t *back_buffer = nullptr;      // Back buffer (rendering)
+  bool double_buffering_enabled = false;
   
-  // Command Queue for batched rendering
+  // Command Queue for batched rendering (TODO: implement)
   static constexpr size_t QUEUE_SIZE =
       128; 
   fk::containers::CircularBuffer<RenderCommand, QUEUE_SIZE> m_command_queue;
@@ -34,6 +36,12 @@ class DisplayFramebuffer : public Display {
   Color current_fg = Color::LightGray;
   Color current_bg = Color::Black;
 
+  // Dirty rectangle tracking for efficient updates
+  struct DirtyRect {
+    uint32_t x, y, width, height;
+    bool dirty;
+  } m_dirty_rect = {0, 0, 0, 0, false};
+
   DisplayFramebuffer();
   void initialize_framebuffer();
   void select_best_font();
@@ -43,6 +51,15 @@ class DisplayFramebuffer : public Display {
   void scroll();
   void draw_cursor();
   void erase_cursor();
+  
+  // Double buffering functions
+  void allocate_back_buffer();
+  void free_back_buffer();
+  void swap_buffers();
+  void wait_vblank();
+  void mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+  void update_dirty_rectangles();
+  uint8_t* get_render_buffer();
 
 public:
   static DisplayFramebuffer &the() {
@@ -53,11 +70,11 @@ public:
   // Test method for VESA rendering verification
   void test_render();
 
-  /// No-op in direct rendering mode
-  void flush() {}
+  /// Flush pending updates to screen
+  void flush() override;
 
-  /// No-op in direct rendering mode
-  void next_frame() {}
+  /// Advance to next frame (with double buffering)
+  void next_frame();
 
   void put_char(char c) override;
   void put_codepoint(uint32_t codepoint) override;

@@ -69,6 +69,8 @@ void VGATerminal::on_char(char c) {
                 m_line_chars--;
                 if (m_echo_enabled && is_active) {
                     vga::the().put_char('\b');
+                    // Flush for immediate backspace visibility
+                    Display::the().flush();
                 }
             }
         } else {
@@ -84,6 +86,8 @@ void VGATerminal::on_char(char c) {
         m_line_chars = 0;
         if (m_echo_enabled && !m_raw_mode && is_active) {
             vga::the().put_char('\n');
+            // Flush for immediate newline visibility
+            Display::the().flush();
         }
         m_input_queue.enqueue(c);
         return;
@@ -92,6 +96,8 @@ void VGATerminal::on_char(char c) {
     // 3. Caracteres Normais
     if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
+        // Flush for immediate character visibility
+        Display::the().flush();
     }
 
     if (!m_raw_mode) {
@@ -166,10 +172,12 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read([[maybe_unused]] uin
 fk::core::Result<size_t, fk::core::Error> VGATerminal::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
     if (!buffer) return fk::core::Error::InvalidParameter;
     
-    fk::synchronization::ScopedLock lock(m_lock);
-    // Only the active terminal should output to the screen
+fk::synchronization::ScopedLock lock(m_lock);
+    // Only active terminal should output to screen
     if (TerminalManager::the().active_terminal() == this) {
         m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
+        // Flush display to make characters visible for framebuffer displays
+        Display::the().flush();
     }
     
     return size;
@@ -201,7 +209,7 @@ struct termios {
 #define ICANON 0000002
 #define ECHO   0000010
 
-fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint64_t arg) {
+fk::core::Result<int, fk::core::Error> terminal::VGATerminal::ioctl(uint64_t request, uint64_t arg) {
     fk::synchronization::ScopedLock lock(m_lock);
     switch (request) {
         case TIOCGWINSZ: {
@@ -230,23 +238,25 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
 
 // --- AnsiDelegate Implementation ---
 
-void VGATerminal::put_char(char c) {
+void terminal::VGATerminal::put_char(char c) {
     vga::the().put_char(c);
+    // Ensure immediate visibility for framebuffer displays
+    Display::the().flush();
 }
 
-void VGATerminal::move_cursor(uint16_t row, uint16_t col) {
+void terminal::VGATerminal::move_cursor(uint16_t row, uint16_t col) {
     // ANSI uses 1-based coordinates
     vga::the().set_cursor_pos(col - 1, row - 1);
 }
 
-void VGATerminal::move_cursor_up(uint16_t rows) {
+void terminal::VGATerminal::move_cursor_up(uint16_t rows) {
     uint32_t x = vga::the().get_cursor_x();
     uint32_t y = vga::the().get_cursor_y();
     if (y >= rows) y -= rows; else y = 0;
     vga::the().set_cursor_pos(x, y);
 }
 
-void VGATerminal::move_cursor_down(uint16_t rows) {
+void terminal::VGATerminal::move_cursor_down(uint16_t rows) {
     uint32_t x = vga::the().get_cursor_x();
     uint32_t y = vga::the().get_cursor_y();
     y += rows;
@@ -254,7 +264,7 @@ void VGATerminal::move_cursor_down(uint16_t rows) {
     vga::the().set_cursor_pos(x, y);
 }
 
-void VGATerminal::move_cursor_forward(uint16_t cols) {
+void terminal::VGATerminal::move_cursor_forward(uint16_t cols) {
     uint32_t x = vga::the().get_cursor_x();
     uint32_t y = vga::the().get_cursor_y();
     x += cols;
@@ -262,45 +272,45 @@ void VGATerminal::move_cursor_forward(uint16_t cols) {
     vga::the().set_cursor_pos(x, y);
 }
 
-void VGATerminal::move_cursor_back(uint16_t cols) {
+void terminal::VGATerminal::move_cursor_back(uint16_t cols) {
     uint32_t x = vga::the().get_cursor_x();
     uint32_t y = vga::the().get_cursor_y();
     if (x >= cols) x -= cols; else x = 0;
     vga::the().set_cursor_pos(x, y);
 }
 
-void VGATerminal::set_colors(uint8_t fg, uint8_t bg) {
+void terminal::VGATerminal::set_colors(uint8_t fg, uint8_t bg) {
     vga::the().set_color(static_cast<Color>(fg), static_cast<Color>(bg));
 }
 
-void VGATerminal::clear_screen(uint8_t mode) {
+void terminal::VGATerminal::clear_screen(uint8_t mode) {
     if (mode == 2) {
         vga::the().clear();
     }
     // Mode 0 and 1 (start/end) can be implemented if needed
 }
 
-void VGATerminal::clear_line(uint8_t mode) {
+void terminal::VGATerminal::clear_line(uint8_t mode) {
     // Basic implementation: just overwrite with spaces if needed
     // In text mode we could do this easily.
     (void)mode;
 }
 
-void VGATerminal::set_scroll_region(uint16_t top, uint16_t bottom) {
+void terminal::VGATerminal::set_scroll_region(uint16_t top, uint16_t bottom) {
     // VGA/Display currently doesn't support limited scroll regions easily
     (void)top; (void)bottom;
 }
 
-void VGATerminal::save_cursor() {
+void terminal::VGATerminal::save_cursor() {
     m_saved_cursor_x = static_cast<uint16_t>(vga::the().get_cursor_x());
     m_saved_cursor_y = static_cast<uint16_t>(vga::the().get_cursor_y());
 }
 
-void VGATerminal::restore_cursor() {
+void terminal::VGATerminal::restore_cursor() {
     vga::the().set_cursor_pos(m_saved_cursor_x, m_saved_cursor_y);
 }
 
-void VGATerminal::show_cursor(bool visible) {
+void terminal::VGATerminal::show_cursor(bool visible) {
     vga::the().show_cursor(visible);
 }
 
