@@ -293,27 +293,33 @@ void DisplayFramebuffer::write(const char *str) {
 }
 
 void DisplayFramebuffer::clear() {
+  fk::synchronization::ScopedLockIRQ lock(Display::lock());
   clear_rect(0, 0, fb_width, fb_height);
   cursor_x = 0; cursor_y = 0;
   m_full_redraw_requested = true;
+  // Also mark all tiles dirty as a fallback
+  if (m_dirty_tiles) {
+      uint32_t total_tiles = m_tiles_x * m_tiles_y;
+      memset(m_dirty_tiles, 0xFF, (total_tiles + 7) / 8);
+  }
 }
 
 void DisplayFramebuffer::clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-  fk::synchronization::ScopedLockIRQ lock(Display::lock());
   uint8_t *target = get_render_buffer(); if (!target) return;
-  
-  if (x == 0 && y == 0 && width >= fb_width && height >= fb_height) {
-      m_full_redraw_requested = true;
-  }
-
   uint32_t bg_pixel = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
   uint32_t end_y = (y + height > fb_height) ? fb_height : y + height;
   uint32_t end_x = (x + width > fb_width) ? fb_width : x + width;
+  
   for (uint32_t py = y; py < end_y; ++py) {
+    uint8_t* line_ptr = target + (py * fb_pitch);
     for (uint32_t px = x; px < end_x; ++px) {
-      uint32_t offset = py * fb_pitch + px * (fb_bpp / 8);
-      if (fb_bpp == 32) *reinterpret_cast<uint32_t *>(target + offset) = bg_pixel;
-      else if (fb_bpp == 24) { target[offset] = bg_pixel & 0xFF; target[offset + 1] = (bg_pixel >> 8) & 0xFF; target[offset + 2] = (bg_pixel >> 16) & 0xFF; }
+      if (fb_bpp == 32) reinterpret_cast<uint32_t*>(line_ptr)[px] = bg_pixel;
+      else if (fb_bpp == 24) {
+          uint32_t offset = px * 3;
+          line_ptr[offset] = bg_pixel & 0xFF;
+          line_ptr[offset + 1] = (bg_pixel >> 8) & 0xFF;
+          line_ptr[offset + 2] = (bg_pixel >> 16) & 0xFF;
+      }
     }
   }
   mark_dirty(x, y, width, height);
@@ -419,26 +425,40 @@ void DisplayFramebuffer::mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint
 
 void DisplayFramebuffer::update_dirty_rectangles() {
   if (!m_dirty_tiles || !double_buffering_enabled) return;
-  uint32_t total_tiles = m_tiles_x * m_tiles_y; size_t bitset_bytes = (total_tiles + 7) / 8;
-  if (m_full_redraw_requested) { memcpy(framebuffer, back_buffer, fb_height * fb_pitch); memset(m_dirty_tiles, 0, bitset_bytes); m_full_redraw_requested = false; return; }
-  uint32_t bpp_bytes = fb_bpp / 8; uint32_t dirty_count = 0;
-  for (uint32_t i = 0; i < bitset_bytes; ++i) { if (m_dirty_tiles[i]) { uint8_t b = m_dirty_tiles[i]; while (b) { if (b & 1) dirty_count++; b >>= 1; } } } 
-  if (dirty_count == 0) return;
-  if (dirty_count > total_tiles / 4) { memcpy(framebuffer, back_buffer, fb_height * fb_pitch); memset(m_dirty_tiles, 0, bitset_bytes); return; }
+  uint32_t total_tiles = m_tiles_x * m_tiles_y;
+  size_t bitset_bytes = (total_tiles + 7) / 8;
+
+  if (m_full_redraw_requested) {
+      memcpy(framebuffer, back_buffer, fb_height * fb_pitch);
+      memset(m_dirty_tiles, 0, bitset_bytes);
+      m_full_redraw_requested = false;
+      return;
+  }
+
+  uint32_t bpp_bytes = fb_bpp / 8;
   for (uint32_t ty = 0; ty < m_tiles_y; ++ty) {
     for (uint32_t tx = 0; tx < m_tiles_x; ++tx) {
-      uint32_t tile_idx = ty * m_tiles_x + tx; uint8_t mask = (1 << (tile_idx % 8));
-      if (m_dirty_tiles[tile_idx / 8] & mask) {
-        uint32_t x = tx * TILE_SIZE; uint32_t y = ty * TILE_SIZE; uint32_t w = TILE_SIZE; uint32_t h = TILE_SIZE;
-        if (x + w > fb_width) w = fb_width - x; if (y + h > fb_height) h = fb_height - y;
-        uint32_t line_copy_size = w * bpp_bytes; uint8_t *src = back_buffer + (y * fb_pitch) + (x * bpp_bytes); uint8_t *dst = framebuffer + (y * fb_pitch) + (x * bpp_bytes);
-        for (uint32_t i = 0; i < h; ++i) { memcpy(dst, src, line_copy_size); src += fb_pitch; dst += fb_pitch; }
-        m_dirty_tiles[tile_idx / 8] &= ~mask;
+      uint32_t tile_idx = ty * m_tiles_x + tx;
+      if (m_dirty_tiles[tile_idx / 8] & (1 << (tile_idx % 8))) {
+        uint32_t x = tx * TILE_SIZE;
+        uint32_t y = ty * TILE_SIZE;
+        uint32_t w = TILE_SIZE;
+        uint32_t h = TILE_SIZE;
+
+        if (x + w > fb_width) w = fb_width - x;
+        if (y + h > fb_height) h = fb_height - y;
+
+        uint32_t line_size = w * bpp_bytes;
+        for (uint32_t i = 0; i < h; ++i) {
+          memcpy(framebuffer + (y + i) * fb_pitch + x * bpp_bytes,
+                 back_buffer + (y + i) * fb_pitch + x * bpp_bytes,
+                 line_size);
+        }
+        m_dirty_tiles[tile_idx / 8] &= ~(1 << (tile_idx % 8));
       }
     }
   }
 }
-
 uint8_t* DisplayFramebuffer::get_render_buffer() { if (double_buffering_enabled && back_buffer) return back_buffer; return framebuffer; }
 
 void DisplayFramebuffer::flush() {
