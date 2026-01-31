@@ -189,3 +189,11 @@ void MemoryManager::free(void* ptr) {
 void MemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags flags){
   VirtualMemoryManager::the().map_page(virt, phys, flags);
 }
+
+uintptr_t MemoryManager::allocate_page(ZoneType preferred, uint32_t preferred_node) {
+    return PhysicalMemoryManager::the().alloc_page(preferred, preferred_node);
+}
+
+void MemoryManager::free_page(uintptr_t phys) {
+    PhysicalMemoryManager::the().free_page(phys);
+}

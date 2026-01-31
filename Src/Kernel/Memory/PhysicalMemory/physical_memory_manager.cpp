@@ -1,3 +1,4 @@
+#include <Kernel/Hardware/Acpi/topology_manager.h>
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
@@ -24,6 +25,9 @@ PhysicalZone *PhysicalMemoryManager::create_zone(uintptr_t base, size_t length,
 
   pz.zone.populate_zone(base, length, type);
   pz.buddy.add_range(base, length);
+  
+  // Set proximity domain using TopologyManager
+  pz.proximity_domain = fkernel::acpi::TopologyManager::the().get_node_for_paddr(base);
 
   m_zone_count++;
   return &pz;
@@ -82,6 +86,9 @@ void PhysicalMemoryManager::initialize() {
 
   fk::algorithms::klog("PHYSICAL MEMORY MANAGER",
                        "Initializing Physical Memory Manager");
+
+  // Initialize TopologyManager to discover NUMA layout
+  fkernel::acpi::TopologyManager::the().initialize();
 
   extern uint8_t __kernel_start[];
   extern uint8_t __kernel_end[];
@@ -164,36 +171,36 @@ PhysicalZone *PhysicalMemoryManager::find_zone_for_paddr(uintptr_t phys) {
   return nullptr;
 }
 
-PhysicalZone *PhysicalMemoryManager::select_zone(ZoneType preferred) {
+PhysicalZone *PhysicalMemoryManager::select_zone(ZoneType preferred, uint32_t preferred_node) {
+  // 1. Try to find preferred zone type in preferred node
   for (size_t i = 0; i < m_zone_count; ++i) {
-    if (m_zones[i].zone.type() == preferred) {
-      /*TODO: Apply this log when we work with LogLevel
-                  fk::algorithms::kdebug(
-                      "PHYSICAL MEMORY MANAGER",
-                      "Selected preferred zone type=%d",
-                      (int)preferred);
-                      */
+    if (m_zones[i].zone.type() == preferred && m_zones[i].proximity_domain == preferred_node) {
       return &m_zones[i];
     }
   }
 
+  // 2. Try to find any zone in preferred node
+  for (size_t i = 0; i < m_zone_count; ++i) {
+    if (m_zones[i].proximity_domain == preferred_node) {
+      return &m_zones[i];
+    }
+  }
+
+  // 3. Fallback: Try to find preferred zone type in ANY node
+  for (size_t i = 0; i < m_zone_count; ++i) {
+    if (m_zones[i].zone.type() == preferred) {
+      return &m_zones[i];
+    }
+  }
+
+  // 4. Ultimate Fallback: Any available NORMAL zone
   for (size_t i = 0; i < m_zone_count; ++i) {
     if (m_zones[i].zone.type() == ZoneType::NORMAL) {
-      /*TODO: Apply this log when we work with LogLevel
-            fk::algorithms::kdebug(
-                "PHYSICAL MEMORY MANAGER",
-                "Preferred zone unavailable, falling back to NORMAL");
-            */
       return &m_zones[i];
     }
   }
 
   if (m_zone_count > 0) {
-    /*TODO: Apply this log when we work with LogLevel
-        fk::algorithms::kdebug(
-            "PHYSICAL MEMORY MANAGER",
-            "Fallback to first available zone");
-      */
     return &m_zones[0];
   }
 
@@ -201,11 +208,11 @@ PhysicalZone *PhysicalMemoryManager::select_zone(ZoneType preferred) {
   return nullptr;
 }
 
-uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred) {
+uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred, uint32_t preferred_node) {
   assert(m_is_initialized);
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
-  PhysicalZone *pz = select_zone(preferred);
+  PhysicalZone *pz = select_zone(preferred, preferred_node);
   if (!pz) {
     fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER",
                           "Alloc_page: No zone available");
@@ -217,13 +224,6 @@ uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred) {
     uintptr_t phys = pz->zone.base() + (frame * FRAME_SIZE);
 
     m_free_memory -= FRAME_SIZE;
-    /*TODO: Apply this log when we work with LogLevel
-        fk::algorithms::kdebug(
-            "PHYSICAL MEMORY MANAGER",
-            "Alloc_page(bitmap): phys=%p zone=%d",
-            phys,
-            (int)pz->zone.type());
-    */
     return phys;
   }
 
@@ -253,32 +253,20 @@ void PhysicalMemoryManager::free_page(uintptr_t phys) {
   if (phys >= base && phys < end) {
     size_t frame = (phys - base) / FRAME_SIZE;
     pz->bitmap.clear(frame);
-    /*TODO: Apply this log when we work with LogLevel
-        fk::algorithms::kdebug(
-            "PHYSICAL MEMORY MANAGER",
-            "Free_page(bitmap): phys=%p frame=%lu",
-            phys,
-            frame);
-    */
   } else {
     pz->buddy.free(reinterpret_cast<void *>(phys), 0);
-    /*TODO: Apply this log when we work with LogLevel
-        fk::algorithms::kdebug(
-            "PHYSICAL MEMORY MANAGER",
-            "Free_page(buddy): phys=%p",
-            phys);
-    */
   }
 
   m_free_memory += FRAME_SIZE;
 }
 
 uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order,
-                                                  ZoneType preferred) {
+                                                  ZoneType preferred,
+                                                  uint32_t preferred_node) {
   assert(m_is_initialized);
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
-  PhysicalZone *pz = select_zone(preferred);
+  PhysicalZone *pz = select_zone(preferred, preferred_node);
   if (!pz) {
     fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER",
                           "alloc_contiguous: No zone available");
@@ -296,15 +284,6 @@ uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order,
 
   uintptr_t phys = reinterpret_cast<uintptr_t>(block);
   m_free_memory -= (FRAME_SIZE << order);
-  /*TODO: Apply this log when we work with LogLevel
-      fk::algorithms::kdebug(
-          "PHYSICAL MEMORY MANAGER",
-          "alloc_contiguous: phys=%p order=%lu size=%lu KB zone=%d",
-          phys,
-          order,
-          (FRAME_SIZE << order) / 1024,
-          (int)pz->zone.type());
-  */
   return phys;
 }
 
@@ -318,13 +297,4 @@ void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
 
   pz->buddy.free(reinterpret_cast<void *>(phys), order);
   m_free_memory += (FRAME_SIZE << order);
-  /*TODO: Apply this log when we work with LogLevel
-      fk::algorithms::kdebug(
-          "PHYSICAL MEMORY MANAGER",
-          "free_contiguous: phys=%p order=%lu size=%lu KB zone=%d",
-          phys,
-          order,
-          (FRAME_SIZE << order) / 1024,
-          (int)pz->zone.type());
-    */
 }
