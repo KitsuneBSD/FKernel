@@ -3,6 +3,7 @@
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
+#include <Kernel/Memory/ObjectMemory/Zone/zone_types.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Synchronization/spinlock.h>
@@ -64,6 +65,16 @@ public:
    * @brief Maps a virtual page to a physical frame.
    */
   void map_page(uintptr_t virt, uintptr_t phys, PageFlags flags);
+
+  /**
+   * @brief Allocates a physical page frame.
+   */
+  uintptr_t allocate_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
+
+  /**
+   * @brief Frees a physical page frame.
+   */
+  void free_page(uintptr_t phys);
 
   /**
    * @brief Allocates a memory block from the kernel heap.

@@ -34,7 +34,7 @@ private:
   PhysicalZone *find_zone_for_paddr(uintptr_t phys);
 
   /** @brief Selects a zone based on type preference and availability. */
-  PhysicalZone *select_zone(ZoneType preferred);
+  PhysicalZone *select_zone(ZoneType preferred, uint32_t preferred_node = 0);
 
   /** @brief Processes a raw memory range into one or more zones. */
   void process_range(uintptr_t base, uintptr_t end, uint64_t *&bitmap_cursor,
@@ -66,9 +66,10 @@ public:
   /**
    * @brief Allocates a single 4KB page.
    * @param preferred The zone type preferred for this allocation.
+   * @param preferred_node The preferred NUMA node ID (proximity domain).
    * @return Physical address of the allocated page.
    */
-  uintptr_t alloc_page(ZoneType preferred = ZoneType::NORMAL);
+  uintptr_t alloc_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
 
   /** @brief Frees a previously allocated page. */
   void free_page(uintptr_t phys);
@@ -77,10 +78,12 @@ public:
    * @brief Allocates a contiguous range of blocks using the buddy system.
    * @param order Power-of-two order.
    * @param preferred The zone type preferred.
+   * @param preferred_node The preferred NUMA node ID.
    * @return Physical address of the block start.
    */
   uintptr_t alloc_contiguous(size_t order,
-                             ZoneType preferred = ZoneType::NORMAL);
+                             ZoneType preferred = ZoneType::NORMAL,
+                             uint32_t preferred_node = 0);
 
   /** @brief Frees a contiguous block. */
   void free_contiguous(uintptr_t phys, size_t order);
