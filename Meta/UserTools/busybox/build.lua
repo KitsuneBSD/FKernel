@@ -95,8 +95,9 @@ local function create_all_links()
   mlink("../usr/bin/busybox", "bin/true")
   mlink("../usr/bin/busybox", "bin/false")
   
-  -- Essentials
   mlink("../usr/bin/busybox", "bin/echo")
+  mlink("../usr/bin/busybox", "bin/top")
+  mlink("../usr/bin/busybox", "bin/ping")
 end
 
 local src_dir = BUILD_DIR .. "/" .. BB_NAME
@@ -173,6 +174,11 @@ local desired_configs = {
   "CONFIG_TOUCH", "CONFIG_TAIL", "CONFIG_HEAD", "CONFIG_WC",
   "CONFIG_SORT", "CONFIG_UNIQ", "CONFIG_BASENAME", "CONFIG_DIRNAME",
   "CONFIG_DU", "CONFIG_DF", "CONFIG_TRUE", "CONFIG_FALSE",
+  
+  -- Top and Ping support
+  "CONFIG_TOP", "CONFIG_FEATURE_TOP_CPU_USAGE_PERCENTAGE", 
+  "CONFIG_FEATURE_TOP_CPU_GLOBAL_PERCENTS", "CONFIG_FEATURE_TOPMEM",
+  "CONFIG_PING", "CONFIG_FEATURE_FANCY_PING",
   
   -- Essentials (implicit shell support)
   "CONFIG_ECHO",
