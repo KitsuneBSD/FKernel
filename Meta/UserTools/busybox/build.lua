@@ -15,7 +15,7 @@ local BUILD_DIR = ROOT_DIR .. "/build/userland/busybox"
 local SYSROOT = ROOT_DIR .. "/build/sysroot"
 local INITRD_DIR = ROOT_DIR .. "/build/initrd_root"
 
-print("--- FKernel BusyBox Toolchain ---")
+print("---" .. " FKernel BusyBox Toolchain ---")
 
 local function mlink(target, link)
   os.execute(string.format("ln -sf %s %s/%s", target, INITRD_DIR, link))
@@ -30,8 +30,6 @@ local function create_etc_configs()
   if inittab then
       inittab:write("::sysinit:/etc/init.d/rcS\n")
       inittab:write("::respawn:-/bin/sh\n")
-      inittab:write("::ctrlaltdel:/sbin/reboot\n")
-      inittab:write("::shutdown:/bin/umount -a -r\n")
       inittab:close()
   end
 
@@ -49,7 +47,7 @@ local function create_etc_configs()
   local profile = io.open(INITRD_DIR .. "/etc/profile", "w")
   if profile then
     profile:write("export PATH=/bin:/sbin:/usr/bin:/usr/sbin\n")
-    profile:write("export PS1='# '\n")
+    profile:write("export PS1='# ' \n")
     profile:write("export TERM=vt100\n")
     profile:close()
   end
@@ -61,19 +59,13 @@ local function create_all_links()
   mlink("../usr/bin/busybox", "bin/sh")
   mlink("../usr/bin/busybox", "sbin/init")
   
-  -- Requested tools
+  -- Supported by native syscalls
   mlink("../usr/bin/busybox", "bin/cat")
   mlink("../usr/bin/busybox", "bin/rm")
-  mlink("../usr/bin/busybox", "bin/rmdir")
   mlink("../usr/bin/busybox", "bin/ls")
-  mlink("../usr/bin/busybox", "bin/vi")
   mlink("../usr/bin/busybox", "bin/cp")
   mlink("../usr/bin/busybox", "bin/mv")
   mlink("../usr/bin/busybox", "bin/mkdir")
-  mlink("../usr/bin/busybox", "bin/grep")
-  mlink("../usr/bin/busybox", "bin/sed")
-  mlink("../usr/bin/busybox", "bin/awk")
-  mlink("../usr/bin/busybox", "bin/find")
   mlink("../usr/bin/busybox", "bin/chmod")
   mlink("../usr/bin/busybox", "bin/chown")
   mlink("../usr/bin/busybox", "bin/ln")
@@ -86,19 +78,16 @@ local function create_all_links()
   mlink("../usr/bin/busybox", "bin/tail")
   mlink("../usr/bin/busybox", "bin/head")
   mlink("../usr/bin/busybox", "bin/wc")
-  mlink("../usr/bin/busybox", "bin/sort")
-  mlink("../usr/bin/busybox", "bin/uniq")
   mlink("../usr/bin/busybox", "bin/basename")
   mlink("../usr/bin/busybox", "bin/dirname")
-  mlink("../usr/bin/busybox", "bin/du")
-  mlink("../usr/bin/busybox", "bin/df")
   mlink("../usr/bin/busybox", "bin/true")
   mlink("../usr/bin/busybox", "bin/false")
-  
   mlink("../usr/bin/busybox", "bin/echo")
-  mlink("../usr/bin/busybox", "bin/top")
-  mlink("../usr/bin/busybox", "bin/ping")
-  mlink("../usr/bin/busybox", "usr/bin/clear")
+  mlink("../usr/bin/busybox", "bin/mount")
+  mlink("../usr/bin/busybox", "bin/umount")
+  mlink("../usr/bin/busybox", "bin/kill")
+  mlink("../usr/bin/busybox", "bin/clear")
+  mlink("../usr/bin/busybox", "bin/sync")
 end
 
 local src_dir = BUILD_DIR .. "/" .. BB_NAME
@@ -107,15 +96,6 @@ local lock_file = BUILD_DIR .. "/.build.lock"
 -- Prevent simultaneous builds
 if OSInteract.FileExists(lock_file) then
   PrintMessage(true, "BusyBox build is already in progress (lock found). Skipping.")
-  os.exit(0)
-end
-
--- If binary exists and is recent enough, skip build but ensure links
-if OSInteract.FileExists(src_dir .. "/busybox") then
-  PrintMessage(false, "BusyBox already built. Ensuring symlinks...")
-  os.execute("mkdir -p " .. INITRD_DIR .. "/usr/bin")
-  os.execute("cp " .. src_dir .. "/busybox " .. INITRD_DIR .. "/usr/bin/")
-  create_all_links()
   os.exit(0)
 end
 
@@ -164,26 +144,19 @@ print("Ensuring BusyBox configuration...")
 local desired_configs = {
   -- Core & Init
   "CONFIG_STATIC", "CONFIG_ASH", "CONFIG_SH_IS_ASH", "CONFIG_INIT", 
-  "CONFIG_FEATURE_USE_INITTAB", "CONFIG_FEATURE_INIT_SCTTY",
+  "CONFIG_FEATURE_USE_INITTAB",
+  "CONFIG_SHOW_USAGE", "CONFIG_FEATURE_VERBOSE_USAGE", "CONFIG_FEATURE_COMPRESS_USAGE",
   
-  -- Requested Tools
-  "CONFIG_CAT", "CONFIG_RM", "CONFIG_RMDIR", "CONFIG_LS",
-  "CONFIG_VI", "CONFIG_CP", "CONFIG_MV", "CONFIG_MKDIR",
-  "CONFIG_GREP", "CONFIG_SED", "CONFIG_AWK", "CONFIG_FIND",
+  -- Supported Tools
+  "CONFIG_CAT", "CONFIG_RM", "CONFIG_LS",
+  "CONFIG_CP", "CONFIG_MV", "CONFIG_MKDIR",
   "CONFIG_CHMOD", "CONFIG_CHOWN", "CONFIG_LN", "CONFIG_SLEEP",
   "CONFIG_UNAME", "CONFIG_ID", "CONFIG_WHOAMI", "CONFIG_ENV",
   "CONFIG_TOUCH", "CONFIG_TAIL", "CONFIG_HEAD", "CONFIG_WC",
-  "CONFIG_SORT", "CONFIG_UNIQ", "CONFIG_BASENAME", "CONFIG_DIRNAME",
-  "CONFIG_DU", "CONFIG_DF", "CONFIG_TRUE", "CONFIG_FALSE",
-  
-  -- Top and Ping support
-  "CONFIG_TOP", "CONFIG_FEATURE_TOP_CPU_USAGE_PERCENTAGE", 
-  "CONFIG_FEATURE_TOP_CPU_GLOBAL_PERCENTS", "CONFIG_FEATURE_TOPMEM",
-  "CONFIG_PING", "CONFIG_FEATURE_FANCY_PING",
-  "CONFIG_CLEAR",
-  
-  -- Essentials (implicit shell support)
-  "CONFIG_ECHO",
+  "CONFIG_BASENAME", "CONFIG_DIRNAME",
+  "CONFIG_TRUE", "CONFIG_FALSE", "CONFIG_ECHO",
+  "CONFIG_MOUNT", "CONFIG_UMOUNT", "CONFIG_KILL",
+  "CONFIG_CLEAR", "CONFIG_SYNC",
   
   -- LS features
   "CONFIG_FEATURE_LS_FILETYPES", "CONFIG_FEATURE_LS_FOLLOWLINKS",
@@ -196,11 +169,15 @@ for _, cfg in ipairs(desired_configs) do
   ensure_config_set(config_file, cfg)
 end
 
--- Force disable Linux-specific configs to maintain POSIX compatibility
+-- Force disable Linux-specific configs to maintain BSD/POSIX compatibility
 local linux_configs = {
   "CONFIG_PLATFORM_LINUX",
   "CONFIG_LINUXRC",
   "CONFIG_FREE",
+  "CONFIG_PS",
+  "CONFIG_TOP",
+  "CONFIG_UPTIME",
+  "CONFIG_DMESG",
   "CONFIG_FEATURE_MOUNT_LOOP",
   "CONFIG_FEATURE_MOUNT_LABEL",
   "CONFIG_FEATURE_MOUNT_NFS",

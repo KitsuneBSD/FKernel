@@ -8,28 +8,19 @@
 using namespace fk::core;
 
 fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
-  // Add partitions entry
   DirectoryEntry p_de;
   strncpy(p_de.name, "partitions", sizeof(p_de.name));
-  p_de.type = 0; // Regular file
+  p_de.type = 0; 
   entries.push_back(p_de);
 
-  // Add an entry for each active PID
   auto& scheduler = SchedulerManager::the();
-  
-  // This is a bit inefficient because we don't have a clean "all_tasks" list,
-  // but we can iterate the queues.
-  
-  // We'll use a simple loop from 1 up to m_next_pid to find active tasks.
-  // In a real system we'd have a task list.
-  
   for (uint64_t pid = 1; pid < 1000; ++pid) {
     if (scheduler.find_task(fk::ProcessId(pid))) {
       DirectoryEntry de;
       char pid_str[32];
       snprintf(pid_str, sizeof(pid_str), "%lu", pid);
       strncpy(de.name, pid_str, sizeof(de.name));
-      de.type = 1; // It's a directory /proc/PID
+      de.type = 0; // In the original simple model, it was a file returning status
       entries.push_back(de);
     }
   }
@@ -38,7 +29,6 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
 }
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> ProcFsNode::lookup(const char* name) {
-  // If name is numeric, return a ProcProcessNode for that pid
   if (!name || !*name) return fk::core::Error::NotFound;
 
   if (strcmp(name, "partitions") == 0) {
@@ -47,7 +37,6 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> ProcFsNode::lookup(const cha
     return fk::RefPtr<Node>(res);
   }
 
-  // Check if numeric
   uint64_t pid = 0;
   const char* p = name;
   while (*p) {
@@ -72,7 +61,6 @@ fk::core::Result<size_t, fk::core::Error> ProcProcessNode::read(uint64_t offset,
 
 void ProcProcessNode::ensure_cached() {
   if (!m_cached.is_empty()) return;
-  // Build a small status string
   uint64_t pid = m_pid;
   Task* t = SchedulerManager::the().find_task(fk::ProcessId(pid));
   fk::text::String buf;
@@ -89,9 +77,9 @@ void ProcProcessNode::ensure_cached() {
       case TaskState::Stopped: state = "Stopped"; break;
       case TaskState::Zombie: state = "Zombie"; break;
     }
-    int n = snprintf(tmp, sizeof(tmp), "Name: %s\nPID: %lu\nState: %s\n", 
+    snprintf(tmp, sizeof(tmp), "Name: %s\nPID: %lu\nState: %s\n", 
                      t->control.identity.name.c_str(), t->control.identity.id.value(), state);
-    if (n > 0) buf = fk::text::String(tmp);
+    buf = fk::text::String(tmp);
   }
 
   m_cached.clear();
@@ -115,11 +103,8 @@ void ProcPartitionsNode::ensure_cached() {
   
   for (auto& part : partitions) {
     char tmp[256];
-    // We don't have major/minor yet, using dummy values
     snprintf(tmp, sizeof(tmp), "   1     %d   %llu %s\n", 
-             0, // dummy minor
-             part->sector_count().value(),
-             part->name().c_str());
+             0, part->sector_count().value(), part->name().c_str());
     buf = buf + fk::text::String(tmp);
   }
 
