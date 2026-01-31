@@ -14,6 +14,10 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
 void init() {
+  // 0. Pre-init: Force serial logs for real hardware debugging
+  fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial);
+  fk::algorithms::klog("SYSTEM", "FKernel Live-Minimal starting on real hardware...");
+
   // Initialize PCI Manager (required for driver registry)
   PciManager::the().initialize();
 
@@ -30,6 +34,9 @@ void init() {
   if (boot::BootInfo::the().has_framebuffer()) {
     Display::switch_to(DisplayFramebuffer::the());
     
+    // Enable on-screen logging now that display is ready
+    fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial | fk::algorithms::LogTarget::Display);
+
     // Garantir que tty0 esteja ativo para userspace
     fkernel::terminal::TerminalManager::the().force_tty0_active();
     
