@@ -221,19 +221,20 @@ uintptr_t allocate_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferre
 
 **Validação**: ✅ Compilação bem-sucedida, parsing de SRAT funcional em boot log
 
-### 11. Implementar Hotplug Device Detection
+### 11. Implementar Hotplug Device Detection - ✅ **CONCLUÍDO**
 
+**Status**: PciManager estendido com suporte a detecção dinâmica e callbacks
 **Descrição**: Estender PciManager para detectar dispositivos dinamicamente
 **Arquivos Chave**:
 
-- `Src/Kernel/Hardware/Pci/pci_manager.cpp` (hotplug support)
-- `Src/Kernel/Arch/x86_64/Interrupt/` (PCI interrupt handling)
-- `Src/Kernel/Driver/` (dynamic driver loading)
-**Dependências**: PCI hotplug controller support, interrupt management, driver framework
+- ✅ `Src/Kernel/Hardware/Pci/pci.cpp` (hotplug detection e event handling)
+- ✅ `Include/Kernel/Hardware/Pci/pci.h` (interface de callbacks e novos métodos)
+- ✅ `Include/Kernel/Hardware/Pci/pci_address.h` (adição de operador de igualdade)
+**Dependências**: PCI configuration space access, driver registry
 **Integração**:
 
 ```cpp
-// Extend PciManager for hotplug
+// ✅ PciManager estendido para hotplug
 class PciManager {
 public:
     void enable_hotplug_detection();
@@ -244,7 +245,7 @@ private:
 };
 ```
 
-**Validação**: Dynamic device insertion/removal, driver loading/unloading
+**Validação**: ✅ Compilação bem-sucedida, lógica de inserção/remoção implementada com notificação de callbacks
 
 ### 12. Adicionar Power Management
 

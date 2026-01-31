@@ -217,3 +217,82 @@ void PciManager::check_function(uint8_t bus, uint8_t device, uint8_t function) {
                        bus, device, function, vendor, dev_id, class_code,
                        subclass, prog_if);
 }
+
+void PciManager::enable_hotplug_detection() {
+    m_hotplug_enabled = true;
+    fk::algorithms::klog("PCI", "Hotplug detection enabled");
+}
+
+void PciManager::register_hotplug_callback(HotplugCallback callback) {
+    m_hotplug_callbacks.push_back(fk::types::move(callback));
+}
+
+void PciManager::scan_for_new_devices() {
+    if (!m_hotplug_enabled) return;
+    
+    fk::algorithms::klog("PCI", "Scanning for new devices...");
+    for (uint16_t bus = 0; bus < 256; ++bus) {
+        for (uint8_t device = 0; device < 32; ++device) {
+            handle_hotplug_event(bus, device, 0);
+        }
+    }
+}
+
+void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t function) {
+    PciAddress address(bus, device, function);
+    uint32_t vendor_device = read_config_dword(address, 0);
+    uint16_t vendor = vendor_device & 0xFFFF;
+
+    // Check if device exists
+    bool exists = (vendor != 0xFFFF);
+    
+    // Check if we already know about this device
+    int known_index = -1;
+    for (size_t i = 0; i < m_devices.size(); ++i) {
+        if (m_devices[i].address() == address) {
+            known_index = (int)i;
+            break;
+        }
+    }
+
+    if (exists && known_index == -1) {
+        // New device discovered
+        uint32_t class_reg = read_config_dword(address, 0x08);
+        uint16_t dev_id = vendor_device >> 16;
+        uint8_t class_code = class_reg >> 24;
+        uint8_t subclass = (class_reg >> 16) & 0xFF;
+        uint8_t prog_if = (class_reg >> 8) & 0xFF;
+
+        PciDevice new_device(address, vendor, dev_id, class_code, subclass, prog_if);
+        m_devices.push_back(new_device);
+
+        fk::algorithms::klog("PCI", "Hotplug: New device inserted at %02x:%02x.%d", bus, device, function);
+        
+        // Notify callbacks
+        for (auto& cb : m_hotplug_callbacks) {
+            cb(new_device, true);
+        }
+
+        // Try to instantiate driver
+        for (const auto &driver : m_drivers) {
+            if (new_device.class_code() == driver.class_code && 
+                new_device.subclass_code() == driver.subclass) {
+                driver.factory(new_device);
+            }
+        }
+    } else if (!exists && known_index != -1) {
+        // Device removed
+        PciDevice removed_device = m_devices[known_index];
+        
+        // Notify callbacks before removing from list
+        for (auto& cb : m_hotplug_callbacks) {
+            cb(removed_device, false);
+        }
+
+        fk::algorithms::klog("PCI", "Hotplug: Device removed from %02x:%02x.%d", bus, device, function);
+        
+        // Remove from known devices
+        m_devices[known_index] = m_devices[m_devices.size() - 1];
+        m_devices.pop_back();
+    }
+}

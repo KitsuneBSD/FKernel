@@ -7,6 +7,7 @@
 #include <LibFK/Types/types.h>
 
 using DriverFactory = fk::functional::Function<void(const PciDevice &)>;
+using HotplugCallback = fk::functional::Function<void(const PciDevice &, bool is_insertion)>;
 
 struct PciDriverEntry {
   uint8_t class_code;
@@ -44,16 +45,23 @@ public:
 
   bool has_functional_legacy_ports() const { return m_legacy_ports.functional; }
 
+  void enable_hotplug_detection();
+  void register_hotplug_callback(HotplugCallback callback);
+  void scan_for_new_devices();
+
 private:
   PciManager() = default;
   fk::containers::Vector<PciDevice> m_devices;
   fk::containers::Vector<PciDriverEntry> m_drivers;
+  fk::containers::Vector<HotplugCallback> m_hotplug_callbacks;
 
   uintptr_t m_mcfg_base{0};
   bool m_has_mcfg{false};
+  bool m_hotplug_enabled{false};
   PciLegacyPorts m_legacy_ports;
 
   void detect_legacy_ports();
   void check_device(uint8_t bus, uint8_t device);
   void check_function(uint8_t bus, uint8_t device, uint8_t function);
+  void handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t function);
 };
