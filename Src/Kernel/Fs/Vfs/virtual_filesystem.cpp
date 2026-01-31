@@ -178,11 +178,19 @@ VirtualFileSystem::resolve_path_to_parent_unlocked(const char *path, int depth) 
     strncpy(parent_path, path, 511);
     parent_path[511] = '\0';
 
+    // Remove trailing slashes (except if it's just "/")
+    size_t len = strlen(parent_path);
+    while (len > 1 && parent_path[len - 1] == '/') {
+        parent_path[len - 1] = '\0';
+        len--;
+    }
+
     char *last_slash = strrchr(parent_path, '/', 512);
     fk::text::String name;
 
     if (!last_slash) {
-        name = path;
+        // Relative path without slashes (e.g. "teste")
+        name = parent_path;
         auto *task = SchedulerManager::the().current();
         auto cwd_res = resolve_path_unlocked(task ? task->resources.files.cwd.c_str() : "/", nullptr, depth + 1);
         if (cwd_res.is_error()) return cwd_res.error();
@@ -190,10 +198,12 @@ VirtualFileSystem::resolve_path_to_parent_unlocked(const char *path, int depth) 
     }
 
     if (last_slash == parent_path) {
+        // Path like "/teste"
         name = last_slash + 1;
         return fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>(m_root, name);
     }
 
+    // Path like "/path/to/teste"
     *last_slash = '\0';
     name = last_slash + 1;
     auto parent_res = resolve_path_unlocked(parent_path, nullptr, depth + 1);
