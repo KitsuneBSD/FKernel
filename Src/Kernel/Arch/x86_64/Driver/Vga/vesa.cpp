@@ -44,10 +44,20 @@ void VESADriver::discover_vbe() {
     }
 
     m_vbe_supported = true;
-    fk::algorithms::klog("VESA", "VBE %d.%d detected (%s)", 
+    fk::algorithms::klog("VESA", "VBE %d.%d detected", 
                          m_controller_info.version >> 8, 
-                         m_controller_info.version & 0xFF,
-                         "Linear Frame Buffer Supported");
+                         m_controller_info.version & 0xFF);
+
+    // Enumerate modes
+    uint32_t mode_ptr = m_controller_info.video_mode_ptr;
+    uint16_t* mode_list = reinterpret_cast<uint16_t*>(((mode_ptr >> 16) << 4) + (mode_ptr & 0xFFFF));
+    
+    m_supported_modes.clear();
+    for (int i = 0; mode_list[i] != 0xFFFF && i < 256; i++) {
+        m_supported_modes.push_back(mode_list[i]);
+    }
+
+    fk::algorithms::klog("VESA", "Found %zu supported modes", m_supported_modes.size());
 }
 
 fk::core::Result<void, fk::core::Error> VESADriver::get_mode_info(uint16_t mode, VbeModeInfoBlock* block) {
@@ -104,18 +114,15 @@ fk::core::Result<void, fk::core::Error> VESADriver::set_resolution(uint32_t widt
 
     fk::algorithms::klog("VESA", "Searching for best mode: %ux%ux%u", width, height, bpp);
 
-    // In a real implementation, we would iterate through m_controller_info.video_mode_ptr
-    // For now, we use standard VBE mode numbers as a starting point
-    // 1024x768x32 is often 0x118 or similar
-    
-    // Attempt common modes if dynamic enumeration is too complex for this phase
-    uint16_t modes[] = { 0x118, 0x117, 0x115, 0x112 }; // Common 32/24 bit modes
-    
-    for (uint16_t m : modes) {
+    for (uint16_t m : m_supported_modes) {
         VbeModeInfoBlock info{};
-        if (get_mode_info(m | (1 << 14), &info).is_ok()) {
+        // Try getting info for both standard and LFB version of the mode
+        uint16_t target_mode = m | (1 << 14);
+        if (get_mode_info(target_mode, &info).is_ok()) {
             if (info.width == width && info.height == height && info.bpp == bpp) {
-                return set_mode(m);
+                if (info.attributes & (1 << 7)) { // Ensure LFB is supported
+                    return set_mode(m);
+                }
             }
         }
     }

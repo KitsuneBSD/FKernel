@@ -24,10 +24,15 @@ enter_user_mode:
     ; Swap GS to user base (0 initially)
     swapgs
 
-    ; Push user SS, RSP, RFLAGS, CS, RIP and iretq into user context
-    ; User data selector = GDT index 3 -> 0x18, with RPL=3 => 0x1B
-    ; User code selector = GDT index 4 -> 0x20, with RPL=3 => 0x23
+    ; Set up user data segments (DS, ES, FS, GS)
+    ; User data selector = 0x1B
+    mov ax, 0x1B
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
 
+    ; Push user SS, RSP, RFLAGS, CS, RIP and iretq into user context
     push qword 0x1B
     push rsi
     push qword 0x202

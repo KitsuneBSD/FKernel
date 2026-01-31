@@ -5,7 +5,14 @@
 
 namespace fkernel::drivers::vesa {
 
+struct VbeRegisters {
+    uint32_t eax, ebx, ecx, edx, esi, edi, ebp, esp;
+    uint16_t ds, es, fs, gs, ss;
+} __attribute__((packed));
+
 extern "C" {
+    void vesa_real_mode_bridge(uint8_t int_no, VbeRegisters* regs);
+
     /**
      * @brief Call BIOS INT 10h, AX=4F00h (Get Controller Info)
      * @param info Pointer to VbeInfoBlock
