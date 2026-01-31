@@ -69,8 +69,6 @@ void VGATerminal::on_char(char c) {
                 m_line_chars--;
                 if (m_echo_enabled && is_active) {
                     vga::the().put_char('\b');
-                    // Flush immediately to see the character being removed
-                    Display::the().flush();
                 }
             }
         } else {
@@ -86,8 +84,6 @@ void VGATerminal::on_char(char c) {
         m_line_chars = 0;
         if (m_echo_enabled && !m_raw_mode && is_active) {
             vga::the().put_char('\n');
-            // Flush on newlines for better responsiveness
-            Display::the().flush();
         }
         m_input_queue.enqueue(c);
         return;
@@ -100,8 +96,6 @@ void VGATerminal::on_char(char c) {
 
     if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
-        // Flush immediately for responsive keyboard echo with double buffering
-        Display::the().flush();
     }
     
     m_input_queue.enqueue(c);

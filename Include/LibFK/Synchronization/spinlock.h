@@ -40,6 +40,28 @@ public:
         m_recursion_count = 1;
     }
 
+    bool try_lock() {
+        uint32_t cpu_id = 0;
+#ifdef __fkernel__
+        uint32_t ebx;
+        asm volatile("cpuid" : "=b"(ebx) : "a"(1) : "rcx", "rdx");
+        cpu_id = (ebx >> 24) + 1;
+#endif
+
+        if (m_owner_cpu == cpu_id && cpu_id != 0) {
+            m_recursion_count = m_recursion_count + 1;
+            return true;
+        }
+
+        if (__sync_lock_test_and_set(&m_lock, 1)) {
+            return false;
+        }
+
+        m_owner_cpu = cpu_id;
+        m_recursion_count = 1;
+        return true;
+    }
+
     void unlock() {
         uint32_t new_count = m_recursion_count - 1;
         m_recursion_count = new_count;
