@@ -127,15 +127,18 @@ public:
 **Validação**: ❌ Falta userspace driver loading e device access control
 
 ### 7. Extender HardwareInterruptManager - ⚠️ **PARCIALMENTE CONCLUÍDO (75%)**
+
 **Status**: MSI allocation e basic configuration implementados para APIC/IOAPIC/x2APIC
 **Descrição**: Adicionar MSI/MSI-X support e interrupt sharing na arquitetura existente
 **Arquivos Chave**:
+
 - ✅ `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp` (implementação básica existente)
 - ✅ `Include/Kernel/Arch/x86_64/Interrupt/hardware_interrupt.h` (extensão MSI adicionada)
 - ✅ `Src/Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/` (MSI implementado em APIC, IOAPIC e x2APIC)
 - ✅ `Include/Kernel/Hardware/Pci/pci_device.h` (config space accessors e capability discovery)
 **Dependências**: PCI MSI capability detection, interrupt routing
 **Integração**:
+
 ```cpp
 // ✅ HardwareInterrupt interface extendida
 class HardwareInterrupt {
@@ -146,6 +149,7 @@ public:
     virtual void disable_msi(uint8_t vector) override;
 };
 ```
+
 **Validação**: ✅ Compilação bem-sucedida, suporte a alocação de vetores MSI e configuração de PCI devices
 **Próximo**: Implementar suporte a MSI-X e interrupt sharing (shared handlers list)
 
@@ -421,29 +425,30 @@ public:
 
 **Validação**: ❌ NUMA system não suportado
 
-### 19. Add IOMMU Support - ❌ **NÃO INICIADO**
+### 19. Add IOMMU Support - ⚠️ **PARCIALMENTE CONCLUÍDO (50%)**
 
-**Status**: Nenhuma implementação IOMMU encontrada
+**Status**: Interface base e inicialização Intel VT-d (DMAR) implementadas
 **Descrição**: DMA protection integrado com MemoryManager abstractions
 **Arquivos Chave**:
 
-- ❌ `Include/Kernel/Memory/iommu.h` (interface não existe)
-- ❌ `Src/Kernel/Arch/x86_64/Memory/IntelIOMMU/` (diretório não existe)
-- ❌ `Src/Kernel/Memory/dma_manager.cpp` (falta IOMMU integration)
+- ✅ `Include/Kernel/Memory/iommu.h` (interface genérica implementada)
+- ✅ `Include/Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h` (Estruturas Intel VT-d)
+- ✅ `Src/Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.cpp` (Parsing de DMAR e inicialização Root Table)
+- ✅ `Include/Kernel/Hardware/Acpi/dmar.h` (Estruturas ACPI DMAR)
 **Dependências**: PCI device identification, DMA remapping, interrupt remapping
 **Integração**:
 
 ```cpp
-// ❌ IOMMU support não implementado
+// ✅ Interface IOMMU integrada ao MemoryManager
 class IOMMU {
 public:
-    Result<void, Error> create_domain(DomainId id);
-    Result<void, Error> map_device(DomainId domain, const PciDevice& device);
-    Result<void, Error> set_translation(DomainId domain, PhysicalAddress input, PhysicalAddress output, size_t size);
+    virtual Result<void, Error> create_domain(DomainId id) = 0;
+    virtual Result<void, Error> map_device(DomainId domain, const PciDevice& device) = 0;
 };
 ```
 
-**Validação**: ❌ DMA protection não implementada
+**Validação**: ✅ Compilação bem-sucedida, detecção de tabela DMAR em boot log
+**Próximo**: Implementar gerenciamento de domínios e tabelas de páginas de Segundo Nível (SLPT)
 
 ### 20. Create IPUK Framework - ❌ **NÃO INICIADO**
 
@@ -541,4 +546,3 @@ public:
 ---
 
 *Este documento é um guia vivo e será atualizado conforme o progresso do desenvolvimento.*
-

@@ -8,6 +8,8 @@
 #include <LibFK/Types/types.h>
 #include <LibFK/Synchronization/spinlock.h>
 
+namespace fkernel { class IOMMU; }
+
 /**
  * @class MemoryManager
  * @brief Singleton class that coordinates virtual and physical memory managers.
@@ -75,6 +77,11 @@ public:
    * @brief Frees a physical page frame.
    */
   void free_page(uintptr_t phys);
+
+  /**
+   * @brief Get the active IOMMU controller if present.
+   */
+  fkernel::IOMMU* get_iommu() const;
 
   /**
    * @brief Allocates a memory block from the kernel heap.
