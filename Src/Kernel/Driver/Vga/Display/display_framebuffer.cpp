@@ -330,10 +330,12 @@ void DisplayFramebuffer::clear() {
       if (old_dirty) MemoryManager::the().free(old_dirty);
       
       cursor_x = 0; cursor_y = 0;
-      m_full_redraw_requested = true;
       
       // 4. Force immediate hardware update from the fresh context
       memcpy(framebuffer, back_buffer, buffer_size);
+      
+      // Screen is already in sync, no need for background full redraw
+      m_full_redraw_requested = false;
   } else {
       // Fallback if allocation fails
       if (next_back_buffer) MemoryManager::the().free(next_back_buffer);
