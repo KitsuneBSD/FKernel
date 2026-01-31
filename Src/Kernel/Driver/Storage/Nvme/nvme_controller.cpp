@@ -92,6 +92,12 @@ fk::core::Result<void, fk::core::Error> NVMeController::initialize_controller() 
     // Configure admin queues
     configure_admin_queue();
     
+    // Create IO queues
+    auto io_queue_result = create_io_queues();
+    if (io_queue_result.is_error()) {
+        return io_queue_result.error();
+    }
+    
     // Identify controller
     auto identify_result = identify_controller();
     if (identify_result.is_error()) {
@@ -127,9 +133,11 @@ fk::core::Result<void, fk::core::Error> NVMeController::reset_controller() {
         return fk::core::Error::DeviceError;
     }
     
-    // Enable controller with IO queues
-    cc = *reinterpret_cast<volatile uint32_t*>(m_controller_regs + NVME_CC);
-    cc = (cc & ~0x06) | 0x00; // Clear IO submission/completion queue size, use default
+    // Set CC with basic configuration (MPS=0, CSS=NVM, AMS=RR)
+    cc = (0 << 7) | (0 << 4) | (0 << 11); 
+    *reinterpret_cast<volatile uint32_t*>(m_controller_regs + NVME_CC) = cc;
+
+    // Enable controller
     cc |= 0x01; // Enable
     *reinterpret_cast<volatile uint32_t*>(m_controller_regs + NVME_CC) = cc;
     
@@ -137,7 +145,7 @@ fk::core::Result<void, fk::core::Error> NVMeController::reset_controller() {
     timeout = 1000;
     while (timeout-- > 0) {
         uint32_t csts = *reinterpret_cast<volatile uint32_t*>(m_controller_regs + NVME_CSTS);
-        if ((csts & 0x01) == 0x01 && (csts & 0x02) == 0) { // RDY set and CSTS cleared
+        if ((csts & 0x01) == 0x01) { // RDY set
             fk::algorithms::klog("NVMe", "Controller reset completed");
             return {};
         }
@@ -168,6 +176,9 @@ void NVMeController::configure_admin_queue() {
     m_admin_queue.cq_memory = reinterpret_cast<void*>(admin_cq_addr);
     m_admin_queue.sq_size = 64;
     m_admin_queue.cq_size = 64;
+    m_admin_queue.sq_tail = 0;
+    m_admin_queue.cq_head = 0;
+    m_admin_queue.cq_phase = 1;
     
     // Clear queue memory
     memset(m_admin_queue.sq_memory, 0, 4096);
@@ -180,69 +191,184 @@ void NVMeController::configure_admin_queue() {
     // Setup doorbell pointers
     uint32_t doorbell_offset = 0x1000; // Base doorbell offset
     m_admin_queue.sq_tail_db = reinterpret_cast<volatile uint32_t*>(m_controller_regs + doorbell_offset);
-    m_admin_queue.cq_head_db = reinterpret_cast<volatile uint32_t*>(m_controller_regs + doorbell_offset + m_doorbell_stride);
+    m_admin_queue.cq_head_db = reinterpret_cast<volatile uint32_t*>(m_controller_regs + doorbell_offset + (1 * m_doorbell_stride * 4));
     
     fk::algorithms::klog("NVMe", "Admin queue configured (SQ:%p, CQ:%p)", 
                          (void*)admin_sq_addr, (void*)admin_cq_addr);
 }
 
-fk::core::Result<void, fk::core::Error> NVMeController::identify_controller() {
-    // TODO: Send IDENTIFY command to get controller information
-    // For now, just log placeholder
-    fk::algorithms::klog("NVMe", "Controller identify (placeholder)");
+fk::core::Result<void, fk::core::Error> NVMeController::create_io_queues() {
+    fk::algorithms::klog("NVMe", "Creating IO queues...");
+
+    // Allocate IO queue memory
+    uintptr_t io_sq_addr = PhysicalMemoryManager::the().alloc_page();
+    uintptr_t io_cq_addr = PhysicalMemoryManager::the().alloc_page();
+    
+    ASSERT(io_sq_addr != 0 && io_cq_addr != 0);
+    
+    MemoryManager::the().map_page(io_sq_addr, io_sq_addr, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+    MemoryManager::the().map_page(io_cq_addr, io_cq_addr, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+    
+    m_io_queue.sq_memory = reinterpret_cast<void*>(io_sq_addr);
+    m_io_queue.cq_memory = reinterpret_cast<void*>(io_cq_addr);
+    m_io_queue.sq_size = 64;
+    m_io_queue.cq_size = 64;
+    m_io_queue.sq_tail = 0;
+    m_io_queue.cq_head = 0;
+    m_io_queue.cq_phase = 1;
+    
+    memset(m_io_queue.sq_memory, 0, 4096);
+    memset(m_io_queue.cq_memory, 0, 4096);
+
+    uint32_t doorbell_offset = 0x1000;
+    m_io_queue.sq_tail_db = reinterpret_cast<volatile uint32_t*>(m_controller_regs + doorbell_offset + (2 * m_doorbell_stride * 4));
+    m_io_queue.cq_head_db = reinterpret_cast<volatile uint32_t*>(m_controller_regs + doorbell_offset + (3 * m_doorbell_stride * 4));
+
+    // 1. Create IO CQ
+    Command cmd;
+    memset(&cmd, 0, sizeof(Command));
+    cmd.cdw0 = NVME_CMD_CREATE_IO_CQ;
+    cmd.prp1 = io_cq_addr;
+    cmd.cdw10 = ((m_io_queue.cq_size - 1) << 16) | 1; // Size, Queue ID 1
+    cmd.cdw11 = 1; // Physically contiguous, interrupts disabled for now
+
+    auto res = submit_command(m_admin_queue, cmd);
+    if (res.is_error()) return res.error();
+
+    // 2. Create IO SQ
+    memset(&cmd, 0, sizeof(Command));
+    cmd.cdw0 = NVME_CMD_CREATE_IO_SQ;
+    cmd.prp1 = io_sq_addr;
+    cmd.cdw10 = ((m_io_queue.sq_size - 1) << 16) | 1; // Size, Queue ID 1
+    cmd.cdw11 = (1 << 16) | 1; // CQ ID 1, Physically contiguous
+
+    res = submit_command(m_admin_queue, cmd);
+    if (res.is_error()) return res.error();
+
+    fk::algorithms::klog("NVMe", "IO queues created successfully");
     return {};
 }
 
+fk::core::Result<void, fk::core::Error> NVMeController::submit_command(QueuePair& queue, Command& cmd) {
+    Command* sq = reinterpret_cast<Command*>(queue.sq_memory);
+    sq[queue.sq_tail] = cmd;
+    
+    queue.sq_tail = (queue.sq_tail + 1) % queue.sq_size;
+    *queue.sq_tail_db = queue.sq_tail;
+
+    // Wait for completion (polling)
+    volatile Completion* cq = reinterpret_cast<volatile Completion*>(queue.cq_memory);
+    int timeout = 1000000;
+    while (timeout-- > 0) {
+        uint16_t status = cq[queue.cq_head].status;
+        if ((status & 0x1) == queue.cq_phase) {
+            queue.cq_head = (queue.cq_head + 1) % queue.cq_size;
+            if (queue.cq_head == 0) queue.cq_phase = !queue.cq_phase;
+            *queue.cq_head_db = queue.cq_head;
+            
+            if ((status >> 1) != 0) {
+                fk::algorithms::kerror("NVMe", "Command failed with status 0x%x", status >> 1);
+                return fk::core::Error::DeviceError;
+            }
+            return {};
+        }
+    }
+
+    fk::algorithms::kerror("NVMe", "Command timeout");
+    return fk::core::Error::DeviceError;
+}
+
+fk::core::Result<void, fk::core::Error> NVMeController::identify_controller() {
+    fk::algorithms::klog("NVMe", "Controller identify");
+    uintptr_t buffer_phys = PhysicalMemoryManager::the().alloc_page();
+    MemoryManager::the().map_page(buffer_phys, buffer_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+    
+    Command cmd;
+    memset(&cmd, 0, sizeof(Command));
+    cmd.cdw0 = NVME_CMD_IDENTIFY;
+    cmd.prp1 = buffer_phys;
+    cmd.cdw10 = 1; // Identify Controller
+
+    auto res = submit_command(m_admin_queue, cmd);
+    // TODO: Parse identify data
+    return res;
+}
+
 void NVMeController::scan_namespaces() {
-    // TODO: Send IDENTIFY command for each namespace
-    // For now, create placeholder namespace
     Namespace ns;
     ns.nsid = 1;
-    ns.size_blocks = 1024 * 1024; // 1M blocks placeholder
-    ns.block_size = 4096; // 4KB blocks
+    ns.size_blocks = 1024 * 1024 * 4; // 4M blocks = 16GB
+    ns.block_size = 4096;
     ns.active = true;
-    
     m_namespaces.push_back(ns);
     
-    fk::algorithms::klog("NVMe", "Namespace scan complete. Found %u namespace(s)", m_namespaces.size());
-    for (const auto& ns : m_namespaces) {
-        fk::algorithms::klog("NVMe", "Namespace %u: %llu blocks x %u bytes = %llu MB", 
-                             ns.nsid, ns.size_blocks, ns.block_size, 
-                             (ns.size_blocks * ns.block_size) / (1024 * 1024));
-    }
+    fk::algorithms::klog("NVMe", "Namespace scan complete (placeholder)");
 }
 
 void NVMeController::probe() {
     fk::algorithms::klog("NVMe", "Probing NVMe controller...");
-    
-    if (!m_initialized) {
-        fk::algorithms::kwarn("NVMe", "Controller not initialized, skipping probe");
-        return;
-    }
-    
-    // TODO: Initialize namespace devices
-    // This would involve creating block device nodes for each namespace
-    
+    if (!m_initialized) return;
     fk::algorithms::klog("NVMe", "Probe completed");
 }
 
 fk::core::Result<size_t, fk::core::Error> 
-NVMeController::read([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* buffer) {
-    // TODO: Implement NVMe read operations
-    // For now, return not implemented
-    return fk::core::Error::NotImplemented;
+NVMeController::read_sectors(uint64_t start_sector, size_t count, uint8_t *buffer) {
+    if (!m_initialized) return fk::core::Error::DeviceError;
+    
+    Command cmd;
+    memset(&cmd, 0, sizeof(Command));
+    cmd.cdw0 = NVME_CMD_READ;
+    cmd.nsid = 1;
+    cmd.prp1 = (uintptr_t)buffer; // Must be physical address
+    cmd.cdw10 = (uint32_t)start_sector;
+    cmd.cdw11 = (uint32_t)(start_sector >> 32);
+    cmd.cdw12 = (uint32_t)((count - 1) & 0xFFFF);
+
+    auto res = submit_command(m_io_queue, cmd);
+    if (res.is_error()) return res.error();
+    return count;
 }
 
 fk::core::Result<size_t, fk::core::Error> 
-NVMeController::write([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] const uint8_t* buffer) {
-    // TODO: Implement NVMe write operations  
-    // For now, return not implemented
-    return fk::core::Error::NotImplemented;
+NVMeController::write_sectors(uint64_t start_sector, size_t count, const uint8_t *buffer) {
+    if (!m_initialized) return fk::core::Error::DeviceError;
+
+    Command cmd;
+    memset(&cmd, 0, sizeof(Command));
+    cmd.cdw0 = NVME_CMD_WRITE;
+    cmd.nsid = 1;
+    cmd.prp1 = (uintptr_t)buffer;
+    cmd.cdw10 = (uint32_t)start_sector;
+    cmd.cdw11 = (uint32_t)(start_sector >> 32);
+    cmd.cdw12 = (uint32_t)((count - 1) & 0xFFFF);
+
+    auto res = submit_command(m_io_queue, cmd);
+    if (res.is_error()) return res.error();
+    return count;
+}
+
+SectorCount NVMeController::sector_count() const {
+    if (m_namespaces.is_empty()) return SectorCount(0);
+    return SectorCount(m_namespaces[0].size_blocks);
+}
+
+fk::core::Result<size_t, fk::core::Error> 
+NVMeController::read(uint64_t offset, size_t size, uint8_t* buffer) {
+    uint64_t start_sector = offset / 4096;
+    size_t count = (size + 4095) / 4096;
+    return read_sectors(start_sector, count, buffer);
+}
+
+fk::core::Result<size_t, fk::core::Error> 
+NVMeController::write(uint64_t offset, size_t size, const uint8_t* buffer) {
+    uint64_t start_sector = offset / 4096;
+    size_t count = (size + 4095) / 4096;
+    return write_sectors(start_sector, count, buffer);
 }
 
 size_t NVMeController::size() const {
-    // TODO: Calculate total size of all namespaces
-    return 0;
+    if (m_namespaces.is_empty()) return 0;
+    return m_namespaces[0].size_blocks * 4096;
 }
 
 } // namespace fkernel

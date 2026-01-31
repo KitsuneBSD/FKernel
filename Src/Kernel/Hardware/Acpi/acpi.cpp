@@ -16,14 +16,22 @@ void ACPIManager::initialize() {
   m_rsdp = find_rsdp();
   assert(m_rsdp && "RSDP not found - critical ACPI infrastructure unavailable!");
 
+  fk::algorithms::klog("ACPI", "RSDP found at %p (Revision: %u)", m_rsdp, (uint32_t)m_rsdp->revision);
+
   if (m_rsdp->revision >= 2 && m_rsdp->xsdt_address) {
     m_xsdt = (XSDT *)((uintptr_t)m_rsdp->xsdt_address);
-    assert(validate_checksum(m_xsdt, m_xsdt->header.length) && "XSDT checksum validation failed - corrupted table!");
+    if (validate_checksum(m_xsdt, m_xsdt->header.length)) {
+      fk::algorithms::klog("ACPI", "Using XSDT at %p (Length: %u)", m_xsdt, m_xsdt->header.length);
+    } else {
+      fk::algorithms::klog("ACPI", "XSDT checksum invalid, falling back to RSDT if possible");
+      m_xsdt = nullptr;
+    }
   }
 
   if (!m_xsdt) {
     m_rsdt = (RSDT *)((uintptr_t)m_rsdp->rsdt_address);
     assert(validate_checksum(m_rsdt, m_rsdt->header.length) && "RSDT checksum validation failed - corrupted table!");
+    fk::algorithms::klog("ACPI", "Using RSDT at %p (Length: %u)", m_rsdt, m_rsdt->header.length);
   }
 
   // Initialize FADT support via the FadtManager
