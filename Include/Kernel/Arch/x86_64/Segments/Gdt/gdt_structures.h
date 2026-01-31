@@ -23,7 +23,9 @@ enum SegmentAccess : uint8_t {
 
 enum SegmentFlags : uint8_t {
   Granularity4K = 1 << 7, ///< 4K-byte granularity
-  LongMode = 1 << 5       ///< 64-bit code segment
+  DefaultSize32 = 1 << 6, ///< 32-bit segment
+  LongMode = 1 << 5,      ///< 64-bit code segment
+  DefaultSize16 = 0       ///< 16-bit segment (all flags 0)
 };
 
 constexpr SegmentFlags operator|(SegmentFlags a, SegmentFlags b) {

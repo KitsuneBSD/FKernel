@@ -34,6 +34,17 @@ void GDTController::setupUserData() {
   gdt[3] = createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
 }
 
+void GDTController::setupCompatibilitySegments() {
+  // Slot 7: 32-bit Kernel Code
+  gdt[7] = createSegment(SegmentAccess::Ring0Code, SegmentFlags::DefaultSize32 | SegmentFlags::Granularity4K);
+  
+  // Slot 8: 16-bit Kernel Code
+  gdt[8] = createSegment(SegmentAccess::Ring0Code, SegmentFlags::DefaultSize16);
+  
+  // Slot 9: 16-bit Kernel Data
+  gdt[9] = createSegment(SegmentAccess::Ring0Data, SegmentFlags::DefaultSize16);
+}
+
 void GDTController::setupTSS() {
 
   uint64_t rsp0_top =
@@ -113,6 +124,7 @@ void GDTController::setupGDT() {
   setupKernelData();
   setupUserCode();
   setupUserData();
+  setupCompatibilitySegments();
   setupTSS();
   setupGDTR();
 }
