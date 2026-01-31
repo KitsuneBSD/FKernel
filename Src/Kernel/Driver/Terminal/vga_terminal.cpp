@@ -69,6 +69,7 @@ void VGATerminal::on_char(char c) {
                 m_line_chars--;
                 if (m_echo_enabled && is_active) {
                     vga::the().put_char('\b');
+                    Display::the().flush();
                 }
             }
         } else {
@@ -84,6 +85,7 @@ void VGATerminal::on_char(char c) {
         m_line_chars = 0;
         if (m_echo_enabled && !m_raw_mode && is_active) {
             vga::the().put_char('\n');
+            Display::the().flush();
         }
         m_input_queue.enqueue(c);
         return;
@@ -96,6 +98,7 @@ void VGATerminal::on_char(char c) {
 
     if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
+        Display::the().flush();
     }
     
     m_input_queue.enqueue(c);
@@ -303,6 +306,7 @@ void terminal::VGATerminal::clear_screen(uint8_t mode) {
         case 3: // Clear entire screen including scrollback
             vga::the().clear();
             vga::the().set_cursor_pos(0, 0);
+            Display::the().flush();
             break;
     }
 }
