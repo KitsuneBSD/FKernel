@@ -1,17 +1,13 @@
 #pragma once
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
+#include <Kernel/Driver/Keyboard/keymap_manager.h>
 #include <LibFK/Core/Result.h>
 #include <LibFK/Types/types.h>
 
 static constexpr uint16_t PS2_DATA_PORT = 0x60;     ///< PS/2 data port
 static constexpr uint16_t PS2_STATUS_PORT = 0x64;   ///< PS/2 status port
 static constexpr size_t KEYBOARD_BUFFER_SIZE = 256; ///< Size of the key buffer
-
-enum class KeyboardLayout {
-  US,
-  ABNT2
-};
 
 /**
  * @brief PS/2 keyboard controller
@@ -26,7 +22,6 @@ private:
   volatile size_t tail = 0;                   ///< Tail index of the buffer
   bool shift_pressed{false};
   bool alt_pressed{false};
-  KeyboardLayout m_layout{KeyboardLayout::US};
 
   PS2Keyboard() {
       set_name("keyboard");
@@ -59,8 +54,8 @@ public:
     return instance;
   }
 
-  void set_layout(KeyboardLayout layout) { m_layout = layout; }
-  KeyboardLayout layout() const { return m_layout; }
+  void set_layout(fkernel::drivers::KeyboardLayout layout) { fkernel::drivers::KeymapManager::the().set_layout(layout); }
+  fkernel::drivers::KeyboardLayout layout() const { return fkernel::drivers::KeymapManager::the().layout(); }
 
   /**
    * @brief Initialize the PS/2 keyboard

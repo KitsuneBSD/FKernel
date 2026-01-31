@@ -5,66 +5,16 @@
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
+#include <Kernel/Driver/Keyboard/keymap_manager.h>
 #include <LibFK/Algorithms/log.h>
 
-// Row helper: 16 entries
-#define R16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p
-
 fk::core::Result<size_t, fk::core::Error> PS2Keyboard::read([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* out_buffer) {
-    // We no longer support direct reading from the keyboard driver to avoid de-sync.
-    // Use /dev/console or /dev/ttyX instead.
     return fk::core::Error::PermissionDenied;
 }
 
 fk::core::Result<size_t, fk::core::Error> PS2Keyboard::write(uint64_t, size_t, const uint8_t*) {
     return fk::core::Error::PermissionDenied;
 }
-
-// Layout US QWERTY
-static const char us_set1[128] = {
-    R16(0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t'), // 0x00
-    R16('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 0, 'a', 's'),  // 0x10
-    R16('d', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0, '\\', 'z', 'x', 'c', 'v'), // 0x20
-    R16('b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x50
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                                // 0x70
-};
-
-static const char us_set1_shift[128] = {
-    R16(0, 27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', '\t'), // 0x00
-    R16('Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0, 'A', 'S'),  // 0x10
-    R16('D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|', 'Z', 'X', 'C', 'V'),  // 0x20
-    R16('B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x50
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                                // 0x70
-};
-
-// Layout ABNT2
-static const char abnt2_set1[128] = {
-    R16(0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t'), // 0x00
-    R16('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 0, '[', '\n', 0, 'a', 's'),   // 0x10 (0x1A: acute)
-    R16('d', 'f', 'g', 'h', 'j', 'k', 'l', 'c', '~', '\'', 0, ']', 'z', 'x', 'c', 'v'), // 0x20 (0x27: ç -> c, 0x2B: ])
-    R16('b', 'n', 'm', ',', '.', ';', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30 (0x35: ;)
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
-    R16(0, 0, 0, 0, 0, 0, '\\', 0, 0, 0, 0, 0, 0, 0, 0, 0),                            // 0x50 (0x56: \)
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
-    R16(0, 0, 0, '/', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                               // 0x70 (0x73: /)
-};
-
-static const char abnt2_set1_shift[128] = {
-    R16(0, 27, '!', '@', '#', '$', '%', 0, '&', '*', '(', ')', '_', '+', '\b', '\t'),   // 0x00
-    R16('Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 0, '{', '\n', 0, 'A', 'S'),   // 0x10 (0x1A: grave)
-    R16('D', 'F', 'G', 'H', 'J', 'K', 'L', 'C', '^', '"', 0, '}', 'Z', 'X', 'C', 'V'),  // 0x20 (0x27: Ç -> C, 0x2B: })
-    R16('B', 'N', 'M', '<', '>', ':', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),               // 0x30 (0x35: :)
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x40
-    R16(0, 0, 0, 0, 0, 0, '|', 0, 0, 0, 0, 0, 0, 0, 0, 0),                             // 0x50 (0x56: |)
-    R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),                               // 0x60
-    R16(0, 0, 0, '?', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)                               // 0x70 (0x73: ?)
-};
 
 void PS2Keyboard::push_char(char c) {
   size_t next = (head + 1) % KEYBOARD_BUFFER_SIZE;
@@ -111,24 +61,11 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
   if (key_released)
     return;
 
-  // Handle Alt + Q shortcut for '/'
-  if (alt_pressed && keycode == 0x10) {
-    fkernel::terminal::TerminalManager::the().handle_input('/');
-    return;
-  }
-
-  char c = 0;
-  if (m_layout == KeyboardLayout::ABNT2) {
-      c = shift_pressed ? abnt2_set1_shift[keycode] : abnt2_set1[keycode];
-  } else {
-      c = shift_pressed ? us_set1_shift[keycode] : us_set1[keycode];
-  }
+  // Delegate translation to the KeymapManager
+  char c = fkernel::drivers::KeymapManager::the().translate(keycode, shift_pressed, alt_pressed);
 
   if (c) {
-    // Notify TerminalManager
     fkernel::terminal::TerminalManager::the().handle_input(c);
-  } else {
-    // fk::algorithms::kdebug("KEYBOARD", "Unmapped keycode: 0x%X", keycode);
   }
 }
 
@@ -138,7 +75,7 @@ void PS2Keyboard::irq_handler() {
 }
 
 void PS2Keyboard::initialize() {
-  m_layout = KeyboardLayout::ABNT2;
+  set_layout(fkernel::drivers::KeyboardLayout::ABNT2);
   HardwareInterruptManager::the().unmask_interrupt(1);
   fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked, ABNT2, Polling Fallback)");
 }
