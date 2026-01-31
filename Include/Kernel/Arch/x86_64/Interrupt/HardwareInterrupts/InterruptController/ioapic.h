@@ -33,6 +33,10 @@ public:
   void unmask_interrupt(uint8_t irq) override;
   void send_eoi(uint8_t irq) override;
 
+  fk::core::Result<uint8_t, fk::core::Error> allocate_msi_vector(const PciDevice& device) override;
+  void enable_msi(uint8_t vector) override;
+  void disable_msi(uint8_t vector) override;
+
   /**
    * @brief Remap IRQ to vector and LAPIC
    */

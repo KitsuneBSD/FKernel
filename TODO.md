@@ -126,30 +126,28 @@ public:
 
 **Validação**: ❌ Falta userspace driver loading e device access control
 
-### 7. Extender HardwareInterruptManager - ⚠️ **PARCIALMENTE CONCLUÍDO (40%)**
-
-**Status**: Basic interrupt handling existe, MSI/MSI-X e sharing faltando
+### 7. Extender HardwareInterruptManager - ⚠️ **PARCIALMENTE CONCLUÍDO (75%)**
+**Status**: MSI allocation e basic configuration implementados para APIC/IOAPIC/x2APIC
 **Descrição**: Adicionar MSI/MSI-X support e interrupt sharing na arquitetura existente
 **Arquivos Chave**:
-
 - ✅ `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp` (implementação básica existente)
-- ❌ `Include/Kernel/Arch/x86_64/Interrupt/hardware_interrupt.h` (falta extensão MSI)
-- ❌ `Src/Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/` (MSI não implementado)
+- ✅ `Include/Kernel/Arch/x86_64/Interrupt/hardware_interrupt.h` (extensão MSI adicionada)
+- ✅ `Src/Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/` (MSI implementado em APIC, IOAPIC e x2APIC)
+- ✅ `Include/Kernel/Hardware/Pci/pci_device.h` (config space accessors e capability discovery)
 **Dependências**: PCI MSI capability detection, interrupt routing
 **Integração**:
-
 ```cpp
-// ⚠️ Extend HardwareInterrupt interface - falta implementação
+// ✅ HardwareInterrupt interface extendida
 class HardwareInterrupt {
 public:
-    // ✅ Existing methods implementados...
-    virtual Result<uint8_t, Error> allocate_msi_vector(const PciDevice& device) = 0; // ❌ Faltando
-    virtual void enable_msi(uint8_t vector) = 0;                                   // ❌ Faltando
-    virtual void disable_msi(uint8_t vector) = 0;                                  // ❌ Faltando
+    // ...
+    virtual Result<uint8_t, Error> allocate_msi_vector(const PciDevice& device) override;
+    virtual void enable_msi(uint8_t vector) override;
+    virtual void disable_msi(uint8_t vector) override;
 };
 ```
-
-**Validação**: ❌ MSI-enabled devices não suportados, interrupt sharing ausente
+**Validação**: ✅ Compilação bem-sucedida, suporte a alocação de vetores MSI e configuração de PCI devices
+**Próximo**: Implementar suporte a MSI-X e interrupt sharing (shared handlers list)
 
 ### 8. Criar USB Host Controller Interface - ❌ **NÃO INICIADO**
 

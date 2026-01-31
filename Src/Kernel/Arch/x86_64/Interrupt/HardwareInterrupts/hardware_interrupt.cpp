@@ -6,6 +6,8 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 
+uint8_t g_next_msi_vector = 0x40;
+
 void HardwareInterruptManager::select_and_configure_controller() {
   static PIC8259 pic_controller_instance;
   static APIC apic_controller_instance;
@@ -76,4 +78,17 @@ void HardwareInterruptManager::unmask_interrupt(uint8_t irq) {
 void HardwareInterruptManager::send_eoi(uint8_t irq) {
   if (m_controller)
     m_controller->send_eoi(irq);
+}
+
+fk::core::Result<uint8_t, fk::core::Error> HardwareInterruptManager::allocate_msi_vector(const PciDevice& device) {
+    if (!m_controller) return fk::core::Error::NotImplemented;
+    return m_controller->allocate_msi_vector(device);
+}
+
+void HardwareInterruptManager::enable_msi(uint8_t vector) {
+    if (m_controller) m_controller->enable_msi(vector);
+}
+
+void HardwareInterruptManager::disable_msi(uint8_t vector) {
+    if (m_controller) m_controller->disable_msi(vector);
 }
