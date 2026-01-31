@@ -292,6 +292,7 @@ void terminal::VGATerminal::clear_screen(uint8_t mode) {
         case 0: // Clear from cursor to end of screen
             clear_line(0); // Clear rest of current line
             if (y + 1 < m_rows) {
+                // Clear all remaining pixels to the bottom of the PHYSICAL screen
                 Display::the().clear_rect(0, (y + 1) * char_h, fb.width, fb.height - (y + 1) * char_h);
             }
             break;
@@ -305,42 +306,30 @@ void terminal::VGATerminal::clear_screen(uint8_t mode) {
         case 3: // Clear entire screen including scrollback
             vga::the().clear();
             vga::the().set_cursor_pos(0, 0);
-            Display::the().flush();
             break;
     }
+    Display::the().flush();
 }
 
 void terminal::VGATerminal::clear_line(uint8_t mode) {
-    uint32_t current_x = Display::the().get_cursor_x();
-    uint32_t current_y = Display::the().get_cursor_y();
-    
-    // Save current cursor position
-    uint32_t saved_x = current_x;
-    uint32_t saved_y = current_y;
-    
+    uint32_t x = vga::the().get_cursor_x();
+    uint32_t y = vga::the().get_cursor_y();
+    auto fb = Display::the().get_framebuffer_info();
+    uint32_t char_w = fb.width / m_cols;
+    uint32_t char_h = fb.height / m_rows;
+
     switch (mode) {
         case 0: // Clear from cursor to end of line
-            for (uint32_t i = current_x; i < m_cols; i++) {
-                Display::the().set_cursor_pos(i, current_y);
-                Display::the().put_char(' ');
-            }
+            // Clear until the PHYSICAL edge of the screen
+            Display::the().clear_rect(x * char_w, y * char_h, fb.width - (x * char_w), char_h);
             break;
-        case 1: // Clear from beginning to cursor
-            for (uint32_t i = 0; i <= current_x; i++) {
-                Display::the().set_cursor_pos(i, current_y);
-                Display::the().put_char(' ');
-            }
+        case 1: // Clear from beginning of line to cursor
+            Display::the().clear_rect(0, y * char_h, (x + 1) * char_w, char_h);
             break;
         case 2: // Clear entire line
-            for (uint32_t i = 0; i < m_cols; i++) {
-                Display::the().set_cursor_pos(i, current_y);
-                Display::the().put_char(' ');
-            }
+            Display::the().clear_rect(0, y * char_h, fb.width, char_h);
             break;
     }
-    
-    // Restore cursor position
-    Display::the().set_cursor_pos(saved_x, saved_y);
 }
 
 void terminal::VGATerminal::set_scroll_region(uint16_t top, uint16_t bottom) {
@@ -420,9 +409,10 @@ void terminal::VGATerminal::delete_chars(uint16_t count) {
         Display::the().copy_rect((x + count) * char_w, y * char_h, 
                                 x * char_w, y * char_h, 
                                 (m_cols - x - count) * char_w, char_h);
-        Display::the().clear_rect((m_cols - count) * char_w, y * char_h, count * char_w, char_h);
+        // Clear until the physical edge of the line
+        Display::the().clear_rect((m_cols - count) * char_w, y * char_h, fb.width - (m_cols - count) * char_w, char_h);
     } else {
-        Display::the().clear_rect(x * char_w, y * char_h, (m_cols - x) * char_w, char_h);
+        Display::the().clear_rect(x * char_w, y * char_h, fb.width - (x * char_w), char_h);
     }
 }
 
@@ -433,8 +423,12 @@ void terminal::VGATerminal::erase_chars(uint16_t count) {
     uint32_t char_w = fb.width / m_cols;
     uint32_t char_h = fb.height / m_rows;
 
-    uint32_t to_clear = (x + count > m_cols) ? (m_cols - x) : count;
-    Display::the().clear_rect(x * char_w, y * char_h, to_clear * char_w, char_h);
+    if (x + count >= m_cols) {
+        // Clear until the physical edge of the line
+        Display::the().clear_rect(x * char_w, y * char_h, fb.width - (x * char_w), char_h);
+    } else {
+        Display::the().clear_rect(x * char_w, y * char_h, count * char_w, char_h);
+    }
 }
 
 void terminal::VGATerminal::insert_lines(uint16_t count) {

@@ -212,17 +212,33 @@ void DisplayFramebuffer::write(const char *str) {
 void DisplayFramebuffer::clear() {
   fk::synchronization::ScopedLockIRQ lock(Display::lock());
   uint32_t bg_pixel = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
-  if (back_buffer) for (uint32_t y = 0; y < fb_height; ++y) {
-      uint8_t* line = back_buffer + (y * fb_pitch);
-      if (fb_bpp == 32) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
-      else for (uint32_t x = 0; x < fb_width; ++x) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
+  
+  // Clear entire memory area (including pitch padding)
+  if (back_buffer) {
+      if (bg_pixel == 0) memset(back_buffer, 0, fb_height * fb_pitch);
+      else {
+          for (uint32_t y = 0; y < fb_height; ++y) {
+              uint8_t* line = back_buffer + (y * fb_pitch);
+              if (fb_bpp == 32) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
+              else for (uint32_t x = 0; x < fb_width; ++x) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
+          }
+      }
   }
-  if (framebuffer) for (uint32_t y = 0; y < fb_height; ++y) {
-      uint8_t* line = framebuffer + (y * fb_pitch);
-      if (fb_bpp == 32) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
-      else for (uint32_t x = 0; x < fb_width; ++x) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
+  
+  if (framebuffer) {
+      if (bg_pixel == 0) memset(framebuffer, 0, fb_height * fb_pitch);
+      else {
+          for (uint32_t y = 0; y < fb_height; ++y) {
+              uint8_t* line = framebuffer + (y * fb_pitch);
+              if (fb_bpp == 32) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
+              else for (uint32_t x = 0; x < fb_width; ++x) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
+          }
+      }
   }
+
+  // Force all tiles to be marked clean since we just synced manually
   if (m_dirty_tiles) memset(m_dirty_tiles, 0, (m_tiles_x * m_tiles_y + 7) / 8);
+  
   cursor_x = 0; cursor_y = 0; m_full_redraw_requested = false;
 }
 
