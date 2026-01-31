@@ -864,6 +864,8 @@ void DisplayFramebuffer::mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint
   if (end_tile_x > m_tiles_x) end_tile_x = m_tiles_x;
   if (end_tile_y > m_tiles_y) end_tile_y = m_tiles_y;
 
+  // No need for a heavy lock here if we use atomic OR, 
+  // but for now let's just ensure we don't crash.
   for (uint32_t ty = start_tile_y; ty < end_tile_y; ++ty) {
     for (uint32_t tx = start_tile_x; tx < end_tile_x; ++tx) {
       uint32_t tile_idx = ty * m_tiles_x + tx;
@@ -878,12 +880,33 @@ void DisplayFramebuffer::update_dirty_rectangles() {
   }
 
   uint32_t bpp_bytes = fb_bpp / 8;
+  uint32_t dirty_count = 0;
+  uint32_t total_tiles = m_tiles_x * m_tiles_y;
   
+  // First pass: count dirty tiles
+  for (uint32_t i = 0; i < (total_tiles + 7) / 8; ++i) {
+    if (m_dirty_tiles[i]) {
+        for (int b = 0; b < 8; ++b) {
+            if (m_dirty_tiles[i] & (1 << b)) dirty_count++;
+        }
+    }
+  }
+
+  if (dirty_count == 0) return;
+
+  // If more than 50% of tiles are dirty, just copy everything
+  if (dirty_count > total_tiles / 2) {
+      memcpy(framebuffer, back_buffer, fb_height * fb_pitch);
+      memset(m_dirty_tiles, 0, (total_tiles + 7) / 8);
+      return;
+  }
+
   for (uint32_t ty = 0; ty < m_tiles_y; ++ty) {
     for (uint32_t tx = 0; tx < m_tiles_x; ++tx) {
       uint32_t tile_idx = ty * m_tiles_x + tx;
-      if (m_dirty_tiles[tile_idx / 8] & (1 << (tile_idx % 8))) {
-        // Tile is dirty, copy it
+      uint8_t mask = (1 << (tile_idx % 8));
+      
+      if (m_dirty_tiles[tile_idx / 8] & mask) {
         uint32_t x = tx * TILE_SIZE;
         uint32_t y = ty * TILE_SIZE;
         uint32_t w = TILE_SIZE;
@@ -902,8 +925,7 @@ void DisplayFramebuffer::update_dirty_rectangles() {
           dst += fb_pitch;
         }
         
-        // Clear dirty bit for this tile
-        m_dirty_tiles[tile_idx / 8] &= ~(1 << (tile_idx % 8));
+        m_dirty_tiles[tile_idx / 8] &= ~mask;
       }
     }
   }
@@ -913,12 +935,6 @@ uint8_t* DisplayFramebuffer::get_render_buffer() {
   if (double_buffering_enabled && back_buffer) {
     return back_buffer;
   }
-  
-  // If double buffering is disabled, ensure framebuffer is accessible
-  if (!framebuffer) {
-    return nullptr; // Prevent null pointer access
-  }
-  
   return framebuffer;
 }
 
@@ -929,14 +945,14 @@ void DisplayFramebuffer::flush() {
 
   uint64_t current_tick = TickManager::the().get_ticks();
   uint32_t freq = TickManager::the().get_frequency();
-  if (freq == 0) freq = 100; // Fallback
+  if (freq == 0) freq = 100;
 
-  // Target 60 FPS: interval = frequency / 60
+  // Target 60 FPS. If freq is 100, interval is 1 (effectively 100 FPS limit)
+  // If freq is 1000, interval is 16 (62.5 FPS limit)
   uint32_t interval = freq / 60;
   if (interval == 0) interval = 1;
 
-  if (current_tick - m_last_flush_tick >= interval) {
-    wait_vblank();
+  if (current_tick >= m_last_flush_tick + interval) {
     update_dirty_rectangles();
     m_last_flush_tick = current_tick;
   }
