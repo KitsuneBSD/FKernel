@@ -19,6 +19,15 @@ KeymapManager& KeymapManager::the() {
     return instance;
 }
 
+void KeymapManager::set_layout(KeyboardLayout layout) {
+    m_current_layout = layout;
+    if (layout == KeyboardLayout::ABNT2) {
+        load_default_abnt2();
+    } else {
+        load_default_us();
+    }
+}
+
 void KeymapManager::load_default_abnt2() {
     static const uint8_t abnt2_normal[128] = {
         R16(0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t'),
@@ -34,7 +43,7 @@ void KeymapManager::load_default_abnt2() {
     static const uint8_t abnt2_shift[128] = {
         R16(0, 27, '!', '@', '#', '$', '%', 0, '&', '*', '(', ')', '_', '+', '\b', '\t'),
         R16('Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 0, '{', '\n', 0, 'A', 'S'),
-        R16('D', 'F', 'G', 'H', 'J', 'K', 'L', 'C', '^', '\"', 0, '}', 'Z', 'X', 'C', 'V'),
+        R16('D', 'F', 'G', 'H', 'J', 'K', 'L', 'C', '^', '"', 0, '}', 'Z', 'X', 'C', 'V'),
         R16('B', 'N', 'M', '<', '>', ':', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),
         R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         R16(0, 0, 0, 0, 0, 0, '|', 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -44,6 +53,34 @@ void KeymapManager::load_default_abnt2() {
 
     memcpy(m_map_normal, abnt2_normal, 128);
     memcpy(m_map_shift, abnt2_shift, 128);
+    memset(m_map_alt, 0, 128);
+}
+
+void KeymapManager::load_default_us() {
+    static const uint8_t us_normal[128] = {
+        R16(0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t'),
+        R16('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 0, 'a', 's'),
+        R16('d', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0, '\\', 'z', 'x', 'c', 'v'),
+        R16('b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    };
+
+    static const uint8_t us_shift[128] = {
+        R16(0, 27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', '\t'),
+        R16('Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0, 'A', 'S'),
+        R16('D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|', 'Z', 'X', 'C', 'V'),
+        R16('B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    };
+
+    memcpy(m_map_normal, us_normal, 128);
+    memcpy(m_map_shift, us_shift, 128);
     memset(m_map_alt, 0, 128);
 }
 
