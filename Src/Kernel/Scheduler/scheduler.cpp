@@ -16,6 +16,7 @@
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Driver/Vga/display.h>
 #include <LibFK/Algorithms/log.h>
 
 extern CpuControlBlock g_cpu_block;
@@ -376,6 +377,7 @@ void SchedulerManager::on_tick() {
   auto &proc = current_processor();
 
   if (proc.id == 0) {
+    Display::the().background_flush();
     fk::synchronization::ScopedLock lock(m_lock);
     for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end();) {
       Task *task = &*it;

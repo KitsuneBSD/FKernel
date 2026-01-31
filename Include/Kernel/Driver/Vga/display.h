@@ -89,6 +89,9 @@ public:
   /// Flush display updates (for double-buffered displays)
   virtual void flush() = 0;
 
+  /// Background flush (called from timer/scheduler), must be non-blocking
+  virtual void background_flush() = 0;
+
   /// Save current screen content to a backup buffer
   virtual void save_screen() = 0;
 
@@ -163,6 +166,7 @@ public:
   void flush() override {
     // Text mode has immediate updates, no flush needed
   }
+  void background_flush() override {}
   void save_screen() override {}
   void restore_screen() override {}
 };

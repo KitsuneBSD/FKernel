@@ -42,10 +42,11 @@ class DisplayFramebuffer : public Display {
   bool use_rgb_color = false;
 
   // Dirty tiles tracking for efficient updates
-  static constexpr uint32_t TILE_SIZE = 64;
+  static constexpr uint32_t TILE_SIZE = 32;
   uint32_t m_tiles_x = 0;
   uint32_t m_tiles_y = 0;
   uint8_t* m_dirty_tiles = nullptr; // Bitset for dirty tiles
+  bool m_full_redraw_requested = false;
 
   DisplayFramebuffer();
   void initialize_framebuffer();
@@ -79,6 +80,8 @@ public:
 
   /// Flush pending updates to screen
   void flush() override;
+
+  void background_flush() override;
 
   /// Advance to next frame (with double buffering)
   void next_frame();
