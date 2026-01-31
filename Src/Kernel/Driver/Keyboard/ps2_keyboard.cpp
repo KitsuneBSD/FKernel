@@ -111,6 +111,12 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
   if (key_released)
     return;
 
+  // Handle Alt + Q shortcut for '/'
+  if (alt_pressed && keycode == 0x10) {
+    fkernel::terminal::TerminalManager::the().handle_input('/');
+    return;
+  }
+
   char c = 0;
   if (m_layout == KeyboardLayout::ABNT2) {
       c = shift_pressed ? abnt2_set1_shift[keycode] : abnt2_set1[keycode];
