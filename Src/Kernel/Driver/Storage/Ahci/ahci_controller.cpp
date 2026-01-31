@@ -93,14 +93,18 @@ fk::core::Result<void, fk::core::Error> AHCIController::initialize_controller() 
         if (!port.is_implemented) continue;
 
         // Allocate physical pages
+        // 1 page for CLB (1K used), 1 page for FB (256B used), 2 pages for Command Tables (32 * 256B = 8K)
         uintptr_t clb_phys = PhysicalMemoryManager::the().alloc_page();
         uintptr_t fb_phys = PhysicalMemoryManager::the().alloc_page();
+        uintptr_t ct_phys_base = PhysicalMemoryManager::the().alloc_contiguous(1); // 2^1 = 2 pages
         
-        ASSERT(clb_phys != 0 && fb_phys != 0);
+        ASSERT(clb_phys != 0 && fb_phys != 0 && ct_phys_base != 0);
 
-        // Identity map for simplicity (or should use VMM properly)
-        MemoryManager::the().map_page(clb_phys, clb_phys, PageFlags::Present | PageFlags::Writable);
-        MemoryManager::the().map_page(fb_phys, fb_phys, PageFlags::Present | PageFlags::Writable);
+        // Identity map for simplicity
+        MemoryManager::the().map_page(clb_phys, clb_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+        MemoryManager::the().map_page(fb_phys, fb_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+        MemoryManager::the().map_page(ct_phys_base, ct_phys_base, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+        MemoryManager::the().map_page(ct_phys_base + 4096, ct_phys_base + 4096, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
 
         port.regs->clb = (uint32_t)clb_phys;
         port.regs->clbu = (uint32_t)(clb_phys >> 32);
@@ -110,6 +114,16 @@ fk::core::Result<void, fk::core::Error> AHCIController::initialize_controller() 
         // Clear memory
         memset(reinterpret_cast<void*>(clb_phys), 0, 4096);
         memset(reinterpret_cast<void*>(fb_phys), 0, 4096);
+        memset(reinterpret_cast<void*>(ct_phys_base), 0, 8192);
+
+        // Initialize Command Headers
+        HBA_CMD_HEADER* cmd_headers = reinterpret_cast<HBA_CMD_HEADER*>(clb_phys);
+        for (int i = 0; i < 32; i++) {
+            uintptr_t ct_phys = ct_phys_base + (i * 256);
+            cmd_headers[i].ctba = (uint32_t)ct_phys;
+            cmd_headers[i].ctbau = (uint32_t)(ct_phys >> 32);
+            cmd_headers[i].prdtl = 8; // 8 entries
+        }
 
         // Enable port
         port.regs->cmd |= (1 << 4); // FRE (FIS Receive Enable)
@@ -173,6 +187,7 @@ void AHCIController::scan_ports() {
         port.is_implemented = true;
         port.has_device = false;
         port.sig = 0;
+        port.sectors = 0;
         port.regs = reinterpret_cast<volatile HBA_PORT*>(m_hba_base + 0x100 + (i * 0x80));
         
         // Check if port has device connected
@@ -194,24 +209,131 @@ void AHCIController::scan_ports() {
             
             fk::algorithms::klog("AHCI", "Port %u: %s device detected (signature: 0x%08x)", 
                                  i, device_type, port.sig);
+            
+            // For now, let's assume a fixed size if it's ATA
+            if (port.sig == 0x00000101) port.sectors = 1024 * 1024 * 2; // 1GB placeholder
         }
         
         m_ports.push_back(port);
     }
 }
 
-fk::core::Result<void, fk::core::Error> AHCIController::read_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, uint16_t* buffer) {
-    if (port_idx >= m_ports.size()) return fk::core::Error::InvalidParameter;
-    // AHCI Read logic here
-    (void)start_sector; (void)count; (void)buffer;
-    return fk::core::Error::NotImplemented;
+int AHCIController::find_cmd_slot(uint32_t port_idx) {
+    uint32_t slots = (m_ports[port_idx].regs->sact | m_ports[port_idx].regs->ci);
+    for (int i = 0; i < 32; i++) {
+        if ((slots & (1 << i)) == 0) return i;
+    }
+    return -1;
 }
 
-fk::core::Result<void, fk::core::Error> AHCIController::write_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, const uint16_t* buffer) {
+fk::core::Result<void, fk::core::Error> AHCIController::read_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, void* buffer) {
     if (port_idx >= m_ports.size()) return fk::core::Error::InvalidParameter;
-    // AHCI Write logic here
-    (void)start_sector; (void)count; (void)buffer;
-    return fk::core::Error::NotImplemented;
+    Port& port = m_ports[port_idx];
+
+    port.regs->is = 0xFFFFFFFF; // Clear interrupts
+    int slot = find_cmd_slot(port_idx);
+    if (slot == -1) return fk::core::Error::DeviceError;
+
+    HBA_CMD_HEADER* cmd_header = (HBA_CMD_HEADER*)(uintptr_t)port.regs->clb;
+    cmd_header += slot;
+    cmd_header->cfl = sizeof(FIS_REG_H2D) / sizeof(uint32_t);
+    cmd_header->w = 0; // Read
+    cmd_header->prdtl = 1;
+
+    HBA_CMD_TABLE* cmd_table = (HBA_CMD_TABLE*)(uintptr_t)cmd_header->ctba;
+    memset(cmd_table, 0, sizeof(HBA_CMD_TABLE) + (cmd_header->prdtl - 1) * sizeof(HBA_PRDT_ENTRY));
+
+    cmd_table->prdt_entry[0].dba = (uint32_t)(uintptr_t)buffer;
+    cmd_table->prdt_entry[0].dbau = (uint32_t)((uintptr_t)buffer >> 32);
+    cmd_table->prdt_entry[0].dbc = (count << 9) - 1; // 512 bytes per sector
+    cmd_table->prdt_entry[0].i = 1;
+
+    FIS_REG_H2D* fis = (FIS_REG_H2D*)(&cmd_table->cfis);
+    fis->fis_type = FIS_TYPE_REG_H2D;
+    fis->c = 1;
+    fis->command = ATA_CMD_READ_DMA_EX;
+
+    fis->lba0 = (uint8_t)start_sector;
+    fis->lba1 = (uint8_t)(start_sector >> 8);
+    fis->lba2 = (uint8_t)(start_sector >> 16);
+    fis->device = 1 << 6; // LBA mode
+
+    fis->lba3 = (uint8_t)(start_sector >> 24);
+    fis->lba4 = (uint8_t)(start_sector >> 32);
+    fis->lba5 = (uint8_t)(start_sector >> 40);
+
+    fis->countl = (uint8_t)count;
+    fis->counth = (uint8_t)(count >> 8);
+
+    int timeout = 1000000;
+    while ((port.regs->tfd & (0x80 | 0x08)) && timeout > 0) timeout--;
+    if (timeout == 0) return fk::core::Error::DeviceError;
+
+    port.regs->ci = (1 << slot);
+
+    while (true) {
+        if ((port.regs->ci & (1 << slot)) == 0) break;
+        if (port.regs->is & (1 << 30)) return fk::core::Error::DeviceError;
+    }
+
+    if (port.regs->is & (1 << 30)) return fk::core::Error::DeviceError;
+
+    return {};
+}
+
+fk::core::Result<void, fk::core::Error> AHCIController::write_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, const void* buffer) {
+    if (port_idx >= m_ports.size()) return fk::core::Error::InvalidParameter;
+    Port& port = m_ports[port_idx];
+
+    port.regs->is = 0xFFFFFFFF;
+    int slot = find_cmd_slot(port_idx);
+    if (slot == -1) return fk::core::Error::DeviceError;
+
+    HBA_CMD_HEADER* cmd_header = (HBA_CMD_HEADER*)(uintptr_t)port.regs->clb;
+    cmd_header += slot;
+    cmd_header->cfl = sizeof(FIS_REG_H2D) / sizeof(uint32_t);
+    cmd_header->w = 1; // Write
+    cmd_header->prdtl = 1;
+
+    HBA_CMD_TABLE* cmd_table = (HBA_CMD_TABLE*)(uintptr_t)cmd_header->ctba;
+    memset(cmd_table, 0, sizeof(HBA_CMD_TABLE) + (cmd_header->prdtl - 1) * sizeof(HBA_PRDT_ENTRY));
+
+    cmd_table->prdt_entry[0].dba = (uint32_t)(uintptr_t)buffer;
+    cmd_table->prdt_entry[0].dbau = (uint32_t)((uintptr_t)buffer >> 32);
+    cmd_table->prdt_entry[0].dbc = (count << 9) - 1;
+    cmd_table->prdt_entry[0].i = 1;
+
+    FIS_REG_H2D* fis = (FIS_REG_H2D*)(&cmd_table->cfis);
+    fis->fis_type = FIS_TYPE_REG_H2D;
+    fis->c = 1;
+    fis->command = ATA_CMD_WRITE_DMA_EX;
+
+    fis->lba0 = (uint8_t)start_sector;
+    fis->lba1 = (uint8_t)(start_sector >> 8);
+    fis->lba2 = (uint8_t)(start_sector >> 16);
+    fis->device = 1 << 6;
+
+    fis->lba3 = (uint8_t)(start_sector >> 24);
+    fis->lba4 = (uint8_t)(start_sector >> 32);
+    fis->lba5 = (uint8_t)(start_sector >> 40);
+
+    fis->countl = (uint8_t)count;
+    fis->counth = (uint8_t)(count >> 8);
+
+    int timeout = 1000000;
+    while ((port.regs->tfd & (0x80 | 0x08)) && timeout > 0) timeout--;
+    if (timeout == 0) return fk::core::Error::DeviceError;
+
+    port.regs->ci = (1 << slot);
+
+    while (true) {
+        if ((port.regs->ci & (1 << slot)) == 0) break;
+        if (port.regs->is & (1 << 30)) return fk::core::Error::DeviceError;
+    }
+
+    if (port.regs->is & (1 << 30)) return fk::core::Error::DeviceError;
+
+    return {};
 }
 
 void AHCIController::probe() {
@@ -222,29 +344,51 @@ void AHCIController::probe() {
         return;
     }
     
-    // TODO: Initialize ports with connected devices
-    // This would involve setting up command lists, FIS receive areas, etc.
-    
     fk::algorithms::klog("AHCI", "Probe completed");
 }
 
 fk::core::Result<size_t, fk::core::Error> 
-AHCIController::read([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* buffer) {
-    // TODO: Implement AHCI read operations
-    // For now, return not implemented
-    return fk::core::Error::NotImplemented;
+AHCIController::read_sectors(uint64_t start_sector, size_t count, uint8_t *buffer) {
+    // For now, use port 0
+    if (m_ports.is_empty()) return fk::core::Error::NotFound;
+    auto res = read_port(0, start_sector, (uint32_t)count, buffer);
+    if (res.is_error()) return res.error();
+    return count;
 }
 
 fk::core::Result<size_t, fk::core::Error> 
-AHCIController::write([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] const uint8_t* buffer) {
-    // TODO: Implement AHCI write operations  
-    // For now, return not implemented
-    return fk::core::Error::NotImplemented;
+AHCIController::write_sectors(uint64_t start_sector, size_t count, const uint8_t *buffer) {
+    // For now, use port 0
+    if (m_ports.is_empty()) return fk::core::Error::NotFound;
+    auto res = write_port(0, start_sector, (uint32_t)count, buffer);
+    if (res.is_error()) return res.error();
+    return count;
+}
+
+SectorCount AHCIController::sector_count() const {
+    if (m_ports.is_empty()) return SectorCount(0);
+    return SectorCount(m_ports[0].sectors);
+}
+
+fk::core::Result<size_t, fk::core::Error> 
+AHCIController::read(uint64_t offset, size_t size, uint8_t* buffer) {
+    uint64_t start_sector = offset / 512;
+    size_t count = (size + 511) / 512;
+    // Note: buffer must be suitable for DMA (ideally physically contiguous)
+    // For now, we assume it's okay (simplicity)
+    return read_sectors(start_sector, count, buffer);
+}
+
+fk::core::Result<size_t, fk::core::Error> 
+AHCIController::write(uint64_t offset, size_t size, const uint8_t* buffer) {
+    uint64_t start_sector = offset / 512;
+    size_t count = (size + 511) / 512;
+    return write_sectors(start_sector, count, buffer);
 }
 
 size_t AHCIController::size() const {
-    // TODO: Calculate total size of all attached devices
-    return 0;
+    if (m_ports.is_empty()) return 0;
+    return m_ports[0].sectors * 512;
 }
 
 } // namespace fkernel

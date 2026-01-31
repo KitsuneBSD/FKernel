@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Kernel/Driver/Device/driver_manager.h>
+#include <Kernel/Driver/Storage/storage_device.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
-#include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -11,7 +11,7 @@ namespace fkernel {
 /// 
 /// Implements AHCI 1.3 specification for SATA storage devices.
 /// Provides block device interface through VFS integration.
-class AHCIController final : public Driver, public Node {
+class AHCIController final : public Driver, public StorageDevice {
 public:
     /// @brief Factory method for creating AHCI controller from PCI device
     /// @param device PCI device that represents AHCI controller
@@ -23,6 +23,15 @@ public:
     // Driver interface
     virtual const char* name() const override { return "AHCIController"; }
     virtual void probe() override;
+
+    // BlockDevice/StorageDevice interface
+    virtual fk::core::Result<size_t, fk::core::Error>
+    read_sectors(uint64_t start_sector, size_t count, uint8_t *buffer) override;
+    virtual fk::core::Result<size_t, fk::core::Error>
+    write_sectors(uint64_t start_sector, size_t count, const uint8_t *buffer) override;
+
+    virtual SectorSize sector_size() const override { return SectorSize(512); }
+    virtual SectorCount sector_count() const override;
 
     // Node interface (VFS integration)
     virtual fk::core::Result<size_t, fk::core::Error> 
@@ -119,8 +128,8 @@ public:
     void configure_interrupts();
     void scan_ports();
     
-    fk::core::Result<void, fk::core::Error> read_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, uint16_t* buffer);
-    fk::core::Result<void, fk::core::Error> write_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, const uint16_t* buffer);
+    fk::core::Result<void, fk::core::Error> read_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, void* buffer);
+    fk::core::Result<void, fk::core::Error> write_port(uint32_t port_idx, uint64_t start_sector, uint32_t count, const void* buffer);
 
     // Port management
     struct Port {
@@ -128,6 +137,7 @@ public:
         bool is_implemented;
         bool has_device;
         uint32_t sig;  // Port signature (SATA, ATAPI, etc.)
+        uint64_t sectors;
         volatile HBA_PORT* regs;
     };
 
@@ -140,6 +150,8 @@ private:
     
     PciDevice m_pci_device;
     bool m_initialized{false};
+
+    int find_cmd_slot(uint32_t port_idx);
     
     // AHCI register offsets
     static constexpr uint32_t HBA_CAP = 0x00;
@@ -156,6 +168,11 @@ private:
     
     // PCI BAR for AHCI HBA
     static constexpr uint8_t AHCI_PCI_BAR = 0x05;
+
+    // ATA Commands
+    static constexpr uint8_t ATA_CMD_READ_DMA_EX = 0x25;
+    static constexpr uint8_t ATA_CMD_WRITE_DMA_EX = 0x35;
+    static constexpr uint8_t FIS_TYPE_REG_H2D = 0x27;
 };
 
 } // namespace fkernel

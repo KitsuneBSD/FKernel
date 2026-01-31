@@ -5,10 +5,9 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
-static constexpr uint16_t PCI_CONFIG_ADDRESS = 0xCF8;
-static constexpr uint16_t PCI_CONFIG_DATA = 0xCFC;
-
 void PciManager::initialize() {
+  detect_legacy_ports();
+
   auto *mcfg = static_cast<MCFGTable *>(ACPIManager::the().find_table("MCFG"));
   if (mcfg) {
     size_t entries_count = (mcfg->header.length - sizeof(MCFGTable)) / sizeof(MCFGEntry);
@@ -28,10 +27,30 @@ void PciManager::initialize() {
   }
 
   if (!m_has_mcfg) {
-    fk::algorithms::klog("PCI", "MCFG not found, using legacy IO ports");
+    if (m_legacy_ports.functional) {
+      fk::algorithms::klog("PCI", "MCFG not found, using legacy IO ports (0x%x/0x%x)", 
+                           m_legacy_ports.address_port, m_legacy_ports.data_port);
+    } else {
+      fk::algorithms::klog("PCI", "Warning: MCFG not found and legacy ports don't seem functional!");
+    }
   }
 
   fk::algorithms::klog("PCI", "Manager initialized");
+}
+
+void PciManager::detect_legacy_ports() {
+  // Try to read VendorID of Bus 0, Device 0, Function 0
+  uint32_t address = 0x80000000; // Bus 0, Dev 0, Func 0, Reg 0
+  outl(m_legacy_ports.address_port, address);
+  uint32_t value = inl(m_legacy_ports.data_port);
+
+  if (value != 0xFFFFFFFF && value != 0x00000000) {
+    m_legacy_ports.functional = true;
+    fk::algorithms::klog("PCI", "Legacy ports 0x%x/0x%x are functional (B0:D0:F0 VendorID: 0x%x)", 
+                         m_legacy_ports.address_port, m_legacy_ports.data_port, value & 0xFFFF);
+  } else {
+    m_legacy_ports.functional = false;
+  }
 }
 
 PciManager &PciManager::the() {
@@ -49,8 +68,8 @@ uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
     return *reinterpret_cast<volatile uint32_t *>(config_addr);
   }
 
-  outl(PCI_CONFIG_ADDRESS, address.to_config_address(offset));
-  return inl(PCI_CONFIG_DATA);
+  outl(m_legacy_ports.address_port, address.to_config_address(offset));
+  return inl(m_legacy_ports.data_port);
 }
 
 void PciManager::write_config_dword(PciAddress address, uint8_t offset, uint32_t value) {
@@ -62,8 +81,8 @@ void PciManager::write_config_dword(PciAddress address, uint8_t offset, uint32_t
                              (offset & 0xFFF));
     *reinterpret_cast<volatile uint32_t *>(config_addr) = value;
   } else {
-    outl(PCI_CONFIG_ADDRESS, address.to_config_address(offset));
-    outl(PCI_CONFIG_DATA, value);
+    outl(m_legacy_ports.address_port, address.to_config_address(offset));
+    outl(m_legacy_ports.data_port, value);
   }
 }
 

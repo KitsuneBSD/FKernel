@@ -14,6 +14,12 @@ struct PciDriverEntry {
   DriverFactory factory;
 };
 
+struct PciLegacyPorts {
+  uint16_t address_port{0xCF8};
+  uint16_t data_port{0xCFC};
+  bool functional{false};
+};
+
 class PciManager {
 public:
   static PciManager &the();
@@ -31,6 +37,8 @@ public:
   /// @brief Combines scan_bus() and instantiate_drivers() for automatic discovery
   void auto_discover();
 
+  bool has_functional_legacy_ports() const { return m_legacy_ports.functional; }
+
 private:
   PciManager() = default;
   fk::containers::Vector<PciDevice> m_devices;
@@ -38,7 +46,9 @@ private:
 
   uintptr_t m_mcfg_base{0};
   bool m_has_mcfg{false};
+  PciLegacyPorts m_legacy_ports;
 
+  void detect_legacy_ports();
   void check_device(uint8_t bus, uint8_t device);
   void check_function(uint8_t bus, uint8_t device, uint8_t function);
 };
