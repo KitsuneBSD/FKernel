@@ -56,38 +56,24 @@ end
 local function create_all_links()
   print("Creating safe symlinks for initrd...")
   create_etc_configs()
+  
+  local src_dir = BUILD_DIR .. "/" .. BB_NAME
+  -- Use the freshly built binary to list applets
+  os.execute(src_dir .. "/busybox --list > /tmp/bb_applets.txt")
+  
+  local f = io.open("/tmp/bb_applets.txt", "r")
+  if f then
+    for line in f:lines() do
+      if line ~= "busybox" then
+        mlink("../usr/bin/busybox", "bin/" .. line)
+      end
+    end
+    f:close()
+  end
+  
+  -- Extra safety links
   mlink("../usr/bin/busybox", "bin/sh")
   mlink("../usr/bin/busybox", "sbin/init")
-  
-  -- Supported by native syscalls
-  mlink("../usr/bin/busybox", "bin/cat")
-  mlink("../usr/bin/busybox", "bin/rm")
-  mlink("../usr/bin/busybox", "bin/ls")
-  mlink("../usr/bin/busybox", "bin/cp")
-  mlink("../usr/bin/busybox", "bin/mv")
-  mlink("../usr/bin/busybox", "bin/mkdir")
-  mlink("../usr/bin/busybox", "bin/chmod")
-  mlink("../usr/bin/busybox", "bin/chown")
-  mlink("../usr/bin/busybox", "bin/ln")
-  mlink("../usr/bin/busybox", "bin/sleep")
-  mlink("../usr/bin/busybox", "bin/uname")
-  mlink("../usr/bin/busybox", "bin/id")
-  mlink("../usr/bin/busybox", "bin/whoami")
-  mlink("../usr/bin/busybox", "bin/env")
-  mlink("../usr/bin/busybox", "bin/touch")
-  mlink("../usr/bin/busybox", "bin/tail")
-  mlink("../usr/bin/busybox", "bin/head")
-  mlink("../usr/bin/busybox", "bin/wc")
-  mlink("../usr/bin/busybox", "bin/basename")
-  mlink("../usr/bin/busybox", "bin/dirname")
-  mlink("../usr/bin/busybox", "bin/true")
-  mlink("../usr/bin/busybox", "bin/false")
-  mlink("../usr/bin/busybox", "bin/echo")
-  mlink("../usr/bin/busybox", "bin/mount")
-  mlink("../usr/bin/busybox", "bin/umount")
-  mlink("../usr/bin/busybox", "bin/kill")
-  mlink("../usr/bin/busybox", "bin/clear")
-  mlink("../usr/bin/busybox", "bin/sync")
 end
 
 local src_dir = BUILD_DIR .. "/" .. BB_NAME
@@ -112,107 +98,67 @@ ArchiveUtils.download(BB_URL, tarball)
 ArchiveUtils.extract(tarball, BUILD_DIR)
 
 local function ensure_config_set(config_file, key)
-  local grep_cmd = string.format("grep -q '^%s=y' %s", key, config_file)
-  if not os.execute(grep_cmd) then
-    local sed_cmd1 = string.format("sed -i 's/^# %s is not set/%s=y/' %s", key, key, config_file)
-    os.execute(sed_cmd1)
-    local sed_cmd2 = string.format("sed -i 's/^%s=n/%s=y/' %s", key, key, config_file)
-    os.execute(sed_cmd2)
-    if not os.execute(grep_cmd) then
-       local f = io.open(config_file, "a")
-       if f then 
-         f:write(key .. "=y\n")
-         f:close()
-       end
-    end
-  end
+  local sed_cmd1 = string.format("sed -i 's/^# %s is not set/%s=y/' %s", key, key, config_file)
+  os.execute(sed_cmd1)
+  local sed_cmd2 = string.format("sed -i 's/^%s=n/%s=y/' %s", key, key, config_file)
+  os.execute(sed_cmd2)
 end
 
-local function ensure_config_unset(config_file, key)
-  local sed_cmd = string.format("sed -i 's/^%s=y/# %s is not set/' %s", key, key, config_file)
-  os.execute(sed_cmd)
-end
+-- Start from allnoconfig
+print("Generating minimal configuration...")
+os.execute("make -C " .. src_dir .. " allnoconfig")
 
-if not OSInteract.FileExists(src_dir .. "/.config") then
-  print("Generating minimal configuration...")
-  os.execute("make -C " .. src_dir .. " allnoconfig")
-end
-
--- Force ensure our desired config options are enabled
 local config_file = src_dir .. "/.config"
-print("Ensuring BusyBox configuration...")
-local desired_configs = {
-  -- Core & Init
-  "CONFIG_STATIC", "CONFIG_ASH", "CONFIG_SH_IS_ASH", "CONFIG_INIT", 
+print("Enabling essential applets and installer...")
+
+local enable_list = {
+  "CONFIG_BUSYBOX",
+  "CONFIG_FEATURE_INSTALLER",
+  "CONFIG_STATIC",
+  "CONFIG_ASH",
+  "CONFIG_SH_IS_ASH",
+  "CONFIG_INIT",
   "CONFIG_FEATURE_USE_INITTAB",
-  "CONFIG_SHOW_USAGE", "CONFIG_FEATURE_VERBOSE_USAGE", "CONFIG_FEATURE_COMPRESS_USAGE",
-  
-  -- Supported Tools
-  "CONFIG_CAT", "CONFIG_RM", "CONFIG_LS",
-  "CONFIG_CP", "CONFIG_MV", "CONFIG_MKDIR",
-  "CONFIG_CHMOD", "CONFIG_CHOWN", "CONFIG_LN", "CONFIG_SLEEP",
-  "CONFIG_UNAME", "CONFIG_ID", "CONFIG_WHOAMI", "CONFIG_ENV",
-  "CONFIG_TOUCH", "CONFIG_TAIL", "CONFIG_HEAD", "CONFIG_WC",
-  "CONFIG_BASENAME", "CONFIG_DIRNAME",
-  "CONFIG_TRUE", "CONFIG_FALSE", "CONFIG_ECHO",
-  "CONFIG_MOUNT", "CONFIG_UMOUNT", "CONFIG_KILL",
-  "CONFIG_CLEAR", "CONFIG_SYNC",
-  
-  -- LS features
-  "CONFIG_FEATURE_LS_FILETYPES", "CONFIG_FEATURE_LS_FOLLOWLINKS",
-  "CONFIG_FEATURE_LS_RECURSIVE", "CONFIG_FEATURE_LS_WIDTH",
-  "CONFIG_FEATURE_LS_SORTFILES", "CONFIG_FEATURE_LS_TIMESTAMPS",
-  "CONFIG_FEATURE_LS_USERNAME", "CONFIG_FEATURE_LS_COLOR"
+  "CONFIG_CAT",
+  "CONFIG_RM",
+  "CONFIG_LS",
+  "CONFIG_CP",
+  "CONFIG_MV",
+  "CONFIG_MKDIR",
+  "CONFIG_CHMOD",
+  "CONFIG_CHOWN",
+  "CONFIG_LN",
+  "CONFIG_SLEEP",
+  "CONFIG_UNAME",
+  "CONFIG_ID",
+  "CONFIG_WHOAMI",
+  "CONFIG_ENV",
+  "CONFIG_TOUCH",
+  "CONFIG_TAIL",
+  "CONFIG_HEAD",
+  "CONFIG_WC",
+  "CONFIG_BASENAME",
+  "CONFIG_DIRNAME",
+  "CONFIG_TRUE",
+  "CONFIG_FALSE",
+  "CONFIG_ECHO",
+  "CONFIG_CLEAR",
+  "CONFIG_SYNC",
+  "CONFIG_KILL",
+  -- Features
+  "CONFIG_FEATURE_LS_FILETYPES",
+  "CONFIG_FEATURE_LS_FOLLOWLINKS",
+  "CONFIG_FEATURE_LS_RECURSIVE",
+  "CONFIG_FEATURE_LS_WIDTH",
+  "CONFIG_FEATURE_LS_SORTFILES",
+  "CONFIG_FEATURE_LS_TIMESTAMPS",
+  "CONFIG_FEATURE_LS_USERNAME",
+  "CONFIG_FEATURE_LS_COLOR",
+  "CONFIG_SHOW_USAGE"
 }
 
-for _, cfg in ipairs(desired_configs) do
+for _, cfg in ipairs(enable_list) do
   ensure_config_set(config_file, cfg)
-end
-
--- Force disable Linux-specific configs to maintain BSD/POSIX compatibility
-local linux_configs = {
-  "CONFIG_PLATFORM_LINUX",
-  "CONFIG_LINUXRC",
-  "CONFIG_FREE",
-  "CONFIG_PS",
-  "CONFIG_TOP",
-  "CONFIG_UPTIME",
-  "CONFIG_DMESG",
-  "CONFIG_FEATURE_MOUNT_LOOP",
-  "CONFIG_FEATURE_MOUNT_LABEL",
-  "CONFIG_FEATURE_MOUNT_NFS",
-  "CONFIG_FEATURE_MOUNT_CIFS",
-  "CONFIG_FEATURE_INIT_MODIFY_CMDLINE",
-  "CONFIG_FEATURE_INIT_COREDUMPS",
-  "CONFIG_RTCWAKE",
-  "CONFIG_UEVENT",
-  "CONFIG_HWCLOCK",
-  "CONFIG_UBIATTACH", "CONFIG_UBIDETACH", "CONFIG_UBIMKVOL", "CONFIG_UBIRMVOL", "CONFIG_UBIRSVOL", "CONFIG_UBIUPDATEVOL",
-  "CONFIG_VCONFIG",
-  "CONFIG_KLOGD",
-  "CONFIG_LOGGER",
-  "CONFIG_LOGREAD",
-  "CONFIG_SYSLOGD",
-  "CONFIG_ACPID",
-  "CONFIG_BLKID",
-  "CONFIG_FDISK",
-  "CONFIG_FREERAMDISK",
-  "CONFIG_FSCK_MINIX",
-  "CONFIG_MKFS_MINIX",
-  "CONFIG_MKFS_REISER",
-  "CONFIG_FLOCK",
-  "CONFIG_MKSWAP",
-  "CONFIG_SWAPON",
-  "CONFIG_SWAPOFF",
-  "CONFIG_LOSETUP",
-  "CONFIG_LSPCI",
-  "CONFIG_LSUSB",
-  "CONFIG_REV",
-  "CONFIG_WATCHDOG"
-}
-
-for _, cfg in ipairs(linux_configs) do
-  ensure_config_unset(config_file, cfg)
 end
 
 os.execute("make -C " .. src_dir .. " oldconfig")
