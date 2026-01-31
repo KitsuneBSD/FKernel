@@ -16,8 +16,11 @@ uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t,
 
     char absolute_path[512];
     if (path[0] != '/') {
-        strcpy(absolute_path, current_task->resources.files.cwd.c_str());
-        if (absolute_path[strlen(absolute_path)-1] != '/') {
+        const char* cwd = current_task->resources.files.cwd.c_str();
+        size_t cwd_len = strlen(cwd);
+        strcpy(absolute_path, cwd);
+        
+        if (cwd_len > 0 && absolute_path[cwd_len - 1] != '/') {
             strcat(absolute_path, "/");
         }
         strcat(absolute_path, path);
