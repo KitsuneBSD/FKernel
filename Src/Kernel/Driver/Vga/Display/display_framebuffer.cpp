@@ -294,17 +294,57 @@ void DisplayFramebuffer::write(const char *str) {
 
 void DisplayFramebuffer::clear() {
   fk::synchronization::ScopedLockIRQ lock(Display::lock());
-  clear_rect(0, 0, fb_width, fb_height);
-  cursor_x = 0; cursor_y = 0;
-  m_full_redraw_requested = true;
-  // Also mark all tiles dirty as a fallback
-  if (m_dirty_tiles) {
-      uint32_t total_tiles = m_tiles_x * m_tiles_y;
-      memset(m_dirty_tiles, 0xFF, (total_tiles + 7) / 8);
+  
+  // 1. Allocate a brand new context
+  size_t buffer_size = fb_height * fb_pitch;
+  size_t bitset_size = (m_tiles_x * m_tiles_y + 7) / 8;
+  
+  uint8_t* next_back_buffer = static_cast<uint8_t*>(MemoryManager::the().allocate(buffer_size));
+  uint8_t* next_dirty_tiles = static_cast<uint8_t*>(MemoryManager::the().allocate(bitset_size));
+  
+  if (next_back_buffer && next_dirty_tiles) {
+      // 2. Prepare the new context
+      uint32_t bg_pixel = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
+      
+      // Fast clear of the new buffer
+      for (uint32_t y = 0; y < fb_height; ++y) {
+          uint8_t* line = next_back_buffer + (y * fb_pitch);
+          if (fb_bpp == 32) {
+              for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
+          } else {
+              for (uint32_t x = 0; x < fb_width; ++x) {
+                  line[x*3] = bg_pixel & 0xFF; line[x*3+1] = (bg_pixel >> 8) & 0xFF; line[x*3+2] = (bg_pixel >> 16) & 0xFF;
+              }
+          }
+      }
+      memset(next_dirty_tiles, 0, bitset_size);
+
+      // 3. Atomically swap and delete old context
+      uint8_t* old_back = back_buffer;
+      uint8_t* old_dirty = m_dirty_tiles;
+      
+      back_buffer = next_back_buffer;
+      m_dirty_tiles = next_dirty_tiles;
+      
+      if (old_back) MemoryManager::the().free(old_back);
+      if (old_dirty) MemoryManager::the().free(old_dirty);
+      
+      cursor_x = 0; cursor_y = 0;
+      m_full_redraw_requested = true;
+      
+      // 4. Force immediate hardware update from the fresh context
+      memcpy(framebuffer, back_buffer, buffer_size);
+  } else {
+      // Fallback if allocation fails
+      if (next_back_buffer) MemoryManager::the().free(next_back_buffer);
+      if (next_dirty_tiles) MemoryManager::the().free(next_dirty_tiles);
+      clear_rect(0, 0, fb_width, fb_height);
+      cursor_x = 0; cursor_y = 0;
   }
 }
 
 void DisplayFramebuffer::clear_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+  fk::synchronization::ScopedLockIRQ lock(Display::lock());
   uint8_t *target = get_render_buffer(); if (!target) return;
   uint32_t bg_pixel = use_rgb_color ? rgb_to_pixel_internal(current_bg_rgb) : color_to_pixel(current_bg);
   uint32_t end_y = (y + height > fb_height) ? fb_height : y + height;
