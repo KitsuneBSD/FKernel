@@ -99,6 +99,29 @@ class UnixSocket : public Socket {
 **Validação**: ✅ Compilação bem-sucedida, syscalls registradas e funcionais para AF_UNIX
 **Próximo**: Implementar bloqueio (wait queues) para accept/read/write em sockets
 
+### 21. Melhorar Multiboot2 Framebuffer Detection - ❌ **NÃO INICIADO**
+
+**Descrição**: Modificar multiboot2 header para inferir automaticamente a melhor resolução suportada pelo hardware
+**Arquivos Chave**:
+
+- ❌ `Src/Kernel/Arch/x86_64/Section/multiboot2.asm` (atualmente com valores fixos)
+- ✅ `Include/Kernel/Boot/Multiboot/multiboot2.h` (estruturas TagFramebuffer existentes)
+- ✅ `Src/Kernel/Boot/boot_info.cpp` (parse de framebuffer info implementado)
+**Dependências**: Multiboot2 specification compliance, GRUB2 bootloader integration
+**Integração**:
+
+```cpp
+// ❌ Atualmente valores fixos no assembly
+dd 1024    ; Width (hardcoded)
+dd 768     ; Height (hardcoded)
+
+// ✅ Deveria usar auto-detection
+dd 0       ; Width (0 = auto-detect best resolution)
+dd 0       ; Height (0 = auto-detect best resolution)
+```
+
+**Validação**: ❌ Ainda usando valores fixos, pode causar "no suitable video mode" em hardware real
+
 ### 7. Implementar DAL Framework - ⚠️ **BASE IMPLEMENTADA (30%)**
 
 **Status**: IPC/capabilities existem, mas falta interface DAL específica

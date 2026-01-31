@@ -9,13 +9,20 @@ header_start:
   dd header_end - header_start
   dd -(MULTIBOOT2_MAGIC + MULTIBOOT2_i386_ARCHITECTURE + (header_end - header_start))
 
+  ; Console Flags Tag (Type 4)
+  align 8
+  dw 4          ; Type
+  dw 0          ; Flags
+  dd 12         ; Size
+  dd 3          ; Console required + EGA text supported
+
   ; Framebuffer Tag (Type 5)
   align 8
   dw 5          ; Type
   dw 0          ; Flags (not optional)
   dd 20         ; Size
-  dd 1024       ; Width
-  dd 768        ; Height
+  dd 640        ; Width
+  dd 480        ; Height
   dd 32         ; BPP
 
   ; End tag obrigatório
