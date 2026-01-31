@@ -69,8 +69,8 @@ void VGATerminal::on_char(char c) {
                 m_line_chars--;
                 if (m_echo_enabled && is_active) {
                     vga::the().put_char('\b');
-                    // Don't flush on every keystroke - let dirty rectangles handle it
-                    // Display::the().flush();
+                    // Flush immediately to see the character being removed
+                    Display::the().flush();
                 }
             }
         } else {
@@ -94,14 +94,14 @@ void VGATerminal::on_char(char c) {
     }
 
     // 3. Caracteres Normais
+    if (!m_raw_mode) {
+        m_line_chars++;
+    }
+
     if (m_echo_enabled && !m_raw_mode && is_active) {
         vga::the().put_char(c);
         // Flush immediately for responsive keyboard echo with double buffering
         Display::the().flush();
-    }
-
-    if (!m_raw_mode) {
-        m_line_chars++;
     }
     
     m_input_queue.enqueue(c);
