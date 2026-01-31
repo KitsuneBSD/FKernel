@@ -51,21 +51,21 @@ class NVMeController : public StorageDevice {
 **Validação**: ✅ Compilação bem-sucedida, I/O framework funcional
 **Próximo**: Migrar polling para interrupções em AHCI/NVMe controllers
 
-### 5. Criar Network Device Interface - ❌ **NÃO INICIADO**
+### 5. Criar Network Device Interface - ✅ **CONCLUÍDO**
 
-**Status**: Nenhuma implementação encontrada, diretório ausente
+**Status**: Interface implementada e driver E1000 funcional integrado
 **Descrição**: Nova classe NetworkDevice seguindo padrão BlockDevice para drivers NIC (e1000, rtl8139)
 **Arquivos Chave**:
 
-- ❌ `Include/Kernel/Driver/Network/network_device.h` (interface não existe)
-- ❌ `Src/Kernel/Driver/Network/E1000/` (diretório não existe)
-- ❌ `Src/Kernel/Driver/Network/Rtl8139/` (diretório não existe)
-- ❌ `Src/Kernel/Syscall/SyscallList/socket.cpp:8-12` (socket API integration ausente)
+- ✅ `Include/Kernel/Driver/Network/network_device.h` (interface implementada)
+- ✅ `Include/Kernel/Driver/Network/mac_address.h` (estrutura MAC implementada)
+- ✅ `Src/Kernel/Driver/Network/E1000/` (driver E1000 implementado)
+- ✅ `Src/Kernel/Syscall/SyscallList/Networking/socket.cpp` (socket API inicial integrada)
 **Dependências**: PCI device management, interrupt handling, memory management
 **Integração**:
 
 ```cpp
-// ❌ Network device interface não implementada
+// ✅ Network device interface implementada
 class NetworkDevice : public CharacterDevice {
 public:
     virtual Result<void, Error> send_packet(const uint8_t* data, size_t size) = 0;
@@ -74,13 +74,32 @@ public:
 };
 ```
 
-**Validação**: ❌ Network stack completamente ausente
+**Validação**: ✅ Compilação bem-sucedida, driver E1000 registra e expõe eth0 no DevFs
 
----
+### 6. Implementar Unix Domain Sockets - ⚠️ **PARCIALMENTE CONCLUÍDO (60%)**
 
-## Medium Priority - Expansão de Capacidades
+**Status**: Infraestrutura base e syscalls iniciais implementadas
+**Descrição**: Suporte a AF_UNIX para comunicação local eficiente entre processos
+**Arquivos Chave**:
 
-### 6. Implementar DAL Framework - ⚠️ **BASE IMPLEMENTADA (30%)**
+- ✅ `Include/Kernel/Net/socket.h` (classe base Socket)
+- ✅ `Include/Kernel/Net/unix_socket.h` (implementação UnixSocket)
+- ✅ `Src/Kernel/Net/unix_socket.cpp` (lógica de bind/connect/listen/accept)
+- ✅ `Src/Kernel/Syscall/SyscallList/Networking/` (syscalls socket, bind, connect, listen, accept integradas)
+**Dependências**: VFS integration, spinlocks, physical memory management
+**Integração**:
+
+```cpp
+// ✅ UnixSocket implementado com buffers circulares
+class UnixSocket : public Socket {
+    // Implementação de bind(path), connect(path), etc.
+};
+```
+
+**Validação**: ✅ Compilação bem-sucedida, syscalls registradas e funcionais para AF_UNIX
+**Próximo**: Implementar bloqueio (wait queues) para accept/read/write em sockets
+
+### 7. Implementar DAL Framework - ⚠️ **BASE IMPLEMENTADA (30%)**
 
 **Status**: IPC/capabilities existem, mas falta interface DAL específica
 **Descrição**: Usar IPC/capability system existente para comunicação userspace drivers com kernel

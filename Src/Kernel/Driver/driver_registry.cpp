@@ -3,6 +3,7 @@
 #include <Kernel/Driver/Storage/Ata/ata_controller.h>
 #include <Kernel/Driver/Storage/Ahci/ahci_controller.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_controller.h>
+#include <Kernel/Driver/Network/E1000/e1000.h>
 #include <LibFK/Traits/type_traits.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -30,8 +31,12 @@ void DriverRegistry::register_storage_drivers() {
 }
 
 void DriverRegistry::register_network_drivers() {
-    fk::algorithms::klog("DRIVER REGISTRY", "Network drivers not implemented yet.");
-    // Future: register_pci_driver<EthernetController>(0x02, 0x00);
+    fk::algorithms::klog("DRIVER REGISTRY", "Registering network drivers...");
+    
+    // PCI Class 0x02: Network Controllers
+    register_pci_driver<E1000Controller>(0x02, 0x00); // Ethernet Controller
+    
+    fk::algorithms::klog("DRIVER REGISTRY", "Network drivers registered.");
 }
 
 void DriverRegistry::register_display_drivers() {
@@ -59,5 +64,6 @@ void DriverRegistry::register_pci_driver(uint8_t class_code, uint8_t subclass) {
 template void DriverRegistry::register_pci_driver<ATAController>(uint8_t, uint8_t);
 template void DriverRegistry::register_pci_driver<AHCIController>(uint8_t, uint8_t);
 template void DriverRegistry::register_pci_driver<NVMeController>(uint8_t, uint8_t);
+template void DriverRegistry::register_pci_driver<E1000Controller>(uint8_t, uint8_t);
 
 } // namespace fkernel
