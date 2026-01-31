@@ -36,7 +36,7 @@ public:
      */
     fk::core::Result<void, fk::core::Error> load_from_file(const char* path);
 
-    void set_layout(KeyboardLayout layout) { m_current_layout = layout; }
+    void set_layout(KeyboardLayout layout);
     KeyboardLayout layout() const { return m_current_layout; }
 
 private:
@@ -48,6 +48,7 @@ private:
     uint8_t m_map_alt[128]{0};
 
     void load_default_abnt2();
+    void load_default_us();
 };
 
 } // namespace fkernel::drivers
