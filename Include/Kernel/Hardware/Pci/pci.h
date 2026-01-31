@@ -29,7 +29,12 @@ public:
   const fk::containers::Vector<PciDevice> &devices() const { return m_devices; }
 
   uint32_t read_config_dword(PciAddress address, uint8_t offset);
+  uint16_t read_config_word(PciAddress address, uint8_t offset);
+  uint8_t read_config_byte(PciAddress address, uint8_t offset);
+
   void write_config_dword(PciAddress address, uint8_t offset, uint32_t value);
+  void write_config_word(PciAddress address, uint8_t offset, uint16_t value);
+  void write_config_byte(PciAddress address, uint8_t offset, uint8_t value);
 
   void register_driver(uint8_t class_code, uint8_t subclass, DriverFactory factory);
   void instantiate_drivers();

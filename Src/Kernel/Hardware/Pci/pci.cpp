@@ -72,6 +72,16 @@ uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
   return inl(m_legacy_ports.data_port);
 }
 
+uint16_t PciManager::read_config_word(PciAddress address, uint8_t offset) {
+    uint32_t val = read_config_dword(address, offset & ~0x3);
+    return (uint16_t)((val >> ((offset & 2) * 8)) & 0xFFFF);
+}
+
+uint8_t PciManager::read_config_byte(PciAddress address, uint8_t offset) {
+    uint32_t val = read_config_dword(address, offset & ~0x3);
+    return (uint8_t)((val >> ((offset & 3) * 8)) & 0xFF);
+}
+
 void PciManager::write_config_dword(PciAddress address, uint8_t offset, uint32_t value) {
   if (m_has_mcfg) {
     uintptr_t config_addr = m_mcfg_base + 
@@ -84,6 +94,41 @@ void PciManager::write_config_dword(PciAddress address, uint8_t offset, uint32_t
     outl(m_legacy_ports.address_port, address.to_config_address(offset));
     outl(m_legacy_ports.data_port, value);
   }
+}
+
+void PciManager::write_config_word(PciAddress address, uint8_t offset, uint16_t value) {
+    uint32_t val = read_config_dword(address, offset & ~0x3);
+    uint32_t mask = 0xFFFF << ((offset & 2) * 8);
+    val = (val & ~mask) | (static_cast<uint32_t>(value) << ((offset & 2) * 8));
+    write_config_dword(address, offset & ~0x3, val);
+}
+
+void PciManager::write_config_byte(PciAddress address, uint8_t offset, uint8_t value) {
+    uint32_t val = read_config_dword(address, offset & ~0x3);
+    uint32_t mask = 0xFF << ((offset & 3) * 8);
+    val = (val & ~mask) | (static_cast<uint32_t>(value) << ((offset & 3) * 8));
+    write_config_dword(address, offset & ~0x3, val);
+}
+
+uint32_t PciDevice::read_config_dword(uint8_t offset) const { return PciManager::the().read_config_dword(m_address, offset); }
+uint16_t PciDevice::read_config_word(uint8_t offset) const { return PciManager::the().read_config_word(m_address, offset); }
+uint8_t PciDevice::read_config_byte(uint8_t offset) const { return PciManager::the().read_config_byte(m_address, offset); }
+
+void PciDevice::write_config_dword(uint8_t offset, uint32_t value) const { PciManager::the().write_config_dword(m_address, offset, value); }
+void PciDevice::write_config_word(uint8_t offset, uint16_t value) const { PciManager::the().write_config_word(m_address, offset, value); }
+void PciDevice::write_config_byte(uint8_t offset, uint8_t value) const { PciManager::the().write_config_byte(m_address, offset, value); }
+
+uint8_t PciDevice::find_capability(uint8_t cap_id) const {
+    uint16_t status = read_config_word(0x06);
+    if (!(status & (1 << 4))) return 0; // No capabilities list
+
+    uint8_t cap_ptr = read_config_byte(0x34);
+    while (cap_ptr != 0) {
+        uint8_t id = read_config_byte(cap_ptr);
+        if (id == cap_id) return cap_ptr;
+        cap_ptr = read_config_byte(cap_ptr + 1);
+    }
+    return 0;
 }
 
 void PciManager::register_driver(uint8_t class_code, uint8_t subclass, DriverFactory factory) {

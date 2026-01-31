@@ -2,6 +2,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Hardware/Pci/pci_device.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -81,4 +82,52 @@ void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
 
   write(reg_low, (uint32_t)entry);
   write(reg_high, (uint32_t)(entry >> 32));
+}
+
+extern uint8_t g_next_msi_vector;
+
+fk::core::Result<uint8_t, fk::core::Error> IOAPIC::allocate_msi_vector(const PciDevice& device) {
+    uint8_t msi_ptr = device.find_capability(0x05); // MSI Capability ID
+    if (msi_ptr == 0) {
+        fk::algorithms::kwarn("MSI", "Device %02x:%02x.%d does not support MSI", 
+                             device.address().bus(), device.address().device(), 
+                             device.address().function());
+        return fk::core::Error::NotImplemented;
+    }
+
+    uint8_t vector = g_next_msi_vector++;
+    if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
+
+    // Configure MSI on the device
+    // Message Address: 0xFEE00000 (Targeting CPU 0)
+    device.write_config_dword(msi_ptr + 4, 0xFEE00000);
+    
+    uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
+    if (msg_ctrl & (1 << 7)) { // 64-bit support
+        device.write_config_dword(msi_ptr + 8, 0); // Upper address
+        device.write_config_word(msi_ptr + 12, vector); // Message Data
+    } else {
+        device.write_config_word(msi_ptr + 8, vector); // Message Data
+    }
+
+    // Enable MSI in Message Control register
+    msg_ctrl |= 0x01; 
+    device.write_config_word(msi_ptr + 2, msg_ctrl);
+
+    fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) for device %02x:%02x.%d", 
+                         vector, device.address().bus(), device.address().device(), 
+                         device.address().function());
+
+    return vector;
+}
+
+void IOAPIC::enable_msi(uint8_t vector) {
+    (void)vector;
+    // MSI is enabled on the device side during allocation.
+    // In a multi-CPU system, we might need to update destination LAPIC.
+}
+
+void IOAPIC::disable_msi(uint8_t vector) {
+    (void)vector;
+    // TODO: Track which device owns this vector to disable it
 }

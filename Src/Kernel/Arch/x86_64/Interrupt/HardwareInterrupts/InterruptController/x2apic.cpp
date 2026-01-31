@@ -1,6 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Hardware/Pci/pci_device.h>
 #include <LibFK/Algorithms/log.h>
 
 // x2APIC MSRs
@@ -95,3 +96,37 @@ void X2APIC::setup_timer(uint64_t ms) {
   fk::algorithms::klog("x2APIC", "Periodic timer set: %lu ms (%lu ticks)", ms,
                        initial);
 }
+
+extern uint8_t g_next_msi_vector;
+
+fk::core::Result<uint8_t, fk::core::Error> X2APIC::allocate_msi_vector(const PciDevice& device) {
+    uint8_t msi_ptr = device.find_capability(0x05); // MSI Capability ID
+    if (msi_ptr == 0) return fk::core::Error::NotImplemented;
+
+    uint8_t vector = g_next_msi_vector++;
+    if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
+
+    // Configure MSI on the device
+    device.write_config_dword(msi_ptr + 4, 0xFEE00000);
+    
+    uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
+    if (msg_ctrl & (1 << 7)) { // 64-bit support
+        device.write_config_dword(msi_ptr + 8, 0); 
+        device.write_config_word(msi_ptr + 12, vector);
+    } else {
+        device.write_config_word(msi_ptr + 8, vector);
+    }
+
+    // Enable MSI
+    msg_ctrl |= 0x01; 
+    device.write_config_word(msi_ptr + 2, msg_ctrl);
+
+    fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) via x2APIC for device %02x:%02x.%d", 
+                         vector, device.address().bus(), device.address().device(), 
+                         device.address().function());
+
+    return vector;
+}
+
+void X2APIC::enable_msi(uint8_t vector) { (void)vector; }
+void X2APIC::disable_msi(uint8_t vector) { (void)vector; }

@@ -24,4 +24,14 @@ public:
   uint8_t class_code() const { return m_class_code; }
   uint8_t subclass_code() const { return m_subclass_code; }
   uint8_t prog_if() const { return m_prog_if; }
+
+  uint32_t read_config_dword(uint8_t offset) const;
+  uint16_t read_config_word(uint8_t offset) const;
+  uint8_t read_config_byte(uint8_t offset) const;
+
+  void write_config_dword(uint8_t offset, uint32_t value) const;
+  void write_config_word(uint8_t offset, uint16_t value) const;
+  void write_config_byte(uint8_t offset, uint8_t value) const;
+
+  uint8_t find_capability(uint8_t cap_id) const;
 };
