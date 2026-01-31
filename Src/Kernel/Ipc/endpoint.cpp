@@ -38,7 +38,8 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info) {
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
     if (m_receivers.empty()) {
-      fk::algorithms::klog("IPC", "Task %u blocked on send", sender_id);
+      fk::algorithms::klog("IPC", "Endpoint %p: Task %u blocked on send (Label: 0x%lx)", 
+                           this, sender_id, info.label());
       IpcLogNode::the()->log_endpoint_operation("send_blocked", sender_id, 0, info.raw());
       m_senders.push_back(current);
       scheduler.block_current();
@@ -49,7 +50,8 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info) {
     m_receivers.remove(receiver);
     uint32_t receiver_id = receiver->control.identity.id.value();
 
-    fk::algorithms::klog("IPC", "Task %u sent immediate message to %u", sender_id, receiver_id);
+    fk::algorithms::klog("IPC", "Endpoint %p: Task %u sent immediate message to %u (Label: 0x%lx)", 
+                         this, sender_id, receiver_id, info.label());
     IpcLogNode::the()->log_endpoint_operation("send_immediate", sender_id, receiver_id, info.raw());
     deliver_message(*current, *receiver, info);
     scheduler.wake_task(receiver);
@@ -66,7 +68,7 @@ fk::core::Result<MessageInfo> Endpoint::receive() {
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
     if (m_senders.empty()) {
-      fk::algorithms::klog("IPC", "Task %u blocked on receive", receiver_id);
+      fk::algorithms::klog("IPC", "Endpoint %p: Task %u blocked on receive", this, receiver_id);
       IpcLogNode::the()->log_endpoint_operation("receive_blocked", receiver_id, 0, 0);
       m_receivers.push_back(current);
       scheduler.block_current();
@@ -78,7 +80,8 @@ fk::core::Result<MessageInfo> Endpoint::receive() {
     uint32_t sender_id = sender->control.identity.id.value();
 
     MessageInfo info(sender->registers().rax); // Assuming info was in rax
-    fk::algorithms::klog("IPC", "Task %u received immediate message from %u", receiver_id, sender_id);
+    fk::algorithms::klog("IPC", "Endpoint %p: Task %u received immediate message from %u (Label: 0x%lx)", 
+                         this, receiver_id, sender_id, info.label());
     IpcLogNode::the()->log_endpoint_operation("receive_immediate", receiver_id, sender_id, info.raw());
     deliver_message(*sender, *current, info);
 

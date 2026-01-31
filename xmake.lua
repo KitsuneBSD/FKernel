@@ -66,6 +66,7 @@ local kernel_non_architecture_related = {
   "Src/Kernel/Loader/**.cpp",
   "Src/Kernel/Scheduler/**.cpp",
   "Src/Kernel/Syscall/**.cpp",
+  "Src/Kernel/Net/**.cpp",
 }
 
 toolchain("FKernel_Compiling")
