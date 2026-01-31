@@ -46,6 +46,9 @@ void DisplayFramebuffer::initialize_framebuffer() {
 
     // Allocate back buffer for double buffering
     allocate_back_buffer();
+
+    // Initialize dirty tiles
+    allocate_dirty_tiles();
   } else if (vesa::VESADriver::the().is_available() &&
              vesa::VESADriver::the().get_framebuffer() != nullptr) {
     framebuffer = vesa::VESADriver::the().get_framebuffer();
@@ -76,8 +79,9 @@ void DisplayFramebuffer::initialize_framebuffer() {
 
 fk::core::Result<void, fk::core::Error>
 DisplayFramebuffer::set_vesa_mode(uint16_t mode) {
-  // Free existing back buffer before changing mode
+  // Free existing buffers before changing mode
   free_back_buffer();
+  free_dirty_tiles();
   
   auto res = vesa::VESADriver::the().set_mode(mode);
   if (res.is_ok()) {
@@ -123,8 +127,9 @@ DisplayFramebuffer::set_vesa_mode(uint16_t mode) {
       }
     }
     
-    // Now allocate the back buffer
+    // Now allocate the buffers
     allocate_back_buffer();
+    allocate_dirty_tiles();
     clear();
   }
   return res;
@@ -133,8 +138,9 @@ DisplayFramebuffer::set_vesa_mode(uint16_t mode) {
 fk::core::Result<void, fk::core::Error>
 DisplayFramebuffer::set_resolution(uint32_t width, uint32_t height,
                                    uint32_t bpp) {
-  // Free existing back buffer before changing resolution
+  // Free existing buffers before changing resolution
   free_back_buffer();
+  free_dirty_tiles();
   
   auto res = vesa::VESADriver::the().set_resolution(width, height, bpp);
   if (res.is_ok()) {
@@ -160,8 +166,9 @@ DisplayFramebuffer::set_resolution(uint32_t width, uint32_t height,
       }
     }
     
-    // Allocate back buffer after framebuffer is set up
+    // Allocate buffers after framebuffer is set up
     allocate_back_buffer();
+    allocate_dirty_tiles();
     clear();
   }
   return res;
@@ -847,65 +854,59 @@ void DisplayFramebuffer::swap_buffers() {
 }
 
 void DisplayFramebuffer::mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-  if (!m_dirty_rect.dirty) {
-    m_dirty_rect.x = x;
-    m_dirty_rect.y = y;
-    m_dirty_rect.width = width;
-    m_dirty_rect.height = height;
-    m_dirty_rect.dirty = true;
-  } else {
-    // Expand rectangle to include new area
-    uint32_t right1 = m_dirty_rect.x + m_dirty_rect.width;
-    uint32_t right2 = x + width;
-    uint32_t bottom1 = m_dirty_rect.y + m_dirty_rect.height;
-    uint32_t bottom2 = y + height;
-    
-    m_dirty_rect.x = (x < m_dirty_rect.x) ? x : m_dirty_rect.x;
-    m_dirty_rect.y = (y < m_dirty_rect.y) ? y : m_dirty_rect.y;
-    m_dirty_rect.width = ((right2 > right1) ? right2 : right1) - m_dirty_rect.x;
-    m_dirty_rect.height = ((bottom2 > bottom1) ? bottom2 : bottom1) - m_dirty_rect.y;
+  if (!m_dirty_tiles) return;
+
+  uint32_t start_tile_x = x / TILE_SIZE;
+  uint32_t start_tile_y = y / TILE_SIZE;
+  uint32_t end_tile_x = (x + width + TILE_SIZE - 1) / TILE_SIZE;
+  uint32_t end_tile_y = (y + height + TILE_SIZE - 1) / TILE_SIZE;
+
+  if (end_tile_x > m_tiles_x) end_tile_x = m_tiles_x;
+  if (end_tile_y > m_tiles_y) end_tile_y = m_tiles_y;
+
+  for (uint32_t ty = start_tile_y; ty < end_tile_y; ++ty) {
+    for (uint32_t tx = start_tile_x; tx < end_tile_x; ++tx) {
+      uint32_t tile_idx = ty * m_tiles_x + tx;
+      m_dirty_tiles[tile_idx / 8] |= (1 << (tile_idx % 8));
+    }
   }
 }
 
 void DisplayFramebuffer::update_dirty_rectangles() {
-  if (!m_dirty_rect.dirty || !double_buffering_enabled) {
+  if (!m_dirty_tiles || !double_buffering_enabled) {
     return;
   }
 
-  // 1. Calculate boundaries
-  uint32_t x = m_dirty_rect.x;
-  uint32_t y = m_dirty_rect.y;
-  uint32_t w = m_dirty_rect.width;
-  uint32_t h = m_dirty_rect.height;
+  uint32_t bpp_bytes = fb_bpp / 8;
+  
+  for (uint32_t ty = 0; ty < m_tiles_y; ++ty) {
+    for (uint32_t tx = 0; tx < m_tiles_x; ++tx) {
+      uint32_t tile_idx = ty * m_tiles_x + tx;
+      if (m_dirty_tiles[tile_idx / 8] & (1 << (tile_idx % 8))) {
+        // Tile is dirty, copy it
+        uint32_t x = tx * TILE_SIZE;
+        uint32_t y = ty * TILE_SIZE;
+        uint32_t w = TILE_SIZE;
+        uint32_t h = TILE_SIZE;
 
-  // Clip to framebuffer limits
-  if (x >= fb_width) x = 0;
-  if (y >= fb_height) y = 0;
-  if (x + w > fb_width) w = fb_width - x;
-  if (y + h > fb_height) h = fb_height - y;
+        if (x + w > fb_width) w = fb_width - x;
+        if (y + h > fb_height) h = fb_height - y;
 
-  // 2. Fast Path: Full screen or nearly full screen
-  // If the area is large enough, a single full-screen memcpy is faster 
-  // than multiple small line copies due to CPU cache and memory controller overhead.
-  if (w >= fb_width * 0.9 && h >= fb_height * 0.9) {
-      size_t buffer_size = fb_height * fb_pitch;
-      memcpy(framebuffer, back_buffer, buffer_size);
-  } else {
-      // 3. Optimized Path: Small area (Dirty Rectangles)
-      uint32_t bpp_bytes = fb_bpp / 8;
-      uint32_t line_copy_size = w * bpp_bytes;
-      
-      uint8_t *src = back_buffer + (y * fb_pitch) + (x * bpp_bytes);
-      uint8_t *dst = framebuffer + (y * fb_pitch) + (x * bpp_bytes);
-      
-      for (uint32_t i = 0; i < h; ++i) {
-        memcpy(dst, src, line_copy_size);
-        src += fb_pitch;
-        dst += fb_pitch;
+        uint32_t line_copy_size = w * bpp_bytes;
+        uint8_t *src = back_buffer + (y * fb_pitch) + (x * bpp_bytes);
+        uint8_t *dst = framebuffer + (y * fb_pitch) + (x * bpp_bytes);
+
+        for (uint32_t i = 0; i < h; ++i) {
+          memcpy(dst, src, line_copy_size);
+          src += fb_pitch;
+          dst += fb_pitch;
+        }
+        
+        // Clear dirty bit for this tile
+        m_dirty_tiles[tile_idx / 8] &= ~(1 << (tile_idx % 8));
       }
+    }
   }
-
-  m_dirty_rect.dirty = false;
 }
 
 uint8_t* DisplayFramebuffer::get_render_buffer() {
@@ -922,32 +923,45 @@ uint8_t* DisplayFramebuffer::get_render_buffer() {
 }
 
 void DisplayFramebuffer::flush() {
-  if (!double_buffering_enabled || !back_buffer) {
-    return; // Direct rendering - no flush needed
-  }
-
-  // Safety check: ensure display is properly initialized
-  if (!framebuffer || fb_width == 0 || fb_height == 0) {
+  if (!double_buffering_enabled || !back_buffer || !m_dirty_tiles) {
     return;
   }
 
-  if (m_dirty_rect.dirty) {
-    uint64_t current_tick = TickManager::the().get_ticks();
-    if (current_tick > m_last_flush_tick) {
-        wait_vblank();
-        m_last_flush_tick = current_tick;
-    }
+  uint64_t current_tick = TickManager::the().get_ticks();
+  uint32_t freq = TickManager::the().get_frequency();
+  if (freq == 0) freq = 100; // Fallback
+
+  // Target 60 FPS: interval = frequency / 60
+  uint32_t interval = freq / 60;
+  if (interval == 0) interval = 1;
+
+  if (current_tick - m_last_flush_tick >= interval) {
+    wait_vblank();
     update_dirty_rectangles();
+    m_last_flush_tick = current_tick;
   }
 }
 
 void DisplayFramebuffer::next_frame() {
-  // Reset dirty tracking for next frame
-  m_dirty_rect.dirty = false;
-  m_dirty_rect.x = 0;
-  m_dirty_rect.y = 0;
-  m_dirty_rect.width = 0;
-  m_dirty_rect.height = 0;
+  // Tiles are cleared during update_dirty_rectangles
+}
+
+void DisplayFramebuffer::allocate_dirty_tiles() {
+  if (m_dirty_tiles) return;
+  m_tiles_x = (fb_width + TILE_SIZE - 1) / TILE_SIZE;
+  m_tiles_y = (fb_height + TILE_SIZE - 1) / TILE_SIZE;
+  size_t bitset_size = (m_tiles_x * m_tiles_y + 7) / 8;
+  m_dirty_tiles = static_cast<uint8_t*>(MemoryManager::the().allocate(bitset_size));
+  if (m_dirty_tiles) {
+    memset(m_dirty_tiles, 0xFF, bitset_size);
+  }
+}
+
+void DisplayFramebuffer::free_dirty_tiles() {
+  if (m_dirty_tiles) {
+    MemoryManager::the().free(m_dirty_tiles);
+    m_dirty_tiles = nullptr;
+  }
 }
 
 void DisplayFramebuffer::finalize_initialization() {

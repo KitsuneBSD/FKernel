@@ -27,6 +27,8 @@ enum class Error {
   IsASymlink = 40,                  // ELOOP or EINVAL
   NotImplemented = 38,              // ENOSYS
   AlreadyExists = 17,               // EEXIST
+  DeviceBusy = 16,                  // EBUSY
+  Timeout = 110,                    // ETIMEDOUT
 };
 
 } // namespace core

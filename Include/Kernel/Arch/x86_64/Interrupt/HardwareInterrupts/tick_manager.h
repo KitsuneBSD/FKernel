@@ -34,5 +34,6 @@ public:
   void sleep(uint64_t ms);
   void increment_ticks();
   uint64_t get_ticks() { return m_ticks; }
+  uint32_t get_frequency() const { return m_frequency; }
   void set_frequency(uint32_t frequency) { m_frequency = frequency; }
 };

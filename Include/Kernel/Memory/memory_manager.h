@@ -69,6 +69,16 @@ public:
   void map_page(uintptr_t virt, uintptr_t phys, PageFlags flags);
 
   /**
+   * @brief Translates a virtual address to its corresponding physical address.
+   */
+  uintptr_t translate(uintptr_t virt);
+
+  /**
+   * @brief Removes a mapping for a virtual address.
+   */
+  void unmap_page(uintptr_t virt);
+
+  /**
    * @brief Allocates a physical page frame.
    */
   uintptr_t allocate_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
@@ -77,6 +87,16 @@ public:
    * @brief Frees a physical page frame.
    */
   void free_page(uintptr_t phys);
+
+  /**
+   * @brief Allocates a contiguous range of physical memory.
+   */
+  uintptr_t allocate_contiguous(size_t order, ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
+
+  /**
+   * @brief Frees a contiguous range of physical memory.
+   */
+  void free_contiguous(uintptr_t phys, size_t order);
 
   /**
    * @brief Get the active IOMMU controller if present.

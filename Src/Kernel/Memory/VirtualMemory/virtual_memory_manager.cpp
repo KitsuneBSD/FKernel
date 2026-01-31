@@ -162,6 +162,17 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys,
   }
 }
 
+void VirtualMemoryManager::unmap_page(uintptr_t virt) {
+    assert((virt % PAGE_SIZE) == 0);
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+
+    uint64_t* pte_ptr = get_pte(virt);
+    if (pte_ptr && (*pte_ptr & static_cast<uint64_t>(PageFlags::Present))) {
+        *pte_ptr = 0;
+        invlpg(virt);
+    }
+}
+
 uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
   assert((virt % PAGE_SIZE) == 0);
 
@@ -383,4 +394,16 @@ fk::core::Result<int, fk::core::Error> VirtualMemoryManager::munmap(uintptr_t ad
     }
 
     return 0;
+}
+
+void VirtualMemoryManager::map_range(uintptr_t start, uintptr_t size, PageFlags flags) {
+    assert((start % PAGE_SIZE) == 0);
+    assert((size % PAGE_SIZE) == 0);
+    
+    for (uintptr_t offset = 0; offset < size; offset += PAGE_SIZE) {
+        // Here we assume identity mapping for simpler use cases or that 
+        // the caller wants to map virtual to physical identical addresses
+        // This is commonly used for MMIO or kernel regions.
+        map_page(start + offset, start + offset, flags);
+    }
 }
