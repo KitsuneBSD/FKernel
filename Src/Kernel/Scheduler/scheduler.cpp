@@ -92,14 +92,15 @@ extern "C" void init_task_entry() {
 
   // Populate FDs 0, 1, 2 for Init process
   auto console_res = fkernel::VirtualFileSystem::the().open("/dev/tty0", O_RDWR);
-  if (console_res.is_ok()) {
-    auto* current = SchedulerManager::the().current();
-    current->add_file_descriptor(console_res.value()); // 0: stdin
-    current->add_file_descriptor(console_res.value()); // 1: stdout
-    current->add_file_descriptor(console_res.value()); // 2: stderr
-  } else {
+  if (console_res.is_error()) {
     fk::algorithms::kerror("INIT", "Failed to open /dev/tty0 for init process!");
+    return;
   }
+  
+  auto* current = SchedulerManager::the().current();
+  current->add_file_descriptor(console_res.value()); // 0: stdin
+  current->add_file_descriptor(console_res.value()); // 1: stdout
+  current->add_file_descriptor(console_res.value()); // 2: stderr
 
   // Load init process from ELF via VFS to resolve symlinks
   auto init_dentry_res = fkernel::VirtualFileSystem::the().resolve_path("/sbin/init");

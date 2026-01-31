@@ -16,13 +16,13 @@ header_start:
   dd 12         ; Size
   dd 3          ; Console required + EGA text supported
 
-  ; Framebuffer Tag (Type 5)
+  ; Framebuffer Tag (Type 5) - Auto-detect best resolution
   align 8
   dw 5          ; Type
   dw 0          ; Flags (not optional)
   dd 20         ; Size
-  dd 640        ; Width
-  dd 480        ; Height
+  dd 0          ; Width (0 = auto-detect best resolution)
+  dd 0          ; Height (0 = auto-detect best resolution)
   dd 32         ; BPP
 
   ; End tag obrigatório

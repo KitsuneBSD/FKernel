@@ -1,0 +1,17 @@
+# FKernel Code Style Configuration - Simplified
+# Based on Object Calisthenics principles
+
+Language: Cpp
+BasedOnStyle: LLVM
+ColumnLimit: 100
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BreakBeforeBraces: Attach
+SortIncludes: true
+SpaceBeforeParens: ControlStatements
+Cpp11BracedListStyle: true

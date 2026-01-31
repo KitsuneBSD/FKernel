@@ -2,10 +2,11 @@
 
 ## Status Atual (Atualizado: Janeiro 2026)
 
-- **Alta Prioridade**: 60% completo (3/5 totalmente concluídos)
-- **Média Prioridade**: 40% completo (4/10 parcialmente concluídos)  
+- **Alta Prioridade**: 25% completo (1/5 totalmente concluídos)
+- **Média Prioridade**: 15% completo (2/10 parcialmente concluídos)  
 - **Baixa Prioridade**: 0% completo (0/6 iniciados)
-- **Progresso Total**: ~40% implementado
+- **Progresso Total**: ~20% implementado
+- **Débito Técnico Crítico**: Object Calisthenics violado extensivamente
 
 ## Visão Geral
 
@@ -51,16 +52,17 @@ class NVMeController : public StorageDevice {
 **Validação**: ✅ Compilação bem-sucedida, I/O framework funcional
 **Próximo**: Migrar polling para interrupções em AHCI/NVMe controllers
 
-### 5. Criar Network Device Interface - ✅ **CONCLUÍDO**
+### 5. Criar Network Device Interface - ⚠️ **PARCIALMENTE CONCLUÍDO (40%)**
 
-**Status**: Interface implementada e driver E1000 funcional integrado
-**Descrição**: Nova classe NetworkDevice seguindo padrão BlockDevice para drivers NIC (e1000, rtl8139)
+**Status**: Interface básica implementada, mas TCP/IP stack ausente
+**Descrição**: NetworkDevice interface criada, E1000 driver funcional mas sem stack de rede completo
 **Arquivos Chave**:
 
 - ✅ `Include/Kernel/Driver/Network/network_device.h` (interface implementada)
 - ✅ `Include/Kernel/Driver/Network/mac_address.h` (estrutura MAC implementada)
 - ✅ `Src/Kernel/Driver/Network/E1000/` (driver E1000 implementado)
-- ✅ `Src/Kernel/Syscall/SyscallList/Networking/socket.cpp` (socket API inicial integrada)
+- ❌ TCP/IP Stack completamente ausente
+- ❌ Socket API funcional apenas para AF_UNIX
 **Dependências**: PCI device management, interrupt handling, memory management
 **Integração**:
 
@@ -74,7 +76,7 @@ public:
 };
 ```
 
-**Validação**: ✅ Compilação bem-sucedida, driver E1000 registra e expõe eth0 no DevFs
+**Validação**: ⚠️ Driver E1000 registra dispositivo, mas sem funcionalidade de rede real
 
 ### 6. Implementar Unix Domain Sockets - ⚠️ **PARCIALMENTE CONCLUÍDO (60%)**
 
@@ -227,31 +229,30 @@ public:
 **Validação**: ✅ Compilação bem-sucedida, suporte a detecção de múltiplos modos VBE
 **Próximo**: Estabilizar real-mode bridge para troca de modos em tempo real
 
-### 10. Enhance Memory Manager - ✅ **CONCLUÍDO**
+### 10. Enhance Memory Manager - ⚠️ **PARCIALMENTE CONCLUÍDO (60%)**
 
-**Status**: Memory manager agora é topology-aware (NUMA nodes via SRAT)
-**Descrição**: Adicionar topology-aware às zones existentes (DMA, Kernel, Userspace)
+**Status**: Topology-aware implementado mas alocação NUMA incompleta
+**Descrição**: SRAT parsing implementado mas alocação preferencial não funcional
 **Arquivos Chave**:
 
 - ✅ `Include/Kernel/Hardware/Acpi/srat.h` (Estruturas SRAT implementadas)
 - ✅ `Include/Kernel/Hardware/Acpi/topology_manager.h` (Interface do TopologyManager)
 - ✅ `Src/Kernel/Hardware/Acpi/topology_manager.cpp` (Parsing de SRAT e mapeamento de nós)
-- ✅ `Src/Kernel/Memory/PhysicalMemory/physical_memory_manager.cpp` (Alocação física com preferência de nó)
-- ✅ `Src/Kernel/Memory/memory_manager.cpp` (Interface de alto nível integrada)
+- ⚠️ PhysicalMemoryManager usa preferência de nó mas alocação real não é NUMA-aware
 **Dependências**: ACPI SRAT table parsing, CPU topology detection
 **Integração**:
 
 ```cpp
-// ✅ Memory manager agora suporta preferência de nó NUMA
+// ⚠️ API existe mas alocação não é verdadeiramente NUMA-aware
 uintptr_t allocate_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
 ```
 
-**Validação**: ✅ Compilação bem-sucedida, parsing de SRAT funcional em boot log
+**Validação**: ⚠️ Parsing de SRAT funcional, mas alocação não considera localidade real
 
-### 11. Implementar Hotplug Device Detection - ✅ **CONCLUÍDO**
+### 11. Implementar Hotplug Device Detection - ⚠️ **PARCIALMENTE CONCLUÍDO (70%)**
 
-**Status**: PciManager estendido com suporte a detecção dinâmica e callbacks
-**Descrição**: Estender PciManager para detectar dispositivos dinamicamente
+**Status**: Framework de callbacks implementado mas detecção real não testada
+**Descrição**: PciManager extendido mas hotplug detection não validada em hardware
 **Arquivos Chave**:
 
 - ✅ `Src/Kernel/Hardware/Pci/pci.cpp` (hotplug detection e event handling)
@@ -272,7 +273,7 @@ private:
 };
 ```
 
-**Validação**: ✅ Compilação bem-sucedida, lógica de inserção/remoção implementada com notificação de callbacks
+**Validação**: ⚠️ Framework implementado mas não validado em hardware real
 
 ### 12. Adicionar Power Management
 
@@ -547,20 +548,132 @@ public:
 - **Performance Benchmarks**: Medir impacto no sistema
 - **Security Review**: Validar isolamento e capabilities
 
+---
+
+## 🚨 Débito Técnico Crítico (Object Calisthenics)
+
+### Status: **VIOLAÇÕES EXTENSIVAS** 
+
+O projeto viola sistematicamente as regras de Object Calisthenics definidas em AGENTS.md:
+
+#### ❌ Violações Críticas Encontradas:
+
+1. **"No ELSE keyword" - 100+ violações**
+   - Uso extensivo de `else {` blocos em arquivos críticos
+   - Arquivos afetados: `scheduler.cpp`, `virtual_memory_manager.cpp`, `ahci_controller.cpp`
+
+2. **"Max 200 lines per class" - Múltiplas violações**
+   - `display_framebuffer.cpp`: 974 linhas (4.8x o limite)
+   - `scheduler.cpp`: 577 linhas (2.9x o limite)
+   - `vga_terminal.cpp`: 512 linhas (2.6x o limite)
+
+3. **"One dot per line" - Violações de Demeter**
+   - Exemplos: `device.address().bus()`, `device.vendor_id()`
+
+4. **"One Indentation Level Per Method"**
+   - Aninhamento excessivo em múltiplos métodos
+
+#### Impacto no Projeto:
+- **Manutenibilidade**: Classes monolíticas difíceis de manter
+- **Testabilidade**: Métodos complexos impossíveis de testar unitariamente
+- **Qualidade**: Código com alta complexidade ciclomática
+
+---
+
+## 🚨 CI/CD e Automação: INFRAESTURA AUSENTE
+
+### Status: **PIPELINE QUEBRADA**
+
+O CI/CD atual está completamente quebrado e sem automação adequada:
+
+#### ❌ Problemas Críticos:
+
+1. **Test Framework Ausente**
+   - CI espera target `Test` mas diretório `tests/` não existe
+   - Nenhum teste unitário ou de integração implementado
+   - Coverage de 0% (vs metas de 75-90% em AGENTS.md)
+
+2. **Falta de Code Quality Gates**
+   - Sem linting automatizado (clang-tidy, clang-format)
+   - Sem validação de Object Calisthenics
+   - Sem análise estática de código
+
+3. **Sem Pre-commit Hooks**
+   - Formatação manual inconsistente
+   - Sem validação automática de estilo
+   - Sem prevenção de regressões
+
+4. **CI Incompleto**
+   - Apenas build básico, sem testes funcionais
+   - Sem benchmarking de performance
+   - Sem security scanning
+   - Sem hardware-in-the-loop testing
+
+#### Arquivos Faltantes:
+```
+tests/                     # ❌ Diretório completo ausente
+├── LibC/
+├── LibFK/
+└── Kernel/
+
+.github/workflows/
+├── code-quality.yml       # ❌ Não existe
+├── security-scan.yml      # ❌ Não existe
+└── performance.yml        # ❌ Não existe
+```
+
+---
+
 ### Critérios de Conclusão
 
 - ❌ Boot bem-sucedido em hardware real (hardcoded values remanescentes)
-- ⚠️ Drivers modernos funcionando (AHCI/NVMe frameworks prontos, I/O faltando)
+- ❌ Drivers modernos funcionando (frameworks básicos, I/O incompleto)
 - ❌ DAL framework operacional (base IPC existe, interface DAL faltando)
-- ⚠️ Testes abrangentes passando (frameworks testados, funcionalidades críticas faltando)
-- ✅ Documentação completa atualizada (este TODO reflete status atual)
+- ❌ Testes abrangentes passando (framework ausente, 0% coverage)
+- ❌ Qualidade de código aceitável (Object Calisthenics violado extensivamente)
+- ✅ Documentação honesta atualizada (este TODO reflete status real ~20%)
 
-### Próximos Passos Prioritários
+### Próximos Passos Prioritários (CRÍTICOS)
 
-1. **Concluir I/O Operations**: Implementar read/write em AHCI/NVMe controllers
-2. **Remover Hardcodes**: Config ports e ATA ports dinâmicos
-3. **Iniciar Network Stack**: Criar interface NetworkDevice base
-4. **Estender Interrupt Manager**: Implementar suporte MSI/MSI-X
+#### 🚨 Ações Imediatas (Bloqueiam Progresso):
+
+1. **Fixar CI/CD Quebrado**
+   - Criar diretório `tests/` e framework básico
+   - Implementar testes unitários para LibC/LibFK
+   - Adicionar code quality gates (clang-tidy, clang-format)
+
+2. **Refatoração Object Calisthenics**
+   - Dividir classes >200 linhas em classes menores
+   - Remover todos os `else {` blocks (usar early returns)
+   - Fixar violações "one dot per line"
+
+3. **Remover Hardcoded Values**
+   - Multiboot2.asm: detectar resolução automaticamente
+   - Device drivers: remover magic numbers
+
+#### ⚠️ Ações de Curto Prazo:
+
+4. **Completar Frameworks Críticos**
+   - I/O operations em AHCI/NVMe controllers
+   - TCP/IP stack básico para NetworkDevice
+   - DAL interface para userspace drivers
+
+5. **Infraestrutura de Desenvolvimento**
+   - Pre-commit hooks para formatação
+   - Scripts de validação Object Calisthenics
+   - Documentação automática
+
+#### 📋 Ações de Médio Prazo:
+
+6. **Drivers Essenciais**
+   - USB host controller framework
+   - Audio device interface
+   - Power management integration
+
+7. **SMP e Multi-core**
+   - Multi-processor initialization
+   - Per-CPU scheduling
+   - IPI handling
 
 ---
 
