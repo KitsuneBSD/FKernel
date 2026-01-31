@@ -1,0 +1,75 @@
+#!/bin/sh
+# FKernel pre-commit hook
+# Enforces code quality before allowing commits
+
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running FKernel pre-commit checks..."
+
+# Check if clang-format is available
+if ! command -v clang-format &> /dev/null; then
+    echo "❌ clang-format not found. Please install clang-format."
+    exit 1
+fi
+
+# Check if clang-tidy is available
+if ! command -v clang-tidy &> /dev/null; then
+    echo "❌ clang-tidy not found. Please install clang-tidy."
+    exit 1
+fi
+
+# Get list of staged files
+staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h|hpp|c|h)$')
+
+if [ -z "$staged_files" ]; then
+    echo "✅ No C/C++ files to check."
+    exit 0
+fi
+
+echo "📝 Checking formatting with clang-format..."
+format_failures=0
+for file in $staged_files; do
+    if [ -f "$file" ]; then
+        # Check if file is properly formatted
+        if ! clang-format --dry-run --Werror "$file" > /dev/null 2>&1; then
+            echo "❌ $file is not properly formatted"
+            format_failures=$((format_failures + 1))
+            
+            # Auto-format the file
+            echo "🔧 Auto-formatting $file..."
+            clang-format -i "$file"
+            git add "$file"
+        fi
+    fi
+done
+
+if [ $format_failures -gt 0 ]; then
+    echo "⚠️  Fixed $format_failures formatting issue(s). Files were staged again."
+fi
+
+echo "🔍 Running clang-tidy checks..."
+tidy_failures=0
+for file in $staged_files; do
+    if [ -f "$file" ]; then
+        # Run clang-tidy with our configuration
+        if ! clang-tidy --config-file=.clang-tidy "$file" --quiet > /dev/null 2>&1; then
+            echo "❌ clang-tidy failed on $file"
+            echo "Run: clang-tidy --config-file=.clang-tidy $file"
+            tidy_failures=$((tidy_failures + 1))
+        fi
+    fi
+done
+
+if [ $tidy_failures -gt 0 ]; then
+    echo "❌ clang-tidy found $tidy_failures issue(s). Please fix them before committing."
+    exit 1
+fi
+
+echo "🧪 Running basic tests..."
+if ! xmake run Test > /dev/null 2>&1; then
+    echo "❌ Tests failed. Please fix failing tests before committing."
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
+exit 0

@@ -5,10 +5,12 @@ This guide provides essential information for AI agents working on the FKernel c
 ## Build System & Commands
 
 ### Primary Build Tool
+
 - **Build System**: XMake (Lua-based)
 - **Language**: C++20 (freestanding), C17 (LibC), NASM (assembly)
 
 ### Essential Commands
+
 ```bash
 # Core build commands
 xmake                    # Build kernel
@@ -28,6 +30,7 @@ xmake analyze           # Analyze kernel runtime
 ```
 
 ### Build Artifacts
+
 - `build/FKernel.bin` - Kernel binary
 - `build/FKernel-MockOS.iso` - Bootable ISO
 - `build/FKernel-HDA.qcow2` - Disk image
@@ -35,11 +38,13 @@ xmake analyze           # Analyze kernel runtime
 ## Code Architecture & Dependencies
 
 ### Layer Separation (STRICT)
+
 1. **LibC** - Minimal freestanding C library (strings, memory, types)
 2. **LibFK** - STL-like library using LibC + self only
 3. **Kernel** - Uses ONLY LibFK, NEVER LibC directly
 
 ### Namespace Structure
+
 ```cpp
 // LibFK namespaces
 namespace fk {
@@ -65,6 +70,7 @@ namespace fkernel {
 ## Mandatory Coding Standards (Object Calisthenics)
 
 ### 1. One Indentation Level Per Method
+
 ```cpp
 // ❌ BAD: Nested hell
 void process() {
@@ -85,6 +91,7 @@ void process() {
 ```
 
 ### 2. No ELSE Keyword
+
 ```cpp
 // ❌ BAD
 if (condition) {
@@ -102,6 +109,7 @@ do_other();
 ```
 
 ### 3. Wrap All Primitives
+
 ```cpp
 // ❌ BAD: Raw primitives
 class Process {
@@ -119,6 +127,7 @@ public:
 ```
 
 ### 4. First-Class Collections
+
 ```cpp
 // ❌ BAD: Exposed vector
 class Manager {
@@ -136,6 +145,7 @@ public:
 ```
 
 ### 5. One Dot Per Line (Law of Demeter)
+
 ```cpp
 // ❌ BAD: Chain calls
 auto name = process->thread()->name();
@@ -145,17 +155,20 @@ auto name = process->thread_name();
 ```
 
 ### 6. No Abbreviations
+
 ```cpp
 // ❌ BAD: class ProcMgr { void init_procs(); }
 // ✅ GOOD: class ProcessManager { void initialize_processes(); }
 ```
 
 ### 7. Keep Entities Small
+
 - **Classes**: Max 200 lines
 - **Methods**: Max 20 lines  
 - **Files**: Max 500 lines
 
 ### 8. Max Two Instance Variables
+
 ```cpp
 // ❌ BAD: Many variables
 class Device {
@@ -173,6 +186,7 @@ class Device {
 ```
 
 ### 9. No Getters/Setters
+
 ```cpp
 // ❌ BAD: Anemic model
 class Process {
@@ -194,6 +208,7 @@ public:
 ## Error Handling
 
 ### Use Result<T, Error> Pattern
+
 ```cpp
 // Return type for fallible operations
 Result<Page*, Error> allocate_page();
@@ -208,12 +223,14 @@ fk::Optional<Process*> find_process(ProcessId pid);
 ## Import & Include Guidelines
 
 ### Include Order
+
 1. System headers (LibC)
 2. LibFK headers  
 3. Kernel headers
 4. Local headers
 
 ### Include Style
+
 ```cpp
 #include <LibC/string.h>
 #include <LibFK/Core/Result.h>
@@ -221,6 +238,7 @@ fk::Optional<Process*> find_process(ProcessId pid);
 ```
 
 ### No Standard Library
+
 - No `<iostream>`, `<vector>`, `<string>` etc.
 - Use LibFK equivalents instead
 - Compile flags: `-nostdlib -nostdinc -ffreestanding`
@@ -228,11 +246,13 @@ fk::Optional<Process*> find_process(ProcessId pid);
 ## Testing Requirements
 
 ### Coverage Goals
+
 - **LibC**: 90%+ coverage required
 - **LibFK**: 85%+ coverage required  
 - **Kernel critical paths**: 75%+ coverage required
 
 ### All Public APIs Must Have Tests
+
 ```cpp
 // Test files follow pattern: tests/[component]/test_[module].cpp
 TEST(memcpy, copies_data_correctly) {
@@ -246,6 +266,7 @@ TEST(memcpy, copies_data_correctly) {
 ## Performance & Hardware
 
 ### Compiler Flags
+
 - `-ffreestanding` - No OS runtime
 - `-fno-exceptions` - No exception support
 - `-fno-rtti` - No runtime type information
@@ -253,6 +274,7 @@ TEST(memcpy, copies_data_correctly) {
 - `-mno-sse` - No SIMD (kernel context)
 
 ### Hardware Interaction
+
 - Use `volatile` for hardware registers
 - Include memory barriers when needed: `__sync_synchronize()`
 - Document against hardware specifications
@@ -261,6 +283,7 @@ TEST(memcpy, copies_data_correctly) {
 ## Documentation Standards
 
 ### Every Public API Needs Documentation
+
 ```cpp
 /// @brief Allocates a physical page frame
 /// @return Result containing page address on success,
@@ -273,19 +296,24 @@ Result<Page*, Error> allocate_page();
 ## Code Style
 
 ### Naming Conventions
+
 - **Classes**: PascalCase (`ProcessManager`)
 - **Methods**: snake_case (`initialize_processes()`)  
 - **Variables**: snake_case with m_ prefix for members (`m_process_count`)
 - **Constants**: UPPER_SNAKE_CASE (`MAX_PROCESSES`)
 - **Namespaces**: snake_case (`fkernel::memory`)
+- **Directories**: PascalCase (`Src/Kernel/Posix/`)
+- **Files**: snake_case (`topology_manager.cpp`)
 
 ### Formatting
+
 - No explicit formatting config found - follow existing patterns
 - 2-space indentation observed in codebase
 - Opening braces on same line for methods/functions
 - Use `//` comments, avoid `/* */` blocks
 
 ### Memory Management
+
 - RAII preferred - no manual cleanup
 - Use LibFK smart pointers: `OwnPtr`, `RefPtr`
 - Stack allocation preferred over heap
@@ -294,6 +322,7 @@ Result<Page*, Error> allocate_page();
 ## Critical Build Dependencies
 
 ### Required Tools
+
 - `clang`/`clang++` (C++20 support)
 - `ld.lld` (linker)
 - `nasm` (assembler)
@@ -301,6 +330,7 @@ Result<Page*, Error> allocate_page();
 - `qemu-system-x86_64` (emulator)
 
 ### Optional Tools (mentioned in README)
+
 - `clang-format` - Code formatting
 - `clang-tidy` - Static analysis  
 - `cppcheck` - Additional analysis
@@ -308,6 +338,7 @@ Result<Page*, Error> allocate_page();
 ## Project Structure Notes
 
 ### Key Directories
+
 - `Src/Kernel/` - Kernel implementation
 - `Src/LibC/` - Freestanding C library
 - `Src/LibFK/` - STL-like library
@@ -315,6 +346,7 @@ Result<Page*, Error> allocate_page();
 - `Meta/` - Build tools and scripts
 
 ### File Organization
+
 - Headers mirror source structure in `Include/`
 - Implementation in `Src/`
 - Architecture-specific code in `Src/Kernel/Arch/x86_64/`
@@ -322,13 +354,16 @@ Result<Page*, Error> allocate_page();
 ## Security & Safety
 
 ### Kernel Mode Constraints
+
 - No standard library access
 - Direct hardware interaction
 - Memory management awareness
 - Interrupt context considerations
 
 ### Development Philosophy
+
 - Security-first design
 - Drivers in userspace (DAL architecture)
 - Isolated kernel subsystems
 - Production-ready, not hobby OS
+

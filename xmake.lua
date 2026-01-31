@@ -184,6 +184,34 @@ end)
 
 target_end()
 
+-- Test target for CI/CD
+target("Test")
+set_kind("binary")
+set_languages("c17")
+add_includedirs("Include")
+
+-- Standard flags for tests (not freestanding)
+add_cxflags("-Wall", "-Wextra")
+add_ldflags("-lc")
+
+-- Add test files
+add_files("tests/LibC/test_standalone.c")
+
+-- Test output
+set_filename("test_runner")
+
+on_run(function(target)
+    local test_binary = target:targetfile()
+    local result = os.execv(test_binary, {})
+    if result ~= 0 then
+        os.raise("Tests failed with exit code: " .. tostring(result))
+    else
+        print("All tests passed!")
+    end
+end)
+
+target_end()
+
 task("setup-hda")
 set_menu({
   usage = "xmake setup-hda",

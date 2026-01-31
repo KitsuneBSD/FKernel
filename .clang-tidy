@@ -1,0 +1,66 @@
+# FKernel clang-tidy configuration
+# Enforces Object Calisthenics and code quality standards
+
+Checks: >
+  readability-identifier-naming,
+  readability-function-size,
+  readability-implicit-bool-conversion,
+  readability-simplify-boolean-expr,
+  readability-isolate-declaration,
+  readability-container-size-empty,
+  bugprone-assert-side-effect,
+  bugprone-dangling-handle,
+  bugprone-forward-declaration-namespace,
+  bugprone-signed-char-misuse,
+  bugprone-undefined-memory-manipulation,
+  bugprone-unused-raii,
+  performance-move-const-arg,
+  performance-unnecessary-copy-initialization,
+  performance-unnecessary-value-param,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-default-member-init,
+  modernize-use-emplace,
+  hicpp-no-assembler,
+  hicpp-signed-char-misuse,
+  hicpp-exception-baseclass,
+  cppcoreguidelines-avoid-magic-numbers,
+  cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  cppcoreguidelines-pro-type-vararg,
+  cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  cppcoreguidelines-pro-type-reinterpret-cast,
+  google-explicit-constructor,
+  google-global-names-in-headers
+
+# Object Calisthenics specific rules
+CheckOptions:
+  - key: readability-function-size.LineThreshold
+    value: 20
+  - key: readability-function-size.StatementThreshold
+    value: 50
+  - key: readability-function-size.BranchThreshold
+    value: 4
+  - key: bugprone-assert-side-effect.CheckAssertMacros
+    value: 'ASSERT,assert'
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;10;100;1000'
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: snake_case
+  - key: readability-identifier-naming.VariableCase
+    value: snake_case
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+
+# Header filter - only check FKernel source
+HeaderFilterRegex: '(Src/|Include/).*\.(cpp|h|hpp|c|h)$'
+
+# Warnings as errors to enforce quality
+WarningsAsErrors: '*'
+
+# Enable all experimental checks for better coverage
+EnableModernize: true
+EnablePerformance: true
