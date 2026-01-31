@@ -1,6 +1,8 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
+#include <Kernel/Memory/iommu.h>
+#include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
 #include <Kernel/Boot/boot_info.h>
 #include <LibFK/Core/Assertions.h>
 #include <LibC/string.h>
@@ -24,6 +26,9 @@ void MemoryManager::initialize() {
   PhysicalMemoryManager::the().initialize();
   VirtualMemoryManager::the().initialize();
 
+  // Initialize Intel IOMMU (VT-d)
+  fkernel::vtd::IntelIOMMU::the().initialize();
+
   initialize_heap();
 
   HardwareInterruptManager::the().set_memory_manager(true);
@@ -31,6 +36,13 @@ void MemoryManager::initialize() {
   ClockManager::the().set_memory_manager(true);
 
   m_is_initialized = true;
+}
+
+fkernel::IOMMU* MemoryManager::get_iommu() const {
+    if (fkernel::vtd::IntelIOMMU::the().is_active()) {
+        return static_cast<fkernel::IOMMU*>(&fkernel::vtd::IntelIOMMU::the());
+    }
+    return nullptr;
 }
 
 void MemoryManager::initialize_heap() {
