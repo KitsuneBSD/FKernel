@@ -202,10 +202,26 @@ void MemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags flags){
   VirtualMemoryManager::the().map_page(virt, phys, flags);
 }
 
+void MemoryManager::unmap_page(uintptr_t virt) {
+    VirtualMemoryManager::the().unmap_page(virt);
+}
+
+uintptr_t MemoryManager::translate(uintptr_t virt) {
+    return VirtualMemoryManager::the().translate(virt);
+}
+
 uintptr_t MemoryManager::allocate_page(ZoneType preferred, uint32_t preferred_node) {
     return PhysicalMemoryManager::the().alloc_page(preferred, preferred_node);
 }
 
 void MemoryManager::free_page(uintptr_t phys) {
     PhysicalMemoryManager::the().free_page(phys);
+}
+
+uintptr_t MemoryManager::allocate_contiguous(size_t order, ZoneType preferred, uint32_t preferred_node) {
+    return PhysicalMemoryManager::the().alloc_contiguous(order, preferred, preferred_node);
+}
+
+void MemoryManager::free_contiguous(uintptr_t phys, size_t order) {
+    PhysicalMemoryManager::the().free_contiguous(phys, order);
 }

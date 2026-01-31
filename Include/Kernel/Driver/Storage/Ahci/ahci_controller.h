@@ -11,7 +11,7 @@ namespace fkernel {
 /// 
 /// Implements AHCI 1.3 specification for SATA storage devices.
 /// Provides block device interface through VFS integration.
-class AHCIController final : public Driver, public StorageDevice {
+class AHCIController : public Driver, public StorageDevice {
 public:
     /// @brief Factory method for creating AHCI controller from PCI device
     /// @param device PCI device that represents AHCI controller
@@ -141,14 +141,16 @@ public:
         volatile HBA_PORT* regs;
     };
 
+protected:
+    PciDevice m_pci_device;
+    volatile uint8_t* m_hba_base{nullptr};
+    fk::containers::Vector<Port> m_ports;
+
 private:
     // AHCI registers and memory management
-    volatile uint8_t* m_hba_base{nullptr};
     uint32_t m_capabilities{0};
     uint32_t m_version{0};
-    fk::containers::Vector<Port> m_ports;
     
-    PciDevice m_pci_device;
     bool m_initialized{false};
 
     int find_cmd_slot(uint32_t port_idx);

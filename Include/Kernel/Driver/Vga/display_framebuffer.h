@@ -41,11 +41,11 @@ class DisplayFramebuffer : public Display {
   uint32_t current_bg_rgb = 0x000000;
   bool use_rgb_color = false;
 
-  // Dirty rectangle tracking for efficient updates
-  struct DirtyRect {
-    uint32_t x, y, width, height;
-    bool dirty;
-  } m_dirty_rect = {0, 0, 0, 0, false};
+  // Dirty tiles tracking for efficient updates
+  static constexpr uint32_t TILE_SIZE = 32;
+  uint32_t m_tiles_x = 0;
+  uint32_t m_tiles_y = 0;
+  uint8_t* m_dirty_tiles = nullptr; // Bitset for dirty tiles
 
   DisplayFramebuffer();
   void initialize_framebuffer();
@@ -60,6 +60,8 @@ class DisplayFramebuffer : public Display {
   // Double buffering functions
   void allocate_back_buffer();
   void free_back_buffer();
+  void allocate_dirty_tiles();
+  void free_dirty_tiles();
   void swap_buffers();
   void wait_vblank();
   void mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
