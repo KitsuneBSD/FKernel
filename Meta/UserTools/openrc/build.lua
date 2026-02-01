@@ -62,13 +62,13 @@ f:write("strip = '" .. Toolchain.get_tool("llvm-strip", "strip") .. "'\n")
 f:write("pkgconfig = 'false'\n")
 f:write("\n")
 f:write("[properties]\n")
-f:write("c_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__', '-D__linux__']\n")
-f:write("cpp_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__', '-D__linux__']\n")
+f:write("c_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__', '-D_BSD_SOURCE']\n")
+f:write("cpp_args = ['--target=", Toolchain.TRIPLE, "', '-isystem', '" .. SYSROOT .. "/include', '-D__fkernel__', '-D_BSD_SOURCE']\n")
 f:write("c_link_args = ['-L" .. SYSROOT .. "/lib', '-static']\n")
 f:write("cpp_link_args = ['-L" .. SYSROOT .. "/lib', '-static']\n")
 f:write("\n")
 f:write("[host_machine]\n")
-f:write("system = 'linux'\n")
+f:write("system = 'freebsd'\n")
 f:write("cpu_family = 'x86_64'\n")
 f:write("cpu = 'x86_64'\n")
 f:write("endian = 'little'\n")
@@ -79,7 +79,7 @@ print("Configuring OpenRC with Meson...")
 local cmd_setup = string.format(
     "cd %s && meson setup %s --cross-file %s --prefix=/ --libdir=lib --sysconfdir=/etc " ..
     "-Ddefault_library=static -Dshell=/bin/sh -Dpam=false -Dselinux=disabled -Daudit=disabled " ..
-    "-Dbranding='\"FKernel\"' -Dsysvinit=false -Dnewnet=true -Dtermcap='' -Dos=Linux " ..
+    "-Dbranding='\"FKernel\"' -Dsysvinit=false -Dnewnet=true -Dtermcap='' -Dos=FreeBSD " ..
     "-Dpkgconfig=false -Dbash-completions=false -Dzsh-completions=false",
     src_dir, build_openrc_dir, cross_file
 )

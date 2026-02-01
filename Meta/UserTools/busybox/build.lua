@@ -114,7 +114,6 @@ print("Enabling essential applets and installer...")
 local enable_list = {
   "CONFIG_BUSYBOX",
   "CONFIG_FEATURE_INSTALLER",
-  "CONFIG_STATIC",
   "CONFIG_ASH",
   "CONFIG_SH_IS_ASH",
   "CONFIG_INIT",
@@ -145,6 +144,7 @@ local enable_list = {
   "CONFIG_CLEAR",
   "CONFIG_SYNC",
   "CONFIG_KILL",
+  "CONFIG_PIE",
   -- Features
   "CONFIG_FEATURE_LS_FILETYPES",
   "CONFIG_FEATURE_LS_FOLLOWLINKS",

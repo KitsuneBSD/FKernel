@@ -1,14 +1,15 @@
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/boot_info.h>
-#include <Kernel/Fs/RamDisk/ram_disk.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Driver/Vga/display.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
+#include <Kernel/Fs/RamDisk/ram_disk.h>
+#include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Loader/elf_loader.h>
@@ -16,13 +17,11 @@
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Driver/Vga/display.h>
 #include <LibFK/Algorithms/log.h>
 
 extern CpuControlBlock g_cpu_block;
 
-extern "C" void switch_context(uint64_t *prev_stack_ptr,
-                               uint64_t next_stack_ptr);
+extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr);
 
 extern "C" void enter_user_mode(uintptr_t rip, uintptr_t rsp);
 
@@ -32,27 +31,27 @@ extern "C" void init_task_entry();
 
 extern "C" void idle_task_entry() {
   static bool s_init_spawned = false;
-  
+
   if (APIC::the().get_id() == 0 && !s_init_spawned) {
-      s_init_spawned = true;
-      
-      // Create Init task on CPU 0
-      Task *init = new Task();
-      *init = create_a_new_task(fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
+    s_init_spawned = true;
 
-      // Set initial memory regions for demand paging
-      init->resources.memory.regions.heap_start = 0x10000000;
-      init->resources.memory.regions.heap_break = 0x10000000;
-      init->resources.memory.regions.mmap_start = 0x40000000;
-      init->resources.memory.regions.mmap_end = 0x40000000;
+    // Create Init task on CPU 0
+    Task* init = new Task();
+    *init = create_a_new_task(fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
 
-      // Migrate logs
-      fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
-                                      fk::algorithms::LogTarget::DebugFS);
+    // Set initial memory regions for demand paging
+    init->resources.memory.regions.heap_start = 0x10000000;
+    init->resources.memory.regions.heap_break = 0x10000000;
+    init->resources.memory.regions.mmap_start = 0x40000000;
+    init->resources.memory.regions.mmap_end = 0x40000000;
 
-      SchedulerManager::the().add_task(init);
-      // Note: m_next_pid handling should be updated in initialize if needed, 
-      // but since we hardcoded PID 1 here, we just need to ensure next generated PID is 2.
+    // Migrate logs
+    fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
+                                    fk::algorithms::LogTarget::DebugFS);
+
+    SchedulerManager::the().add_task(init);
+    // Note: m_next_pid handling should be updated in initialize if needed,
+    // but since we hardcoded PID 1 here, we just need to ensure next generated PID is 2.
   }
 
   while (true) {
@@ -68,15 +67,14 @@ SchedulerManager::SchedulerManager() {
 extern "C" void init_task_entry() {
   fk::algorithms::klog("INIT", "Init process trampoline started.");
 
-  auto &modules = boot::BootInfo::the().get_modules();
+  auto& modules = boot::BootInfo::the().get_modules();
   if (modules.is_empty()) {
     fk::algorithms::kerror("INIT", "No RamDisk module found!");
   }
 
   // Assume the first module is our RamDisk
-  auto &ramdisk_mod = modules[0];
-  auto ramdisk_res =
-      fkernel::RamDiskNode::create(ramdisk_mod.start, ramdisk_mod.end);
+  auto& ramdisk_mod = modules[0];
+  auto ramdisk_res = fkernel::RamDiskNode::create(ramdisk_mod.start, ramdisk_mod.end);
   if (ramdisk_res.is_error()) {
     fk::algorithms::kerror("INIT", "Failed to create RamDisk");
     return;
@@ -97,7 +95,7 @@ extern "C" void init_task_entry() {
     fk::algorithms::kerror("INIT", "Failed to open /dev/tty0 for init process!");
     return;
   }
-  
+
   auto* current = SchedulerManager::the().current();
   current->add_file_descriptor(console_res.value()); // 0: stdin
   current->add_file_descriptor(console_res.value()); // 1: stdout
@@ -117,49 +115,54 @@ extern "C" void init_task_entry() {
   auto entry_res = fkernel::ElfLoader::load(init_dentry_res.value()->top_node());
 
   if (entry_res.is_error()) {
-    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF (Error %d)", (int)entry_res.error());
-    while(1) asm volatile("hlt");
+    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF (Error %d)",
+                           (int)entry_res.error());
+    while (1)
+      asm volatile("hlt");
   }
 
   fkernel::ElfLoadResult elf_res = entry_res.value();
   uintptr_t entry = elf_res.entry;
-  fk::algorithms::klog("INIT", "Jumping to user-mode init at %p",
-                       (void *)entry);
+  fk::algorithms::klog("INIT", "Jumping to user-mode init at %p", (void*)entry);
 
   // Map user stack (32 KB) at the top of the user address space
   constexpr uintptr_t USER_STACK_TOP = 0x7fffffffe000;
   constexpr size_t STACK_PAGES = 8;
   for (size_t i = 0; i < STACK_PAGES; ++i) {
     uintptr_t stack_phys = PhysicalMemoryManager::the().alloc_page();
-    VirtualMemoryManager::the().map_page(
-        USER_STACK_TOP - (i + 1) * 0x1000, stack_phys,
-        PageFlags::Present | PageFlags::Writable | PageFlags::User);
-    memset(reinterpret_cast<void *>(USER_STACK_TOP - (i + 1) * 0x1000), 0,
-           0x1000);
+    VirtualMemoryManager::the().map_page(USER_STACK_TOP - (i + 1) * 0x1000, stack_phys,
+                                         PageFlags::Present | PageFlags::Writable |
+                                             PageFlags::User);
+    memset(reinterpret_cast<void*>(USER_STACK_TOP - (i + 1) * 0x1000), 0, 0x1000);
   }
 
   // Setup initial stack frame for Musl/BusyBox
-  char *string_area = reinterpret_cast<char *>(USER_STACK_TOP) - 128;
+  char* string_area = reinterpret_cast<char*>(USER_STACK_TOP) - 128;
   strcpy(string_area, "/sbin/init");
   strcpy(string_area + 32, "PATH=/bin:/sbin:/usr/bin:/usr/sbin");
   uintptr_t argv0_addr = USER_STACK_TOP - 128;
   uintptr_t envp0_addr = USER_STACK_TOP - 96;
 
   // Space for auxv: we need more pointers
-  uintptr_t *pointers = reinterpret_cast<uintptr_t *>(string_area) - 25;
+  uintptr_t* pointers = reinterpret_cast<uintptr_t*>(string_area) - 25;
   size_t idx = 0;
   pointers[idx++] = 1;          // argc
   pointers[idx++] = argv0_addr; // argv[0]
   pointers[idx++] = 0;          // argv[1] (NULL)
   pointers[idx++] = envp0_addr; // envp[0]
   pointers[idx++] = 0;          // envp[1] (NULL)
-  
+
   // Auxv
-  pointers[idx++] = 3; pointers[idx++] = elf_res.ph_addr; // AT_PHDR
-  pointers[idx++] = 4; pointers[idx++] = elf_res.ph_ent;  // AT_PHENT
-  pointers[idx++] = 5; pointers[idx++] = elf_res.ph_num;  // AT_PHNUM
-  pointers[idx++] = 6; pointers[idx++] = 4096;           // AT_PAGESZ
-  pointers[idx++] = 0; pointers[idx++] = 0;              // AT_NULL
+  pointers[idx++] = 3;
+  pointers[idx++] = elf_res.ph_addr; // AT_PHDR
+  pointers[idx++] = 4;
+  pointers[idx++] = elf_res.ph_ent; // AT_PHENT
+  pointers[idx++] = 5;
+  pointers[idx++] = elf_res.ph_num; // AT_PHNUM
+  pointers[idx++] = 6;
+  pointers[idx++] = 4096; // AT_PAGESZ
+  pointers[idx++] = 0;
+  pointers[idx++] = 0; // AT_NULL
 
   uintptr_t final_rsp = reinterpret_cast<uintptr_t>(pointers);
 
@@ -175,9 +178,8 @@ void SchedulerManager::initialize() {
 
   // Create Idle tasks for each CPU
   for (uint32_t i = 0; i < m_processor_count; ++i) {
-    Task *idle = new Task();
-    *idle =
-        create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
+    Task* idle = new Task();
+    *idle = create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
 
     m_processors[i].idle_task = idle;
     m_processors[i].current_task = nullptr;
@@ -185,13 +187,19 @@ void SchedulerManager::initialize() {
 
   m_next_pid = 2; // Init will be PID 1 (created by idle), next is 2
 
-  fk::algorithms::klog(
-      "SCHEDULER MANAGER",
-      "Initializing SMP Scheduler Manager (round robin per CPU)...");
+  fk::algorithms::klog("SCHEDULER MANAGER",
+                       "Initializing SMP Scheduler Manager (round robin per CPU)...");
 }
 
-void SchedulerManager::add_task(Task *task) {
-  ASSERT(task && task->is_valid());
+void SchedulerManager::add_task(Task* task) {
+  if (!task) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "add_task: null task pointer");
+    return;
+  }
+  if (!task->is_valid()) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "add_task: invalid task provided");
+    return;
+  }
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
@@ -210,23 +218,25 @@ void SchedulerManager::add_task(Task *task) {
     target_cpu = APIC::the().get_id();
   }
 
-  if (target_cpu >= 32) target_cpu = 0;
-  
+  if (target_cpu >= 32)
+    target_cpu = 0;
+
   {
     fk::synchronization::ScopedLock lock(m_processors[target_cpu].run_queue_lock);
     m_processors[target_cpu].run_queue.push_back(task);
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::block_current() {
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
-  auto &proc = current_processor();
+  auto& proc = current_processor();
   if (proc.current_task) {
-    Task *task = proc.current_task;
+    Task* task = proc.current_task;
     task->control.lifecycle.state = TaskState::Blocked;
     {
       fk::synchronization::ScopedLock lock(m_lock);
@@ -235,16 +245,17 @@ void SchedulerManager::block_current() {
     proc.need_resched = true;
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::zombify_current() {
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
-  auto &proc = current_processor();
+  auto& proc = current_processor();
   if (proc.current_task) {
-    Task *task = proc.current_task;
+    Task* task = proc.current_task;
     task->control.lifecycle.state = TaskState::Blocked;
     task->control.lifecycle.terminated = true;
     {
@@ -254,16 +265,17 @@ void SchedulerManager::zombify_current() {
     proc.need_resched = true;
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::sleep_current(uint64_t sleep_ticks) {
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
-  auto &proc = current_processor();
+  auto& proc = current_processor();
   if (proc.current_task) {
-    Task *task = proc.current_task;
+    Task* task = proc.current_task;
     task->control.lifecycle.state = TaskState::Sleeping;
     task->control.lifecycle.wake_up_time_ticks = TickManager::the().get_ticks() + sleep_ticks;
     {
@@ -273,16 +285,17 @@ void SchedulerManager::sleep_current(uint64_t sleep_ticks) {
     proc.need_resched = true;
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::yield() {
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
-  auto &proc = current_processor();
+  auto& proc = current_processor();
   if (proc.current_task) {
-    Task *task = proc.current_task;
+    Task* task = proc.current_task;
     if (task->control.lifecycle.state == TaskState::Running) {
       task->control.lifecycle.state = TaskState::Ready;
       {
@@ -294,11 +307,19 @@ void SchedulerManager::yield() {
     }
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
-void SchedulerManager::wake_task(Task *task) {
-  ASSERT(task && task->is_valid());
+void SchedulerManager::wake_task(Task* task) {
+  if (!task) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "wake_task: null task pointer");
+    return;
+  }
+  if (!task->is_valid()) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "wake_task: invalid task provided");
+    return;
+  }
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
@@ -325,38 +346,42 @@ void SchedulerManager::wake_task(Task *task) {
     m_processors[target_cpu].run_queue.push_back(task);
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::terminate_current(int status) {
-    Task* curr = this->current();
-    if (!curr) return;
+  Task* curr = this->current();
+  if (!curr) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "terminate_current: no current task");
+    return;
+  }
 
-    curr->control.lifecycle.terminated = true;
-    curr->control.lifecycle.exit_status = status;
+  curr->control.lifecycle.terminated = true;
+  curr->control.lifecycle.exit_status = status;
 
-    auto* parent = find_task(curr->control.identity.ppid);
-    if (parent) {
-        if (parent->control.lifecycle.vfork_waiting && 
-            curr->control.lifecycle.vfork_parent_id == parent->control.identity.id) {
-            parent->control.lifecycle.vfork_waiting = false;
-        }
-        wake_task(parent);
+  auto* parent = find_task(curr->control.identity.ppid);
+  if (parent) {
+    if (parent->control.lifecycle.vfork_waiting &&
+        curr->control.lifecycle.vfork_parent_id == parent->control.identity.id) {
+      parent->control.lifecycle.vfork_waiting = false;
     }
+    wake_task(parent);
+  }
 
-    zombify_current();
-    schedule();
+  zombify_current();
+  schedule();
 }
 
-Task *SchedulerManager::pick_next() {
-  auto &proc = current_processor();
+Task* SchedulerManager::pick_next() {
+  auto& proc = current_processor();
 
   {
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
     if (proc.run_queue.empty()) {
       proc.current_task = proc.idle_task;
     } else {
-      Task *next = proc.run_queue.front();
+      Task* next = proc.run_queue.front();
       proc.run_queue.pop_front();
 
       next->control.lifecycle.state = TaskState::Running;
@@ -374,13 +399,13 @@ void SchedulerManager::on_tick() {
   InterruptController::the().disable_interrupt();
 
   uint64_t now = TickManager::the().get_ticks();
-  auto &proc = current_processor();
+  auto& proc = current_processor();
 
   if (proc.id == 0) {
     Display::the().background_flush();
     fk::synchronization::ScopedLock lock(m_lock);
     for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end();) {
-      Task *task = &*it;
+      Task* task = &*it;
       ++it;
 
       if (task->control.lifecycle.wake_up_time_ticks <= now) {
@@ -399,7 +424,7 @@ void SchedulerManager::on_tick() {
   if (!proc.current_task || proc.current_task == proc.idle_task || !is_run_queue_empty) {
     proc.need_resched = true;
   } else if (--proc.current_task->control.lifecycle.time_slice_ticks == 0) {
-    Task *task = proc.current_task;
+    Task* task = proc.current_task;
     task->control.lifecycle.state = TaskState::Ready;
     {
       fk::synchronization::ScopedLock lock(proc.run_queue_lock);
@@ -408,10 +433,11 @@ void SchedulerManager::on_tick() {
     proc.need_resched = true;
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
-fkernel::Processor &SchedulerManager::current_processor() {
+fkernel::Processor& SchedulerManager::current_processor() {
   uint32_t id = APIC::the().get_id();
   if (id < 32)
     return m_processors[id];
@@ -423,23 +449,25 @@ void SchedulerManager::schedule() {
   InterruptController::the().disable_interrupt();
 
   if (is_need_resched()) {
-    auto &proc = current_processor();
-    Task *prev_task = proc.current_task;
-    Task *next_task = pick_next();
+    auto& proc = current_processor();
+    Task* prev_task = proc.current_task;
+    Task* next_task = pick_next();
 
     if (next_task && prev_task != next_task) {
       if (prev_task) {
-          fk::algorithms::klog(
-              "SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
-              prev_task->control.identity.name.c_str(), prev_task, (void *)prev_task->resources.context.stack_pointer,
-              next_task->control.identity.name.c_str(), next_task, (void *)next_task->resources.context.stack_pointer);
+        fk::algorithms::klog("SCHEDULER", "Switch: %s (%p, SP=%p) -> %s (%p, SP=%p)",
+                             prev_task->control.identity.name.c_str(), prev_task,
+                             (void*)prev_task->resources.context.stack_pointer,
+                             next_task->control.identity.name.c_str(), next_task,
+                             (void*)next_task->resources.context.stack_pointer);
       } else {
-          fk::algorithms::klog(
-              "SCHEDULER", "Switch: (Boot) -> %s (%p, SP=%p)",
-              next_task->control.identity.name.c_str(), next_task, (void *)next_task->resources.context.stack_pointer);
+        fk::algorithms::klog("SCHEDULER", "Switch: (Boot) -> %s (%p, SP=%p)",
+                             next_task->control.identity.name.c_str(), next_task,
+                             (void*)next_task->resources.context.stack_pointer);
       }
 
-      if (prev_task && next_task->resources.memory.cr3 != 0 && next_task->resources.memory.cr3 != prev_task->resources.memory.cr3) {
+      if (prev_task && next_task->resources.memory.cr3 != 0 &&
+          next_task->resources.memory.cr3 != prev_task->resources.memory.cr3) {
         VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
       } else if (!prev_task && next_task->resources.memory.cr3 != 0) {
         VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
@@ -463,34 +491,42 @@ void SchedulerManager::schedule() {
       CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->resources.context.gs_base);
 
       GDTController::the().set_kernel_stack(next_task->resources.context.kernel_stack_top);
-      
+
       if (prev_task) {
-          switch_context(&prev_task->resources.context.stack_pointer, next_task->resources.context.stack_pointer);
+        switch_context(&prev_task->resources.context.stack_pointer,
+                       next_task->resources.context.stack_pointer);
       } else {
-          uint64_t dummy_stack_ptr;
-          switch_context(&dummy_stack_ptr, next_task->resources.context.stack_pointer);
+        uint64_t dummy_stack_ptr;
+        switch_context(&dummy_stack_ptr, next_task->resources.context.stack_pointer);
       }
     }
   }
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }
 
 void SchedulerManager::print_all_tasks() {
   for (uint32_t i = 0; i < m_processor_count; ++i) {
-    auto &proc = m_processors[i];
-    if (proc.current_task) proc.current_task->print_info();
-    if (proc.idle_task) proc.idle_task->print_info();
-    for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) it->print_info();
+    auto& proc = m_processors[i];
+    if (proc.current_task)
+      proc.current_task->print_info();
+    if (proc.idle_task)
+      proc.idle_task->print_info();
+    for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it)
+      it->print_info();
   }
-  for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) it->print_info();
-  for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) it->print_info();
-  for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) it->print_info();
+  for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it)
+    it->print_info();
+  for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it)
+    it->print_info();
+  for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it)
+    it->print_info();
 }
 
-Task *SchedulerManager::find_task(fk::ProcessId id) {
+Task* SchedulerManager::find_task(fk::ProcessId id) {
   for (uint32_t i = 0; i < m_processor_count; ++i) {
-    auto &proc = m_processors[i];
+    auto& proc = m_processors[i];
     if (proc.current_task && proc.current_task->control.identity.id == id)
       return proc.current_task;
     if (proc.idle_task && proc.idle_task->control.identity.id == id)
@@ -499,7 +535,8 @@ Task *SchedulerManager::find_task(fk::ProcessId id) {
     {
       fk::synchronization::ScopedLock lock(proc.run_queue_lock);
       for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
-        if (it->control.identity.id == id) return &*it;
+        if (it->control.identity.id == id)
+          return &*it;
       }
     }
   }
@@ -507,22 +544,25 @@ Task *SchedulerManager::find_task(fk::ProcessId id) {
   {
     fk::synchronization::ScopedLock lock(m_lock);
     for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
-      if (it->control.identity.id == id) return &*it;
+      if (it->control.identity.id == id)
+        return &*it;
     }
 
     for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-      if (it->control.identity.id == id) return &*it;
+      if (it->control.identity.id == id)
+        return &*it;
     }
 
     for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
-      if (it->control.identity.id == id) return &*it;
+      if (it->control.identity.id == id)
+        return &*it;
     }
   }
 
   return nullptr;
 }
 
-Task *SchedulerManager::find_terminated_child(fk::ProcessId ppid) {
+Task* SchedulerManager::find_terminated_child(fk::ProcessId ppid) {
   fk::synchronization::ScopedLock lock(m_lock);
   for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
     Task& task = *it;
@@ -533,16 +573,18 @@ Task *SchedulerManager::find_terminated_child(fk::ProcessId ppid) {
   return nullptr;
 }
 
-Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
+Task* SchedulerManager::find_any_child(fk::ProcessId ppid) {
   for (uint32_t i = 0; i < m_processor_count; ++i) {
-    auto &proc = m_processors[i];
-    if (proc.current_task && proc.current_task->is_valid() && proc.current_task->control.identity.ppid == ppid)
+    auto& proc = m_processors[i];
+    if (proc.current_task && proc.current_task->is_valid() &&
+        proc.current_task->control.identity.ppid == ppid)
       return proc.current_task;
 
     {
       fk::synchronization::ScopedLock lock(proc.run_queue_lock);
       for (auto it = proc.run_queue.begin(); it != proc.run_queue.end(); ++it) {
-        if (it->is_valid() && it->control.identity.ppid == ppid) return &*it;
+        if (it->is_valid() && it->control.identity.ppid == ppid)
+          return &*it;
       }
     }
   }
@@ -550,23 +592,33 @@ Task *SchedulerManager::find_any_child(fk::ProcessId ppid) {
   {
     fk::synchronization::ScopedLock lock(m_lock);
     for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
-      if (it->is_valid() && it->control.identity.ppid == ppid) return &*it;
+      if (it->is_valid() && it->control.identity.ppid == ppid)
+        return &*it;
     }
 
     for (auto it = m_zombie_queue.begin(); it != m_zombie_queue.end(); ++it) {
-      if (it->is_valid() && it->control.identity.ppid == ppid) return &*it;
+      if (it->is_valid() && it->control.identity.ppid == ppid)
+        return &*it;
     }
 
     for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end(); ++it) {
-      if (it->is_valid() && it->control.identity.ppid == ppid) return &*it;
+      if (it->is_valid() && it->control.identity.ppid == ppid)
+        return &*it;
     }
   }
 
   return nullptr;
 }
 
-void SchedulerManager::reap_zombie(Task *task) {
-  ASSERT(task && task->is_valid());
+void SchedulerManager::reap_zombie(Task* task) {
+  if (!task) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "reap_zombie: null task pointer");
+    return;
+  }
+  if (!task->is_valid()) {
+    fk::algorithms::kerror("SCHEDULER MANAGER", "reap_zombie: invalid task provided");
+    return;
+  }
   bool intr_state = InterruptController::the().get_interrupt_state();
   InterruptController::the().disable_interrupt();
 
@@ -576,5 +628,6 @@ void SchedulerManager::reap_zombie(Task *task) {
   }
   task->invalidate();
 
-  if (intr_state) InterruptController::the().enable_interrupt();
+  if (intr_state)
+    InterruptController::the().enable_interrupt();
 }

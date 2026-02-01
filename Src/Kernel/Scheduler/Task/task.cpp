@@ -1,6 +1,6 @@
+#include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/heap_malloc.h>
 
@@ -10,16 +10,16 @@
 
 extern "C" void task_trampoline();
 
-Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
-                       void (*entry)(), bool kernel_task, uint8_t priority,
-                       uint64_t cpu_affinity, uint64_t arg1, uint64_t arg2) {
+Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name, void (*entry)(),
+                       bool kernel_task, uint8_t priority, uint64_t cpu_affinity, uint64_t arg1,
+                       uint64_t arg2) {
   const size_t STACK_SIZE = 16 * fk::types::KiB;
 
-  void *stack_mem = kmalloc(STACK_SIZE);
+  void* stack_mem = kmalloc(STACK_SIZE);
   uint64_t stack_top = reinterpret_cast<uint64_t>(stack_mem) + STACK_SIZE;
 
   // Setup initial stack for switch_context
-  uint64_t *stack = reinterpret_cast<uint64_t *>(stack_top);
+  uint64_t* stack = reinterpret_cast<uint64_t*>(stack_top);
   *(--stack) = reinterpret_cast<uint64_t>(task_trampoline);
   *(--stack) = 0;                                 // rbx
   *(--stack) = 0;                                 // rbp
@@ -29,34 +29,31 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
   *(--stack) = 0;                                 // r15
 
   // Initialize IPC CSpace
-  auto *cspace = new fkernel::ipc::CSpace();
-  auto *signal_notification = new fkernel::ipc::Notification();
-  cspace->install(fkernel::ipc::Capability(
-      signal_notification, fkernel::ipc::CapabilityType::Notification));
+  auto* cspace = new fkernel::ipc::CSpace();
+  auto* signal_notification = new fkernel::ipc::Notification();
+  cspace->install(
+      fkernel::ipc::Capability(signal_notification, fkernel::ipc::CapabilityType::Notification));
 
   // Also register in global manager for sys_kill access
-  fkernel::ipc::GlobalEndpointManager::the().register_notification(
-      id.value(), signal_notification);
+  fkernel::ipc::GlobalEndpointManager::the().register_notification(id.value(), signal_notification);
 
   Task task;
   task.magic = Task::MAGIC;
-  task.control.identity = { .id = id, .ppid = fk::ProcessId(), .name = name };
-  task.control.lifecycle = {
-      .state = TaskState::Ready,
-      .priority = priority,
-      .cpu_affinity = cpu_affinity,
-      .time_slice_ticks = 0,
-      .wake_up_time_ticks = 0,
-      .is_a_kernel_task = kernel_task,
-      .terminated = false,
-      .exit_status = 0,
-      .clear_child_tid = 0,
-      .vfork_waiting = false,
-      .vfork_parent_id = fk::ProcessId(),
-      .is_vfork_sharing_address_space = false
-  };
+  task.control.identity = {.id = id, .ppid = fk::ProcessId(), .name = name};
+  task.control.lifecycle = {.state = TaskState::Ready,
+                            .priority = priority,
+                            .cpu_affinity = cpu_affinity,
+                            .time_slice_ticks = 0,
+                            .wake_up_time_ticks = 0,
+                            .is_a_kernel_task = kernel_task,
+                            .terminated = false,
+                            .exit_status = 0,
+                            .clear_child_tid = 0,
+                            .vfork_waiting = false,
+                            .vfork_parent_id = fk::ProcessId(),
+                            .is_vfork_sharing_address_space = false};
 
-  task.resources.memory = { .cr3 = read_on_cr3() };
+  task.resources.memory = {.cr3 = read_on_cr3()};
   task.resources.files.cwd = "/";
   task.resources.ipc.cspace = cspace;
   task.resources.ipc.signal_notification = signal_notification;
@@ -68,30 +65,19 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
       .saved_rip = 0,
       .saved_rflags = 0,
       .fs_base = 0,
-      .gs_base = 0
-  };
+      .gs_base = 0};
 
   return task;
 }
 
-void Task::print_info() const {
-  fk::algorithms::kdebug("TASK INFO",
-                         "Task ID: %lu, Name: %s, State: %u, Priority: %u, CPU "
-                         "Affinity: %lu, Is Kernel Task: %s",
-                         control.identity.id.value(), control.identity.name.c_str(), 
-                         static_cast<uint8_t>(control.lifecycle.state),
-                         control.lifecycle.priority, control.lifecycle.cpu_affinity,
-                         control.lifecycle.is_a_kernel_task ? "Yes" : "No");
-}
+void Task::print_info() const {}
 
-int Task::add_file_descriptor(
-    fk::RefPtr<FileDescription> description) {
+int Task::add_file_descriptor(fk::RefPtr<FileDescription> description) {
   fk::synchronization::ScopedLockIRQ lock_task(lock);
   for (size_t i = 0; i < resources.files.descriptors.size(); ++i) {
     if (!resources.files.descriptors[i]) {
       resources.files.descriptors[i] = description;
-      fk::algorithms::klog("TASK", "Task %lu: Added FD %zu -> %s", 
-                           control.identity.id.value(), i, description->node()->name().c_str());
+
       return static_cast<int>(i);
     }
   }
@@ -104,33 +90,35 @@ int Task::add_file_descriptor(
 
   int fd = static_cast<int>(resources.files.descriptors.size());
   resources.files.descriptors.push_back(description);
-  fk::algorithms::klog("TASK", "Task %lu: Added FD %d -> %s", 
-                       control.identity.id.value(), fd, description->node()->name().c_str());
+
   return fd;
 }
 
 void Task::dump_file_descriptors() const {
-    fk::synchronization::ScopedLockIRQ lock_task(lock);
-    fk::algorithms::klog("TASK", "FD table for Task %lu (%s):", 
-                         control.identity.id.value(), control.identity.name.c_str());
-    for (size_t i = 0; i < resources.files.descriptors.size(); ++i) {
-        if (resources.files.descriptors[i]) {
-            auto node = resources.files.descriptors[i]->node();
-            const char* type = "unknown";
-            if (node->is_character_device()) type = "char";
-            else if (node->is_block_device()) type = "block";
-            else if (node->is_directory()) type = "dir";
-            else type = "file";
+  fk::synchronization::ScopedLockIRQ lock_task(lock);
 
-            fk::algorithms::klog("TASK", "  [%zu] -> %s (type: %s, ptr: %p)", 
-                                 i, node->name().c_str(), type, node.get());
-        }
+  for (size_t i = 0; i < resources.files.descriptors.size(); ++i) {
+    if (resources.files.descriptors[i]) {
+      auto node = resources.files.descriptors[i]->node();
+      const char* type = "unknown";
+      if (node->is_character_device())
+        type = "char";
+      else if (node->is_block_device())
+        type = "block";
+      else if (node->is_directory())
+        type = "dir";
+      else
+        type = "file";
+      (void)type; // Suppress unused variable warning
     }
+  }
 }
 
 int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min_fd) {
   fk::synchronization::ScopedLockIRQ lock_task(lock);
-  auto description = (old_fd < 0 || old_fd >= static_cast<int>(resources.files.descriptors.size())) ? nullptr : resources.files.descriptors[old_fd];
+  auto description = (old_fd < 0 || old_fd >= static_cast<int>(resources.files.descriptors.size()))
+                         ? nullptr
+                         : resources.files.descriptors[old_fd];
   if (!description) {
     fk::algorithms::kwarn("TASK", "dup_file_descriptor: Source FD %d not found", old_fd);
     return -1; // EBADF
@@ -139,7 +127,7 @@ int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min
   for (int i = min_fd; i < static_cast<int>(resources.files.descriptors.capacity()); ++i) {
     if (i >= static_cast<int>(resources.files.descriptors.size())) {
       while (static_cast<int>(resources.files.descriptors.size()) < i) {
-          resources.files.descriptors.push_back({});
+        resources.files.descriptors.push_back({});
       }
       resources.files.descriptors.push_back(description);
       int new_fd = resources.files.descriptors.size() - 1;

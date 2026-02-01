@@ -1,4 +1,3 @@
-#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
@@ -7,13 +6,13 @@
 
 extern "C" {
 
-uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                           uint64_t, [[maybe_unused]] PtRegs* regs) {
+uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           [[maybe_unused]] PtRegs* regs) {
 
   auto* task = SchedulerManager::the().current();
-  if (!task) return -1;
+  if (!task)
+    return -1;
 
-  fk::algorithms::klog("SYSCALL", "sigsuspend: PID %lu blocking", task->control.identity.id.value());
   SchedulerManager::the().block_current();
   SchedulerManager::the().schedule();
 

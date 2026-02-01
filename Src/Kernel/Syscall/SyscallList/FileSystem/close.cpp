@@ -7,15 +7,13 @@
 #include <LibFK/Types/types.h>
 
 extern "C" {
-uint64_t sys_close(uint64_t fd_u64, uint64_t, uint64_t, uint64_t, uint64_t,
-                   uint64_t, [[maybe_unused]] PtRegs* regs) {
+uint64_t sys_close(uint64_t fd_u64, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                   [[maybe_unused]] PtRegs* regs) {
   int fd = (int)fd_u64;
 
-  auto *current_task = SchedulerManager::the().current();
+  auto* current_task = SchedulerManager::the().current();
   if (!current_task)
     return -1;
-
-  fk::algorithms::kdebug("SYSCALL", "sys_close: fd=%d", fd);
 
   if (fd < 0 || fd >= (int)current_task->resources.files.descriptors.size())
     return -static_cast<int>(fk::core::Error::InvalidHandle);
@@ -26,10 +24,7 @@ uint64_t sys_close(uint64_t fd_u64, uint64_t, uint64_t, uint64_t, uint64_t,
   }
 
   auto desc = current_task->resources.files.descriptors[fd];
-  fk::algorithms::klog("SYSCALL", "sys_close: fd=%d, desc=%p", fd, desc.get());
-
   current_task->resources.files.descriptors[fd] = nullptr;
-  fk::algorithms::klog("SYSCALL", "sys_close: success");
   return 0;
 }
 }

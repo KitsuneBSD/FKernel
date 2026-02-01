@@ -46,16 +46,18 @@ void DriverRegistry::register_display_drivers() {
 
 template<typename ControllerClass>
 void DriverRegistry::register_pci_driver(uint8_t class_code, uint8_t subclass) {
-    PciManager::the().register_driver(class_code, subclass, [](const PciDevice& device) {
+    PciManager::the().register_driver(class_code, subclass, [](const PciDevice& device) -> fk::RefPtr<Node> {
         if constexpr (fk::traits::is_same_v<ControllerClass, ATAController>) {
             // ATA uses singleton pattern
             ATAController::the().detect_on_pci(device);
+            return nullptr; 
         } else {
             // Other controllers use factory pattern
             auto controller = ControllerClass::create(device);
             if (controller) {
                 DriverManager::the().register_device(controller);
             }
+            return controller;
         }
     });
 }
