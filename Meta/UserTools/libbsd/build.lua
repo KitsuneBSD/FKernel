@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 -- Script de construção da LibBSD (Official) para FKernel
 local ArchiveUtils = require("Meta.Lib.archive_utils")

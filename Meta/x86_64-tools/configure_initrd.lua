@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local config_file = "build/initrd_config.txt"
 os.execute("mkdir -p build")

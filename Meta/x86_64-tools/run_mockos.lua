@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 require("Meta.Lib.os_interact")
 require("Meta.Lib.print_message")

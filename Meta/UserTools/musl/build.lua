@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 -- Script de construção da Musl LibC para FKernel
 local ArchiveUtils = require("Meta.Lib.archive_utils")

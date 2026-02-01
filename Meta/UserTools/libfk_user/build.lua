@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 -- Script de construção da LibFKUser (Syscall wrappers)
 local Toolchain = require("Meta.Lib.toolchain")

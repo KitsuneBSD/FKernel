@@ -1,5 +1,3 @@
-#!/usr/bin/env lua
-
 -- Adicionar caminho para as bibliotecas Meta
 package.path = package.path .. ";./?.lua;./Meta/Lib/?.lua"
 

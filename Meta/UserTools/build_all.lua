@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local PrintMessage = require("Meta.Lib.print_message")
 

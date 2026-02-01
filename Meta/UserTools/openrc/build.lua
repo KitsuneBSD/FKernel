@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local ArchiveUtils = require("Meta.Lib.archive_utils")
 local BuildUtils = require("Meta.Lib.build_utils")

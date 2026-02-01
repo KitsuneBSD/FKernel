@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 -- Script de construção da LibMD para FKernel (Dependência da LibBSD)
 local ArchiveUtils = require("Meta.Lib.archive_utils")
