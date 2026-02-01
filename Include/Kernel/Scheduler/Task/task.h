@@ -159,6 +159,10 @@ struct Task {
     fk::RefPtr<FileDescription> get_file_descriptor(int fd);
     void close_file_descriptor(int fd);
 
+    void set_heap_regions(uintptr_t start, uintptr_t break_addr);
+    void set_mmap_regions(uintptr_t start, uintptr_t end);
+    bool is_address_in_allowed_regions(uintptr_t address) const;
+
     void dump_file_descriptors() const;
     void print_info() const;
 };
