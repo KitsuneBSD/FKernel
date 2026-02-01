@@ -126,14 +126,25 @@ Physical::free_page(page);
 - Green threads via MLFQ by default, bypass with O_HPC.
 - Memory management hybrid: Buddy + Zones + Bitmap.
 
-### 11. File & Directory Naming Conventions
+### 11. File & Directory Naming Conventions - SECRET RULE
 
-- **Directories:** PascalCase  
+- **🔑 SECRET RULE: ONE STRUCT/CLASS PER FILE** - This is non-negotiable and must be enforced
+- **Directories:** PascalCase representing **domains**  
   - Examples: `Kernel`, `Driver`, `PhysicalMemory`, `VirtualMemory`, `Syscall`  
-- **Files:** camel-case, one struct/class per file  
-  - Examples: `cpuContext.h`, `ataController.cpp`, `virtualMemoryManager.h`  
-- Subdirectories represent **domains**; files inside represent **single responsibilities**.
+- **Files:** camel-case, **exactly one** struct/class per file  
+  - Examples: `cpuContext.h` (contains ONLY CpuContext), `ataController.cpp` (contains ONLY AtaController)  
+- **Domain-based organization**: Each directory represents a **cohesive domain** with clear boundaries
+- **Single responsibility**: Each file represents **exactly one concept/responsibility**
+- **Deep autodocumentation**: Structure should be self-evident from directory/file names alone
 - Keep **modification scope minimal**: changing a file should affect **only its domain**.
+
+#### Domain Organization Principles
+
+1. **Domain Separation**: Directories represent clear domain boundaries
+2. **Conceptual Clarity**: File names should immediately reveal their purpose
+3. **Architectural Intent**: Directory structure should document the system architecture
+4. **Maintenance Isolation**: Changes to one domain should never impact unrelated domains
+5. **Discovery**: Developers should be able to locate functionality by following the domain hierarchy
 
 ### 12. Directory Structure Enforcement
 
@@ -713,11 +724,78 @@ auto page = TRY(Physical::allocate_page());
 
 - Enforces predictable behavior, early error propagation, and secure kernel state.
 
-### 14. GEMINI Script Management
+### 14. GEMINI Script Management & Memory System
 
-- GEMINI must generate Lua scripts automatically based on kernel, library, and userland analysis.  
-- Generated scripts should be integrated into the kernel build, testing, and deployment pipelines as needed.  
-- All script generation and modifications must be documented:
-  - In the `Docs/` directory for public or technical documentation.
-  - In the `.ai-docs/` directory for internal tracking, auditing, and metadata purposes.  
-- This ensures full traceability, reproducibility, and transparency of all automated processes.
+- **Memory System**: GEMINI must maintain conceptual memory in `.ai-docs/` for all recent modifications and architectural decisions
+- **Documentation Pipeline**: 
+  - `.ai-docs/` → **Internal AI memory** (conceptual knowledge, recent changes, architectural decisions)
+  - `Docs/` → **Human documentation** (comprehensive guides with descriptive names)
+- **Continuous Learning**: GEMINI must read `.ai-docs/` as primary memory for understanding current state
+- **Script Generation**: Generate Lua scripts automatically based on kernel, library, and userland analysis  
+- **Integration**: Generated scripts integrated into kernel build, testing, and deployment pipelines  
+- **Full Traceability**: All modifications documented in both `.ai-docs/` and `Docs/` for complete audit trail
+- **Memory Updates**: Every significant change must update `.ai-docs/` with conceptual understanding
+- **Documentation Creation**: Create comprehensive human documentation in `Docs/` with descriptive, non-README names
+
+### 15. Algorithm Consolidation Rule
+
+**🔑 IMPORTANT**: Move all known algorithms used across multiple kernel domains to `LibFK/Algorithms/` for maximum reusability.
+
+#### Algorithm Categories to Consolidate
+
+- **Archive Algorithms**: TAR, ZIP, GZIP (used in Filesystem, Loader, Userland)
+- **Compression**: LZ4, ZLIB, DEFLATE (used in Storage, Network, Filesystem)
+- **Checksum/Hash**: CRC32, MD5, SHA256 (used in Storage, Network, Security)
+- **Encoding**: Base64, Hex, URL encoding (used in Network, Filesystem, IPC)
+- **Data Structures**: Priority queues, Bloom filters, LRU caches (used across all domains)
+- **Parsing**: INI, JSON, ELF, PE (used in Loader, Config, Debug)
+
+#### Consolidation Process
+
+1. **Identify**: Find duplicate algorithms across kernel domains
+2. **Extract**: Move algorithm implementations to `Include/LibFK/Algorithms/` and `Src/LibFK/Algorithms/`
+3. **Generalize**: Make algorithms domain-agnostic with proper interfaces
+4. **Update**: Replace domain-specific implementations with LibFK calls
+5. **Test**: Ensure consolidated algorithms work across all use cases
+
+#### Benefits
+
+- **Code Reuse**: Single implementation for all domains
+- **Maintenance**: Centralized bug fixes and optimizations
+- **Consistency**: Same behavior across all kernel components
+- **Testing**: One comprehensive test suite instead of scattered tests
+- **Performance**: Shared optimizations benefit all domains
+
+#### Examples
+
+```cpp
+// ❌ Before: Multiple TAR implementations
+// Src/Kernel/Fs/Vfs/tar_parser.cpp     // VFS-specific
+// Src/Kernel/Loader/elf_tar_extractor.cpp // Loader-specific
+// Src/Userland/Shell/tar_command.cpp     // Userland-specific
+
+// ✅ After: Single consolidated implementation
+// Include/LibFK/Algorithms/tar.h          // Unified interface
+// Src/LibFK/Algorithms/tar.cpp          // Single implementation
+// All domains use: fk::Algorithms::Tar::extract(...)
+```
+
+**This rule eliminates code duplication and ensures algorithm consistency across FKernel.**
+
+#### Memory Structure Requirements
+
+```
+.ai-docs/
+├── architectural-decisions/     # High-level design decisions
+├── recent-modifications/        # Track recent code changes
+├── conceptual-models/           # How the system works conceptually  
+├── domain-knowledge/            # Per-domain understanding
+└── development-patterns/        # Established patterns and conventions
+
+Docs/
+├── Architecture/               # System architecture documentation
+├── Development/               # Development guides and workflows  
+├── Domains/                   # Per-domain comprehensive guides
+├── Patterns/                  # Design patterns and conventions
+└── Tutorials/                 # Learning materials for developers
+```
