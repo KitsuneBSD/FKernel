@@ -87,4 +87,7 @@ public:
 
 private:
   void unmap_page_range(uintptr_t start, uintptr_t end);
+
+  /** @brief Ensures a page table level exists, creating it if necessary. */
+  PageTable* ensure_table(PageTable* parent, size_t index, PageFlags flags, bool& changed);
 };
