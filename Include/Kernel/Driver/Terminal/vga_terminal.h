@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Kernel/Driver/Terminal/terminal.h>
+#include <Kernel/Driver/Terminal/terminal_renderer.h>
 #include <LibFK/Core/Result.h>
 #include <LibFK/Container/circular_buffer.h>
 #include <LibFK/Terminal/ansi_parser.h>
@@ -8,6 +9,15 @@
 
 namespace fkernel {
 namespace terminal {
+
+struct TerminalState {
+    bool raw_mode{false};
+    bool echo_enabled{true};
+    bool line_drawing_mode{false};
+    size_t line_chars{0};
+    uint16_t rows{25};
+    uint16_t cols{80};
+};
 
 /// @brief VGA Terminal implementation using VGA adapter and PS/2 keyboard
 class VGATerminal final : public Terminal, public fk::terminal::AnsiDelegate {
@@ -62,7 +72,6 @@ public:
   virtual uint16_t get_height() override;
   virtual void respond(const char* data) override;
   
-  // Additional methods for vi compatibility
   virtual void insert_chars(uint16_t count) override;
   virtual void delete_chars(uint16_t count) override;
   virtual void erase_chars(uint16_t count) override;
@@ -70,38 +79,20 @@ public:
   virtual void delete_lines(uint16_t count) override;
   virtual void scroll_up(uint16_t count) override;
   virtual void scroll_down(uint16_t count) override;
-
-  // Line drawing and Charset
   virtual void set_line_drawing_mode(bool enabled) override;
 
-  // Public access to index
   int index() const { return m_index; }
-
-  // Clear screen
   void clear();
 
 private:
-  [[maybe_unused]] int m_index;
-
-  // Input queue for keys
+  int m_index;
   static constexpr size_t INPUT_QUEUE_SIZE = 1024;
   fk::containers::CircularBuffer<char, INPUT_QUEUE_SIZE> m_input_queue;
-
-  // ANSI Parser and Synchronization
   fk::terminal::AnsiParser m_ansi_parser;
   fk::synchronization::Spinlock m_lock;
-
-  // Terminal state
-  bool m_raw_mode{false};
-  bool m_echo_enabled{true};
-  bool m_line_drawing_mode{false};
-  size_t m_line_chars{0};
-  uint16_t m_rows{25};
-  uint16_t m_cols{80};
-
-  // Cursor state for save/restore
-  uint16_t m_saved_cursor_x{0};
-  uint16_t m_saved_cursor_y{0};
+  
+  TerminalState m_state;
+  TerminalRenderer m_renderer;
 };
 
 } // namespace terminal
