@@ -79,6 +79,32 @@ void VirtualMemoryManager::initialize() {
   fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Initialize done: cr3=%p", m_pml4);
 }
 
+PageTable* VirtualMemoryManager::ensure_table(PageTable* parent, size_t index, PageFlags flags,
+                                              bool& changed) {
+  uint64_t user_bit = static_cast<uint64_t>(flags) & static_cast<uint64_t>(PageFlags::User);
+  uint64_t write_bit = static_cast<uint64_t>(flags) & static_cast<uint64_t>(PageFlags::Writable);
+
+  if (!(parent->entries[index] & static_cast<uint64_t>(PageFlags::Present))) {
+    uintptr_t new_table = PhysicalMemoryManager::the().alloc_page();
+    if (new_table == 0) {
+      return nullptr;
+    }
+    memset(reinterpret_cast<void*>(new_table), 0, PAGE_SIZE);
+    parent->entries[index] =
+        new_table | static_cast<uint64_t>(PageFlags::Present) | write_bit | user_bit;
+    changed = true;
+    return reinterpret_cast<PageTable*>(new_table);
+  }
+
+  uint64_t original = parent->entries[index];
+  parent->entries[index] |= (user_bit | write_bit);
+  if (parent->entries[index] != original) {
+    changed = true;
+  }
+
+  return reinterpret_cast<PageTable*>(parent->entries[index] & 0x000FFFFFFFFFF000);
+}
+
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags flags) {
   assert((virt % PAGE_SIZE) == 0);
   assert((phys % PAGE_SIZE) == 0);
@@ -89,75 +115,35 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags fl
   size_t pd_idx = (virt >> 21) & 0x1FF;
   size_t pt_idx = (virt >> 12) & 0x1FF;
 
-  uint64_t user_bit = static_cast<uint64_t>(flags) & static_cast<uint64_t>(PageFlags::User);
-  uint64_t write_bit = static_cast<uint64_t>(flags) & static_cast<uint64_t>(PageFlags::Writable);
   bool changed_parents = false;
 
-  // PML4
-  if (!(m_pml4->entries[pml4_idx] & static_cast<uint64_t>(PageFlags::Present))) {
-    uintptr_t new_pdpt = PhysicalMemoryManager::the().alloc_page();
-    if (new_pdpt == 0) {
-      fk::algorithms::kerror("VIRTUAL MEMORY MANAGER", "map_page: failed to allocate PDPT page");
-      return;
-    }
-    memset(reinterpret_cast<void*>(new_pdpt), 0, PAGE_SIZE);
-    m_pml4->entries[pml4_idx] =
-        new_pdpt | static_cast<uint64_t>(PageFlags::Present) | write_bit | user_bit;
-    changed_parents = true;
-  } else {
-    uint64_t original = m_pml4->entries[pml4_idx];
-    m_pml4->entries[pml4_idx] |= (user_bit | write_bit);
-    if (m_pml4->entries[pml4_idx] != original)
-      changed_parents = true;
+  PageTable* pdpt = ensure_table(m_pml4, pml4_idx, flags, changed_parents);
+  if (!pdpt) {
+    fk::algorithms::kerror("VIRTUAL MEMORY MANAGER", "map_page: failed to ensure PDPT");
+    return;
   }
-  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
 
-  // PDPT
-  if (!(pdpt->entries[pdpt_idx] & static_cast<uint64_t>(PageFlags::Present))) {
-    uintptr_t new_pd = PhysicalMemoryManager::the().alloc_page();
-    if (new_pd == 0) {
-      fk::algorithms::kerror("VIRTUAL MEMORY MANAGER", "map_page: failed to allocate PD page");
-      return;
-    }
-    memset(reinterpret_cast<void*>(new_pd), 0, PAGE_SIZE);
-    pdpt->entries[pdpt_idx] =
-        new_pd | static_cast<uint64_t>(PageFlags::Present) | write_bit | user_bit;
-    changed_parents = true;
-  } else {
-    uint64_t original = pdpt->entries[pdpt_idx];
-    pdpt->entries[pdpt_idx] |= (user_bit | write_bit);
-    if (pdpt->entries[pdpt_idx] != original)
-      changed_parents = true;
+  PageTable* pd = ensure_table(pdpt, pdpt_idx, flags, changed_parents);
+  if (!pd) {
+    fk::algorithms::kerror("VIRTUAL MEMORY MANAGER", "map_page: failed to ensure PD");
+    return;
   }
-  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
 
-  // PD
-  if (!(pd->entries[pd_idx] & static_cast<uint64_t>(PageFlags::Present))) {
-    uintptr_t new_pt = PhysicalMemoryManager::the().alloc_page();
-    if (new_pt == 0) {
-      fk::algorithms::kerror("VIRTUAL MEMORY MANAGER", "map_page: failed to allocate PT page");
-      return;
-    }
-    memset(reinterpret_cast<void*>(new_pt), 0, PAGE_SIZE);
-    pd->entries[pd_idx] = new_pt | static_cast<uint64_t>(PageFlags::Present) | write_bit | user_bit;
-    changed_parents = true;
-  } else {
-    uint64_t original = pd->entries[pd_idx];
-    pd->entries[pd_idx] |= (user_bit | write_bit);
-    if (pd->entries[pd_idx] != original)
-      changed_parents = true;
+  PageTable* pt = ensure_table(pd, pd_idx, flags, changed_parents);
+  if (!pt) {
+    fk::algorithms::kerror("VIRTUAL MEMORY MANAGER", "map_page: failed to ensure PT");
+    return;
   }
-  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
 
-  // PT
   pt->entries[pt_idx] =
       phys | static_cast<uint64_t>(flags) | static_cast<uint64_t>(PageFlags::Present);
 
   if (changed_parents) {
     flush_tlb();
-  } else {
-    invlpg(virt);
+    return;
   }
+
+  invlpg(virt);
 }
 
 void VirtualMemoryManager::unmap_page(uintptr_t virt) {
