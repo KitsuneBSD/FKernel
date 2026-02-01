@@ -69,11 +69,10 @@ local kernel_non_architecture_related = {
   "Src/Kernel/Net/**.cpp",
 }
 
+-- Custom Toolchain for Kernel
 toolchain("FKernel_Compiling")
 set_kind("standalone")
-
 local toolchain_bin = os.getenv("HOME") .. "/.fkernel/toolchain/bin/"
-
 if os.exists(toolchain_bin .. "x86_64-fkernel-clang") then
   set_toolset("cc", toolchain_bin .. "x86_64-fkernel-clang")
   set_toolset("cxx", toolchain_bin .. "x86_64-fkernel-clang")
@@ -81,19 +80,16 @@ else
   set_toolset("cc", "clang", "gcc")
   set_toolset("cxx", "clang++", "g++")
 end
-
 if os.exists(toolchain_bin .. "x86_64-fkernel-ld.lld") then
   set_toolset("ld", toolchain_bin .. "x86_64-fkernel-ld.lld")
 else
   set_toolset("ld", "ld.lld", "ld")
 end
-
 if os.exists(toolchain_bin .. "fkernel-nasm") then
   set_toolset("as", toolchain_bin .. "fkernel-nasm")
 else
   set_toolset("as", "nasm")
 end
-
 toolchain_end()
 
 option("initrd_mode")
@@ -101,161 +97,105 @@ set_default("busybox")
 set_values("busybox", "openrc")
 set_description("Select initrd system style")
 
+-- TARGET: FKernel
 target("FKernel")
-set_kind("binary")
-set_toolchains("FKernel_Compiling")
+  set_kind("binary")
+  set_toolchains("FKernel_Compiling")
+  set_default(true)
+  set_filename("FKernel.bin")
+  set_license("BSD-3-Clause")
+  set_warnings("allextra", "error")
+  add_includedirs("Include")
 
-before_build(function(target)
-  if os.getenv("CI") or os.getenv("GITHUB_ACTIONS") then
-    return
+  add_cxflags(flags.general.cxx, { force = true })
+  add_asflags(flags.general.asm, { force = true })
+  add_ldflags(flags.general.ld, { force = true })
+
+  if is_mode("debug") then
+    set_symbols("debug")
+    set_optimize("fast")
+    add_defines("FKERNEL_DEBUG")
+    if is_arch("x86_64", "x64") then
+      add_cxflags(flags.x86_64.cxx)
+    end
   end
 
-  local clang = path.join(toolchain_bin, "x86_64-fkernel-clang")
-  local lld = path.join(toolchain_bin, "x86_64-fkernel-ld.lld")
-
-  if not os.exists(clang) or not os.exists(lld) then
-    print(">>> Custom FKernel toolchain (clang/lld) not found in " .. toolchain_bin)
-    print(">>> Starting automatic toolchain build (this may take a long time)...")
-
-    os.execv("xmake", { "lua", "Meta/Toolchain/build_clang.lua" })
-    os.execv("xmake", { "lua", "Meta/Toolchain/build_lld.lua" })
-    os.execv("xmake", { "lua", "Meta/Toolchain/build_nasm.lua" })
-    os.execv("xmake", { "lua", "Meta/Toolchain/build_lua.lua" })
-
-    print(">>> Toolchain built successfully!")
-    print(">>> Please run 'xmake config -c' to ensure the new tools are correctly detected.")
-    os.raise("Toolchain was missing and has been built. Re-run xmake to continue.")
-  end
-end)
-
-set_default(true)
-set_filename("FKernel.bin")
-
-set_license("BSD-3-Clause")
-set_warnings("allextra", "error")
-add_includedirs("Include")
-
-if is_mode("debug") then
-  set_symbols("debug")
-  set_optimize("fast")
-  add_defines("FKERNEL_DEBUG")
+  add_files("Src/LibC/**.c")
+  add_files("Src/LibC/**.cpp")
+  add_files("Src/LibFK/**.cpp")
 
   if is_arch("x86_64", "x64") then
     add_cxflags(flags.x86_64.cxx)
+    add_asflags(flags.x86_64.asm)
+    add_files("Src/Kernel/Arch/x86_64/**.asm")
+    add_files("Src/Kernel/Arch/x86_64/**.cpp")
   end
-end
 
-if is_mode("release") then
-  set_symbols("hidden")
-  set_optimize("faster")
-  set_strip("all")
-end
+  add_files(kernel_non_architecture_related)
 
-add_cxflags(flags.general.cxx, { force = true })
-add_asflags(flags.general.asm, { force = true })
-add_ldflags(flags.general.ld, { force = true })
-
-add_files("Src/LibC/**.c")
-add_files("Src/LibC/**.cpp")
-add_files("Src/LibFK/**.cpp")
-
-if is_arch("x86_64", "x64") then
-  add_cxflags(flags.x86_64.cxx)
-  add_asflags(flags.x86_64.asm)
-
-  add_files("Src/Kernel/Arch/x86_64/**.asm")
-  add_files("Src/Kernel/Arch/x86_64/**.cpp")
-end
-
-add_files(kernel_non_architecture_related)
-add_defines("FKERNEL_DEBUG")
-
-if is_arch("x86_64", "x64") then
-  after_link(function(target)
-    os.execv("xmake", { "lua", "Meta/x86_64-tools/mount_mockos.lua" })
+  after_link(function (target)
+    os.execv("lua", {"Meta/x86_64-tools/mount_mockos.lua"})
   end)
+
+  on_run(function (target)
+    os.execv("lua", {"Meta/x86_64-tools/run_mockos.lua"})
+  end)
+target_end()
+
+-- TARGET: LibC_Testing (Static library with renamed symbols)
+target("LibC_Testing")
+  set_kind("static")
+  set_toolchains("clang")
+  add_includedirs("Include")
+  add_cxflags("-fno-builtin", "-g")
+  add_defines(
+    "memcpy=kernel_memcpy",
+    "memset=kernel_memset",
+    "memmove=kernel_memmove",
+    "memcmp=kernel_memcmp",
+    "strlen=kernel_strlen",
+    "strcpy=kernel_strcpy",
+    "strncpy=kernel_strncpy",
+    "strcmp=kernel_strcmp",
+    "strncmp=kernel_strncmp",
+    "strcat=kernel_strcat",
+    "strchr=kernel_strchr",
+    "strrchr=kernel_strrchr",
+    "atoi=kernel_atoi",
+    "itoa=kernel_itoa",
+    "stol=kernel_stol",
+    "snprintf=kernel_snprintf",
+    "vsnprintf=kernel_vsnprintf"
+  )
+  add_files("Src/LibC/string/*.c")
+  add_files("Src/LibC/ctype.c")
+target_end()
+
+-- TARGET: Test (Host executable)
+target("Test")
+  set_kind("binary")
+  set_default(false)
+  set_toolchains("clang")
+  add_deps("LibC_Testing")
+  add_includedirs("Include", ".")
+  set_languages("cxx20")
+  add_defines("FKERNEL_TEST")
+  add_cxflags("-g")
+  
+  -- Add test files
+  add_files("tests/main.cpp")
+  add_files("tests/LibC/test_string_memory_comprehensive.cpp")
+  add_files("tests/LibFK/test_circular_buffer.cpp")
+  add_files("tests/test_mock.c")
 
   on_run(function(target)
-    os.execv("xmake", { "lua", "Meta/x86_64-tools/run_mockos.lua" })
+    local test_binary = target:targetfile()
+    print(">>> Running tests: " .. test_binary)
+    local result = os.execv(test_binary, {})
+    if result ~= 0 then
+      os.raise("Tests failed with exit code: " .. tostring(result))
+    else
+      print("All tests passed!")
+    end
   end)
-end
-
-on_clean(function(target)
-  os.rm("Build")
-  os.rm("build")
-  os.rm("logs")
-end)
-
 target_end()
-
--- Test target for CI/CD
-target("Test")
-set_default(false)
-set_kind("binary")
-set_languages("c17")
-add_includedirs("Include")
-
--- Standard flags for tests (not freestanding)
-add_cxflags("-Wall", "-Wextra")
-add_ldflags("-lc")
-
--- Add test files
-add_files("tests/LibC/test_standalone.c")
-
--- Test output
-set_filename("test_runner")
-
-on_run(function(target)
-  local test_binary = target:targetfile()
-  local result = os.execv(test_binary, {})
-  if result ~= 0 then
-    os.raise("Tests failed with exit code: " .. tostring(result))
-  else
-    print("All tests passed!")
-  end
-end)
-
-target_end()
-
-task("setup-hda")
-set_menu({
-  usage = "xmake setup-hda",
-  description = "Create and format the FKernel-HDA.qcow2 disk image with MBR and FAT32",
-})
-on_run(function()
-  os.execv("xmake", { "lua", "Meta/x86_64-tools/create_hda.lua" })
-end)
-task_end()
-
-task("build-initrd")
-set_menu({
-  usage = "xmake build-initrd",
-  description = "Compile and package the initrd (BusyBox or OpenRC)",
-})
-on_run(function()
-  os.execv("xmake", { "lua", "Meta/x86_64-tools/mount_mockos.lua", "--only-initrd" })
-end)
-task_end()
-
-task("config-initrd")
-set_menu({
-  usage = "xmake config-initrd",
-  description = "Configure items to include in the initrd.tar using an interactive menu",
-})
-on_run(function()
-  os.execv("xmake", { "lua", "Meta/x86_64-tools/configure_initrd.lua" })
-end)
-task_end()
-
-task("analyze")
-set_category("plugin")
-
-set_menu({
-  usage = "xmake analyze",
-  description = "Run the script to analyze the kernel runtime",
-})
-
-on_run(function()
-  os.execv("xmake", { "lua", "Meta/x86_64-tools/analyze_kernel_runtime.lua" })
-end)
-task_end()
