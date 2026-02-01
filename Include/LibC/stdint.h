@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined(FKERNEL_TEST) && !defined(__fkernel__)
+#include_next <stdint.h>
+#else
+
 /**
  * @typedef int8_t
  * @brief Signed 8-bit integer.
@@ -155,3 +159,5 @@ typedef __INTPTR_TYPE__ intptr_t;
  * @brief Unsigned integer type capable of holding a pointer.
  */
 typedef __UINTPTR_TYPE__ uintptr_t;
+
+#endif

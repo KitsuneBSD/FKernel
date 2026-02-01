@@ -1,5 +1,14 @@
 #pragma once
 
+#if defined(FKERNEL_TEST) && !defined(__fkernel__)
+#include_next <stddef.h>
+// We still need ssize_t and container_of as they might not be in host stddef.h
+#include <LibC/stdint.h>
+typedef int64_t ssize_t;
+#define container_of(ptr, type, member)                                        \
+  ((type *)((char *)(ptr) - __builtin_offsetof(type, member)))
+#else
+
 #include <LibC/stdint.h>
 
 /**
@@ -51,7 +60,9 @@ typedef int64_t ssize_t;
  *
  * Defined as `nullptr` for type safety.
  */
+#ifndef NULL
 #define NULL nullptr
+#endif
 
 /**
  * @typedef nullptr_t
@@ -66,7 +77,9 @@ using nullptr_t = decltype(nullptr);
  *
  * Defined as `(void *)0`.
  */
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 #endif
 
 /**
@@ -77,7 +90,9 @@ using nullptr_t = decltype(nullptr);
  * @param member The name of the member within the structure.
  * @return The offset of @p member within @p type, in bytes.
  */
+#ifndef offsetof
 #define offsetof(type, member) __builtin_offsetof(type, member)
+#endif
 
 /**
  * @def container_of
@@ -94,3 +109,5 @@ using nullptr_t = decltype(nullptr);
  */
 #define container_of(ptr, type, member)                                        \
   ((type *)((char *)(ptr) - offsetof(type, member)))
+
+#endif

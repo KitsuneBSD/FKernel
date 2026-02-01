@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibC/stddef.h>
+#include <LibFK/Core/Assertions.h>
 
 namespace fk {
 namespace containers {
