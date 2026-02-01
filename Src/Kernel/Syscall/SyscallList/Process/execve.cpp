@@ -1,9 +1,8 @@
-#include <Kernel/Syscall/syscall_utils.h>
-#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include "Kernel/Hardware/Cpu/cpu_block.h"
-#include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Loader/elf_loader.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
@@ -17,20 +16,21 @@
 #include <LibFK/Text/string.h>
 
 extern "C" {
-uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
-                    uint64_t, uint64_t, uint64_t, PtRegs* regs) {
-  if (!path_ptr) return -static_cast<int>(fk::core::Error::InvalidParameter);
+uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uint64_t, uint64_t,
+                    uint64_t, PtRegs* regs) {
+  if (!path_ptr)
+    return -static_cast<int>(fk::core::Error::InvalidParameter);
 
-  auto *task = SchedulerManager::the().current();
+  auto* task = SchedulerManager::the().current();
   if (!task)
     return -1;
 
   // 1. Capture data from user space before we lose the address space
-  fk::text::String path = reinterpret_cast<const char *>(path_ptr);
+  fk::text::String path = reinterpret_cast<const char*>(path_ptr);
 
   fk::containers::Vector<fk::text::String> args;
   if (argv_ptr) {
-    char **user_argv = reinterpret_cast<char **>(argv_ptr);
+    char** user_argv = reinterpret_cast<char**>(argv_ptr);
     while (*user_argv) {
       args.push_back(*user_argv);
       user_argv++;
@@ -39,7 +39,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
 
   fk::containers::Vector<fk::text::String> envs;
   if (envp_ptr) {
-    char **user_envp = reinterpret_cast<char **>(envp_ptr);
+    char** user_envp = reinterpret_cast<char**>(envp_ptr);
     while (*user_envp) {
       envs.push_back(*user_envp);
       user_envp++;
@@ -48,13 +48,11 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
 
   auto res = fkernel::VirtualFileSystem::the().open(path.c_str(), 0);
   if (res.is_error()) {
-    fk::algorithms::kwarn("SYSCALL", "sys_execve: Failed to open %s: %d", path.c_str(), (int)res.error());
+
     return fkernel::return_error(res.error());
   }
-  
+
   auto node = res.value()->node();
-  fk::algorithms::klog("SYSCALL", "sys_execve: Opened %s, type=%s, size=%zu", 
-                       path.c_str(), node->is_directory() ? "dir" : "file", node->size());
 
   if (node->is_directory())
     return fkernel::return_error(fk::core::Error::IsDirectory);
@@ -63,24 +61,23 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   char magic[2];
   auto magic_read_res = node->read(0, 2, reinterpret_cast<uint8_t*>(magic));
   if (magic_read_res.is_ok() && magic_read_res.value() == 2 && magic[0] == '#' && magic[1] == '!') {
-      fk::algorithms::klog("SYSCALL", "sys_execve: Detected script (shebang), invoking /bin/sh");
-      
-      fk::containers::Vector<fk::text::String> script_args;
-      script_args.push_back("/bin/sh");
-      script_args.push_back(path);
-      for (size_t i = 1; i < args.size(); ++i) {
-          script_args.push_back(args[i]);
-      }
-      
-      auto sh_res = fkernel::VirtualFileSystem::the().open("/bin/sh", 0);
-      if (sh_res.is_error()) {
-          fk::algorithms::kwarn("SYSCALL", "sys_execve: Script detected but /bin/sh not found!");
-          return fkernel::return_error(fk::core::Error::NotFound);
-      }
-      
-      path = "/bin/sh";
-      args = fk::types::move(script_args);
-      node = sh_res.value()->node();
+
+    fk::containers::Vector<fk::text::String> script_args;
+    script_args.push_back("/bin/sh");
+    script_args.push_back(path);
+    for (size_t i = 1; i < args.size(); ++i) {
+      script_args.push_back(args[i]);
+    }
+
+    auto sh_res = fkernel::VirtualFileSystem::the().open("/bin/sh", 0);
+    if (sh_res.is_error()) {
+
+      return fkernel::return_error(fk::core::Error::NotFound);
+    }
+
+    path = "/bin/sh";
+    args = fk::types::move(script_args);
+    node = sh_res.value()->node();
   }
 
   // 2. Load the new binary into a fresh address space
@@ -90,18 +87,18 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
 
   // If we are a vfork child, unblock the parent now that we have our own address space
   if (task->control.lifecycle.vfork_parent_id.is_valid()) {
-      auto* parent = SchedulerManager::the().find_task(task->control.lifecycle.vfork_parent_id);
-      if (parent && parent->control.lifecycle.vfork_waiting) {
-          parent->control.lifecycle.vfork_waiting = false;
-          SchedulerManager::the().wake_task(parent);
-      }
-      task->control.lifecycle.vfork_parent_id = fk::ProcessId();
+    auto* parent = SchedulerManager::the().find_task(task->control.lifecycle.vfork_parent_id);
+    if (parent && parent->control.lifecycle.vfork_waiting) {
+      parent->control.lifecycle.vfork_waiting = false;
+      SchedulerManager::the().wake_task(parent);
+    }
+    task->control.lifecycle.vfork_parent_id = fk::ProcessId();
   }
 
   auto entry_res = fkernel::ElfLoader::load(node);
   if (entry_res.is_error())
     return fkernel::return_error(entry_res.error());
-  
+
   fkernel::ElfLoadResult elf_res = entry_res.value();
   uintptr_t entry = elf_res.entry;
 
@@ -111,14 +108,14 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
     uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
     VirtualMemoryManager::the().map_page(
         v, phys, PageFlags::Present | PageFlags::Writable | PageFlags::User);
-    memset(reinterpret_cast<void *>(v), 0, 0x1000);
+    memset(reinterpret_cast<void*>(v), 0, 0x1000);
   }
 
   uintptr_t current_user_stack = USER_STACK_TOP;
-  auto push_string = [&](const fk::text::String &s) -> uintptr_t {
+  auto push_string = [&](const fk::text::String& s) -> uintptr_t {
     size_t len = s.length() + 1;
     current_user_stack -= len;
-    memcpy(reinterpret_cast<void *>(current_user_stack), s.c_str(), len);
+    memcpy(reinterpret_cast<void*>(current_user_stack), s.c_str(), len);
     return current_user_stack;
   };
 
@@ -136,7 +133,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   current_user_stack -= 16;
   uintptr_t random_ptr = current_user_stack;
   for (int i = 0; i < 16; ++i)
-    reinterpret_cast<uint8_t *>(random_ptr)[i] = (uint8_t)(i ^ 0x77);
+    reinterpret_cast<uint8_t*>(random_ptr)[i] = (uint8_t)(i ^ 0x77);
 
   // 4. Construct the pointer array below the strings
   current_user_stack &= ~0xFULL; // Alignment
@@ -148,7 +145,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   current_user_stack -= (total_ptrs * sizeof(uintptr_t));
   current_user_stack &= ~0xFULL;
 
-  uintptr_t *stack_ptr = reinterpret_cast<uintptr_t *>(current_user_stack);
+  uintptr_t* stack_ptr = reinterpret_cast<uintptr_t*>(current_user_stack);
   size_t idx = 0;
 
   stack_ptr[idx++] = args.size();
@@ -199,11 +196,6 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr,
   task->resources.context.saved_rflags = 0x202;
 
   task->dump_file_descriptors();
-
-  fk::algorithms::klog("SYSCALL",
-                       "EXECVE: Success. Arg0='%s', RSP=%p, Entry=%p",
-                       args.size() > 0 ? args[0].c_str() : "N/A",
-                       (void *)final_rsp, (void *)entry);
 
   return 0;
 }

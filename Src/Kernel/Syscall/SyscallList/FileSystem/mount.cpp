@@ -1,4 +1,3 @@
-#include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
@@ -12,29 +11,28 @@
 #include <LibFK/Text/string.h>
 
 extern "C" {
-uint64_t sys_mount(uint64_t source_ptr, uint64_t target_ptr,
-                   uint64_t filesystemtype_ptr, uint64_t /*mountflags*/,
-                   uint64_t /*data*/, [[maybe_unused]] PtRegs* regs) {
-  auto *current_task = SchedulerManager::the().current();
+uint64_t sys_mount(uint64_t source_ptr, uint64_t target_ptr, uint64_t filesystemtype_ptr,
+                   uint64_t /*mountflags*/, uint64_t /*data*/, [[maybe_unused]] PtRegs* regs) {
+  auto* current_task = SchedulerManager::the().current();
   if (!current_task) {
     fk::algorithms::kerror("Syscall", "sys_mount: No current task");
     return fkernel::return_error(fk::core::Error::PermissionDenied);
   }
 
-  const char *source = (const char *)source_ptr;
-  const char *target = (const char *)target_ptr;
-  const char *filesystemtype = (const char *)filesystemtype_ptr;
+  const char* source = (const char*)source_ptr;
+  const char* target = (const char*)target_ptr;
+  const char* filesystemtype = (const char*)filesystemtype_ptr;
 
   // Use stack-allocated buffers to avoid heap corruption
   char log_buf[256];
-  int log_len = snprintf(log_buf, sizeof(log_buf), 
-      "[SYSCALL] sys_mount: source=%s target=%s type=%s\n", 
-      source ? source : "null", target ? target : "null", 
-      filesystemtype ? filesystemtype : "null");
-  
-  // Log to DebugFS if available  
+  int log_len = snprintf(
+      log_buf, sizeof(log_buf), "[SYSCALL] sys_mount: source=%s target=%s type=%s\n",
+      source ? source : "null", target ? target : "null", filesystemtype ? filesystemtype : "null");
+
+  // Log to DebugFS if available
   auto syscall_log = fkernel::DebugLogNode::the();
-  if (syscall_log) syscall_log->append(log_buf, log_len);
+  if (syscall_log)
+    syscall_log->append(log_buf, log_len);
 
   // Input validation
   if (!target) {
@@ -55,14 +53,11 @@ uint64_t sys_mount(uint64_t source_ptr, uint64_t target_ptr,
     // Just mark it as mounted and return success
     proc_mounted = true;
 
-    fk::algorithms::klog("Syscall", "proc filesystem mounted at /proc");
     return 0;
   }
 
   // For BusyBox: return success for other mount attempts but log them
-  fk::algorithms::klog("Syscall",
-                       "sys_mount: Unsupported filesystem %s mounted at %s",
-                       filesystemtype ? filesystemtype : "unknown", target);
+
   return 0; // Pretend success to let rcS continue
 }
 

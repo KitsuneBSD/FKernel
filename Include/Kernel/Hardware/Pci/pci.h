@@ -2,11 +2,25 @@
 
 #include <Kernel/Hardware/Pci/pci_address.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Hardware/Pci/pci_node.h>
+#include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Container/vector.h>
+#include <LibFK/Container/hash_map.h>
 #include <LibFK/Functional/Function.h>
+#include <LibFK/Memory/ref_ptr.h>
 #include <LibFK/Types/types.h>
 
-using DriverFactory = fk::functional::Function<void(const PciDevice &)>;
+namespace fk {
+namespace containers {
+template <> struct DefaultHasher<PciAddress> {
+  size_t operator()(const PciAddress &value) const {
+    return static_cast<size_t>(value.id());
+  }
+};
+}
+}
+
+using DriverFactory = fk::functional::Function<fk::RefPtr<Node>(const PciDevice &)>;
 using HotplugCallback = fk::functional::Function<void(const PciDevice &, bool is_insertion)>;
 
 struct PciDriverEntry {
@@ -54,6 +68,8 @@ private:
   fk::containers::Vector<PciDevice> m_devices;
   fk::containers::Vector<PciDriverEntry> m_drivers;
   fk::containers::Vector<HotplugCallback> m_hotplug_callbacks;
+  fk::containers::HashMap<PciAddress, fk::RefPtr<Node>> m_device_nodes;
+  fk::RefPtr<fkernel::PCIDeviceNode> m_pci_node;
 
   uintptr_t m_mcfg_base{0};
   bool m_has_mcfg{false};

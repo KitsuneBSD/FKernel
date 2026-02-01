@@ -2,6 +2,8 @@
 #include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Acpi/mcfg.h>
 #include <Kernel/Hardware/Pci/pci.h>
+#include <Kernel/Driver/Device/driver_manager.h>
+#include <Kernel/Fs/DevFs/dev_fs.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -33,6 +35,15 @@ void PciManager::initialize() {
     } else {
       fk::algorithms::klog("PCI", "Warning: MCFG not found and legacy ports don't seem functional!");
     }
+  }
+
+  // Initialize event delivery node
+  auto pci_node_res = fk::make_ref<fkernel::PCIDeviceNode>();
+  if (pci_node_res.is_error()) {
+      fk::algorithms::klog("PCI", "Failed to allocate PCI device node!");
+  } else {
+      m_pci_node = pci_node_res.value();
+      fkernel::DevFs::the().register_device(m_pci_node, "pci");
   }
 
   fk::algorithms::klog("PCI", "Manager initialized");
@@ -146,13 +157,15 @@ void PciManager::instantiate_drivers() {
         fk::algorithms::klog("PCI", "  -> Found driver for %02x:%02x.%d (Vendor:%04x Device:%04x)",
                              device.address().bus(), device.address().device(), 
                              device.address().function(), device.vendor_id(), device.device_id());
-        driver.factory(device);
+        auto node = driver.factory(device);
+        if (node) {
+            m_device_nodes.insert(device.address(), node);
+        }
         driver_found = true;
       }
     }
     if (!driver_found) {
         // Optional: log devices without drivers at debug level
-        // fk::algorithms::kdebug("PCI", "  No driver for %02x:%02x.%d (Class:%02x Sub:%02x)", ...);
     }
   }
 }
@@ -234,6 +247,15 @@ void PciManager::scan_for_new_devices() {
     for (uint16_t bus = 0; bus < 256; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
             handle_hotplug_event(bus, device, 0);
+            
+            // Check if we should scan more functions
+            PciAddress addr(bus, device, 0);
+            uint32_t header_type_reg = read_config_dword(addr, 0x0C);
+            if (header_type_reg != 0xFFFFFFFF && ((header_type_reg >> 16) & 0x80)) {
+                for (uint8_t function = 1; function < 8; ++function) {
+                    handle_hotplug_event(bus, device, function);
+                }
+            }
         }
     }
 }
@@ -268,6 +290,11 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
 
         fk::algorithms::klog("PCI", "Hotplug: New device inserted at %02x:%02x.%d", bus, device, function);
         
+        // Notify userspace node
+        if (m_pci_node) {
+            m_pci_node->push_event({fkernel::PCIEvent::Type::Insertion, bus, device, function, vendor, dev_id});
+        }
+
         // Notify callbacks
         for (auto& cb : m_hotplug_callbacks) {
             cb(new_device, true);
@@ -277,7 +304,10 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
         for (const auto &driver : m_drivers) {
             if (new_device.class_code() == driver.class_code && 
                 new_device.subclass_code() == driver.subclass) {
-                driver.factory(new_device);
+                auto node = driver.factory(new_device);
+                if (node) {
+                    m_device_nodes.insert(address, node);
+                }
             }
         }
     } else if (!exists && known_index != -1) {
@@ -291,6 +321,18 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
 
         fk::algorithms::klog("PCI", "Hotplug: Device removed from %02x:%02x.%d", bus, device, function);
         
+        // Notify userspace node
+        if (m_pci_node) {
+            m_pci_node->push_event({fkernel::PCIEvent::Type::Removal, bus, device, function, removed_device.vendor_id(), removed_device.device_id()});
+        }
+
+        // Unregister from DriverManager if we have a node
+        auto node_opt = m_device_nodes.get(address);
+        if (node_opt.has_value()) {
+            fkernel::DriverManager::the().unregister_device(node_opt.value());
+            m_device_nodes.remove(address);
+        }
+
         // Remove from known devices
         m_devices[known_index] = m_devices[m_devices.size() - 1];
         m_devices.pop_back();

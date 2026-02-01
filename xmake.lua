@@ -186,6 +186,7 @@ target_end()
 
 -- Test target for CI/CD
 target("Test")
+set_default(false)
 set_kind("binary")
 set_languages("c17")
 add_includedirs("Include")
@@ -201,13 +202,13 @@ add_files("tests/LibC/test_standalone.c")
 set_filename("test_runner")
 
 on_run(function(target)
-    local test_binary = target:targetfile()
-    local result = os.execv(test_binary, {})
-    if result ~= 0 then
-        os.raise("Tests failed with exit code: " .. tostring(result))
-    else
-        print("All tests passed!")
-    end
+  local test_binary = target:targetfile()
+  local result = os.execv(test_binary, {})
+  if result ~= 0 then
+    os.raise("Tests failed with exit code: " .. tostring(result))
+  else
+    print("All tests passed!")
+  end
 end)
 
 target_end()
@@ -254,3 +255,4 @@ on_run(function()
   os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
 end)
 task_end()
+
