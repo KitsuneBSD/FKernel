@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 require("Meta.Lib.run_command") -- Added require for RunCommand
 

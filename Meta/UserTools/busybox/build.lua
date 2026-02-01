@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 -- Script de construção do BusyBox para FKernel
 local ArchiveUtils = require("Meta.Lib.archive_utils")

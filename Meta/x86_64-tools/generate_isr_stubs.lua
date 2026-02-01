@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local filename = "isr_stubs.h"
 local max_limit = 255

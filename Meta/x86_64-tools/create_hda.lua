@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local RunCommand = require("Meta.Lib.run_command")
 local PrintMessage = require("Meta.Lib.print_message")

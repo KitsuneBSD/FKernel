@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local LogParser = require("Meta.Lib.log_parser")
 

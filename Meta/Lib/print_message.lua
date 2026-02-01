@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 -- Function Utility: Print Colored Message
 -- Arguments:
