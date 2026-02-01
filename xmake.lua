@@ -106,6 +106,10 @@ set_kind("binary")
 set_toolchains("FKernel_Compiling")
 
 before_build(function(target)
+  if os.getenv("CI") or os.getenv("GITHUB_ACTIONS") then
+    return
+  end
+
   local clang = path.join(toolchain_bin, "x86_64-fkernel-clang")
   local lld = path.join(toolchain_bin, "x86_64-fkernel-ld.lld")
 
@@ -113,10 +117,10 @@ before_build(function(target)
     print(">>> Custom FKernel toolchain (clang/lld) not found in " .. toolchain_bin)
     print(">>> Starting automatic toolchain build (this may take a long time)...")
 
-    os.execv("lua", { "Meta/Toolchain/build_clang.lua" })
-    os.execv("lua", { "Meta/Toolchain/build_lld.lua" })
-    os.execv("lua", { "Meta/Toolchain/build_nasm.lua" })
-    os.execv("lua", { "Meta/Toolchain/build_lua.lua" })
+    os.execv("xmake", { "lua", "Meta/Toolchain/build_clang.lua" })
+    os.execv("xmake", { "lua", "Meta/Toolchain/build_lld.lua" })
+    os.execv("xmake", { "lua", "Meta/Toolchain/build_nasm.lua" })
+    os.execv("xmake", { "lua", "Meta/Toolchain/build_lua.lua" })
 
     print(">>> Toolchain built successfully!")
     print(">>> Please run 'xmake config -c' to ensure the new tools are correctly detected.")
@@ -168,18 +172,18 @@ add_defines("FKERNEL_DEBUG")
 
 if is_arch("x86_64", "x64") then
   after_link(function(target)
-    os.execv("lua Meta/x86_64-tools/mount_mockos.lua")
+    os.execv("xmake", { "lua", "Meta/x86_64-tools/mount_mockos.lua" })
   end)
 
   on_run(function(target)
-    os.execv("lua Meta/x86_64-tools/run_mockos.lua")
+    os.execv("xmake", { "lua", "Meta/x86_64-tools/run_mockos.lua" })
   end)
 end
 
 on_clean(function(target)
-  os.execv("rm -rf Build")
-  os.execv("rm -rf build")
-  os.execv("rm -rf logs/")
+  os.rm("Build")
+  os.rm("build")
+  os.rm("logs")
 end)
 
 target_end()
@@ -219,7 +223,7 @@ set_menu({
   description = "Create and format the FKernel-HDA.qcow2 disk image with MBR and FAT32",
 })
 on_run(function()
-  os.execv("lua Meta/x86_64-tools/create_hda.lua")
+  os.execv("xmake", { "lua", "Meta/x86_64-tools/create_hda.lua" })
 end)
 task_end()
 
@@ -229,7 +233,7 @@ set_menu({
   description = "Compile and package the initrd (BusyBox or OpenRC)",
 })
 on_run(function()
-  os.execv("lua", { "Meta/x86_64-tools/mount_mockos.lua", "--only-initrd" })
+  os.execv("xmake", { "lua", "Meta/x86_64-tools/mount_mockos.lua", "--only-initrd" })
 end)
 task_end()
 
@@ -239,7 +243,7 @@ set_menu({
   description = "Configure items to include in the initrd.tar using an interactive menu",
 })
 on_run(function()
-  os.execv("lua Meta/x86_64-tools/configure_initrd.lua")
+  os.execv("xmake", { "lua", "Meta/x86_64-tools/configure_initrd.lua" })
 end)
 task_end()
 
@@ -252,7 +256,6 @@ set_menu({
 })
 
 on_run(function()
-  os.execv("lua Meta/x86_64-tools/analyze_kernel_runtime.lua")
+  os.execv("xmake", { "lua", "Meta/x86_64-tools/analyze_kernel_runtime.lua" })
 end)
 task_end()
-
