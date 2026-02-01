@@ -18,7 +18,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang clang-format clang-tidy nasm qemu-system-x86 build-essential
+        sudo apt-get install -y clang clang-format clang-tidy nasm qemu-system-x86 qemu-utils build-essential lua5.4 ninja-build xorriso mtools grub-common grub-pc-bin
+        sudo ln -sf /usr/bin/lua5.4 /usr/bin/lua
         
     - name: Install xmake
       run: |
