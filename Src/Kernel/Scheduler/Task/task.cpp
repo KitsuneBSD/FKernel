@@ -70,6 +70,29 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
   return task;
 }
 
+void Task::set_heap_regions(uintptr_t start, uintptr_t break_addr) {
+    resources.memory.regions.heap_start = start;
+    resources.memory.regions.heap_break = break_addr;
+}
+
+void Task::set_mmap_regions(uintptr_t start, uintptr_t end) {
+    resources.memory.regions.mmap_start = start;
+    resources.memory.regions.mmap_end = end;
+}
+
+bool Task::is_address_in_allowed_regions(uintptr_t address) const {
+    if (address >= resources.memory.regions.heap_start && address < resources.memory.regions.heap_break) {
+        return true;
+    }
+    if (address >= resources.memory.regions.mmap_start && address < resources.memory.regions.mmap_end) {
+        return true;
+    }
+    if (address >= 0x7ffffff00000ULL && address < 0x7fffffffe000ULL) {
+        return true;
+    }
+    return false;
+}
+
 void Task::print_info() const {}
 
 int Task::add_file_descriptor(fk::RefPtr<FileDescription> description) {
