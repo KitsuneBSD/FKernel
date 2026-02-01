@@ -1,6 +1,6 @@
 # FKernel Development Guide for AI Agents
 
-This guide provides essential information for AI agents working on the FKernel codebase.
+This guide provides essential information for AI agents working on the FKernel codebase, including the latest GEMINI AI automation features and validation requirements.
 
 ## Build System & Commands
 
@@ -53,6 +53,7 @@ namespace fk {
     namespace memory { }      // Smart pointers
     namespace core { }        // Result, Optional
     namespace utilities { }   // Aligner, Pair, etc.
+    namespace algorithms { }  # Consolidated algorithms
 }
 
 // Kernel namespaces  
@@ -166,6 +167,26 @@ auto name = process->thread_name();
 - **Classes**: Max 200 lines
 - **Methods**: Max 20 lines  
 - **Files**: Max 500 lines
+
+### 9. No Getters/Setters
+
+```cpp
+// ❌ BAD: Anemic model
+class Process {
+    ProcessState m_state;
+public:
+    ProcessState state() const { return m_state; }
+    void set_state(ProcessState s) { m_state = s; }
+};
+
+// ✅ GOOD: Rich model  
+class Process {
+    ProcessState m_state;
+public:
+    bool is_running() const { return m_state == Running; }
+    void block() { m_state = Blocked; }
+};
+```
 
 ### 8. Max Two Instance Variables
 
@@ -344,12 +365,17 @@ Result<Page*, Error> allocate_page();
 - `Src/LibFK/` - STL-like library
 - `Include/` - All header files
 - `Meta/` - Build tools and scripts
+- `.ai-docs/` - AI conceptual memory system
+- `.gemini/` - Validation scripts and configuration
+- `Docs/` - Human documentation
 
 ### File Organization
 
 - Headers mirror source structure in `Include/`
 - Implementation in `Src/`
 - Architecture-specific code in `Src/Kernel/Arch/x86_64/`
+- **SECRET RULE**: One struct/class per file strictly enforced
+- **Domain-based**: PascalCase directories represent cohesive domains
 
 ## Security & Safety
 
@@ -366,4 +392,118 @@ Result<Page*, Error> allocate_page();
 - Drivers in userspace (DAL architecture)
 - Isolated kernel subsystems
 - Production-ready, not hobby OS
+
+## GEMINI AI Integration & Memory System
+
+### AI Memory Protocol
+
+- **Primary Memory**: `.ai-docs/` serves as conceptual memory for all AI agents
+- **Documentation Pipeline**: `.ai-docs/` → AI memory, `Docs/` → human documentation
+- **Continuous Learning**: Agents must read `.ai-docs/` before making changes
+- **Memory Updates**: Every significant change must update `.ai-docs/`
+
+### GEMINI Validation System
+
+The `.gemini/fkernel_validator.lua` enforces:
+- **Object Calisthenics**: Automatic validation of all 9 rules
+- **SECRET RULE**: One struct/class per file enforcement
+- **Architecture**: Strict layer separation validation
+- **Testing**: Coverage requirements validation
+- **Algorithms**: Consolidation policy enforcement
+
+### AI Automation Features
+
+- **Script Generation**: Lua scripts auto-generated based on analysis
+- **CI/CD Integration**: Automated validation in build pipeline
+- **Memory Management**: AI maintains conceptual understanding
+- **Full Traceability**: All changes tracked in both `.ai-docs/` and `Docs/`
+
+## SECRET RULE: One Struct/Class Per File
+
+### Non-Negotiable Rule
+
+- **Exactly ONE** struct or class per header/source file
+- **File name** must match the struct/class name (camelCase → PascalCase)
+- **Domain-based directories**: PascalCase representing cohesive domains
+- **Self-documenting structure**: Directory/file names reveal purpose
+
+### Enforcement
+
+```bash
+# GEMINI validator automatically checks:
+xmake validate-gemini  # Runs fkernel_validator.lua
+```
+
+### Benefits
+
+- **Deep Autodocumentation**: File structure reveals system architecture
+- **Maintenance Isolation**: Changes affect only one domain
+- **Perfect Discovery**: Developers locate functionality by names
+- **High Cohesion**: Each file represents exactly one concept
+
+## Algorithm Consolidation Policy
+
+### Consolidate in LibFK
+
+All algorithms used across multiple domains MUST be in `LibFK/Algorithms/`:
+
+- **Archive**: TAR, ZIP, GZIP
+- **Compression**: LZ4, ZLIB, DEFLATE  
+- **Checksum/Hash**: CRC32, MD5, SHA256
+- **Encoding**: Base64, Hex, URL encoding
+- **Parsing**: INI, JSON, ELF, PE
+- **Data Structures**: Priority queues, Bloom filters, LRU caches
+
+### Implementation
+
+```cpp
+// Unified API for all domains
+namespace fk::Algorithms::Archive {
+    class Tar {
+        static Result<fk::Vector<uint8_t>, Error> create_archive(...);
+        static Result<void, Error> extract_archive(...);
+    };
+}
+
+// Usage across all domains
+auto result = fk::Algorithms::Archive::Tar::extract_archive(...);
+```
+
+## Validation & Automation
+
+### Automated Validation
+
+```bash
+# Run full GEMINI validation suite
+xmake validate-all     # Object Calisthenics + Architecture + Tests
+xmake validate-oc     # Object Calisthenics only  
+xmake validate-arch   # Architecture separation only
+xmake validate-tests  # Test coverage only
+```
+
+### Configuration
+
+Configuration in `.gemini/settings.json`:
+- Object Calisthenics limits (200 lines/class, 20 lines/method, 2 variables)
+- Testing coverage targets (LibC 90%, LibFK 85%, Kernel 75%)
+- Architecture enforcement flags
+- Algorithm consolidation policies
+
+### Memory Structure
+
+```
+.ai-docs/
+├── architectural-decisions/     # High-level design decisions
+├── recent-modifications/        # Track recent code changes
+├── conceptual-models/           # How system works conceptually
+├── domain-knowledge/            # Per-domain understanding
+└── development-patterns/        # Established patterns and conventions
+
+Docs/
+├── Architecture/               # System architecture documentation
+├── Development/               # Development guides and workflows
+├── Domains/                   # Per-domain comprehensive guides
+├── Patterns/                  # Design patterns and conventions
+└── Tutorials/                 # Learning materials for developers
+```
 
