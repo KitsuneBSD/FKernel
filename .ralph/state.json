@@ -3,7 +3,7 @@
   "base_branch": "wiggum/feature/early-init",
   "current_model": "opencode/minimax-m2.1",
   "iteration": 0,
-  "last_updated": "2026-02-02T19:35:33Z",
+  "last_updated": "2026-02-02T19:36:01Z",
   "model_usage": {
 
   },
@@ -16,7 +16,7 @@
       "imported_at": "2026-02-02T19:35:33Z",
       "priority": "critical",
       "source": "TODO.md",
-      "status": "in_progress",
+      "status": "completed",
       "steps": {
 
       },
@@ -29,7 +29,7 @@
       "imported_at": "2026-02-02T19:35:33Z",
       "priority": "critical",
       "source": "TODO.md",
-      "status": "pending",
+      "status": "in_progress",
       "steps": {
 
       },

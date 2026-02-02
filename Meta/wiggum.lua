@@ -40,71 +40,45 @@ local RALPH_LOGS_DIR = ".ralph/logs"
 local RALPH_SPECS_DIR = ".ralph/specs"
 
 local OPENCODE_MODELS = {
-    ["opencode/minimax-m2.1"] = {
-        name = "Minimax M2.1",
+    ["opencode/minimax-m2.1-free"] = {
+        name = "MiniMax M2.1 Free",
         provider = "opencode",
         priority = 1,
         rpm = 60,
         is_free = true,
-        notes = "Free model included in Zen"
+        notes = "Free model"
     },
-    ["opencode/gpt-5.2"] = {
-        name = "GPT-5.2",
-        provider = "openai",
+    ["opencode/trinity-large-preview"] = {
+        name = "Trinity Large Preview",
+        provider = "opencode",
         priority = 2,
-        rpm = 10,
+        rpm = 60,
         is_free = true,
-        notes = "Free ChatGPT tier"
+        notes = "Preview model"
     },
-    ["opencode/gpt-5.1-codex"] = {
-        name = "GPT-5.1 Codex",
-        provider = "openai",
+    ["opencode/kimi-k2.5-free"] = {
+        name = "Kimi K2.5 Free",
+        provider = "opencode",
         priority = 3,
-        rpm = 10,
+        rpm = 60,
         is_free = true,
-        notes = "Code specialized"
+        notes = "Free model"
     },
-    ["google/gemini-3-pro"] = {
-        name = "Gemini 3 Pro",
-        provider = "google",
+    ["opencode/glm-4.7-free"] = {
+        name = "GLM-4.7 Free",
+        provider = "opencode",
         priority = 4,
-        rpm = 10,
+        rpm = 60,
         is_free = true,
-        notes = "Free Gemini API tier"
+        notes = "Free model"
     },
-    ["anthropic/claude-sonnet-4-20250514"] = {
-        name = "Claude Sonnet 4.5",
-        provider = "anthropic",
+    ["opencode/big-pickle"] = {
+        name = "Big Pickle",
+        provider = "opencode",
         priority = 5,
-        rpm = 5,
-        is_free = false,
-        notes = "API key required"
-    },
-    ["anthropic/claude-opus-4-20250514"] = {
-        name = "Claude Opus 4.5",
-        provider = "anthropic",
-        priority = 6,
-        rpm = 5,
-        is_free = false,
-        notes = "Max capability, API key required"
-    },
-    ["ollama/llama3.3"] = {
-        name = "Llama 3.3 (Local)",
-        provider = "ollama",
-        priority = 7,
-        rpm = nil,
+        rpm = 60,
         is_free = true,
-        is_local = true,
-        notes = "Local model via Ollama"
-    },
-    ["docker/deepseek-coder"] = {
-        name = "DeepSeek Coder (Local)",
-        provider = "docker",
-        priority = 8,
-        rpm = nil,
-        is_free = true,
-        is_local = true,
-        notes = "Local model via Docker Model Runner"
+        notes = "Free model"
     },
 }
 
@@ -369,8 +343,8 @@ function Wiggum:detect_current_model()
         return state.last_model
     end
 
-    Wiggum:log("No model detected, using default: opencode/minimax-m2.1", "WARNING")
-    return "opencode/minimax-m2.1"
+    Wiggum:log("No model detected, using default: opencode/minimax-m2.1-free", "WARNING")
+    return "opencode/minimax-m2.1-free"
 end
 
 function Wiggum:load_opencode_config()
@@ -404,13 +378,11 @@ end
 
 function Wiggum:normalize_model_id(model_id)
     local mapping = {
-        ["minimax-m2.1"] = "opencode/minimax-m2.1",
-        ["gpt-5.2"] = "opencode/gpt-5.2",
-        ["gpt-5.1-codex"] = "opencode/gpt-5.1-codex",
-        ["claude-sonnet-4.5"] = "anthropic/claude-sonnet-4-20250514",
-        ["claude-opus-4.5"] = "anthropic/claude-opus-4-20250514",
-        ["gemini-3-pro"] = "google/gemini-3-pro",
-        ["llama3.3"] = "ollama/llama3.3",
+        ["minimax"] = "opencode/minimax-m2.1-free",
+        ["trinity"] = "opencode/trinity-large-preview",
+        ["kimi"] = "opencode/kimi-k2.5-free",
+        ["glm"] = "opencode/glm-4.7-free",
+        ["pickle"] = "opencode/big-pickle",
     }
 
     if self.config.models[model_id] then
