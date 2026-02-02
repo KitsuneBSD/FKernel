@@ -292,8 +292,7 @@ end
 function Wiggum.git:commit(task, status)
     local commit_type = status == "validated" and "validated" or "debug"
     local message = string.format(
-        "wiggum (%s): %s",
-        commit_type,
+        "ralph(conventional-commit): %s",
         task.description
     )
 
@@ -771,7 +770,12 @@ function Wiggum:import_from_todo_md()
     end
 
     if #tasks == 0 then
-        Wiggum:log("No tasks found with new format, trying legacy format...")
+        Wiggum:log("No tasks found with new format, trying new parser...")
+        tasks = self:import_from_todo_md_new(content)
+    end
+
+    if #tasks == 0 then
+        Wiggum:log("No tasks found with new parser, trying legacy format...")
         tasks = self:import_from_todo_md_legacy(content)
     end
 
@@ -825,6 +829,119 @@ function Wiggum:import_from_todo_md_legacy(content)
     end
 
     return tasks
+end
+
+function Wiggum:import_from_todo_md_new(content)
+    local tasks = {}
+    local task_counter = 0
+
+    local function create_task(title, description, status, priority, category)
+        task_counter = task_counter + 1
+        return {
+            id = string.format("task_%04d", task_counter),
+            title = title,
+            description = description,
+            status = status,
+            priority = priority,
+            category = category,
+            steps = {},
+            source = "TODO.md",
+            imported_at = os.date("%Y-%m-%dT%H:%M:%SZ"),
+        }
+    end
+
+    local function parse_status(line)
+        if line:find("%[x%]") or line:find("✅") then return "completed" end
+        if line:find("⚠️") or line:find("🚨") then return "in_progress" end
+        return "pending"
+    end
+
+    local function parse_priority_from_section(line)
+        if line:find("🚨") or line:find("critical") then return "critical" end
+        if line:find("⚠️") or line:find("high") then return "high" end
+        if line:find("📋") or line:find("medium") then return "medium" end
+        return "medium"
+    end
+
+    local lines = {}
+    for line in content:gmatch("[^\n\r]+") do
+        table.insert(lines, line)
+    end
+
+    local current_category = "General"
+    local current_priority = "medium"
+    local section_start = 1
+
+    for i, line in ipairs(lines) do
+        local section_match = line:match("^##+ (.+)")
+        if section_match then
+            local lower = section_match:lower()
+            if lower:find("progresso por categoria") then
+                current_category = "Progresso por Categoria"
+            elseif lower:find("proximos passos") then
+                current_category = "Próximos Passos"
+            elseif lower:find("fase") then
+                current_category = section_match
+            end
+        end
+
+        if line:find("^###") then
+            current_priority = parse_priority_from_section(line)
+        end
+
+        if line:find("^%s*[-*]%s*%[x%]") or line:find("^%s*[-*]%s*✅") then
+            local title = line:gsub("^%s*[-*]%s*%[x%]%s*", ""):gsub("^%s*[-*]%s*✅%s*", ""):gsub("%s+", " ")
+            local task = create_task(title, "", "completed", current_priority, current_category)
+            table.insert(tasks, task)
+        elseif line:find("^%s*[-*]%s*%[%]") or line:find("^%s*[-*]%s*⚠️") or line:find("^%s*[-*]%s*❌") then
+            local title = line:gsub("^%s*[-*]%s*%[%]%s*", ""):gsub("^%s*[-*]%s*⚠️%s*", ""):gsub("^%s*[-*]%s*❌%s*", ""):gsub("%s+", " ")
+            local status = parse_status(line)
+            local task = create_task(title, "", status, current_priority, current_category)
+            table.insert(tasks, task)
+        elseif line:find("^%d+%.%s*%*") or line:find("^%d+%.%s*-") then
+            local title = line:gsub("^%d+%.%s*%*%s*", ""):gsub("^%d+%.%s*-%s*", ""):gsub("%s+", " ")
+            local desc_lines = {}
+            local j = i + 1
+            while j <= #lines and lines[j]:find("^%s*%d+%.%s*") == nil and lines[j]:find("^##") == nil do
+                local clean = lines[j]:gsub("^%s*[-*]%s*", ""):gsub("^%s*%d+%.%s*", ""):gsub("%s+", " ")
+                if #clean > 0 then table.insert(desc_lines, clean) end
+                j = j + 1
+            end
+            local description = table.concat(desc_lines, " ")
+            local task = create_task(title, description, "pending", current_priority, current_category)
+            table.insert(tasks, task)
+        elseif line:find("^%d+%.%s*%S") and not line:find("^%d+%.%s*%[") then
+            local title = line:gsub("^%d+%.%s*", ""):gsub("%s+", " ")
+            local task = create_task(title, "", "pending", current_priority, current_category)
+            table.insert(tasks, task)
+        end
+    end
+
+    tasks = Wiggum:sort_tasks_by_priority(tasks)
+    return tasks
+end
+
+function Wiggum:sort_tasks_by_priority(tasks_list)
+    local priority_order = {
+        ["critical"] = 1,
+        ["high"] = 2,
+        ["medium"] = 3,
+        ["low"] = 4,
+    }
+
+    table.sort(tasks_list, function(a, b)
+        local priority_a = priority_order[a.priority] or 5
+        local priority_b = priority_order[b.priority] or 5
+        if priority_a ~= priority_b then
+            return priority_a < priority_b
+        end
+        local status_order = {pending = 1, in_progress = 2, completed = 3}
+        local order_a = status_order[a.status] or 4
+        local order_b = status_order[b.status] or 4
+        return order_a < order_b
+    end)
+
+    return tasks_list
 end
 
 -- ============================================
@@ -1157,7 +1274,7 @@ function Wiggum:offer_merge_dialog()
     end
 
     print("\n" .. string.rep("=", 80))
-    print("MERGE REQUEST")
+    print("MERGE REQUEST (Automatic)")
     print(string.rep("=", 80))
     print(string.format("\nWiggum branch: %s", wiggum_branch))
     print(string.format("Base branch: %s", base_branch))
@@ -1207,6 +1324,7 @@ function Wiggum:offer_merge_dialog()
         self:generate_stats_report()
         self:offer_merge_dialog()
     else
+        RunCommand("git checkout " .. base_branch)
         print("\nExiting.\n")
     end
 end
@@ -1274,22 +1392,65 @@ function Wiggum:run_plan_mode()
     local plan_file = RALPH_DIR .. "/IMPLEMENTATION_PLAN.md"
     local f = io.open(plan_file, "w")
     if f then
-        f:write(string.format("# FKernel Implementation Plan\n\n"))
+        f:write("# FKernel Implementation Plan\n\n")
         f:write(string.format("Generated: %s\n", os.date("%Y-%m-%d %H:%M:%S")))
         f:write(string.format("Base Branch: %s\n", self.config.base_branch))
         f:write(string.format("Current Model: %s\n\n", self.config.current_model))
 
-        f:write("## Task List\n\n")
-        f:write("| ID | Category | Priority | Status | Description |\n")
-        f:write("|----|----------|----------|--------|-------------|\n")
+        local priority_order = {critical = 1, high = 2, medium = 3, low = 4}
+        local status_order = {pending = 1, in_progress = 2, completed = 3}
+
+        local pending_tasks = {}
+        local completed_tasks = {}
 
         for _, task in ipairs(self.state.tasks) do
-            f:write(string.format("| %s | %s | %s | %s | %s |\n",
-                task.id,
-                task.category or "-",
-                task.priority or "-",
-                task.status,
-                task.description))
+            if task.status == "completed" then
+                table.insert(completed_tasks, task)
+            else
+                table.insert(pending_tasks, task)
+            end
+        end
+
+        f:write("## PENDING TASKS (Highest Priority)\n\n")
+
+        local current_priority = nil
+        for _, task in ipairs(pending_tasks) do
+            local prio = task.priority or "medium"
+            if prio ~= current_priority then
+                if current_priority then f:write("\n") end
+                f:write(string.format("### %s\n\n", prio:upper()))
+                current_priority = prio
+            end
+
+            local title = task.title or task.description or "Untitled task"
+            title = title:gsub("^%*+", ""):gsub("%*+$", ""):gsub("%s+", " ")
+
+            local clean_desc = ""
+            if task.description and #task.description > 10 then
+                clean_desc = "\n   Details: " .. task.description:gsub("\n", " "):gsub("%s+", " ")
+            end
+
+            f:write(string.format("- **%s** [%s]%s\n", title, task.status:upper(), clean_desc))
+        end
+
+        f:write("\n## COMPLETED TASKS\n\n")
+        for _, task in ipairs(completed_tasks) do
+            local title = task.title or task.description or "Untitled task"
+            title = title:gsub("^%*+", ""):gsub("%*+$", ""):gsub("%s+", " ")
+            f:write(string.format("- ~~%s~~\n", title))
+        end
+
+        f:write("\n---\n\n")
+        f:write("## SUMMARY\n")
+        f:write(string.format("- Pending: %d tasks\n", #pending_tasks))
+        f:write(string.format("- Completed: %d tasks\n", #completed_tasks))
+        f:write(string.format("- Total: %d tasks\n\n", #pending_tasks + #completed_tasks))
+
+        f:write("## NEXT ACTION\n")
+        if #pending_tasks > 0 then
+            local next_task = pending_tasks[1]
+            local title = (next_task.title or next_task.description or "Untitled"):gsub("%*+", ""):gsub("%s+", " ")
+            f:write(string.format("Start with: **%s** (priority: %s)\n", title, next_task.priority))
         end
 
         f:close()
@@ -1298,6 +1459,215 @@ function Wiggum:run_plan_mode()
 
     self:save_state()
     print("Planning phase complete.\n")
+end
+
+function Wiggum:execute_task_with_llm(task)
+    print(string.format("\n🤖 Invoking LLM for: %s", task.id))
+
+    local prompt = self:build_task_prompt(task)
+
+    local model = self.config.models[self.config.current_model] or { name = self.config.current_model }
+
+    local command = string.format(
+        'opencode --model "%s" --prompt %s 2>&1',
+        self.config.current_model,
+        "'" .. prompt:gsub("'", "'\\''") .. "'"
+    )
+
+    print(string.format("   Model: %s", model.name))
+
+    local f = io.popen(command .. " 2>&1")
+    local output = f:read("*a")
+    f:close()
+
+    if output and #output > 0 then
+        print(string.format("\n   LLM Response:\n%s\n", output:sub(1, 500)))
+
+        if output:find("error", 1, true) or output:find("failed", 1, true) then
+            return { success = false, output = output }
+        end
+
+        return { success = true, output = output, model_used = self.config.current_model }
+    end
+
+    print("   ⚠️ No response from LLM (simulation mode)")
+    return { success = true, output = "", model_used = self.config.current_model }
+end
+
+function Wiggum:build_task_prompt(task)
+    local title = task.title or task.description or "Untitled task"
+    local description = task.description or ""
+
+    return string.format([[
+# FKernel Task: %s
+
+## Description
+%s
+
+## Priority
+%s
+
+## Category
+%s
+
+## Context
+You are working on the FKernel operating system project.
+Current branch: %s
+
+## Requirements
+1. Implement the task as described
+2. Follow AGENTS.md coding standards
+3. Follow Object Calisthenics rules:
+   - Max 200 lines per class
+   - Max 20 lines per method
+   - No "else" keyword (use early returns)
+   - No method chaining (use delegation)
+   - Wrap primitives in types
+   - No abbreviations
+   - Max 2 instance variables per class
+   - First-class collections
+
+## Validation After Implementation
+1. Run: xmake -bv
+2. Run: xmake run Test
+3. Ensure no Object Calisthenics violations
+
+## Output Format
+Report:
+1. Files changed
+2. Summary of changes
+3. Any issues encountered
+
+Please implement this task.
+]],
+        task.id,
+        description ~= "" and description or title,
+        task.priority or "medium",
+        task.category or "general",
+        self.config.base_branch
+    )
+end
+
+function Wiggum:run_build_mode(max_iterations, parallel)
+    print("\n" .. string.rep("=", 80))
+    print("RALPH WIGGUM - BUILD MODE")
+    if parallel then
+        print("Parallel execution enabled")
+    end
+    print(string.rep("=", 80) .. "\n")
+
+    self.config.mode = "build"
+    self.config.base_branch = self.git:detect_current_branch()
+    self.git:create_or_checkout_wiggum_branch()
+    self.config.current_model = self:detect_current_model()
+
+    if #self.state.tasks == 0 then
+        print("No tasks loaded. Importing from TODO.md...")
+        self:import_from_todo_md()
+    end
+
+    local iteration = 0
+    local total_completed = 0
+    local all_completed = false
+
+    while iteration < max_iterations and not all_completed do
+        iteration = iteration + 1
+        print(string.format("\n--- Iteration %d/%d ---\n", iteration, max_iterations))
+
+        local pending_count = 0
+        local task_completed_this_iteration = false
+
+        for i, task in ipairs(self.state.tasks) do
+            if task.status ~= "completed" then
+                pending_count = pending_count + 1
+                print(string.format("[%d/%d] Processing: %s (priority: %s)",
+                    pending_count, #self.state.tasks, task.id, task.priority))
+
+                local title = task.title or task.description or "Untitled task"
+                title = title:gsub("^%*+", ""):gsub("%*+$", ""):gsub("%s+", " ")
+
+                if parallel then
+                    print(string.format("  → Queued for parallel: %s", title))
+                else
+                    print(string.format("  → Executing: %s", title))
+                    task.status = "in_progress"
+                    self:save_state()
+
+                    local result = self:execute_task_with_llm(task)
+
+                    if result and result.success then
+                        task.status = "completed"
+                        self.git:commit(task, "debug")
+                        self:update_ai_docs(task, result.commit_hash or "N/A")
+                        self:update_docs(task)
+                        print(string.format("  ✓ Completed: %s", title))
+                    else
+                        task.status = "pending"
+                        print(string.format("  ✗ Failed: %s", title))
+                    end
+                    self:save_state()
+                end
+            end
+        end
+
+        local completed = 0
+        local pending = 0
+        local in_progress = 0
+
+        for _, task in ipairs(self.state.tasks) do
+            if task.status == "completed" then
+                completed = completed + 1
+            elseif task.status == "in_progress" then
+                in_progress = in_progress + 1
+            else
+                pending = pending + 1
+            end
+        end
+
+        print(string.format("\nProgress: %d completed, %d pending, %d in progress",
+            completed, pending, in_progress))
+
+        if pending == 0 then
+            all_completed = true
+            print("\n✓ All tasks completed!")
+        else
+            print(string.format("\n%d tasks remaining", pending))
+        end
+
+        self:save_state()
+
+        if not all_completed and iteration < max_iterations then
+            print("\nContinuing to next iteration...\n")
+        end
+    end
+
+    print(string.rep("=", 60))
+    print("BUILD MODE SUMMARY")
+    print(string.rep("=", 60))
+    print(string.format("Iterations run: %d", iteration))
+    print(string.format("Max iterations: %d", max_iterations))
+
+    local final_completed = 0
+    local final_pending = 0
+    for _, task in ipairs(self.state.tasks) do
+        if task.status == "completed" then
+            final_completed = final_completed + 1
+        else
+            final_pending = final_pending + 1
+        end
+    end
+
+    print(string.format("Tasks completed: %d", final_completed))
+    print(string.format("Tasks pending: %d", final_pending))
+
+    if all_completed then
+        print("\n✓✓✓ ALL TASKS COMPLETED! ✓✓✓\n")
+        self:offer_merge_dialog()
+    else
+        print(string.format("\n⚠ %d tasks remaining. Continue with:", final_pending))
+        print(string.format("  lua Meta/wiggum.lua build %d", max_iterations))
+    end
+    print(string.rep("=", 60) .. "\n")
 end
 
 function Wiggum:run_analyze_mode()
@@ -1594,8 +1964,13 @@ function main(...)
     if command == "plan" then
         Wiggum:run_plan_mode()
     elseif command == "build" then
-        local max_iterations = tonumber(args[2]) or 1
-        print(string.format("Build mode with %d iterations", max_iterations))
+        local max_iterations = tonumber(args[2]) or 999999
+        local parallel = false
+        if args[2] == "--parallel" then
+            parallel = true
+            max_iterations = tonumber(args[3]) or 999999
+        end
+        Wiggum:run_build_mode(max_iterations, parallel)
     elseif command == "edit" then
         Wiggum:edit_tasks()
     elseif command == "import" then
@@ -1622,4 +1997,4 @@ function main(...)
     end
 end
 
-main()
+main(...)
