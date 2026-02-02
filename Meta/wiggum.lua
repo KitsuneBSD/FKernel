@@ -242,6 +242,9 @@ function Wiggum.git:detect_current_branch()
 end
 
 function Wiggum.git:get_wiggum_branch_name()
+    if Wiggum.config.base_branch:sub(1, #Wiggum.config.wiggum_branch_prefix) == Wiggum.config.wiggum_branch_prefix then
+        return Wiggum.config.base_branch
+    end
     return Wiggum.config.wiggum_branch_prefix .. Wiggum.config.base_branch
 end
 
