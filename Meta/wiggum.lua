@@ -142,45 +142,121 @@ function Wiggum:run_build(max_iters, concurrency)
         marathon_count = marathon_count + 1
         task.status = "in_progress"
         task.attempts = (task.attempts or 0) + 1
+        task.subtasks = task.subtasks or {}
+        task.start_hash = Git.get_last_hash()
         self:save_state()
 
-        local model = LLM.get_next_model()
-        self.state.current_model = model
-        LLM.wait_if_needed(model)
-
-        self:log("🏃 Step " .. marathon_count .. " | Mission: " .. task.title .. " (" .. model .. ")")
-        
-        local prompt = string.format([[
-MISSION: Implement FKernel feature: %s
-Description: %s
-CONSTRAINTS: One class/file, Object Calisthenics, Result<T, Error>.
-GOAL: Compile ('xmake -bv') and pass tests ('xmake run Test').
+        -- Phase 1: Planning (if no subtasks)
+        if #task.subtasks == 0 then
+            self:log("📝 Planning subtasks for: " .. task.title)
+            local model = LLM.get_next_model()
+            local plan_prompt = string.format([[
+MISSION: Break this task into small, verifiable subtasks for FKernel.
+TASK: %s
+DESCRIPTION: %s
+Format: JSON only. {"subtasks": [{"title": "...", "description": "..."}]}
 ]], task.title, task.description or "")
+            
+            -- This is a simplified call, we assume the LLM agent handles the file creation/parsing
+            -- In a real scenario, we'd use a specific tool to parse this.
+            -- For now, we'll delegate to opencode to update the state.json directly or via a temp file.
+            local plan_cmd = string.format('opencode run "Break task %s into subtasks and update the subtasks array in %s. Return ONLY the updated JSON for the task object or the whole file." -m %s -f %s --log-level WARN', task.id, STATE_PATH, model, STATE_PATH)
+            os.execute(plan_cmd)
+            self:load_state()
+            -- Re-fetch task after state update
+            for _, t in ipairs(self.state.tasks) do if t.id == task.id then task = t; break end end
+        end
 
-        LLM.call(model, prompt)
-        
-        self:log("Validating mission result for " .. task.id)
-        local build_ok = RunCommand("xmake -bv 2>&1")
-        local test_ok = build_ok and RunCommand("xmake run Test 2>&1")
+        -- Phase 2: Execution of Subtasks
+        local all_subtasks_ok = true
+        local models_to_try = {
+            "opencode/trinity-large-preview-free",
+            "opencode/kimi-k2.5-free",
+            "opencode/minimax-m2.1-free",
+            "opencode/glm-4.7-free"
+        }
 
-        if build_ok and test_ok then
+        for i, sub in ipairs(task.subtasks or {}) do
+            if sub.status ~= "completed" then
+                local sub_success = false
+                
+                for _, model in ipairs(models_to_try) do
+                    self.state.current_model = model
+                    self.state.current_subtask = sub.title
+                    self:save_state()
+                    LLM.wait_if_needed(model)
+
+                    self:log(string.format("🔧 Subtask %d/%d: %s (Trying: %s)", i, #task.subtasks, sub.title, model))
+                    
+                    local prompt = string.format([[
+MISSION: Implement FKernel SUBTASK: %s
+Context: Part of task "%s"
+Description: %s
+CONSTRAINTS (STRICT ENFORCEMENT):
+- 🔑 SECRET RULE: ONE STRUCT/CLASS PER FILE.
+- Naming: Directories in PascalCase, Files in snake_case (mandatory).
+- Deep development: use domain-based directory structure.
+- Follow ALL instructions in AGENTS.md and GEMINI.md.
+- Object Calisthenics (No else, wrap primitives, one dot per line).
+- Entity size: classes ≤200 lines, methods ≤20 lines.
+- No getters/setters: use rich domain model methods.
+- Return Result<T, Error> for all fallible operations.
+]], sub.title, task.title, sub.description or "")
+
+                    LLM.call(model, prompt)
+                    
+                    self:log("Validating subtask: " .. sub.title)
+                    local build_ok = RunCommand("xmake -bv 2>&1")
+                    local test_ok = build_ok and RunCommand("xmake run Test 2>&1")
+
+                    if build_ok and test_ok then
+                        sub.status = "completed"
+                        Git.commit(string.format("ralph - feat(%s): %s", task.id, sub.title))
+                        self:log("✅ Subtask SUCCESS with " .. model, "INFO")
+                        sub_success = true
+                        break
+                    else
+                        self:log("❌ Subtask FAILED with " .. model .. ". Swapping model...", "WARN")
+                        os.execute("git checkout .") 
+                        os.execute("git clean -fd")
+                    end
+                end
+
+                if not sub_success then
+                    all_subtasks_ok = false
+                    sub.status = "failed"
+                    self:log("🛑 Subtask could not be completed with any available model.", "ERROR")
+                    break
+                end
+                self:save_state()
+            end
+        end
+
+        if all_subtasks_ok and #task.subtasks > 0 then
             task.status = "completed"
-            task.feedback = nil
-            Git.commit("feat: " .. task.title)
-            self:log("✅ Task SUCCESS", "INFO")
+            self:log("🎉 Task FULLY COMPLETED: " .. task.title, "INFO")
+            
+            -- Final task cleanup and commit (without ralph- prefix)
+            if task.start_hash then
+                self:log("📦 Finalizing task with stash and clean commit...")
+                os.execute("git reset --soft " .. task.start_hash)
+                os.execute("git stash")
+                os.execute("git stash pop")
+                Git.commit(string.format("feat(%s): %s", task.id, task.title))
+            end
         else
             if (task.attempts or 0) >= 3 then
                 task.status = "blocked"
-                task.feedback = "Failed 3 models."
-                self:log("🛑 Task BLOCKED", "ERROR")
+                self:log("🛑 Task BLOCKED after retries", "ERROR")
             else
                 task.status = "pending"
-                os.execute("git checkout .") 
-                self:log("🔄 Task FAILED. Retrying with next model...", "WARNING")
+                -- Reset subtasks status for retry if needed or keep progress? 
+                -- Usually keep progress if atomic.
             end
         end
         
         self.state.iteration = marathon_count
+        self.state.current_subtask = nil
         self:save_state()
         
         local _, reason = os.execute("sleep 1")

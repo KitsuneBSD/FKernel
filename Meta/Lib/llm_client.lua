@@ -40,7 +40,7 @@ function LLMClient.call(model_id, prompt)
     -- Removida a flag -y/--yolo pois não é suportada nesta versão
     -- A instrução principal é o primeiro argumento posicional
     local cmd = string.format(
-        'opencode run "Execute the mission in the attached file." -m %s -f %s -f GEMINI.md -f AGENTS.md %s --log-level WARN',
+        'opencode run "Execute the mission in the attached file." -m %s -f %s -f GEMINI.md -f AGENTS.md -f TODO.md %s --log-level WARN',
         model_id, prompt_file, variant_flag
     )
     

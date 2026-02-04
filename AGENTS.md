@@ -68,6 +68,19 @@ namespace fkernel {
 }
 ```
 
+## Ralph Wiggum Commit Policy
+
+### Intermediate Commits (Subtasks)
+- **Prefix**: Every sub-step commit MUST be prefixed with `ralph -`.
+- **Format**: `ralph - <conventional-commit-type>(<scope>): <description>`
+- **Example**: `ralph - feat(memory): implement buddy allocator`
+
+### Final Task Commit
+- **Action**: When a task is fully completed, all intermediate `ralph -` commits are squashed.
+- **Format**: Strictly conventional commit WITHOUT the `ralph -` prefix.
+- **Example**: `feat(memory): comprehensive physical memory management`
+- **Workflow**: `git reset --soft` -> `git stash` -> `git stash pop` -> `git commit`.
+
 ## Mandatory Coding Standards (Object Calisthenics)
 
 ### 1. One Indentation Level Per Method
