@@ -3,8 +3,8 @@
 local LLMClient = {
     models = {
         ["opencode/minimax-m2.1-free"] = { rpm = 2, priority = 1 },
-        ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 2 },
-        ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 3 },
+        ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 2, variant = "high" },
+        ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 3, variant = "high" },
         ["opencode/glm-4.7-free"] = { rpm = 2, priority = 4 },
     },
     usage = {},
@@ -31,14 +31,25 @@ function LLMClient.call(model_id, prompt)
         f:close()
     end
 
-    -- Mudança crucial: usando 'opencode run' para ativar o modo agente
-    local cmd = 'opencode run --model "' .. model_id .. '" --file "' .. prompt_file .. '" 2>&1'
-    local proc = io.popen(cmd)
-    local output = proc:read("*a")
-    proc:close()
+    local model_cfg = LLMClient.models[model_id] or {}
+    local variant_flag = ""
+    if model_cfg.variant then
+        variant_flag = ' --variant "' .. model_cfg.variant .. '"'
+    end
+
+    -- YOLO MODE ATIVADO: --yolo auto-aprova todas as ferramentas
+    local cmd = 'opencode run --yolo --model "' .. model_id .. '"' ..
+                ' --file "' .. prompt_file .. '"' ..
+                ' --file "GEMINI.md"' ..
+                ' --file "AGENTS.md"' ..
+                variant_flag ..
+                ' --log-level WARN'
+    
+    print("\n🚀 Ralph is launching Agent in YOLO MODE...")
+    local success = os.execute(cmd)
     
     os.remove(prompt_file)
-    return output
+    return success
 end
 
 function LLMClient.wait_if_needed(model_id)
@@ -51,7 +62,7 @@ function LLMClient.wait_if_needed(model_id)
     end
     
     local config = LLMClient.models[model_id]
-    if config and LLMClient.usage[model_id].count >= config.rpm then
+    if config and LLMClient.usage[model_id].count >= (config.rpm or 2) then
         local wait_time = 65 - (now - LLMClient.usage[model_id].last_reset)
         print(string.format("⏳ Rate limit for %s. Waiting %ds...", model_id, wait_time))
         os.execute("sleep " .. wait_time)
