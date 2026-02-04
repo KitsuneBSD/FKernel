@@ -18,90 +18,64 @@ end
 
 local function format_usage(usage)
     local lines = {}
-    table.insert(lines, "--- Model Usage (RPM/Total) ---")
-    
-    local models = {}
+    table.insert(lines, "--- Model Usage (RPM) ---")
+    local sorted_models = {}
     for name, data in pairs(usage or {}) do
-        table.insert(models, {name = name, data = data})
+        table.insert(sorted_models, {name = name, data = data})
     end
-    table.sort(models, function(a, b) return a.name < b.name end)
-
-    for _, m in ipairs(models) do
-        local name = m.name:gsub("opencode/", "")
-        table.insert(lines, string.format("%-20s : %d RPM | Total: %d", 
-            name, m.data.calls_this_minute or 0, m.data.calls_today or 0))
+    table.sort(sorted_models, function(a, b) return a.name < b.name end)
+    for _, m in ipairs(sorted_models) do
+        local short_name = m.name:gsub("opencode/", "")
+        table.insert(lines, string.format("%-15s: %d RPM | Total: %d", 
+            short_name, m.data.count or 0, m.data.total or m.data.count or 0))
     end
     return table.concat(lines, "\n")
 end
 
 local function format_tasks(tasks)
-    local completed = 0
-    local pending = 0
-    local failed = 0
-    local blocked = 0
-    local feedback = ""
-    
+    local stats = { pending = 0, completed = 0, failed = 0, blocked = 0, in_progress = 0 }
+    local blockers = {}
     for _, t in ipairs(tasks or {}) do
-        if t.status == "completed" then completed = completed + 1
-        elseif t.status == "failed" then failed = failed + 1
-        elseif t.status == "blocked" then 
-            blocked = blocked + 1
-            if #feedback < 300 then -- Mostra apenas o primeiro feedback encontrado para não poluir
-                feedback = feedback .. "\n ! " .. t.title .. ": " .. (t.feedback or "No explanation"):sub(1, 100) .. "..."
-            end
-        else pending = pending + 1 end
-    end
-    
-    local res = string.format("Tasks: %d Done | %d Pend | %d Block | %d Fail", 
-        completed, pending, blocked, failed)
-    
-    if blocked > 0 then
-        res = res .. "\n\nBlocker Details:" .. feedback
-    end
-    return res
-end
-
-local function get_summary_text()
-    local state_raw = read_file(STATE_PATH)
-    local report_raw = read_file(REPORT_PATH)
-    
-    local state = Json.parse(state_raw) or {}
-    local report = Json.parse(report_raw) or {}
-    
-    local lines = {}
-    table.insert(lines, "=== RALPH WIGGUM COMMAND CENTER ===")
-    table.insert(lines, "Status: " .. (state.phase or "IDLE"):upper())
-    table.insert(lines, "Iteration: " .. (state.iteration or 0))
-    table.insert(lines, "Last Update: " .. (state.last_updated or "N/A"))
-    table.insert(lines, "")
-    
-    table.insert(lines, format_tasks(state.tasks))
-    table.insert(lines, "")
-    
-    if report.sections then
-        table.insert(lines, "--- Analysis Report ---")
-        for _, sec in ipairs(report.sections) do
-            table.insert(lines, string.format("[%s] %-18s: %s", 
-                sec.status or "?", sec.name, sec.details))
+        stats[t.status] = (stats[t.status] or 0) + 1
+        if t.status == "blocked" then
+            table.insert(blockers, "! " .. t.id .. ": " .. (t.feedback or "No info"):sub(1, 40))
         end
-        table.insert(lines, "")
     end
     
-    table.insert(lines, format_usage(state.model_usage))
+    local line1 = string.format("Tasks: %d Done | %d Work | %d Pend | %d Block", 
+        stats.completed, stats.in_progress, stats.pending, stats.blocked)
     
-    return table.concat(lines, "\n")
+    if #blockers > 0 then
+        line1 = line1 .. "\n\nBlockers:\n" .. table.concat(blockers, "\n")
+    end
+    return line1
 end
 
--- Main Loop
 while true do
-    local text = get_summary_text()
-    -- Use dialog to show the status
-    -- infobox doesn't wait for user, perfect for live updates
-    local cmd = string.format('dialog --backtitle "FKernel - Ralph Wiggum Dashboard" ' ..
-                              '--title "System Status" ' ..
-                              '--infobox "%s" 22 75', text)
-    os.execute(cmd)
+    local state = Json.parse(read_file(STATE_PATH) or "{}") or {}
+    local report = Json.parse(read_file(REPORT_PATH) or "{}") or {}
     
-    -- Check if user wants to quit (hard to do with infobox, so we use a small sleep)
+    local view = {
+        "=== RALPH WIGGUM COMMAND CENTER ===",
+        "Status: " .. (state.phase or "IDLE"):upper(),
+        "Iters:  " .. (state.iteration or 0),
+        "Model:  " .. (state.current_model or "None"):gsub("opencode/", ""),
+        "",
+        format_tasks(state.tasks),
+        "",
+        "--- Analysis ---"
+    }
+    
+    for _, sec in ipairs(report.sections or {}) do
+        table.insert(view, string.format("[%s] %-12s: %s", sec.status or "?", sec.name, sec.details))
+    end
+    
+    table.insert(view, "")
+    table.insert(view, format_usage(state.model_usage))
+    
+    local cmd = string.format('dialog --backtitle "FKernel - Ralph Wiggum Dashboard" ' ..
+                              '--title "Live Monitor" ' ..
+                              '--infobox "%s" 24 78', table.concat(view, "\n"))
+    os.execute(cmd)
     os.execute("sleep 2")
 end

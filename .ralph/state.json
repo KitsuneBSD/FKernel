@@ -1,327 +1,80 @@
 {
-  "alternation_count": 0,
-  "base_branch": "feature/early-init",
-  "current_model": "opencode/minimax-m2.1-free",
   "iteration": 0,
-  "last_updated": "2026-02-04T01:43:46Z",
-  "model_usage": {
+  "last_updated": "2026-02-04T03:39:24Z",
+  "model_usage": [
 
-  },
-  "phase": "build",
+  ],
+  "phase": "BUILDING",
   "tasks": [
     {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "Usar delegação Target: <10 violações",
-      "id": "task_0019",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "critical",
-      "source": "TODO.md",
-      "status": "in_progress",
-      "steps": {
-
-      },
-      "title": "*Corrigir method chaining**"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "interrupt_driven_nvme.cpp: 484 → 200 linhas virtual_memory_manager.cpp: 397 → 200 linhas ahci_controller.cpp: 393 → 200 linhas",
-      "id": "task_0017",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "critical",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Refatorar classes grandes**"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "Aplicar early returns Target: <50 violações",
-      "id": "task_0018",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "critical",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Remover violações \"else {\"**"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "Implementar interrupt-driven AHCI/NVMe Adicionar timeout handling",
-      "id": "task_0020",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Completar Storage I/O**"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "Bug em algorithm_consolidation Melhorar output de violações",
-      "id": "task_0021",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Consertar validator Lua**"
-    },
-    {
-      "category": "Fase 3: Network ⚠️ 40%",
-      "description": "",
-      "id": "task_0009",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "NetworkDevice interface"
-    },
-    {
-      "category": "Fase 2: Storage ⚠️ 85%",
-      "description": "",
-      "id": "task_0007",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "AHCI controller (polling)"
-    },
-    {
-      "category": "Fase 2: Storage ⚠️ 85%",
-      "description": "",
-      "id": "task_0006",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "ATA implementation"
-    },
-    {
-      "category": "Fase 2: Storage ⚠️ 85%",
-      "description": "",
-      "id": "task_0005",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "StorageDevice interface"
-    },
-    {
-      "category": "Fase 3: Network ⚠️ 40%",
-      "description": "",
-      "id": "task_0010",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "E1000 driver"
-    },
-    {
-      "category": "Fase 2: Storage ⚠️ 85%",
-      "description": "",
-      "id": "task_0008",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "high",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "NVMe controller (polling)"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "--",
-      "id": "task_0024",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Corrigir estrutura de diretórios**"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0022",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Implementar TCP/IP stack**"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0016",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*security-scan**: Análise básica ⚠️"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0015",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*hardware-compatibility**: Verifica hardcoded values ✅"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0012",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*test**: Executa 31 testes ✅"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0013",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*code-quality**: clang-format/tidy ⚠️"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0014",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*object-calisthenics**: Verifica limites ❌"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0011",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*build**: Compila kernel ✅"
-    },
-    {
-      "category": "Fase 4: Qualidade ❌ BLOQUEADO",
-      "description": "",
-      "id": "task_0023",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "pending",
-      "steps": {
-
-      },
-      "title": "*Adicionar mais testes**"
-    },
-    {
-      "category": "Fase 1: Infraestrutura ✅ COMPLETA",
-      "description": "",
-      "id": "task_0002",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "Boot em QEMU"
-    },
-    {
-      "category": "Fase 1: Infraestrutura ✅ COMPLETA",
-      "description": "",
-      "id": "task_0004",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "CI/CD pipeline"
-    },
-    {
-      "category": "Fase 1: Infraestrutura ✅ COMPLETA",
-      "description": "",
-      "id": "task_0003",
-      "imported_at": "2026-02-04T01:43:46Z",
-      "priority": "medium",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "Test framework"
-    },
-    {
-      "category": "Fase 1: Infraestrutura ✅ COMPLETA",
-      "description": "",
+      "attempts": 1,
       "id": "task_0001",
-      "imported_at": "2026-02-04T01:43:46Z",
       "priority": "medium",
-      "source": "TODO.md",
-      "status": "completed",
-      "steps": {
-
-      },
-      "title": "Build system funcional"
+      "status": "in_progress",
+      "title": "Interrupt-driven I/O"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0002",
+      "priority": "medium",
+      "status": "pending",
+      "title": "NCQ support (AHCI)"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0003",
+      "priority": "medium",
+      "status": "pending",
+      "title": "Multi-queue I/O (NVMe)"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0004",
+      "priority": "medium",
+      "status": "pending",
+      "title": "TCP/IP stack (IPv4, TCP, UDP, ARP, ICMP)"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0005",
+      "priority": "medium",
+      "status": "pending",
+      "title": "Socket extensions (AF_INET)"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0006",
+      "priority": "medium",
+      "status": "pending",
+      "title": "TCP sliding window, congestion control"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0007",
+      "priority": "medium",
+      "status": "pending",
+      "title": "Corrigir classes >200 linhas"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0008",
+      "priority": "medium",
+      "status": "pending",
+      "title": "Eliminar 92+ violações \"else {\""
+    },
+    {
+      "attempts": 0,
+      "id": "task_0009",
+      "priority": "medium",
+      "status": "pending",
+      "title": "Corrigir 122 violações method chaining"
+    },
+    {
+      "attempts": 0,
+      "id": "task_0010",
+      "priority": "medium",
+      "status": "pending",
+      "title": "Padronizar diretórios PascalCase"
     }
-  ],
-  "total_calls": 0,
-  "version": "1.0.0"
+  ]
 }
