@@ -59,29 +59,54 @@ function Wiggum:save_state()
 end
 
 function Wiggum:import_tasks()
-    self:log("Importing tasks from TODO.md...")
-    local f = io.open("TODO.md", "r")
-    if not f then return end
-    local content = f:read("*a")
+    self:log("Using opencode to import tasks intelligently...", "INFO")
+    self.state.phase = "PLANNING"
+    
+    local model = LLM.get_next_model()
+    local prompt = [[
+Read the TODO.md file and create a JSON list of pending missions.
+For each mission, provide:
+- title: clear mission name
+- priority: critical, high, or medium
+- description: short detail
+
+Return ONLY the JSON in this format:
+{
+  "tasks": [
+    {"title": "...", "priority": "...", "description": "..."}
+  ]
+}
+]]
+    
+    -- Usamos call sem yolo para capturar o output JSON
+    local prompt_file = "/tmp/wiggum_import.txt"
+    local f = io.open(prompt_file, "w")
+    f:write(prompt)
     f:close()
     
-    local tasks = {}
-    for line in content:gmatch("[^\n]+") do
-        if line:find("^%s*-%s*%[%s*%]") then
-            local title = line:gsub("^%s*-%s*%[%s*%]%s*", ""):gsub("%s+", " ")
-            table.insert(tasks, {
-                id = "task_" .. string.format("%04d", #tasks + 1),
-                title = title,
-                status = "pending",
-                priority = (line:find("🚨") or line:find("critical")) and "critical" or "medium",
-                attempts = 0
-            })
+    local cmd = 'opencode run --model "' .. model .. '" --file "' .. prompt_file .. '" --file "TODO.md"'
+    local handle = io.popen(cmd)
+    local output = handle:read("*a")
+    handle:close()
+    
+    local json_str = output:match("({.*})")
+    if json_str then
+        local data = Json.parse(json_str)
+        if data and data.tasks then
+            self.state.tasks = {}
+            for i, t in ipairs(data.tasks) do
+                t.id = "task_" .. string.format("%04d", i)
+                t.status = "pending"
+                t.attempts = 0
+                table.insert(self.state.tasks, t)
+            end
+            self:save_state()
+            self:log("Imported " .. #self.state.tasks .. " missions via opencode.")
         end
+    else
+        self:log("Failed to parse missions from opencode. Check TODO.md manually.", "ERROR")
     end
-    self.state.tasks = tasks
-    self.state.phase = "PLANNING"
-    self:save_state()
-    self:log("Imported " .. #tasks .. " tasks.")
+    os.remove(prompt_file)
 end
 
 function Wiggum:run_build(max_iters, concurrency)
@@ -133,15 +158,26 @@ function Wiggum:run_build(max_iters, concurrency)
         self:log("🏃 Step " .. marathon_count .. " | Task: " .. task.title .. " (" .. model .. ")")
         
         local prompt = string.format([[
-Project: FKernel
-Task: %s
-Rules: Object Calisthenics, Result<T, Error>, One class per file.
-Validation: Must pass 'xmake -bv' and 'xmake run Test'.
-]], task.title)
+MISSION:
+Implement the following feature in FKernel: %s
+Description: %s
 
+CONSTRAINTS:
+1. One class per file. Deep domain structure (e.g. Src/Kernel/Net/Ipv4/...).
+2. Object Calisthenics.
+3. No 'else', use early returns.
+4. Use Result<T, Error> for all fallible functions.
+
+INSTRUCTIONS:
+- You MUST create or update the necessary files.
+- You MUST use the available tools to verify that the kernel still compiles.
+- When finished, ensure 'xmake -bv' succeeds.
+]], task.title, task.description or "")
+
+        -- O LLM.call agora executa o agente e retorna se o processo terminou ok
         LLM.call(model, prompt)
         
-        self:log("Validating " .. task.id)
+        self:log("Validating current repository state for " .. task.id)
         local build_ok = RunCommand("xmake -bv 2>&1")
         local test_ok = build_ok and RunCommand("xmake run Test 2>&1")
 
@@ -165,7 +201,6 @@ Validation: Must pass 'xmake -bv' and 'xmake run Test'.
         self.state.iteration = marathon_count
         self:save_state()
         
-        -- Pequena pausa para permitir interrupção via Ctrl+C entre tarefas
         local _, reason = os.execute("sleep 1")
         if reason == "signal" then
             self:log("Marathon interrupted by user.", "INFO")
@@ -179,42 +214,22 @@ end
 
 function Wiggum:analyze()
     self.state.phase = "ANALYZING"
-    self:log("Analyzing codebase...")
-    local build_status = RunCommand("xmake build -q") and "✅" or "❌"
-    local report = {
-        timestamp = os.date("%Y-%m-%dT%H:%M:%SZ"),
-        sections = {
-            { name = "Build", status = build_status, details = "Kernel compilation" },
-            { name = "Test", status = "📊", details = "Live test results" }
-        }
-    }
+    self:log("Using opencode to analyze codebase and sync TODO.md...", "INFO")
     
-    -- Sync TODO.md
-    local f = io.open("TODO.md", "r")
-    if f then
-        local lines = {}
-        for line in f:lines() do
-            local updated = line
-            for _, t in ipairs(self.state.tasks) do
-                if t.status == "completed" then
-                    local esc = t.title:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
-                    updated = updated:gsub("%%- %[ %] " .. esc, "- [x] " .. t.title)
-                end
-            end
-            table.insert(lines, updated)
-        end
-        f:close()
-        local fw = io.open("TODO.md", "w")
-        fw:write(table.concat(lines, "\n"))
-        fw:close()
-    end
+    local model = LLM.get_next_model()
+    local prompt = [[
+Analyze the current state of the FKernel project and the pending tasks in TODO.md.
+Check which tasks are actually implemented and which are missing.
+Update the TODO.md file by marking completed tasks with [x] and adding any necessary sub-tasks or quality warnings based on the current code.
+Finally, provide a short summary of the project health.
+]]
     
-    local fr = io.open(RALPH_DIR .. "/analysis_report.json", "w")
-    fr:write(Json.encode(report))
-    fr:close()
+    -- Aqui usamos o LLM.call em modo YOLO para que o agente possa editar o TODO.md e analisar arquivos
+    LLM.call(model, prompt)
     
     self.state.phase = "IDLE"
     self:save_state()
+    self:log("Analysis and sync complete.")
 end
 
 local args = {...}
@@ -234,7 +249,7 @@ elseif cmd == "build" then
 elseif cmd == "analyze" then
     Wiggum:analyze()
 elseif cmd == "status" then
-    print("Ralph Wiggum v3.0 (Marathon Mode)")
+    print("Ralph Wiggum v3.2 (Super-Agent Mode)")
     print("Phase: " .. Wiggum.state.phase)
     print("Tasks: " .. #Wiggum.state.tasks)
 else
