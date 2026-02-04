@@ -1,23 +1,27 @@
 {
-  "iteration": 0,
-  "last_updated": "2026-02-04T03:49:09Z",
-  "model_usage": [
-
-  ],
+  "current_model": "opencode/minimax-m2.1-free",
+  "iteration": 1,
+  "last_updated": "2026-02-04T03:49:15Z",
+  "model_usage": {
+    "opencode/minimax-m2.1-free": {
+      "count": 1,
+      "last_reset": 1770187749
+    }
+  },
   "phase": "BUILDING",
   "tasks": [
     {
       "attempts": 1,
       "id": "task_0001",
       "priority": "medium",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Interrupt-driven I/O"
     },
     {
-      "attempts": 0,
+      "attempts": 1,
       "id": "task_0002",
       "priority": "medium",
-      "status": "pending",
+      "status": "in_progress",
       "title": "NCQ support (AHCI)"
     },
     {
