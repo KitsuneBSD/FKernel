@@ -34,10 +34,34 @@ end
 
 local function format_tasks(tasks)
     local stats = { pending = 0, completed = 0, failed = 0, blocked = 0, in_progress = 0 }
+    local current_task_info = ""
     local blockers = {}
+    
     for _, t in ipairs(tasks or {}) do
         local status = t.status or "pending"
         stats[status] = (stats[status] or 0) + 1
+        
+        if status == "in_progress" then
+            local sub_progress = ""
+            if t.subtasks and #t.subtasks > 0 then
+                local done = 0
+                for _, st in ipairs(t.subtasks) do
+                    if st.status == "completed" then done = done + 1 end
+                end
+                sub_progress = string.format(" [%d/%d subtasks]", done, #t.subtasks)
+                
+                -- Add subtasks list
+                local sub_list = {}
+                for i, st in ipairs(t.subtasks) do
+                    local symbol = st.status == "completed" and "✅" or (st.status == "failed" and "❌" or "⏳")
+                    table.insert(sub_list, string.format("   %s %s", symbol, st.title:sub(1, 30)))
+                end
+                current_task_info = "\n\nCURRENT TASK: " .. t.title .. sub_progress .. "\n" .. table.concat(sub_list, "\n")
+            else
+                current_task_info = "\n\nCURRENT TASK: " .. t.title .. " (Planning...)"
+            end
+        end
+        
         if status == "blocked" then
             table.insert(blockers, "! " .. t.id .. ": " .. (t.feedback or "No info"):sub(1, 40))
         end
@@ -46,10 +70,12 @@ local function format_tasks(tasks)
     local line1 = string.format("Tasks: %d Done | %d Work | %d Pend | %d Block", 
         stats.completed or 0, stats.in_progress or 0, stats.pending or 0, stats.blocked or 0)
     
+    local output = line1 .. current_task_info
+    
     if #blockers > 0 then
-        line1 = line1 .. "\n\nBlockers:\n" .. table.concat(blockers, "\n")
+        output = output .. "\n\nBlockers:\n" .. table.concat(blockers, "\n")
     end
-    return line1
+    return output
 end
 
 -- Limpa a tela ao sair
@@ -68,6 +94,7 @@ while true do
         "Status: " .. (state.phase or "IDLE"):upper(),
         "Iters:  " .. (state.iteration or 0),
         "Model:  " .. (state.current_model or "None"):gsub("opencode/", ""),
+        "Sub:    " .. (state.current_subtask or "None"),
         "",
         format_tasks(state.tasks),
         "",

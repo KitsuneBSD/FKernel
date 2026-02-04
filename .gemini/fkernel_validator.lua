@@ -153,10 +153,11 @@ function validate_file_organization(file_path)
         return false
     end
     
-    -- Verifica se o nome do arquivo corresponde ao tipo principal
-    if total_types == 1 then
-        local file_name = file_path:match("([^/]+)%.%w+$"):gsub("%.%w+$", "")
-        -- Implementar verificação de nome se necessário
+    -- Verifica se o nome do arquivo segue snake_case
+    local file_name = file_path:match("([^/]+)%.%w+$")
+    if file_name and (file_name:match("%u") or file_name:match("%-")) then
+        print(string.format("ERRO: %s não segue snake_case (encontrado CamelCase ou hifens)", file_path))
+        return false
     end
     
     return true

@@ -131,8 +131,8 @@ Physical::free_page(page);
 - **🔑 SECRET RULE: ONE STRUCT/CLASS PER FILE** - This is non-negotiable and must be enforced
 - **Directories:** PascalCase representing **domains**  
   - Examples: `Kernel`, `Driver`, `PhysicalMemory`, `VirtualMemory`, `Syscall`  
-- **Files:** camel-case, **exactly one** struct/class per file  
-  - Examples: `cpuContext.h` (contains ONLY CpuContext), `ataController.cpp` (contains ONLY AtaController)  
+- **Files:** snake_case, **exactly one** struct/class per file  
+  - Examples: `cpu_context.h` (contains ONLY CpuContext), `ata_controller.cpp` (contains ONLY AtaController)  
 - **Domain-based organization**: Each directory represents a **cohesive domain** with clear boundaries
 - **Single responsibility**: Each file represents **exactly one concept/responsibility**
 - **Deep autodocumentation**: Structure should be self-evident from directory/file names alone
@@ -781,6 +781,18 @@ auto page = TRY(Physical::allocate_page());
 ```
 
 **This rule eliminates code duplication and ensures algorithm consistency across FKernel.**
+
+### 16. Ralph Wiggum Commit Policy
+
+- **Intermediate Commits (Subtasks)**: Every sub-step commit MUST be prefixed with `ralph -`.
+  - Format: `ralph - <conventional-commit-type>(<scope>): <description>`
+- **Final Task Commit**: When a task is fully completed, all intermediate `ralph -` commits are squashed.
+  - Action: `git reset --soft` -> `git stash` -> `git stash pop` -> `git commit`.
+  - Format: Strictly conventional commit WITHOUT the `ralph -` prefix.
+
+---
+
+**This rule ensures a clean Git history while tracking progress during development.**
 
 #### Memory Structure Requirements
 
