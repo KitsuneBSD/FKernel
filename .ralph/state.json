@@ -1,8 +1,12 @@
 {
-  "current_model": "opencode/kimi-k2.5-free",
-  "iteration": 3,
-  "last_updated": "2026-02-04T03:49:26Z",
+  "current_model": "opencode/glm-4.7-free",
+  "iteration": 4,
+  "last_updated": "2026-02-04T03:49:31Z",
   "model_usage": {
+    "opencode/glm-4.7-free": {
+      "count": 1,
+      "last_reset": 1770187766
+    },
     "opencode/kimi-k2.5-free": {
       "count": 1,
       "last_reset": 1770187761
@@ -43,14 +47,14 @@
       "attempts": 1,
       "id": "task_0004",
       "priority": "medium",
-      "status": "in_progress",
+      "status": "completed",
       "title": "TCP/IP stack (IPv4, TCP, UDP, ARP, ICMP)"
     },
     {
-      "attempts": 0,
+      "attempts": 1,
       "id": "task_0005",
       "priority": "medium",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Socket extensions (AF_INET)"
     },
     {
