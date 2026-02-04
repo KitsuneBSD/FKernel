@@ -7,4 +7,5 @@ doxyfile
 logs
 ./Toolchain
 .ralph
+.ralph/state.json
 .ralph/*
