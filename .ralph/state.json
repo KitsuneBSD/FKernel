@@ -1,14 +1,14 @@
 {
-  "current_model": "opencode/trinity-large-preview-free",
-  "iteration": 6,
-  "last_updated": "2026-02-04T03:49:41Z",
+  "current_model": "opencode/glm-4.7-free",
+  "iteration": 8,
+  "last_updated": "2026-02-04T03:49:52Z",
   "model_usage": {
     "opencode/glm-4.7-free": {
-      "count": 1,
+      "count": 2,
       "last_reset": 1770187766
     },
     "opencode/kimi-k2.5-free": {
-      "count": 1,
+      "count": 2,
       "last_reset": 1770187761
     },
     "opencode/minimax-m2.1-free": {
@@ -68,21 +68,21 @@
       "attempts": 1,
       "id": "task_0007",
       "priority": "medium",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Corrigir classes >200 linhas"
     },
     {
-      "attempts": 0,
+      "attempts": 1,
       "id": "task_0008",
       "priority": "medium",
-      "status": "pending",
+      "status": "completed",
       "title": "Eliminar 92+ violações \"else {\""
     },
     {
-      "attempts": 0,
+      "attempts": 1,
       "id": "task_0009",
       "priority": "medium",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Corrigir 122 violações method chaining"
     },
     {
