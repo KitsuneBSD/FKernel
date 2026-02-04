@@ -85,6 +85,16 @@ function Wiggum:import_tasks()
 end
 
 function Wiggum:run_build(max_iters, concurrency)
+    -- Check for dirty working directory
+    local status = io.popen("git status --porcelain"):read("*a")
+    if status ~= "" then
+        self:log("Working directory is dirty! Commit your infrastructure changes first.", "ERROR")
+        print("\n❌ ERROR: Working directory is dirty.")
+        print("The agent cannot start because it might commit your local changes as part of a feature.")
+        print("Please commit or stash your changes (Meta/, .ralph/, etc.) and try again.\n")
+        return
+    end
+
     self.state.phase = "BUILDING"
     local base_branch = Git.get_current_branch()
     local wiggum_branch = Git.get_wiggum_branch_name(base_branch)
