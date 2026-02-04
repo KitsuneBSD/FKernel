@@ -36,14 +36,15 @@ local function format_tasks(tasks)
     local stats = { pending = 0, completed = 0, failed = 0, blocked = 0, in_progress = 0 }
     local blockers = {}
     for _, t in ipairs(tasks or {}) do
-        stats[t.status] = (stats[t.status] or 0) + 1
-        if t.status == "blocked" then
+        local status = t.status or "pending"
+        stats[status] = (stats[status] or 0) + 1
+        if status == "blocked" then
             table.insert(blockers, "! " .. t.id .. ": " .. (t.feedback or "No info"):sub(1, 40))
         end
     end
     
     local line1 = string.format("Tasks: %d Done | %d Work | %d Pend | %d Block", 
-        stats.completed, stats.in_progress, stats.pending, stats.blocked)
+        stats.completed or 0, stats.in_progress or 0, stats.pending or 0, stats.blocked or 0)
     
     if #blockers > 0 then
         line1 = line1 .. "\n\nBlockers:\n" .. table.concat(blockers, "\n")
@@ -51,8 +52,15 @@ local function format_tasks(tasks)
     return line1
 end
 
+-- Limpa a tela ao sair
+local function cleanup()
+    os.execute("clear")
+    print("Dashboard closed.")
+end
+
 while true do
-    local state = Json.parse(read_file(STATE_PATH) or "{}") or {}
+    local state_raw = read_file(STATE_PATH)
+    local state = Json.parse(state_raw or "{}") or {}
     local report = Json.parse(read_file(REPORT_PATH) or "{}") or {}
     
     local view = {
@@ -73,9 +81,22 @@ while true do
     table.insert(view, "")
     table.insert(view, format_usage(state.model_usage))
     
+    local content = table.concat(view, "\n")
     local cmd = string.format('dialog --backtitle "FKernel - Ralph Wiggum Dashboard" ' ..
                               '--title "Live Monitor" ' ..
-                              '--infobox "%s" 24 78', table.concat(view, "\n"))
-    os.execute(cmd)
-    os.execute("sleep 2")
+                              '--infobox "%s" 24 78', content)
+    
+    -- Executa o dialog e verifica se foi interrompido
+    local ok, reason, code = os.execute(cmd)
+    if reason == "signal" then 
+        cleanup()
+        break 
+    end
+    
+    -- Sleep de 2 segundos, mas permite interrupção
+    local ok_sleep, reason_sleep = os.execute("sleep 2")
+    if reason_sleep == "signal" then
+        cleanup()
+        break
+    end
 end

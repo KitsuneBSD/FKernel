@@ -1,6 +1,6 @@
 --[[
     Meta/wiggum.lua - Ralph Wiggum Autonomous Coding Agent for FKernel
-    (Modular, Hardened & Agentic version)
+    (Modular, Hardened, Agentic & Marathon version)
 --]]
 
 require("Meta.Lib.os_interact")
@@ -44,7 +44,7 @@ function Wiggum:load_state()
         if parsed then 
             self.state = parsed 
         else
-            self:log("Failed to parse state.json, using defaults", "WARNING")
+            self:log("Failed to parse state.json", "WARNING")
         end
     end
 end
@@ -52,7 +52,7 @@ end
 function Wiggum:save_state()
     os.execute("mkdir -p " .. RALPH_DIR)
     self.state.last_updated = os.date("%Y-%m-%dT%H:%M:%SZ")
-    self.state.model_usage = LLM.usage -- Sincroniza uso de tokens
+    self.state.model_usage = LLM.usage 
     local f = io.open(RALPH_DIR .. "/state.json", "w")
     f:write(Json.encode(self.state))
     f:close()
@@ -85,13 +85,12 @@ function Wiggum:import_tasks()
 end
 
 function Wiggum:run_build(max_iters, concurrency)
-    -- Check for dirty working directory
-    local status = io.popen("git status --porcelain"):read("*a")
+    local status_handle = io.popen("git status --porcelain")
+    local status = status_handle:read("*a")
+    status_handle:close()
+    
     if status ~= "" then
-        self:log("Working directory is dirty! Commit your infrastructure changes first.", "ERROR")
-        print("\n❌ ERROR: Working directory is dirty.")
-        print("The agent cannot start because it might commit your local changes as part of a feature.")
-        print("Please commit or stash your changes (Meta/, .ralph/, etc.) and try again.\n")
+        self:log("Working directory is dirty! Commit changes before marathon.", "ERROR")
         return
     end
 
@@ -108,14 +107,21 @@ function Wiggum:run_build(max_iters, concurrency)
         return
     end
 
-    for i = 1, max_iters do
+    local marathon_count = 0
+    while true do
+        if max_iters and marathon_count >= max_iters then break end
+
         local task = nil
         for _, t in ipairs(self.state.tasks) do
             if t.status == "pending" then task = t; break end
         end
 
-        if not task then break end
+        if not task then 
+            self:log("🏁 MARATHON COMPLETE", "INFO")
+            break 
+        end
 
+        marathon_count = marathon_count + 1
         task.status = "in_progress"
         task.attempts = (task.attempts or 0) + 1
         self:save_state()
@@ -124,88 +130,101 @@ function Wiggum:run_build(max_iters, concurrency)
         self.state.current_model = model
         LLM.wait_if_needed(model)
 
-        self:log("Starting mission: " .. task.title .. " with " .. model)
+        self:log("🏃 Step " .. marathon_count .. " | Task: " .. task.title .. " (" .. model .. ")")
         
         local prompt = string.format([[
-Mission: %s
+Project: FKernel
+Task: %s
 Rules: Object Calisthenics, Result<T, Error>, One class per file.
-Objective: Implement and ensure 'xmake -bv' and 'xmake run Test' pass.
+Validation: Must pass 'xmake -bv' and 'xmake run Test'.
 ]], task.title)
 
-        local output = LLM.call(model, prompt)
+        LLM.call(model, prompt)
         
-        self:log("Validation phase for " .. task.id)
-        if RunCommand("xmake -bv 2>&1") and RunCommand("xmake run Test 2>&1") then
+        self:log("Validating " .. task.id)
+        local build_ok = RunCommand("xmake -bv 2>&1")
+        local test_ok = build_ok and RunCommand("xmake run Test 2>&1")
+
+        if build_ok and test_ok then
             task.status = "completed"
+            task.feedback = nil
             Git.commit("feat: " .. task.title)
-            self:log("Task " .. task.id .. " SUCCESS", "INFO")
+            self:log("✅ Task SUCCESS", "INFO")
         else
-            if task.attempts >= 3 then
+            if (task.attempts or 0) >= 3 then
                 task.status = "blocked"
-                task.feedback = "Failed after 3 attempts with different models."
+                task.feedback = "Failed 3 models."
+                self:log("🛑 Task BLOCKED", "ERROR")
             else
                 task.status = "pending"
-                os.execute("git checkout .") -- Cleanup
+                os.execute("git checkout .") 
+                self:log("🔄 Task FAILED. Cleaning up...", "WARNING")
             end
-            self:log("Task " .. task.id .. " FAILED/RETRY", "WARNING")
         end
-        self.state.iteration = self.state.iteration + 1
+        
+        self.state.iteration = marathon_count
         self:save_state()
+        
+        -- Pequena pausa para permitir interrupção via Ctrl+C entre tarefas
+        local _, reason = os.execute("sleep 1")
+        if reason == "signal" then
+            self:log("Marathon interrupted by user.", "INFO")
+            break
+        end
     end
+    
     self.state.phase = "IDLE"
     self:save_state()
 end
 
 function Wiggum:analyze()
     self.state.phase = "ANALYZING"
-    self:log("Performing full codebase analysis...")
-    
+    self:log("Analyzing codebase...")
+    local build_status = RunCommand("xmake build -q") and "✅" or "❌"
     local report = {
         timestamp = os.date("%Y-%m-%dT%H:%M:%SZ"),
         sections = {
-            { name = "Build", status = RunCommand("xmake build -q") and "✅" or "❌", details = "Kernel compilation" },
-            { name = "Tests", status = "📊", details = "Check dashboard for coverage" }
+            { name = "Build", status = build_status, details = "Kernel compilation" },
+            { name = "Test", status = "📊", details = "Live test results" }
         }
     }
     
     -- Sync TODO.md
     local f = io.open("TODO.md", "r")
-    local lines = {}
-    for line in f:lines() do
-        local updated = line
-        for _, t in ipairs(self.state.tasks) do
-            if t.status == "completed" then
-                local escaped = t.title:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
-                updated = updated:gsub("%%- %[ %] " .. escaped, "- [x] " .. t.title)
+    if f then
+        local lines = {}
+        for line in f:lines() do
+            local updated = line
+            for _, t in ipairs(self.state.tasks) do
+                if t.status == "completed" then
+                    local esc = t.title:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+                    updated = updated:gsub("%%- %[ %] " .. esc, "- [x] " .. t.title)
+                end
             end
+            table.insert(lines, updated)
         end
-        table.insert(lines, updated)
+        f:close()
+        local fw = io.open("TODO.md", "w")
+        fw:write(table.concat(lines, "\n"))
+        fw:close()
     end
-    f:close()
     
-    local f2 = io.open("TODO.md", "w")
-    f2:write(table.concat(lines, "\n"))
-    f2:close()
-    
-    local f3 = io.open(RALPH_DIR .. "/analysis_report.json", "w")
-    f3:write(Json.encode(report))
-    f3:close()
+    local fr = io.open(RALPH_DIR .. "/analysis_report.json", "w")
+    fr:write(Json.encode(report))
+    fr:close()
     
     self.state.phase = "IDLE"
     self:save_state()
-    self:log("Analysis complete and TODO.md synced.")
 end
 
--- Entry Point
 local args = {...}
 local cmd = args[1] or "status"
-
 Wiggum:load_state()
 
 if cmd == "import" then
     Wiggum:import_tasks()
 elseif cmd == "build" then
-    local iters = tonumber(args[2]) or 1
+    local iters = tonumber(args[2]) or 999
     local concurrency = 1
     if args[2] == "--parallel" then
         concurrency = tonumber(args[3]) or 2
@@ -215,7 +234,7 @@ elseif cmd == "build" then
 elseif cmd == "analyze" then
     Wiggum:analyze()
 elseif cmd == "status" then
-    print("Ralph Wiggum Status:")
+    print("Ralph Wiggum v3.0 (Marathon Mode)")
     print("Phase: " .. Wiggum.state.phase)
     print("Tasks: " .. #Wiggum.state.tasks)
 else
