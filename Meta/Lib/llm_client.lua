@@ -2,9 +2,9 @@
 
 local LLMClient = {
     models = {
-        ["opencode/minimax-m2.1-free"] = { rpm = 2, priority = 1 },
-        ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 2, variant = "high" },
-        ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 3, variant = "high" },
+        ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 1, variant = "high" },
+        ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 2, variant = "high" },
+        ["opencode/minimax-m2.1-free"] = { rpm = 2, priority = 3 },
         ["opencode/glm-4.7-free"] = { rpm = 2, priority = 4 },
     },
     usage = {},
@@ -12,9 +12,9 @@ local LLMClient = {
 }
 
 local MODEL_LIST = {
-    "opencode/minimax-m2.1-free",
     "opencode/trinity-large-preview-free",
     "opencode/kimi-k2.5-free",
+    "opencode/minimax-m2.1-free",
     "opencode/glm-4.7-free"
 }
 
@@ -34,18 +34,17 @@ function LLMClient.call(model_id, prompt)
     local model_cfg = LLMClient.models[model_id] or {}
     local variant_flag = ""
     if model_cfg.variant then
-        variant_flag = ' --variant "' .. model_cfg.variant .. '"'
+        variant_flag = '--variant ' .. model_cfg.variant
     end
 
-    -- YOLO MODE ATIVADO: --yolo auto-aprova todas as ferramentas
-    local cmd = 'opencode run --yolo --model "' .. model_id .. '"' ..
-                ' --file "' .. prompt_file .. '"' ..
-                ' --file "GEMINI.md"' ..
-                ' --file "AGENTS.md"' ..
-                variant_flag ..
-                ' --log-level WARN'
+    -- Removida a flag -y/--yolo pois não é suportada nesta versão
+    -- A instrução principal é o primeiro argumento posicional
+    local cmd = string.format(
+        'opencode run "Execute the mission in the attached file." -m %s -f %s -f GEMINI.md -f AGENTS.md %s --log-level WARN',
+        model_id, prompt_file, variant_flag
+    )
     
-    print("\n🚀 Ralph is launching Agent in YOLO MODE...")
+    print("\n🚀 Ralph is launching Agent...")
     local success = os.execute(cmd)
     
     os.remove(prompt_file)
