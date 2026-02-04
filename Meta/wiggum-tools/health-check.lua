@@ -5,8 +5,11 @@ local LLM = require("Meta.Lib.llm_client")
 print("🔍 Checking Ralph Wiggum Integrity...")
 
 -- 1. Lib Check
-print("- JsonUtils: " .. (type(Json.parse) == "function" and "✅" or "❌"))
-print("- LLMClient: " .. (type(LLM.call) == "function" and "✅" or "❌"))
+local has_json = type(Json.parse) == "function"
+local has_llm = type(LLM.call) == "function"
+
+print("- JsonUtils: " .. (has_json and "✅" or "❌"))
+print("- LLMClient: " .. (has_llm and "✅" or "❌"))
 
 -- 2. OpenCode Check
 print("- OpenCode Connectivity: ")
@@ -21,5 +24,4 @@ end
 os.execute("mkdir -p .ralph/logs")
 print("- Logs Directory: ✅")
 
-print("
-All systems nominal.")
+print("\nAll systems nominal.")
