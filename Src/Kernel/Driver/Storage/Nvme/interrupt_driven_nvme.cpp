@@ -1,7 +1,10 @@
 #include <Kernel/Driver/Storage/Nvme/interrupt_driven_nvme.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_command_builder.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_completion_processor.h>
+#include <Kernel/Driver/Storage/Nvme/nvme_interrupt_configurator.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_interrupt_handler.h>
+#include <Kernel/Driver/Storage/Nvme/nvme_queue_setup.h>
+#include <Kernel/Driver/Storage/Nvme/nvme_register_mapper.h>
 #include <Kernel/Hardware/Pci/pci.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
@@ -42,22 +45,8 @@ InterruptDrivenNvmeController::initialize_interrupt_driven() {
 }
 
 fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::map_controller_registers() {
-  PciDevice& device = m_state.device();
-  uint32_t bar0 = PciManager::the().read_config_dword(device.address(), 0x10);
-  if ((bar0 & 0x01) != 0) {
-    fk::algorithms::kerror("NVMe-INT", "IO space BAR not supported");
-    return fk::core::Error::InvalidParameter;
-  }
-  uintptr_t phys_addr = bar0 & ~0xFu;
-  MemoryManager::the().map_page(
-      phys_addr, phys_addr, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
-  NvmeRegisterAccess new_access(phys_addr);
-  m_state.set_register_access(new_access);
-  m_state.configuration().set_controller_page_size(new_access.get_page_size());
-  uint32_t cmd = PciManager::the().read_config_dword(device.address(), 0x04);
-  PciManager::the().write_config_dword(device.address(), 0x04, cmd | 0x06);
-  fk::algorithms::klog("NVMe-INT", "Registers mapped");
-  return {};
+  NvmeRegisterMapper mapper(m_state);
+  return mapper.map_registers();
 }
 
 fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::configure_controller() {
@@ -65,11 +54,8 @@ fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::configure
 }
 
 fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::setup_queues() {
-  return setup_admin_queue();
-}
-
-fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::setup_admin_queue() {
-  return m_state.queue_manager().setup_admin_queue();
+  NvmeQueueSetup queue_setup(m_state);
+  return queue_setup.setup_queues();
 }
 
 fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::identify_namespace() {
@@ -77,13 +63,8 @@ fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::identify_
 }
 
 fk::core::Result<void, fk::core::Error> InterruptDrivenNvmeController::enable_interrupts() {
-  PciDevice& device = m_state.device();
-  uint32_t interrupt_line = PciManager::the().read_config_byte(device.address(), 0x3C);
-  m_state.set_interrupt_line(interrupt_line);
-  m_state.register_access().write_intms(0xFFFFFFFF);
-  m_state.enable_interrupts();
-  fk::algorithms::klog("NVMe-INT", "IRQ %d enabled", interrupt_line);
-  return {};
+  NvmeInterruptConfigurator configurator(m_state);
+  return configurator.configure_interrupts();
 }
 
 void InterruptDrivenNvmeController::handle_interrupt() {
@@ -111,29 +92,53 @@ InterruptDrivenNvmeController::submit_read_async(uint64_t start_lba, uint32_t bl
   uint16_t command_id = m_state.command_id_manager().allocate();
   if (command_id == 0xFFFF)
     return fk::core::Error::DeviceBusy;
-  auto* operation = new NvmeAsyncOperation(command_id, start_lba, block_count, buffer, false);
-  if (!operation) {
+
+  auto operation_result = create_read_operation(command_id, start_lba, block_count, buffer);
+  if (operation_result.is_error()) {
     m_state.command_id_manager().release(command_id);
-    return fk::core::Error::OutOfMemory;
+    return operation_result.error();
   }
+
+  auto* operation = operation_result.value();
   m_state.pending_operations().add(operation);
-  uint64_t prp1 = MemoryManager::the().translate(reinterpret_cast<uintptr_t>(buffer));
-  uint32_t transfer_size = block_count * m_state.configuration().block_size();
-  if (transfer_size > 4096) {
-    fk::algorithms::kerror("NVMe-INT", "Large xfer not supported");
-    m_state.command_id_manager().release(command_id);
-    return fk::core::Error::NotImplemented;
-  }
-  NvmeCommand cmd = NvmeCommandBuilder::build_read(start_lba, block_count, prp1, 0,
-                                                   m_state.configuration().namespace_id());
-  cmd.cdw0 |= (command_id & 0xFFFF) << 16;
-  auto submit_result = submit_io_command(cmd);
+
+  auto submit_result = submit_read_command(operation);
   if (submit_result.is_error()) {
     m_state.command_id_manager().release(command_id);
     return submit_result.error();
   }
+
   fk::algorithms::klog("NVMe-INT", "Read: cmd=%d, lba=%ld", command_id, start_lba);
   return operation;
+}
+
+fk::core::Result<NvmeAsyncOperation*, fk::core::Error>
+InterruptDrivenNvmeController::create_read_operation(uint16_t command_id, uint64_t start_lba,
+                                                     uint32_t block_count, uint8_t* buffer) {
+  auto* operation = new NvmeAsyncOperation(command_id, start_lba, block_count, buffer, false);
+  if (!operation)
+    return fk::core::Error::OutOfMemory;
+  return operation;
+}
+
+fk::core::Result<void, fk::core::Error>
+InterruptDrivenNvmeController::submit_read_command(NvmeAsyncOperation* operation) {
+  uint64_t prp1 = MemoryManager::the().translate(reinterpret_cast<uintptr_t>(operation->buffer()));
+  uint32_t transfer_size = operation->block_count() * m_state.configuration().block_size();
+  if (transfer_size > 4096) {
+    fk::algorithms::kerror("NVMe-INT", "Large xfer not supported");
+    return fk::core::Error::NotImplemented;
+  }
+
+  NvmeCommand cmd = NvmeCommandBuilder::build_read(operation->start_lba(), operation->block_count(),
+                                                   prp1, 0, m_state.configuration().namespace_id());
+  cmd.cdw0 |= (operation->command_id() & 0xFFFF) << 16;
+
+  auto submit_result = submit_io_command(cmd);
+  if (submit_result.is_error())
+    return submit_result.error();
+
+  return {};
 }
 
 fk::core::Result<size_t, fk::core::Error>
