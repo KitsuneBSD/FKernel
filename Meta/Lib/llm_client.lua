@@ -2,10 +2,10 @@
 
 local LLMClient = {
   models = {
-    ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 1, variant = "high" },
-    --  ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 2, variant = "high" },
-    -- ["opencode/minimax-m2.1-free"] = { rpm = 2, priority = 3 },
-    -- ["opencode/glm-4.7-free"] = { rpm = 2, priority = 4 },
+    ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 1 },
+    ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 2, variant = "high" },
+    ["opencode/minimax-m2.1-free"] = { rpm = 2, priority = 3 },
+    ["opencode/glm-4.7-free"] = { rpm = 2, priority = 4 },
   },
   usage = {},
   last_model_index = 0
@@ -13,13 +13,13 @@ local LLMClient = {
 
 local MODEL_LIST = {
   "opencode/trinity-large-preview-free",
-  -- "opencode/kimi-k2.5-free",
-  -- "opencode/minimax-m2.1-free",
-  -- "opencode/glm-4.7-free"
+  "opencode/kimi-k2.5-free",
+  "opencode/minimax-m2.1-free",
+  "opencode/glm-4.7-free"
 }
 
 function LLMClient.get_next_model()
-  LLMClient.last_model_index = 0 --(LLMClient.last_model_index % #MODEL_LIST) + 1
+  LLMClient.last_model_index = (LLMClient.last_model_index % #MODEL_LIST) + 1
   return MODEL_LIST[LLMClient.last_model_index]
 end
 
