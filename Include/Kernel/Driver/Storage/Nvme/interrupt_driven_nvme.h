@@ -3,23 +3,13 @@
 #include <Kernel/Driver/Storage/Nvme/nvme_async_operation.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_command.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_controller_state.h>
+#include <Kernel/Driver/Storage/Nvme/nvme_interrupt_line.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
 #include <LibFK/Core/Result.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
 
 namespace fkernel {
-
-class NvmeInterruptLine {
-public:
-  explicit NvmeInterruptLine(uint32_t line) : m_line(line) {}
-
-  uint32_t value() const { return m_line; }
-  bool is_valid() const { return m_line > 0; }
-
-private:
-  uint32_t m_line;
-};
 
 class InterruptDrivenNvmeController : public fk::memory::RefCounted<InterruptDrivenNvmeController> {
 public:
@@ -48,12 +38,11 @@ private:
   fk::core::Result<void, fk::core::Error> setup_queues();
   fk::core::Result<void, fk::core::Error> identify_namespace();
   fk::core::Result<void, fk::core::Error> enable_interrupts();
-
-  fk::core::Result<void, fk::core::Error> reset_controller();
   fk::core::Result<void, fk::core::Error> setup_admin_queue();
-  fk::core::Result<void, fk::core::Error> setup_io_queues();
 
   fk::core::Result<uint16_t, fk::core::Error> submit_io_command(const NvmeCommand& cmd);
+  fk::core::Result<size_t, fk::core::Error> translate_completion_status(IoCompletionStatus status,
+                                                                        size_t block_count);
 
   fk::core::Result<uintptr_t, fk::core::Error> allocate_dma_memory(size_t size);
   void free_dma_memory(uintptr_t phys_addr, size_t size);
