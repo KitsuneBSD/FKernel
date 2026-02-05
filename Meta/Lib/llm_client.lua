@@ -19,7 +19,7 @@ local MODEL_LIST = {
 }
 
 function LLMClient.get_next_model()
-  LLMClient.last_model_index = (LLMClient.last_model_index % #MODEL_LIST) + 1
+  LLMClient.last_model_index = 0 --(LLMClient.last_model_index % #MODEL_LIST) + 1
   return MODEL_LIST[LLMClient.last_model_index]
 end
 
