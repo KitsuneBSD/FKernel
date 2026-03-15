@@ -68,19 +68,6 @@ namespace fkernel {
 }
 ```
 
-## Ralph Wiggum Commit Policy
-
-### Intermediate Commits (Subtasks)
-- **Prefix**: Every sub-step commit MUST be prefixed with `ralph -`.
-- **Format**: `ralph - <conventional-commit-type>(<scope>): <description>`
-- **Example**: `ralph - feat(memory): implement buddy allocator`
-
-### Final Task Commit
-- **Action**: When a task is fully completed, all intermediate `ralph -` commits are squashed.
-- **Format**: Strictly conventional commit WITHOUT the `ralph -` prefix.
-- **Example**: `feat(memory): comprehensive physical memory management`
-- **Workflow**: `git reset --soft` -> `git stash` -> `git stash pop` -> `git commit`.
-
 ## Mandatory Coding Standards (Object Calisthenics)
 
 ### 1. One Indentation Level Per Method
@@ -418,6 +405,7 @@ Result<Page*, Error> allocate_page();
 ### GEMINI Validation System
 
 The `.gemini/fkernel_validator.lua` enforces:
+
 - **Object Calisthenics**: Automatic validation of all 9 rules
 - **SECRET RULE**: One struct/class per file enforcement
 - **Architecture**: Strict layer separation validation
@@ -497,6 +485,7 @@ xmake validate-tests  # Test coverage only
 ### Configuration
 
 Configuration in `.gemini/settings.json`:
+
 - Object Calisthenics limits (200 lines/class, 20 lines/method, 2 variables)
 - Testing coverage targets (LibC 90%, LibFK 85%, Kernel 75%)
 - Architecture enforcement flags
@@ -519,4 +508,3 @@ Docs/
 ├── Patterns/                  # Design patterns and conventions
 └── Tutorials/                 # Learning materials for developers
 ```
-
