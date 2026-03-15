@@ -1,10 +1,10 @@
 #pragma once
 
+#include <Kernel/Driver/Storage/Nvme/NvmeQueueManager.h>
+#include <Kernel/Driver/Storage/Nvme/NvmeRegisterAccess.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_command_id_manager.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_device_configuration.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_pending_operations.h>
-#include <Kernel/Driver/Storage/Nvme/nvme_queue_manager.h>
-#include <Kernel/Driver/Storage/Nvme/nvme_register_access.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
 
 namespace fkernel {

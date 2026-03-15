@@ -1,5 +1,3 @@
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/task_entries.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/boot_info.h>
@@ -12,10 +10,12 @@
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/task_entries.h>
+#include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Error.h>
 #include <LibFK/Core/Result.h>
-#include <LibC/string.h>
 
 extern "C" void enter_user_mode(uintptr_t rip, uintptr_t rsp);
 
@@ -37,6 +37,8 @@ static bool setup_initial_filesystem() {
   }
 
   auto ramdisk = ramdisk_res.value();
+  // Mount RamDisk at root (read-only base), TmpFs is already mounted as root (writable overlay)
+  // This way: writes go to TmpFs, reads check TmpFs first then fall back to RamDisk
   VirtualFileSystem::the().mount("/", ramdisk);
 
   // Remount DevFs to ensure /dev is populated in the new root
@@ -58,7 +60,8 @@ static bool setup_initial_file_descriptors(Task* current_task) {
   return true;
 }
 
-static fk::core::Result<ElfLoadResult, fk::core::Error> load_init_executable_and_setup_address_space() {
+static fk::core::Result<ElfLoadResult, fk::core::Error>
+load_init_executable_and_setup_address_space() {
   auto init_dentry_res = VirtualFileSystem::the().resolve_path("/sbin/init");
   if (init_dentry_res.is_error()) {
     fk::algorithms::kerror("INIT", "Could not find /sbin/init in VFS");
@@ -142,7 +145,8 @@ extern "C" void init_task_entry() {
 
   auto elf_load_res = load_init_executable_and_setup_address_space();
   if (elf_load_res.is_error()) {
-    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF (Error %d)", (int)elf_load_res.error());
+    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF (Error %d)",
+                           (int)elf_load_res.error());
     while (true)
       asm volatile("hlt");
   }

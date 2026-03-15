@@ -8,7 +8,7 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #endif
 
-SyscallManager &SyscallManager::the() {
+SyscallManager& SyscallManager::the() {
   static SyscallManager instance;
   return instance;
 }
@@ -24,9 +24,8 @@ void SyscallManager::register_syscall(uint64_t num, syscall_function_t fn) {
   }
 }
 
-uint64_t SyscallManager::handle(uint64_t num, uint64_t arg1, uint64_t arg2,
-                                uint64_t arg3, uint64_t arg4, uint64_t arg5,
-                                uint64_t arg6, PtRegs* regs) {
+uint64_t SyscallManager::handle(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
+                                uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs) {
   if (num >= SYS_MAX || !m_syscall_table[num]) {
     return -38; // -ENOSYS
   }
@@ -42,17 +41,19 @@ uint64_t sys_writev(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
 uint64_t sys_lseek(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_exit(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_yield(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_nanosleep(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                       uint64_t, PtRegs*);
+uint64_t sys_nanosleep(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_mkdir(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_getdents64(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                        uint64_t, PtRegs*);
+uint64_t sys_rmdir(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_unlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_creat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_link(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_rename(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_getdents64(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_chdir(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_fork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_mount(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_umount2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t, PtRegs*);
+uint64_t sys_umount2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_execve(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_dup2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_wait4(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -61,56 +62,38 @@ uint64_t sys_munmap(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
 uint64_t sys_brk(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getpid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_gettid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_getppid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t, PtRegs*);
+uint64_t sys_getppid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_geteuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t, PtRegs*);
+uint64_t sys_geteuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getgid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_getegid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t, PtRegs*);
-uint64_t sys_getpgrp(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t, PtRegs*);
+uint64_t sys_getegid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_getpgrp(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_fcntl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_kill(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_sigaction(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                       uint64_t, PtRegs*);
-uint64_t sys_sigprocmask(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                         uint64_t, PtRegs*);
-uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                           uint64_t, PtRegs*);
+uint64_t sys_sigaction(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_sigprocmask(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_rt_sigsuspend(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_stat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_fstat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_lstat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_socket(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_bind(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_connect(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                     uint64_t, PtRegs*);
+uint64_t sys_connect(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_listen(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_accept(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_uname(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_ioctl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getcwd(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
-uint64_t sys_arch_prctl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                        uint64_t, PtRegs*);
-uint64_t sys_set_tid_address(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                             uint64_t, PtRegs*);
-uint64_t sys_clock_gettime(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                           uint64_t, PtRegs*);
-uint64_t sys_gettimeofday(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                          uint64_t, PtRegs*);
-uint64_t sys_exit_group(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                        uint64_t, PtRegs*);
-uint64_t sys_ipc_send(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                      uint64_t, PtRegs*);
-uint64_t sys_ipc_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                         uint64_t, PtRegs*);
-uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                      uint64_t, PtRegs*);
-uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                      uint64_t, PtRegs*);
-uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-                        uint64_t, PtRegs*);
+uint64_t sys_arch_prctl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_set_tid_address(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_clock_gettime(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_gettimeofday(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_exit_group(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_ipc_send(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_ipc_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_pipe(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_poll(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_select(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -119,6 +102,20 @@ uint64_t sys_kevent(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
 uint64_t sys_tty_create_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_tty_delete_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_tty_list_kernel(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_access(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_chmod(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_chown(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_mknod(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_symlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_readlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_setuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_setgid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_setpgid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_getpgid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_getgroups(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_setgroups(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_getrlimit(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_setrlimit(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 }
 
 extern "C" void initialize_syscalls() {
@@ -132,6 +129,11 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_YIELD, sys_yield);
   SyscallManager::the().register_syscall(SYS_NANOSLEEP, sys_nanosleep);
   SyscallManager::the().register_syscall(SYS_MKDIR, sys_mkdir);
+  SyscallManager::the().register_syscall(SYS_RMDIR, sys_rmdir);
+  SyscallManager::the().register_syscall(SYS_UNLINK, sys_unlink);
+  SyscallManager::the().register_syscall(SYS_CREAT, sys_creat);
+  SyscallManager::the().register_syscall(SYS_LINK, sys_link);
+  SyscallManager::the().register_syscall(SYS_RENAME, sys_rename);
   SyscallManager::the().register_syscall(SYS_READDIR, sys_getdents);
   SyscallManager::the().register_syscall(SYS_GETDENTS64, sys_getdents64);
   SyscallManager::the().register_syscall(262, sys_newfstatat); // SYS_NEWFSTATAT
@@ -171,8 +173,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IOCTL, sys_ioctl);
   SyscallManager::the().register_syscall(SYS_GETCWD, sys_getcwd);
   SyscallManager::the().register_syscall(SYS_ARCH_PRCTL, sys_arch_prctl);
-  SyscallManager::the().register_syscall(SYS_SET_TID_ADDRESS,
-                                         sys_set_tid_address);
+  SyscallManager::the().register_syscall(SYS_SET_TID_ADDRESS, sys_set_tid_address);
   SyscallManager::the().register_syscall(SYS_CLOCK_GETTIME, sys_clock_gettime);
   SyscallManager::the().register_syscall(SYS_GETTIMEOFDAY, sys_gettimeofday);
   SyscallManager::the().register_syscall(SYS_EXIT_GROUP, sys_exit_group);
@@ -188,25 +189,36 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_TTY_CREATE, sys_tty_create_kernel);
   SyscallManager::the().register_syscall(SYS_TTY_DELETE, sys_tty_delete_kernel);
   SyscallManager::the().register_syscall(SYS_TTY_LIST, sys_tty_list_kernel);
+  SyscallManager::the().register_syscall(SYS_ACCESS, sys_access);
+  SyscallManager::the().register_syscall(SYS_CHMOD, sys_chmod);
+  SyscallManager::the().register_syscall(SYS_CHOWN, sys_chown);
+  SyscallManager::the().register_syscall(SYS_MKNOD, sys_mknod);
+  SyscallManager::the().register_syscall(SYS_SYMLINK, sys_symlink);
+  SyscallManager::the().register_syscall(SYS_READLINK, sys_readlink);
+  SyscallManager::the().register_syscall(SYS_SETUID, sys_setuid);
+  SyscallManager::the().register_syscall(SYS_SETGID, sys_setgid);
+  SyscallManager::the().register_syscall(SYS_SETPGID, sys_setpgid);
+  SyscallManager::the().register_syscall(SYS_GETPGID, sys_getpgid);
+  SyscallManager::the().register_syscall(SYS_GETGROUPS, sys_getgroups);
+  SyscallManager::the().register_syscall(SYS_SETGROUPS, sys_setgroups);
+  SyscallManager::the().register_syscall(SYS_GETRLIMIT, sys_getrlimit);
+  SyscallManager::the().register_syscall(SYS_SETRLIMIT, sys_setrlimit);
 }
-extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1,
-                                       uint64_t arg2, uint64_t arg3,
-                                       uint64_t arg4, uint64_t arg5,
-                                       uint64_t arg6, PtRegs* regs) {
-  auto *task = SchedulerManager::the().current();
+extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
+                                       uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs) {
+  auto* task = SchedulerManager::the().current();
 
-  uint64_t result =
-      SyscallManager::the().handle(num, arg1, arg2, arg3, arg4, arg5, arg6, regs);
+  uint64_t result = SyscallManager::the().handle(num, arg1, arg2, arg3, arg4, arg5, arg6, regs);
 
   // Log to SyscallLogNode (DebugFS) instead of console
   if (MemoryManager::the().is_heap_initialized()) {
     char log_buf[512];
-    int log_len = snprintf(log_buf, sizeof(log_buf),
-                           "[SYSCALL] Task %lu (%s): %lu (args: %p, %p, %p, %p, %p, %p) -> %p\n",
-                           task ? task->control.identity.id.value() : 0, 
-                           task ? task->control.identity.name.c_str() : "unknown",
-                           num, (void *)arg1, (void *)arg2, (void *)arg3, 
-                           (void *)arg4, (void *)arg5, (void *)arg6, (void *)result);
+    int log_len =
+        snprintf(log_buf, sizeof(log_buf),
+                 "[SYSCALL] Task %lu (%s): %lu (args: %p, %p, %p, %p, %p, %p) -> %p\n",
+                 task ? task->control.identity.id.value() : 0,
+                 task ? task->control.identity.name.c_str() : "unknown", num, (void*)arg1,
+                 (void*)arg2, (void*)arg3, (void*)arg4, (void*)arg5, (void*)arg6, (void*)result);
 
     auto syscall_log = fkernel::SyscallLogNode::the();
     if (syscall_log)

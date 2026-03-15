@@ -2,22 +2,24 @@
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall_utils.h>
+#include <LibC/string.h>
 
 using namespace fkernel;
 
 extern "C" {
-uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t, uint64_t, uint64_t,
-                   [[maybe_unused]] PtRegs* regs) {
+uint64_t sys_symlink(uint64_t target_ptr, uint64_t linkpath_ptr, uint64_t, uint64_t, uint64_t,
+                     uint64_t, [[maybe_unused]] PtRegs* regs) {
   auto* current_task = SchedulerManager::the().current();
   if (!current_task)
     return -1;
 
-  const char* path = reinterpret_cast<const char*>(path_ptr);
-  if (!path)
-    return -static_cast<int>(fk::core::Error::InvalidParameter);
+  const char* target = reinterpret_cast<const char*>(target_ptr);
+  const char* linkpath = reinterpret_cast<const char*>(linkpath_ptr);
+  if (!target || !linkpath)
+    return return_error(fk::core::Error::InvalidParameter);
 
   char absolute_path[512];
-  if (path[0] != '/') {
+  if (linkpath[0] != '/') {
     const char* cwd = current_task->resources.files.cwd.c_str();
     size_t cwd_len = strlen(cwd);
     strcpy(absolute_path, cwd);
@@ -25,11 +27,11 @@ uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t, uint64_
     if (cwd_len > 0 && absolute_path[cwd_len - 1] != '/') {
       strcat(absolute_path, "/");
     }
-    strcat(absolute_path, path);
-    path = absolute_path;
+    strcat(absolute_path, linkpath);
+    linkpath = absolute_path;
   }
 
-  auto res = VirtualFileSystem::the().mkdir(path, (int)mode);
+  auto res = VirtualFileSystem::the().symlink(linkpath, target);
   if (res.is_error())
     return return_error(res.error());
 

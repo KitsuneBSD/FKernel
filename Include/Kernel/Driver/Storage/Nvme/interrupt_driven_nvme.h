@@ -47,6 +47,12 @@ private:
   fk::core::Result<uintptr_t, fk::core::Error> allocate_dma_memory(size_t size);
   void free_dma_memory(uintptr_t phys_addr, size_t size);
 
+  fk::core::Result<NvmeAsyncOperation*, fk::core::Error> create_read_operation(uint16_t command_id,
+                                                                               uint64_t start_lba,
+                                                                               uint32_t block_count,
+                                                                               uint8_t* buffer);
+  fk::core::Result<void, fk::core::Error> submit_read_command(NvmeAsyncOperation* operation);
+
   NvmeControllerState m_state;
   NvmeInterruptLine m_interrupt_line{0};
 };

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Kernel/Driver/Storage/Nvme/NvmeQueueManager.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_async_operation.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_command.h>
-#include <Kernel/Driver/Storage/Nvme/nvme_queue_manager.h>
 #include <Kernel/Driver/async_io.h>
 #include <LibC/stdint.h>
 
