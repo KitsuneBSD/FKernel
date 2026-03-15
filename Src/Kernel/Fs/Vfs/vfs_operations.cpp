@@ -44,18 +44,10 @@ fk::core::Result<void, fk::core::Error> VirtualFileSystem::mkdir(const char* pat
   auto parent_dentry = parent_res.value().first;
   auto name = parent_res.value().second;
 
-  fk::algorithms::kdebug("VFS", "mkdir: path=%s, parent_dentry=%s, name=%s", path,
-                         parent_dentry->get_path().c_str(), name.c_str());
-
   auto node = find_writable_directory_node(parent_dentry);
   if (!node) {
-    fk::algorithms::kdebug("VFS", "mkdir: parent dentry has no writable directory node for %s",
-                           path);
     return fk::core::Error::NotFound;
   }
-
-  fk::algorithms::kdebug("VFS", "mkdir: using node=%s, is_dir=%d", node->name().c_str(),
-                         node->is_directory());
 
   TRY(node->mkdir(name.c_str(), mode));
   return {};
@@ -71,7 +63,7 @@ fk::core::Result<void, fk::core::Error> VirtualFileSystem::symlink(const char* p
   auto parent_dentry = parent_res.value().first;
   auto name = parent_res.value().second;
 
-  auto node = parent_dentry->top_node();
+  auto node = find_writable_directory_node(parent_dentry);
   if (!node)
     return fk::core::Error::NotFound;
 

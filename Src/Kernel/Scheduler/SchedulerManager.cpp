@@ -1,5 +1,3 @@
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Core/Assertions.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
@@ -9,8 +7,10 @@
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Scheduler/task_entries.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Core/Assertions.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
 
 extern CpuControlBlock g_cpu_block;
@@ -57,24 +57,15 @@ Task* SchedulerManager::pick_next() {
 
 fkernel::Processor& SchedulerManager::current_processor() {
   uint32_t id = APIC::the().get_id();
-  if (id < 32) return m_processors[id];
+  if (id < 32)
+    return m_processors[id];
   return m_processors[0];
-}
-
-static void log_context_switch(Task* prev_task, Task* next_task) {
-  if (prev_task) {
-    fk::algorithms::klog("SCHEDULER", "Switch: %s -> %s",
-                         prev_task->control.identity.name.c_str(),
-                         next_task->control.identity.name.c_str());
-  } else {
-    fk::algorithms::klog("SCHEDULER", "Switch: (Boot) -> %s",
-                         next_task->control.identity.name.c_str());
-  }
 }
 
 static void switch_address_space_if_needed(Task* prev_task, Task* next_task) {
   if (next_task->resources.memory.cr3 != 0 &&
-      (prev_task == nullptr || next_task->resources.memory.cr3 != prev_task->resources.memory.cr3)) {
+      (prev_task == nullptr ||
+       next_task->resources.memory.cr3 != prev_task->resources.memory.cr3)) {
     VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
   }
 }
@@ -101,20 +92,22 @@ static void load_next_task_context(Task* next_task) {
 
 void SchedulerManager::schedule() {
   fk::synchronization::ScopedInterruptDisabler intr_disabler;
-  if (!is_need_resched()) return;
+  if (!is_need_resched())
+    return;
 
   auto& proc = current_processor();
   Task* prev_task = proc.current_task;
   Task* next_task = pick_next();
-  if (next_task == prev_task) return;
+  if (next_task == prev_task)
+    return;
 
-  log_context_switch(prev_task, next_task);
   switch_address_space_if_needed(prev_task, next_task);
   save_previous_task_context(prev_task);
   load_next_task_context(next_task);
-  
+
   if (prev_task) {
-    switch_context(&prev_task->resources.context.stack_pointer, next_task->resources.context.stack_pointer);
+    switch_context(&prev_task->resources.context.stack_pointer,
+                   next_task->resources.context.stack_pointer);
   } else {
     uint64_t dummy;
     switch_context(&dummy, next_task->resources.context.stack_pointer);
