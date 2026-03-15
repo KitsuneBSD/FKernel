@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Kernel/Driver/Storage/Nvme/NvmeQueueManager.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_command.h>
-#include <Kernel/Driver/Storage/Nvme/nvme_queue_manager.h>
 #include <LibC/stdint.h>
 
 namespace fkernel {

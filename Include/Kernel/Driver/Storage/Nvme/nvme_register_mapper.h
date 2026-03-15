@@ -1,10 +1,10 @@
 #pragma once
 
 #include <Kernel/Driver/Storage/Nvme/nvme_controller_state.h>
+#include <Kernel/Hardware/Pci/pci.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
-#include <Kernel/Hardware/Pci/pci_manager.h>
+#include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <Kernel/Memory/page_flags.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/Result.h>
 

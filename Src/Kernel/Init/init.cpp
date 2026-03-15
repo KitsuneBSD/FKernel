@@ -33,17 +33,16 @@ void init() {
   // Priorizar VESA sobre VGA
   if (boot::BootInfo::the().has_framebuffer()) {
     Display::switch_to(DisplayFramebuffer::the());
-    
+
     // Enable on-screen logging now that display is ready
-    fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial | fk::algorithms::LogTarget::Display);
+    fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
+                                    fk::algorithms::LogTarget::Display);
 
     // Garantir que tty0 esteja ativo para userspace
     fkernel::terminal::TerminalManager::the().force_tty0_active();
-    
-    // Teste com mensagem visível
-    Display::the().write("[SYSTEM] FKernel VESA + BusyBox rodando!\n");
+
     Display::the().flush();
-    
+
     // Finalize display initialization after system is stable
     if (DisplayFramebuffer* fb_display = static_cast<DisplayFramebuffer*>(&Display::the())) {
       fb_display->finalize_initialization();
@@ -51,7 +50,7 @@ void init() {
   }
 
   // Initialize Driver Framework
-  auto &driver_manager = fkernel::DriverManager::the();
+  auto& driver_manager = fkernel::DriverManager::the();
 
   // Probe all registered drivers (handles any non-PCI drivers)
   driver_manager.probe_all();

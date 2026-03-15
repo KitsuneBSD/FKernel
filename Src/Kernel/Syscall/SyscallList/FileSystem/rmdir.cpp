@@ -6,7 +6,7 @@
 using namespace fkernel;
 
 extern "C" {
-uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t, uint64_t, uint64_t,
+uint64_t sys_rmdir(uint64_t path_ptr, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
                    [[maybe_unused]] PtRegs* regs) {
   auto* current_task = SchedulerManager::the().current();
   if (!current_task)
@@ -29,7 +29,7 @@ uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t, uint64_
     path = absolute_path;
   }
 
-  auto res = VirtualFileSystem::the().mkdir(path, (int)mode);
+  auto res = VirtualFileSystem::the().rmdir(path);
   if (res.is_error())
     return return_error(res.error());
 

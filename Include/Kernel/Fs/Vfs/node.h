@@ -7,10 +7,10 @@
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 
+#include <Kernel/Fs/Vfs/definitions.h>
 #include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
-#include <Kernel/Fs/Vfs/definitions.h>
 
 struct DirectoryEntry {
   char name[256];
@@ -21,39 +21,56 @@ class Node : public fk::memory::RefCounted<Node> {
 public:
   virtual ~Node() override = default;
 
-  virtual fk::core::Result<size_t, fk::core::Error>
-  read(uint64_t offset, size_t size, uint8_t *buffer) = 0;
-  virtual fk::core::Result<size_t, fk::core::Error>
-  write(uint64_t offset, size_t size, const uint8_t *buffer) = 0;
+  virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size,
+                                                         uint8_t* buffer) = 0;
+  virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t offset, size_t size,
+                                                          const uint8_t* buffer) = 0;
   virtual size_t size() const = 0;
 
-  virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-  lookup(const char * /*name*/) {
+  virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> lookup(const char* /*name*/) {
     return fk::core::Error::NotADirectory;
   }
 
   virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-  create_child([[maybe_unused]] const char *name, [[maybe_unused]] int mode) {
+  create_child([[maybe_unused]] const char* name, [[maybe_unused]] int mode) {
     return fk::core::Error::NotADirectory;
   }
 
   virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-  mkdir([[maybe_unused]] const char *name, [[maybe_unused]] int mode) {
+  mkdir([[maybe_unused]] const char* name, [[maybe_unused]] int mode) {
     return fk::core::Error::NotADirectory;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error> symlink([[maybe_unused]] const char* name,
+                                                          [[maybe_unused]] const char* target) {
+    return fk::core::Error::NotADirectory;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error> rmdir([[maybe_unused]] const char* name) {
+    return fk::core::Error::NotADirectory;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error> unlink([[maybe_unused]] const char* name) {
+    return fk::core::Error::NotImplemented;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error> link([[maybe_unused]] const char* name,
+                                                       [[maybe_unused]] const char* target) {
+    return fk::core::Error::NotImplemented;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error> rename([[maybe_unused]] const char* old_name,
+                                                         [[maybe_unused]] const char* new_name) {
+    return fk::core::Error::NotImplemented;
   }
 
   virtual fk::core::Result<void, fk::core::Error>
-  symlink([[maybe_unused]] const char *name, [[maybe_unused]] const char *target) {
+  list_dir([[maybe_unused]] fk::containers::Vector<DirectoryEntry>& entries) {
     return fk::core::Error::NotADirectory;
   }
 
-  virtual fk::core::Result<void, fk::core::Error>
-  list_dir([[maybe_unused]] fk::containers::Vector<DirectoryEntry> &entries) {
-    return fk::core::Error::NotADirectory;
-  }
-
-  virtual fk::core::Result<int, fk::core::Error>
-  ioctl([[maybe_unused]] uint64_t request, [[maybe_unused]] uint64_t arg) {
+  virtual fk::core::Result<int, fk::core::Error> ioctl([[maybe_unused]] uint64_t request,
+                                                       [[maybe_unused]] uint64_t arg) {
     return fk::core::Error::NotImplemented;
   }
 
@@ -68,9 +85,11 @@ public:
   }
 
   virtual fk::text::String get_path() const {
-    if (!m_parent) return m_name.is_empty() ? "/" : m_name;
+    if (!m_parent)
+      return m_name.is_empty() ? "/" : m_name;
     fk::text::String parent_path = m_parent->get_path();
-    if (parent_path == "/") return "/" + m_name;
+    if (parent_path == "/")
+      return "/" + m_name;
     return parent_path + "/" + m_name;
   }
 
@@ -80,8 +99,8 @@ public:
   void set_parent(fk::RefPtr<Node> parent) { m_parent = fk::types::move(parent); }
   fk::RefPtr<Node> parent() const { return m_parent; }
 
-  Node(const Node &) = delete;
-  Node &operator=(const Node &) = delete;
+  Node(const Node&) = delete;
+  Node& operator=(const Node&) = delete;
 
   // Allow default constructor
   Node() = default;
