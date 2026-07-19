@@ -67,6 +67,7 @@ local kernel_non_architecture_related = {
   "Src/Kernel/Scheduler/**.cpp",
   "Src/Kernel/Syscall/**.cpp",
   "Src/Kernel/Net/**.cpp",
+  "Src/Kernel/Io/**.cpp",
 }
 
 -- Custom Toolchain for Kernel
@@ -107,6 +108,7 @@ target("FKernel")
   set_warnings("allextra", "error")
   add_includedirs("Include")
 
+  add_defines("__FKERNEL_FREESTANDING__")
   add_cxflags(flags.general.cxx, { force = true })
   add_asflags(flags.general.asm, { force = true })
   add_ldflags(flags.general.ld, { force = true })
@@ -186,6 +188,13 @@ target("Test")
   add_files("tests/main.cpp")
   add_files("tests/LibC/test_string_memory_comprehensive.cpp")
   add_files("tests/LibFK/test_circular_buffer.cpp")
+  add_files("tests/LibFK/test_containers.cpp")
+  add_files("tests/LibFK/test_smart_pointers.cpp")
+  add_files("tests/LibFK/test_text.cpp")
+  add_files("tests/LibFK/test_multi_containers.cpp")
+  add_files("tests/LibFK/test_tuple.cpp")
+  add_files("Src/LibFK/Text/string.cpp")
+  add_files("Src/LibFK/Memory/new.cpp")
   add_files("tests/test_mock.c")
 
   on_run(function(target)
@@ -199,3 +208,47 @@ target("Test")
     end
   end)
 target_end()
+
+-- TASK: setup-hda — Create and partition the disk image
+task("setup-hda")
+  set_menu {
+    usage = "xmake setup-hda",
+    description = "Create a partitioned FAT32 disk image (build/FKernel-HDA.qcow2)",
+  }
+  on_run(function()
+    os.execv("lua", {"Meta/x86_64-tools/create_hda.lua"})
+  end)
+task_end()
+
+-- TASK: build-initrd — Build initrd only (no ISO)
+task("build-initrd")
+  set_menu {
+    usage = "xmake build-initrd",
+    description = "Build the initrd TAR (build/initrd.tar) without rebuilding the ISO",
+  }
+  on_run(function()
+    os.execv("lua", {"Meta/x86_64-tools/mount_mockos.lua", "--only-initrd"})
+  end)
+task_end()
+
+-- TASK: config-initrd — Configure initrd system style
+task("config-initrd")
+  set_menu {
+    usage = "xmake config-initrd",
+    description = "Interactively configure the initrd system style (busybox / openrc)",
+  }
+  on_run(function()
+    os.execv("lua", {"Meta/x86_64-tools/configure_initrd.lua"})
+  end)
+task_end()
+
+-- TASK: analyze — Analyze kernel runtime logs
+task("analyze")
+  set_menu {
+    usage = "xmake analyze",
+    description = "Analyze kernel runtime logs",
+  }
+  on_run(function()
+    os.execv("lua", {"Meta/x86_64-tools/analyze_kernel_runtime.lua"})
+  end)
+task_end()

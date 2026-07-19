@@ -17,6 +17,10 @@ public:
     void append(const String& s);
     void append_decimal(int n);
     void append_decimal(uint64_t n);
+    void append_hex(uint64_t n, bool prefix = true);
+    void append_octal(uint64_t n);
+    void append_binary(uint64_t n);
+    void append_float(double f, int precision = 6);
 
     String to_string() const;
     void clear();

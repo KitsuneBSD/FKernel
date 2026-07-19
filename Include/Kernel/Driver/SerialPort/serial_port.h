@@ -22,6 +22,7 @@ private:
    * @return true if ready to transmit, false otherwise
    */
   static inline bool is_transmit_empty() { return inb(COM1 + 5) & 0x20; }
+  static inline bool is_data_ready()     { return inb(COM1 + 5) & 0x01; }
 
 public:
   /**
@@ -54,4 +55,10 @@ public:
    * @param value Integer value to write
    */
   static void write_hex(uint64_t value);
+
+  /**
+   * @brief Read bytes from the serial port (non-blocking).
+   * @return Number of bytes read into buf.
+   */
+  static size_t read(uint8_t* buf, size_t max);
 };

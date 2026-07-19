@@ -18,6 +18,8 @@ extern "C" uint64_t sys_ipc_send(uint64_t handle, uint64_t info_raw,
   Capability cap = task->ipc().cspace->get(static_cast<uint32_t>(handle));
   if (cap.type() != CapabilityType::Endpoint)
     return (uint64_t)-1;
+  if (!cap.can_send())
+    return -static_cast<uint64_t>(fk::core::Error::PermissionDenied);
 
   Endpoint *endpoint = static_cast<Endpoint *>(cap.object());
   MessageInfo info(info_raw);

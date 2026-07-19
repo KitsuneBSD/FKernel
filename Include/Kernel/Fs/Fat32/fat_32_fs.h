@@ -34,6 +34,12 @@ public:
     fk::core::Result<size_t, fk::core::Error>
     read_from_cluster_chain(uint32_t first_cluster, uint64_t offset, size_t size, uint8_t* buffer);
 
+    fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
+    find_in_directory(uint32_t first_cluster, const char* name);
+
+    fk::core::Result<void, fk::core::Error>
+    list_directory_from(uint32_t first_cluster, fk::containers::Vector<DirectoryEntry>& entries);
+
 private:
     Fat32FileSystem(fk::RefPtr<StorageDevice> device) : m_device(device) {}
     uint32_t cluster_to_sector(uint32_t cluster) const;

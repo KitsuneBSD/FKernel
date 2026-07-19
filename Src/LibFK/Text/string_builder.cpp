@@ -46,6 +46,73 @@ void StringBuilder::append_decimal(uint64_t n) {
     append(&buf[i]);
 }
 
+void StringBuilder::append_hex(uint64_t n, bool prefix) {
+    if (prefix) {
+        append('0');
+        append('x');
+    }
+    if (n == 0) {
+        append('0');
+        return;
+    }
+    char buf[17];
+    int i = 16;
+    buf[i] = '\0';
+    while (n > 0) {
+        uint64_t digit = n & 0xF;
+        buf[--i] = (digit < 10) ? ('0' + digit) : ('a' + digit - 10);
+        n >>= 4;
+    }
+    append(&buf[i]);
+}
+
+void StringBuilder::append_octal(uint64_t n) {
+    if (n == 0) {
+        append('0');
+        return;
+    }
+    char buf[23];
+    int i = 22;
+    buf[i] = '\0';
+    while (n > 0) {
+        buf[--i] = '0' + (n & 7);
+        n >>= 3;
+    }
+    append(&buf[i]);
+}
+
+void StringBuilder::append_binary(uint64_t n) {
+    if (n == 0) {
+        append('0');
+        return;
+    }
+    char buf[65];
+    int i = 64;
+    buf[i] = '\0';
+    while (n > 0) {
+        buf[--i] = '0' + (n & 1);
+        n >>= 1;
+    }
+    append(&buf[i]);
+}
+
+void StringBuilder::append_float(double f, int precision) {
+    if (__builtin_isnan(f)) { append("nan"); return; }
+    if (__builtin_isinf(f)) { append(f < 0.0 ? "-inf" : "inf"); return; }
+    if (f < 0.0) { append('-'); f = -f; }
+    uint64_t integer_part = static_cast<uint64_t>(f);
+    append_decimal(integer_part);
+    if (precision <= 0) return;
+    append('.');
+    double frac = f - static_cast<double>(integer_part);
+    for (int i = 0; i < precision; ++i) {
+        frac *= 10.0;
+        int digit = static_cast<int>(frac);
+        append(static_cast<char>('0' + digit));
+        frac -= static_cast<double>(digit);
+    }
+}
+
 String StringBuilder::to_string() const {
     if (m_buffer.is_empty())
         return String("");

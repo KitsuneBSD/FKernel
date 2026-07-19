@@ -123,12 +123,8 @@ public:
    * @return Reference to stored value
    */
   T &value() {
-    if (!has_value_) {
-    /*TODO: Apply this log when we work with LogLevel  
-      fk::algorithms::kdebug("OPTIONAL",
-          "Attempted to access value of empty optional (non-const).");
-    */
-    }
+    if (!has_value_)
+      __builtin_trap();
     return *ptr();
   }
 
@@ -137,12 +133,8 @@ public:
    * @return Const reference to stored value
    */
   const T &value() const {
-    if (!has_value_) {
-      /*TODO: Apply this log when we work with LogLevel
-      fk::algorithms::kdebug("OPTIONAL", "Attempted to access value of empty optional (const).");
-      */
-      return nullptr;
-    }
+    if (!has_value_)
+      __builtin_trap();
     return *ptr();
   }
 

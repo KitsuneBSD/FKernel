@@ -63,6 +63,9 @@ public:
   /** @brief Removes a mapping for a virtual address. */
   void unmap_page(uintptr_t virt);
 
+  /** @brief Changes the protection flags of a mapped page (RELRO, mprotect). */
+  void protect_page(uintptr_t virt, PageFlags flags);
+
   /** @brief Translates a virtual address to its corresponding physical address.
    */
   uintptr_t translate(uintptr_t virt);

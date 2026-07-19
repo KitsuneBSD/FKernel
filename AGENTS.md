@@ -1,510 +1,141 @@
-# FKernel Development Guide for AI Agents
+# FKernel Development Guide
 
-This guide provides essential information for AI agents working on the FKernel codebase, including the latest GEMINI AI automation features and validation requirements.
-
-## Build System & Commands
-
-### Primary Build Tool
-
-- **Build System**: XMake (Lua-based)
-- **Language**: C++20 (freestanding), C17 (LibC), NASM (assembly)
-
-### Essential Commands
+## Build Commands
 
 ```bash
-# Core build commands
-xmake                    # Build kernel
-xmake run               # Run in QEMU  
-xmake clean             # Clean build artifacts
-
-# Testing commands
-xmake -bv Test          # Build tests (verbose)
-xmake run Test          # Run all tests
-# Note: No single test command available - run full test suite
-
-# Custom tasks
-xmake setup-hda         # Create disk image
-xmake build-initrd      # Build initrd
-xmake config-initrd     # Configure initrd interactively
-xmake analyze           # Analyze kernel runtime
+xmake                           # Build kernel
+xmake run                      # Run in QEMU
+xmake clean                    # Clean build artifacts
+xmake -bv Test                 # Build tests (verbose)
+xmake run Test                 # Run all tests (no single test target)
+xmake setup-hda                # Create disk image
+xmake build-initrd             # Build initrd
+xmake config-initrd            # Configure initrd interactively
+xmake analyze                  # Analyze kernel runtime
 ```
 
-### Build Artifacts
+Build outputs: `build/FKernel.bin`, `build/FKernel-MockOS.iso`, `build/FKernel-HDA.qcow2`.
 
-- `build/FKernel.bin` - Kernel binary
-- `build/FKernel-MockOS.iso` - Bootable ISO
-- `build/FKernel-HDA.qcow2` - Disk image
+## Layer Separation (STRICT)
 
-## Code Architecture & Dependencies
+1. **LibC** - Freestanding C library (strings, memory, types)
+2. **LibFK** - STL-like library, depends on LibC + self only
+3. **Kernel** - Depends on LibFK only, NEVER LibC directly
 
-### Layer Separation (STRICT)
+```
+LibC (std types) → LibFK (std containers) → Kernel (drivers, scheduling, VFS, IPC)
+```
 
-1. **LibC** - Minimal freestanding C library (strings, memory, types)
-2. **LibFK** - STL-like library using LibC + self only
-3. **Kernel** - Uses ONLY LibFK, NEVER LibC directly
+Violations are build errors. LibFK defines the boundary between LibC and Kernel.
 
-### Namespace Structure
+## Namespace Structure
 
 ```cpp
-// LibFK namespaces
-namespace fk {
-    namespace containers { }  // Vector, HashMap, List
-    namespace text { }        // String, StringBuilder  
-    namespace memory { }      // Smart pointers
-    namespace core { }        // Result, Optional
-    namespace utilities { }   // Aligner, Pair, etc.
-    namespace algorithms { }  # Consolidated algorithms
-}
+// LibFK
+namespace fk::containers { }   // Vector, HashMap, List
+namespace fk::text { }         // String, StringBuilder
+namespace fk::memory { }       // Smart pointers
+namespace fk::core { }         // Result, Error
+namespace fk::algorithms { }   // CRC32, DJB2
 
-// Kernel namespaces  
-namespace fkernel {
-    namespace boot { }
-    namespace cpu { }
-    namespace memory { }
-    namespace process { }
-    namespace fs { }
-    namespace drivers { }
-    // ... etc
-}
+// Kernel
+namespace fkernel::boot { }
+namespace fkernel::cpu { }
+namespace fkernel::memory { }
+namespace fkernel::process { }
+namespace fkernel::fs { }
+namespace fkernel::drivers { }
 ```
 
-## Mandatory Coding Standards (Object Calisthenics)
+## Object Calisthenics (Mandatory)
 
-### 1. One Indentation Level Per Method
+| Rule | Example |
+|---|---|
+| 1 indentation level per method | Extract helper methods, no nested `if` in loops |
+| No `else` | Early returns instead |
+| Wrap all primitives | `ProcessId` not `int`, `BlockSize` not `u64` |
+| First-class collections | `ProcessList` class, not raw `Vector` |
+| 1 dot per line | `process->thread_name()` not `process->thread()->name()` |
+| No abbreviations | `ProcessManager` not `ProcMgr` |
+| Keep entities small | Class ≤200 lines, method ≤20 lines, file ≤500 lines |
+| Max 2 instance variables | Compose objects instead |
+| No getters/setters | `is_running()` / `block()` not `state()` / `set_state()` |
 
-```cpp
-// ❌ BAD: Nested hell
-void process() {
-    for (auto& item : items) {
-        if (item.valid()) {
-            if (item.ready()) {
-                do_work(item);
-            }
-        }
-    }
-}
-
-// ✅ GOOD: Extract methods
-void process() {
-    for (auto& item : items)
-        process_item(item);
-}
-```
-
-### 2. No ELSE Keyword
-
-```cpp
-// ❌ BAD
-if (condition) {
-    do_something();
-} else {
-    do_other();
-}
-
-// ✅ GOOD: Early returns
-if (condition) {
-    do_something();
-    return;
-}
-do_other();
-```
-
-### 3. Wrap All Primitives
-
-```cpp
-// ❌ BAD: Raw primitives
-class Process {
-    int pid;
-    unsigned long flags;
-};
-
-// ✅ GOOD: Type-safe wrappers
-class ProcessId {
-    int m_value;
-public:
-    explicit ProcessId(int id) : m_value(id) {}
-    bool is_valid() const { return m_value > 0; }
-};
-```
-
-### 4. First-Class Collections
-
-```cpp
-// ❌ BAD: Exposed vector
-class Manager {
-    fk::Vector& processes() { return m_processes; }
-};
-
-// ✅ GOOD: Dedicated collection class
-class ProcessList {
-    fk::Vector m_processes;
-public:
-    void add(Process* p);
-    Process* find_by_pid(ProcessId pid);
-    // Iterators, etc.
-};
-```
-
-### 5. One Dot Per Line (Law of Demeter)
-
-```cpp
-// ❌ BAD: Chain calls
-auto name = process->thread()->name();
-
-// ✅ GOOD: Delegate
-auto name = process->thread_name();
-```
-
-### 6. No Abbreviations
-
-```cpp
-// ❌ BAD: class ProcMgr { void init_procs(); }
-// ✅ GOOD: class ProcessManager { void initialize_processes(); }
-```
-
-### 7. Keep Entities Small
-
-- **Classes**: Max 200 lines
-- **Methods**: Max 20 lines  
-- **Files**: Max 500 lines
-
-### 9. No Getters/Setters
-
-```cpp
-// ❌ BAD: Anemic model
-class Process {
-    ProcessState m_state;
-public:
-    ProcessState state() const { return m_state; }
-    void set_state(ProcessState s) { m_state = s; }
-};
-
-// ✅ GOOD: Rich model  
-class Process {
-    ProcessState m_state;
-public:
-    bool is_running() const { return m_state == Running; }
-    void block() { m_state = Blocked; }
-};
-```
-
-### 8. Max Two Instance Variables
-
-```cpp
-// ❌ BAD: Many variables
-class Device {
-    u16 m_iobase, m_control;
-    u8 m_irq;
-    bool m_dma_enabled;
-    DMAController* m_dma;
-};
-
-// ✅ GOOD: Compose objects
-class Device {
-    DevicePorts m_ports;
-    DeviceTransfer m_transfer;
-};
-```
-
-### 9. No Getters/Setters
-
-```cpp
-// ❌ BAD: Anemic model
-class Process {
-    ProcessState m_state;
-public:
-    ProcessState state() const { return m_state; }
-    void set_state(ProcessState s) { m_state = s; }
-};
-
-// ✅ GOOD: Rich model  
-class Process {
-    ProcessState m_state;
-public:
-    bool is_running() const { return m_state == Running; }
-    void block() { m_state = Blocked; }
-};
-```
+**SECRET RULE**: One struct/class per file. File name matches class name.
 
 ## Error Handling
 
-### Use Result<T, Error> Pattern
-
 ```cpp
-// Return type for fallible operations
-Result<Page*, Error> allocate_page();
-
-// Usage with TRY macro
-auto page = TRY(allocate_page());
-
-// Optional for nullable values
-fk::Optional<Process*> find_process(ProcessId pid);
+Result<Page*, Error> allocate_page();        // Fallible operations
+auto page = TRY(allocate_page());            // Propagate errors
+fk::Optional<Process*> find_process(ProcessId pid);  // Nullable values
 ```
 
-## Import & Include Guidelines
-
-### Include Order
-
-1. System headers (LibC)
-2. LibFK headers  
-3. Kernel headers
-4. Local headers
-
-### Include Style
-
-```cpp
-#include <LibC/string.h>
-#include <LibFK/Core/Result.h>
-#include <Kernel/Memory/memory_manager.h>
-```
-
-### No Standard Library
-
-- No `<iostream>`, `<vector>`, `<string>` etc.
-- Use LibFK equivalents instead
-- Compile flags: `-nostdlib -nostdinc -ffreestanding`
-
-## Testing Requirements
-
-### Coverage Goals
-
-- **LibC**: 90%+ coverage required
-- **LibFK**: 85%+ coverage required  
-- **Kernel critical paths**: 75%+ coverage required
-
-### All Public APIs Must Have Tests
-
-```cpp
-// Test files follow pattern: tests/[component]/test_[module].cpp
-TEST(memcpy, copies_data_correctly) {
-    char src[10] = "hello";
-    char dst[10];
-    memcpy(dst, src, 6);
-    EXPECT_STREQ(dst, "hello");
-}
-```
-
-## Performance & Hardware
-
-### Compiler Flags
-
-- `-ffreestanding` - No OS runtime
-- `-fno-exceptions` - No exception support
-- `-fno-rtti` - No runtime type information
-- `-mcmodel=kernel` - Kernel memory model
-- `-mno-sse` - No SIMD (kernel context)
-
-### Hardware Interaction
-
-- Use `volatile` for hardware registers
-- Include memory barriers when needed: `__sync_synchronize()`
-- Document against hardware specifications
-- Handle MMIO correctly
-
-## Documentation Standards
-
-### Every Public API Needs Documentation
-
-```cpp
-/// @brief Allocates a physical page frame
-/// @return Result containing page address on success,
-///         Error::OutOfMemory if no pages available
-/// @note This function is thread-safe
-/// @warning Caller must free page with free_page()
-Result<Page*, Error> allocate_page();
-```
-
-## Code Style
-
-### Naming Conventions
+## Coding Style
 
 - **Classes**: PascalCase (`ProcessManager`)
-- **Methods**: snake_case (`initialize_processes()`)  
-- **Variables**: snake_case with m_ prefix for members (`m_process_count`)
+- **Methods**: snake_case (`initialize_processes()`)
+- **Members**: `m_` prefix (`m_process_count`)
 - **Constants**: UPPER_SNAKE_CASE (`MAX_PROCESSES`)
 - **Namespaces**: snake_case (`fkernel::memory`)
 - **Directories**: PascalCase (`Src/Kernel/Posix/`)
 - **Files**: snake_case (`topology_manager.cpp`)
+- 2-space indentation, opening braces on same line
+- No `<iostream>`, `<vector>`, `<string>` — use LibFK equivalents
+- No exceptions, no RTTI. Use `Result<T, Error>` for errors
+- Use `volatile` for hardware registers; memory barriers when needed
+- RAII preferred, stack allocation preferred, `OwnPtr`/`RefPtr` for heap
 
-### Formatting
+## Include Order
 
-- No explicit formatting config found - follow existing patterns
-- 2-space indentation observed in codebase
-- Opening braces on same line for methods/functions
-- Use `//` comments, avoid `/* */` blocks
+1. System headers (LibC)
+2. LibFK headers
+3. Kernel headers
+4. Local headers
 
-### Memory Management
-
-- RAII preferred - no manual cleanup
-- Use LibFK smart pointers: `OwnPtr`, `RefPtr`
-- Stack allocation preferred over heap
-- No exceptions - use Result<T, Error> pattern
-
-## Critical Build Dependencies
-
-### Required Tools
-
-- `clang`/`clang++` (C++20 support)
-- `ld.lld` (linker)
-- `nasm` (assembler)
-- `xmake` (build system)
-- `qemu-system-x86_64` (emulator)
-
-### Optional Tools (mentioned in README)
-
-- `clang-format` - Code formatting
-- `clang-tidy` - Static analysis  
-- `cppcheck` - Additional analysis
-
-## Project Structure Notes
-
-### Key Directories
-
-- `Src/Kernel/` - Kernel implementation
-- `Src/LibC/` - Freestanding C library
-- `Src/LibFK/` - STL-like library
-- `Include/` - All header files
-- `Meta/` - Build tools and scripts
-- `.ai-docs/` - AI conceptual memory system
-- `.gemini/` - Validation scripts and configuration
-- `Docs/` - Human documentation
-
-### File Organization
-
-- Headers mirror source structure in `Include/`
-- Implementation in `Src/`
-- Architecture-specific code in `Src/Kernel/Arch/x86_64/`
-- **SECRET RULE**: One struct/class per file strictly enforced
-- **Domain-based**: PascalCase directories represent cohesive domains
-
-## Security & Safety
-
-### Kernel Mode Constraints
-
-- No standard library access
-- Direct hardware interaction
-- Memory management awareness
-- Interrupt context considerations
-
-### Development Philosophy
-
-- Security-first design
-- Drivers in userspace (DAL architecture)
-- Isolated kernel subsystems
-- Production-ready, not hobby OS
-
-## GEMINI AI Integration & Memory System
-
-### AI Memory Protocol
-
-- **Primary Memory**: `.ai-docs/` serves as conceptual memory for all AI agents
-- **Documentation Pipeline**: `.ai-docs/` → AI memory, `Docs/` → human documentation
-- **Continuous Learning**: Agents must read `.ai-docs/` before making changes
-- **Memory Updates**: Every significant change must update `.ai-docs/`
-
-### GEMINI Validation System
-
-The `.gemini/fkernel_validator.lua` enforces:
-
-- **Object Calisthenics**: Automatic validation of all 9 rules
-- **SECRET RULE**: One struct/class per file enforcement
-- **Architecture**: Strict layer separation validation
-- **Testing**: Coverage requirements validation
-- **Algorithms**: Consolidation policy enforcement
-
-### AI Automation Features
-
-- **Script Generation**: Lua scripts auto-generated based on analysis
-- **CI/CD Integration**: Automated validation in build pipeline
-- **Memory Management**: AI maintains conceptual understanding
-- **Full Traceability**: All changes tracked in both `.ai-docs/` and `Docs/`
-
-## SECRET RULE: One Struct/Class Per File
-
-### Non-Negotiable Rule
-
-- **Exactly ONE** struct or class per header/source file
-- **File name** must match the struct/class name (camelCase → PascalCase)
-- **Domain-based directories**: PascalCase representing cohesive domains
-- **Self-documenting structure**: Directory/file names reveal purpose
-
-### Enforcement
-
-```bash
-# GEMINI validator automatically checks:
-xmake validate-gemini  # Runs fkernel_validator.lua
-```
-
-### Benefits
-
-- **Deep Autodocumentation**: File structure reveals system architecture
-- **Maintenance Isolation**: Changes affect only one domain
-- **Perfect Discovery**: Developers locate functionality by names
-- **High Cohesion**: Each file represents exactly one concept
-
-## Algorithm Consolidation Policy
-
-### Consolidate in LibFK
-
-All algorithms used across multiple domains MUST be in `LibFK/Algorithms/`:
-
-- **Archive**: TAR, ZIP, GZIP
-- **Compression**: LZ4, ZLIB, DEFLATE  
-- **Checksum/Hash**: CRC32, MD5, SHA256
-- **Encoding**: Base64, Hex, URL encoding
-- **Parsing**: INI, JSON, ELF, PE
-- **Data Structures**: Priority queues, Bloom filters, LRU caches
-
-### Implementation
-
-```cpp
-// Unified API for all domains
-namespace fk::Algorithms::Archive {
-    class Tar {
-        static Result<fk::Vector<uint8_t>, Error> create_archive(...);
-        static Result<void, Error> extract_archive(...);
-    };
-}
-
-// Usage across all domains
-auto result = fk::Algorithms::Archive::Tar::extract_archive(...);
-```
-
-## Validation & Automation
-
-### Automated Validation
-
-```bash
-# Run full GEMINI validation suite
-xmake validate-all     # Object Calisthenics + Architecture + Tests
-xmake validate-oc     # Object Calisthenics only  
-xmake validate-arch   # Architecture separation only
-xmake validate-tests  # Test coverage only
-```
-
-### Configuration
-
-Configuration in `.gemini/settings.json`:
-
-- Object Calisthenics limits (200 lines/class, 20 lines/method, 2 variables)
-- Testing coverage targets (LibC 90%, LibFK 85%, Kernel 75%)
-- Architecture enforcement flags
-- Algorithm consolidation policies
-
-### Memory Structure
+## Project Structure
 
 ```
-.ai-docs/
-├── architectural-decisions/     # High-level design decisions
-├── recent-modifications/        # Track recent code changes
-├── conceptual-models/           # How system works conceptually
-├── domain-knowledge/            # Per-domain understanding
-└── development-patterns/        # Established patterns and conventions
-
-Docs/
-├── Architecture/               # System architecture documentation
-├── Development/               # Development guides and workflows
-├── Domains/                   # Per-domain comprehensive guides
-├── Patterns/                  # Design patterns and conventions
-└── Tutorials/                 # Learning materials for developers
+Src/Kernel/        # Kernel implementation
+Src/LibC/          # Freestanding C library
+Src/LibFK/         # STL-like library
+Include/           # All headers (mirrors Src/)
+Meta/              # Build tools and scripts
+Docs/              # Documentation
+tests/             # Unit tests (pattern: tests/[component]/test_[module].cpp)
+.ai-docs/          # AI conceptual memory
+.gemini/           # Validation scripts (tooling, not docs)
 ```
+
+Full directory tree: `Docs/directory-structure.md`.
+
+## Testing
+
+- LibC: 90%+ coverage required
+- LibFK: 85%+ coverage required
+- Kernel critical paths: 75%+ coverage
+- All public APIs must have tests
+- New LibFK/LibC PRs require test additions
+- Framework: custom (see `tests/test_framework.h`)
+
+## Algorithm Consolidation
+
+All algorithms used across multiple domains belong in `LibFK/Algorithms/`:
+- Archive: TAR, ZIP, GZIP
+- Compression: LZ4, ZLIB, DEFLATE
+- Checksum/Hash: CRC32, MD5, SHA256
+- Encoding: Base64, Hex, URL
+- Parsing: INI, JSON, ELF, PE
+
+## Hardware Notes
+
+- Compiler flags: `-ffreestanding`, `-fno-exceptions`, `-fno-rtti`, `-mcmodel=kernel`, `-mno-sse`
+- Use `volatile` for MMIO, `__sync_synchronize()` for memory barriers
+- Document against hardware specifications
+
+## AI Agent Instructions
+
+- Read `.ai-docs/` before making changes; update it for significant modifications
+- Layer separation is non-negotiable — never add LibC calls in Kernel code
+- Scheduler runs at CPL 0 with interrupts disabled; shared data needs interrupt-safe locking
+- Every struct/class goes in its own file (SECRET RULE)

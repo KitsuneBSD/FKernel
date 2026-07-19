@@ -4,6 +4,7 @@
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Net/unix_socket.h>
+#include <Kernel/Net/InetSocket/inet_socket.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Algorithms/log.h>
@@ -16,19 +17,19 @@ uint64_t sys_socket(uint64_t domain, uint64_t type, [[maybe_unused]] uint64_t pr
 
   fk::RefPtr<Node> socket_node;
 
-  if (domain == 1) { // AF_UNIX / AF_LOCAL
+  if (domain == 1) { // AF_UNIX
     auto socket_res = fkernel::UnixSocket::create(static_cast<fkernel::SocketType>(type));
     if (socket_res.is_error())
       return -static_cast<int>(socket_res.error());
     socket_node = socket_res.value();
+  } else if (domain == 2) { // AF_INET
+    auto socket_res = fkernel::net::create_inet_socket(static_cast<fkernel::SocketType>(type));
+    if (socket_res.is_error())
+      return -static_cast<int>(socket_res.error());
+    socket_node = socket_res.value();
   } else {
-    // Fallback legacy behavior: return eth0
-    auto dentry_res = fkernel::VirtualFileSystem::the().resolve_path("/dev/eth0");
-    if (dentry_res.is_error()) {
-      fk::algorithms::kerror("Syscall", "Failed to find /dev/eth0 for generic socket");
-      return -static_cast<int>(fk::core::Error::NotFound);
-    }
-    socket_node = dentry_res.value()->top_node();
+    fk::algorithms::kerror("Syscall", "sys_socket: unsupported domain %lu", domain);
+    return -static_cast<int>(fk::core::Error::InvalidParameter);
   }
 
   // Create a virtual dentry for this socket (not bound to FS yet)

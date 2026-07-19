@@ -9,7 +9,7 @@ invalid_tlb:
   jnz invalid_tlb_error
 
   invlpg [rdi]
-  mfence 
+
 
   mov rsp, rbp 
   pop rbp 

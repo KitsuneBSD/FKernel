@@ -5,6 +5,7 @@
 #include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
 #include <Kernel/Boot/boot_info.h>
 #include <LibFK/Core/Assertions.h>
+#include <LibC/stdio.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -58,9 +59,11 @@ void MemoryManager::initialize_heap() {
     m_heap_head->size = total_size - sizeof(BlockHeader);
     m_heap_head->is_free = true;
     m_heap_head->next = nullptr;
+    m_heap_head->prev = nullptr;
     m_heap_head->magic = BlockHeader::MAGIC;
 
     m_heap_initialized = true;
+    libc_set_heap_ready();
     fk::algorithms::klog("MEMORY", "Kernel Heap initialized. Size: %zu bytes", total_size);
 }
 
@@ -100,7 +103,10 @@ void* MemoryManager::allocate(size_t size) {
                 new_block->size = current->size - size - sizeof(BlockHeader);
                 new_block->is_free = true;
                 new_block->next = current->next;
+                new_block->prev = current;
                 new_block->magic = BlockHeader::MAGIC;
+                if (new_block->next)
+                    new_block->next->prev = new_block;
 
                 current->size = size;
                 current->next = new_block;
@@ -108,8 +114,6 @@ void* MemoryManager::allocate(size_t size) {
 
             current->is_free = false;
             void* ptr = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(current) + sizeof(BlockHeader));
-            memset(ptr, 0, size);
-            
             m_heap_lock.unlock();
             restore_interrupts(flags);
             return ptr;
@@ -145,10 +149,13 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     }
 
     size_t old_size = header->size;
+    if (size <= old_size) {
+        m_heap_lock.unlock();
+        restore_interrupts(flags);
+        return ptr;
+    }
     m_heap_lock.unlock();
     restore_interrupts(flags);
-
-    if (size <= old_size) return ptr;
 
     void* new_ptr = allocate(size);
     if (!new_ptr) return nullptr;
@@ -185,13 +192,23 @@ void MemoryManager::free(void* ptr) {
     }
 
     header->is_free = true;
-    
-    // Merge with next
-    if (header->next && header->next->is_free) {
-        if (header->next->magic == BlockHeader::MAGIC) {
-            header->size += sizeof(BlockHeader) + header->next->size;
-            header->next = header->next->next;
-        }
+
+    // Merge with next free block
+    if (header->next && header->next->is_free && header->next->magic == BlockHeader::MAGIC) {
+        BlockHeader* next = header->next;
+        header->size += sizeof(BlockHeader) + next->size;
+        header->next = next->next;
+        if (header->next)
+            header->next->prev = header;
+    }
+
+    // Merge with previous free block
+    if (header->prev && header->prev->is_free && header->prev->magic == BlockHeader::MAGIC) {
+        BlockHeader* prev = header->prev;
+        prev->size += sizeof(BlockHeader) + header->size;
+        prev->next = header->next;
+        if (prev->next)
+            prev->next->prev = prev;
     }
 
     m_heap_lock.unlock();

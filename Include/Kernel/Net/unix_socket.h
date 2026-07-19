@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Kernel/Net/socket.h>
+#include <Kernel/Net/unix_socket_buffer.h>
+#include <Kernel/Scheduler/Task/task.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 
@@ -30,18 +32,15 @@ public:
 private:
     SocketType m_type;
     fk::synchronization::Spinlock m_lock;
-    
+
     fk::RefPtr<UnixSocket> m_peer;
     fk::RefPtr<UnixSocket> m_backlog[16];
     size_t m_backlog_count{0};
     bool m_listening{false};
     bool m_connected{false};
+    Task* m_accept_waiter{nullptr};
 
-    // Buffer for IPC (simplified for now)
-    uint8_t* m_buffer{nullptr};
-    size_t m_buffer_size{0};
-    size_t m_read_ptr{0};
-    size_t m_write_ptr{0};
+    UnixSocketBuffer m_rx_buffer;
 };
 
 } // namespace fkernel

@@ -46,6 +46,13 @@ void serial::write_dec(int64_t value) {
   write(buffer);
 }
 
+size_t serial::read(uint8_t* buf, size_t max) {
+  size_t n = 0;
+  while (n < max && is_data_ready())
+    buf[n++] = static_cast<uint8_t>(inb(COM1));
+  return n;
+}
+
 void serial::write_hex(uint64_t value) {
   char buffer[17] = {};
   const char hex_chars[] = "0123456789ABCDEF";

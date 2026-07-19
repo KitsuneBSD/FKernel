@@ -1,4 +1,5 @@
 #include "Kernel/Hardware/Cpu/cpu_block.h"
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
@@ -102,12 +103,35 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   fkernel::ElfLoadResult elf_res = entry_res.value();
   uintptr_t entry = elf_res.entry;
 
-  // 3. Setup the user stack (32KB)
+  // 2.5 Setup TLS if PT_TLS is present (x86-64 variant II)
+  uint64_t tls_fs_base = 0;
+  if (elf_res.tls.present && elf_res.tls.memsz > 0) {
+    size_t tls_pages = (elf_res.tls.memsz + sizeof(uintptr_t) + 0xFFF) / 0x1000;
+    constexpr uintptr_t TLS_VIRT_BASE = 0x7FFFFE000000ULL;
+    for (size_t i = 0; i < tls_pages; ++i) {
+      uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
+      VirtualMemoryManager::the().map_page(TLS_VIRT_BASE + i * 0x1000, phys,
+                                           PageFlags::Present | PageFlags::Writable |
+                                               PageFlags::User);
+      memset(reinterpret_cast<void*>(TLS_VIRT_BASE + i * 0x1000), 0, 0x1000);
+    }
+    memcpy(reinterpret_cast<void*>(TLS_VIRT_BASE),
+           reinterpret_cast<const void*>(elf_res.tls.vaddr), elf_res.tls.filesz);
+    uintptr_t tp = TLS_VIRT_BASE + elf_res.tls.memsz;
+    *reinterpret_cast<uintptr_t*>(tp) = tp; // self-reference
+    tls_fs_base = tp;
+    task->resources.context.fs_base = tp;
+    CPU::the().write_msr(MSR_FS_BASE, tp);
+  }
+
+  // 3. Setup the user stack (32KB); enforce NX unless PT_GNU_STACK marks it executable
   constexpr uintptr_t USER_STACK_TOP = 0x7fffffffe000;
+  PageFlags stack_flags = PageFlags::Present | PageFlags::Writable | PageFlags::User;
+  if (!elf_res.stack_executable)
+    stack_flags = stack_flags | PageFlags::ExecuteDisable;
   for (uintptr_t v = USER_STACK_TOP - 0x8000; v < USER_STACK_TOP; v += 0x1000) {
     uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
-    VirtualMemoryManager::the().map_page(
-        v, phys, PageFlags::Present | PageFlags::Writable | PageFlags::User);
+    VirtualMemoryManager::the().map_page(v, phys, stack_flags);
     memset(reinterpret_cast<void*>(v), 0, 0x1000);
   }
 
@@ -115,7 +139,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   auto push_string = [&](const fk::text::String& s) -> uintptr_t {
     size_t len = s.length() + 1;
     current_user_stack -= len;
-    memcpy(reinterpret_cast<void*>(current_user_stack), s.c_str(), len);
+    fkernel::memory::copy_to_user(reinterpret_cast<void*>(current_user_stack), s.c_str(), len);
     return current_user_stack;
   };
 
@@ -137,7 +161,7 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
 
   // 4. Construct the pointer array below the strings
   current_user_stack &= ~0xFULL; // Alignment
-  constexpr size_t auxv_pairs = 10;
+  size_t auxv_pairs = tls_fs_base ? 11u : 10u;
   size_t total_ptrs = 1 + args.size() + 1 + envs.size() + 1 + (auxv_pairs * 2);
   if (total_ptrs % 2 != 0)
     total_ptrs++; // 16-byte alignment requirement
@@ -147,6 +171,8 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
 
   uintptr_t* stack_ptr = reinterpret_cast<uintptr_t*>(current_user_stack);
   size_t idx = 0;
+
+  if (CPU::the().has_smap()) asm volatile("stac" ::: "memory");
 
   stack_ptr[idx++] = args.size();
   for (size_t i = 0; i < arg_ptrs.size(); ++i)
@@ -176,8 +202,14 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   stack_ptr[idx++] = random_ptr; // AT_RANDOM
   stack_ptr[idx++] = 31;
   stack_ptr[idx++] = execfn_ptr; // AT_EXECFN
+  if (tls_fs_base) {
+    stack_ptr[idx++] = 51; // AT_MINSIGSTKSZ reused as AT_TLS base signal
+    stack_ptr[idx++] = tls_fs_base;
+  }
   stack_ptr[idx++] = 0;
   stack_ptr[idx++] = 0; // AT_NULL
+
+  if (CPU::the().has_smap()) asm volatile("clac" ::: "memory");
 
   uintptr_t final_rsp = current_user_stack;
 

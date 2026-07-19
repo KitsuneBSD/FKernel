@@ -12,8 +12,9 @@ public:
     }
     virtual ~SerialNode() override = default;
 
-    virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t, uint8_t*) override {
-        return fk::core::Error::NotImplemented;
+    virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t size, uint8_t* buffer) override {
+        if (!buffer || size == 0) return fk::core::Error::InvalidParameter;
+        return serial::read(buffer, size);
     }
 
     virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t, size_t size, const uint8_t* buffer) override {

@@ -5,6 +5,29 @@
 
 namespace fkernel {
 
+static fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
+resolve_symlink(VirtualFileSystem& vfs, fk::RefPtr<Dentry> dentry, int depth) {
+  auto link_res = dentry->top_node()->read_link();
+  if (link_res.is_error())
+    return link_res.error();
+  auto& link = link_res.value();
+  auto base = link.c_str()[0] == '/' ? nullptr : dentry->parent();
+  return vfs.resolve_path_unlocked(link.c_str(), base, depth + 1);
+}
+
+static const char* skip_slashes(const char* ptr) {
+  while (*ptr == '/') ++ptr;
+  return ptr;
+}
+
+static const char* read_component(const char* ptr, char* out, size_t max) {
+  size_t i = 0;
+  while (*ptr && *ptr != '/' && i < max - 1)
+    out[i++] = *ptr++;
+  out[i] = '\0';
+  return ptr;
+}
+
 fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
 VirtualFileSystem::resolve_path(const char *path, fk::RefPtr<Dentry> base, int depth) {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
@@ -20,51 +43,43 @@ VirtualFileSystem::resolve_path_unlocked(const char *path, fk::RefPtr<Dentry> ba
   const char *ptr = path;
 
   if (path[0] == '/') {
-      while (*ptr == '/') ptr++;
+    ptr = skip_slashes(ptr);
   } else if (base) {
-      current = base;
+    current = base;
   } else {
-      auto *task = SchedulerManager::the().current();
-      if (task && !task->resources.files.cwd.empty()) {
-          auto cwd_res = resolve_path_unlocked(task->resources.files.cwd.c_str(), nullptr, depth + 1);
-          if (cwd_res.is_ok()) current = cwd_res.value();
-      }
+    auto *task = SchedulerManager::the().current();
+    if (task && !task->resources.files.cwd.empty()) {
+      auto cwd_res = resolve_path_unlocked(task->resources.files.cwd.c_str(), nullptr, depth + 1);
+      if (cwd_res.is_ok()) current = cwd_res.value();
+    }
   }
 
   while (*ptr) {
     char name[256];
-    size_t i = 0;
-    while (*ptr && *ptr != '/' && i < 255) name[i++] = *ptr++;
-    name[i] = '\0';
+    ptr = read_component(ptr, name, sizeof(name));
 
     if (name[0] == '\0' || strcmp(name, ".") == 0) {
-        while (*ptr == '/') ptr++;
-        continue;
+      ptr = skip_slashes(ptr);
+      continue;
+    }
+
+    if (strcmp(name, "..") == 0) {
+      if (current->parent()) current = current->parent();
+      ptr = skip_slashes(ptr);
+      continue;
     }
 
     auto next_res = current->lookup(name);
     if (next_res.is_error()) return next_res.error();
     current = next_res.value();
 
-    int symlink_depth = 0;
-    while (current->top_node() && current->top_node()->is_symlink() && symlink_depth < 8) {
-        auto link_res = current->top_node()->read_link();
-        if (link_res.is_error()) return link_res.error();
-        
-        fk::text::String link = link_res.value();
-        if (link.c_str()[0] == '/') {
-            auto sub_res = resolve_path_unlocked(link.c_str(), nullptr, depth + 1);
-            if (sub_res.is_error()) return sub_res.error();
-            current = sub_res.value();
-        } else {
-            auto sub_res = resolve_path_unlocked(link.c_str(), current->parent(), depth + 1);
-            if (sub_res.is_error()) return sub_res.error();
-            current = sub_res.value();
-        }
-        symlink_depth++;
+    for (int sl = 0; current->top_node() && current->top_node()->is_symlink() && sl < 8; ++sl) {
+      auto res = resolve_symlink(*this, current, depth);
+      if (res.is_error()) return res.error();
+      current = res.value();
     }
 
-    while (*ptr == '/') ptr++;
+    ptr = skip_slashes(ptr);
   }
 
   return current;

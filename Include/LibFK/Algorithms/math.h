@@ -26,5 +26,20 @@ template <typename T> T floor(T x, T y) {
   return q;
 }
 
+template <typename T>
+constexpr T abs(T x) { return x < 0 ? -x : x; }
+
+template <typename T>
+constexpr void swap(T& a, T& b) {
+  T tmp = static_cast<T&&>(a);
+  a = static_cast<T&&>(b);
+  b = static_cast<T&&>(tmp);
+}
+
+template <typename T>
+constexpr T clamp(T value, T lo, T hi) {
+  return value < lo ? lo : value > hi ? hi : value;
+}
+
 } // namespace algorithms
 } // namespace fk

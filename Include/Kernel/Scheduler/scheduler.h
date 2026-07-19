@@ -31,7 +31,9 @@ public:
         return instance;
     }
 
-    fk::ProcessId generate_pid() { return fk::ProcessId(m_next_pid++); }
+    fk::ProcessId generate_pid() {
+      return fk::ProcessId(__sync_fetch_and_add(&m_next_pid, 1));
+    }
 
     void initialize();
     void add_task(Task* task);
@@ -52,10 +54,12 @@ public:
     void reap_zombie(Task* task);
 
     Task* pick_next();
-    
+    Task* steal_task(uint32_t stealing_cpu);
+
     fkernel::Processor& current_processor();
     Task* current() { return current_processor().current_task; }
     
     bool is_need_resched() { return current_processor().need_resched; }
     void set_need_resched(bool value) { current_processor().need_resched = value; }
+    bool is_initialized() const { return m_is_initialized; }
 };

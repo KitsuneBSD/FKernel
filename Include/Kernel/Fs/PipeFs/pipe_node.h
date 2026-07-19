@@ -18,19 +18,18 @@ public:
     virtual size_t size() const override { return m_buffer.size(); }
     virtual bool is_directory() const override { return false; }
 
-    void set_eof() { m_eof = true; m_notification.signal(DATA_AVAILABLE); }
+    void set_eof() { m_eof = true; m_data_notification.signal(1); }
 
 private:
     static constexpr size_t PIPE_BUFFER_SIZE = 65536;
-    static constexpr uint64_t DATA_AVAILABLE = 1 << 0;
-    static constexpr uint64_t SPACE_AVAILABLE = 1 << 1;
 
     fk::containers::Vector<uint8_t> m_buffer;
     size_t m_read_pos{0};
     size_t m_write_pos{0};
     bool m_eof{false};
 
-    ipc::Notification m_notification;
+    ipc::Notification m_data_notification;
+    ipc::Notification m_space_notification;
 };
 
 } // namespace fkernel

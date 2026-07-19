@@ -168,6 +168,65 @@ public:
         return compare(other) >= 0;
     }
 
+    static constexpr size_type NPOS = ~size_type(0);
+
+    constexpr bool is_empty() const noexcept { return m_size == 0; }
+
+    constexpr const_reference front() const noexcept { return m_data[0]; }
+    constexpr const_reference back() const noexcept { return m_data[m_size - 1]; }
+
+    constexpr void remove_prefix(size_type n) noexcept {
+        m_data += n;
+        m_size -= n;
+    }
+
+    constexpr void remove_suffix(size_type n) noexcept {
+        m_size -= n;
+    }
+
+    constexpr StringView substr(size_type pos, size_type count = NPOS) const noexcept {
+        if (pos >= m_size) return StringView();
+        size_type available = m_size - pos;
+        size_type len = (count == NPOS || count > available) ? available : count;
+        return StringView(m_data + pos, len);
+    }
+
+    constexpr size_type find(char c, size_type pos = 0) const noexcept {
+        for (size_type i = pos; i < m_size; ++i) {
+            if (m_data[i] == c) return i;
+        }
+        return NPOS;
+    }
+
+    constexpr size_type rfind(char c, size_type pos = NPOS) const noexcept {
+        if (m_size == 0) return NPOS;
+        size_type i = (pos == NPOS || pos >= m_size) ? m_size - 1 : pos;
+        while (true) {
+            if (m_data[i] == c) return i;
+            if (i == 0) break;
+            --i;
+        }
+        return NPOS;
+    }
+
+    constexpr bool starts_with(StringView sv) const noexcept {
+        if (sv.m_size > m_size) return false;
+        return memcmp(m_data, sv.m_data, sv.m_size) == 0;
+    }
+
+    constexpr bool starts_with(char c) const noexcept {
+        return m_size > 0 && m_data[0] == c;
+    }
+
+    constexpr bool ends_with(StringView sv) const noexcept {
+        if (sv.m_size > m_size) return false;
+        return memcmp(m_data + m_size - sv.m_size, sv.m_data, sv.m_size) == 0;
+    }
+
+    constexpr bool ends_with(char c) const noexcept {
+        return m_size > 0 && m_data[m_size - 1] == c;
+    }
+
 private:
     const char* m_data;
     size_type m_size;

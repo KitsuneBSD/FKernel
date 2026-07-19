@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Core/Assertions.h>
 #include <LibFK/Core/Error.h>
 #include <LibFK/Memory/optional.h>
 #include <LibFK/Types/types.h>
@@ -36,17 +37,17 @@ public:
   explicit operator bool() const { return is_ok(); }
 
   const T &value() const {
-    // ASSERT(is_ok()); // Consider adding assertions for debug builds
+    ASSERT(is_ok());
     return m_value.value();
   }
 
   T &value() {
-    // ASSERT(is_ok()); // Consider adding assertions for debug builds
+    ASSERT(is_ok());
     return m_value.value();
   }
 
   E error() const {
-    // ASSERT(is_error()); // Consider adding assertions for debug builds
+    ASSERT(is_error());
     return m_error;
   }
 
@@ -82,13 +83,12 @@ public:
   // Allow using in if statements: if (res) { ... }
   explicit operator bool() const { return is_ok(); }
 
-  // No value() method for void specialization.
   void value() const {
-    // ASSERT(is_ok()); // Consider adding assertions for debug builds
+    ASSERT(is_ok());
   }
 
   E error() const {
-    // ASSERT(is_error()); // Consider adding assertions for debug builds
+    ASSERT(is_error());
     return m_error;
   }
 

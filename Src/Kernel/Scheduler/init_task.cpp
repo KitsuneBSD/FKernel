@@ -98,8 +98,11 @@ static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintp
   uintptr_t argv0_addr = user_stack_top - 128;
   uintptr_t envp0_addr = user_stack_top - 96;
 
-  // Space for auxv: we need more pointers
-  uintptr_t* pointers = reinterpret_cast<uintptr_t*>(string_area) - 25;
+  // Space for auxv: allocate 25 slots then align RSP to 16 bytes.
+  // System V ABI: RSP at _start must be 16-byte aligned so that after
+  // `call main` (which pushes 8 bytes) + `push rbp`, movaps targets are aligned.
+  uintptr_t raw_ptr = reinterpret_cast<uintptr_t>(reinterpret_cast<uintptr_t*>(string_area) - 25);
+  uintptr_t* pointers = reinterpret_cast<uintptr_t*>(raw_ptr & ~(uintptr_t)15);
   size_t idx = 0;
   pointers[idx++] = 1;          // argc
   pointers[idx++] = argv0_addr; // argv[0]

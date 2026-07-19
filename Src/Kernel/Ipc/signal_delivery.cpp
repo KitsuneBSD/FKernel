@@ -1,6 +1,7 @@
 #include <Kernel/Ipc/cspace.h>
 #include <Kernel/Ipc/notification.h>
 #include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/signal_frame.h>
 #include <Kernel/Ipc/ipc_log_node.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -72,22 +73,42 @@ void SignalDelivery::handle_pending_signals(Task *task, PtRegs* regs) {
           }
 
           // Custom Handler
-          if (!regs) {
-              // We need PtRegs to manipulate user stack/RIP
+          if (!regs)
               return;
+
+          uint64_t handler_addr = reinterpret_cast<uint64_t>(action.sa_handler);
+
+          // Reject kernel-space handler addresses
+          static constexpr uint64_t USERSPACE_MAX = 0x0000800000000000ULL;
+          if (handler_addr >= USERSPACE_MAX) {
+              fk::algorithms::kerror("SIGNAL", "Task %lu: sa_handler %p is not in userspace — ignoring",
+                  task->control.identity.id.value(), (void*)handler_addr);
+              continue;
           }
 
-          // 1. Prepare user stack
-          regs->rsp -= 128;
-          
-          // 2. Redirect to handler
-          regs->rdi = sig;
-          regs->rip = reinterpret_cast<uint64_t>(action.sa_handler);
-          
+          // Build full signal frame on user stack.
+          // Frame layout (rsp → pretcode, then saved_regs):
+          //   When handler does RET, rsp advances by 8 (past pretcode) and
+          //   we are at the restorer which calls sys_rt_sigreturn.
+          //   sys_rt_sigreturn reads saved_regs from [regs->rsp].
+          uint64_t restorer = reinterpret_cast<uint64_t>(action.sa_restorer);
+          if (!restorer || restorer >= USERSPACE_MAX) restorer = 0;
+
+          uint64_t user_sp = regs->rsp & ~15ULL;
+          user_sp -= sizeof(KernelSignalFrame);
+
+          auto* frame = reinterpret_cast<KernelSignalFrame*>(user_sp);
+          frame->pretcode  = restorer;
+          frame->saved_regs = *regs;
+
+          regs->rsp = user_sp;
+          regs->rdi = static_cast<uint64_t>(sig);
+          regs->rip = handler_addr;
+
           fk::algorithms::klog("SIGNAL", "Redirecting Task %lu to handler %p for signal %d",
               task->control.identity.id.value(), (void*)regs->rip, sig);
 
-          return; // Process one signal at a time
+          return;
       }
   }
 }

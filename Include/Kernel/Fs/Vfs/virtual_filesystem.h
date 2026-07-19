@@ -52,6 +52,9 @@ public:
 
   fk::core::Result<void, fk::core::Error> stat(const char* path, struct stat* buf);
 
+  fk::core::Result<void, fk::core::Error> truncate(const char* path, uint64_t size);
+  fk::core::Result<void, fk::core::Error> fsync(fk::RefPtr<FileDescription> desc);
+
   fk::core::Result<void, fk::core::Error> unmount(const char* path);
 
   fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>

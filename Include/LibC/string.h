@@ -239,6 +239,23 @@ char *strnchr(const char *s, int c, size_t n);
  */
 int strncmp(const char *s1, const char *s2, size_t n);
 
+char *strdup(const char *s);
+char *strndup(const char *s, size_t n);
+char *strerror(int errnum);
+
+/* These use C signatures that conflict with C++ hosted overloads —
+   only declare in the freestanding kernel build. */
+#if !defined(__STDC_HOSTED__) || defined(__FKERNEL_FREESTANDING__)
+char *strstr(const char *haystack, const char *needle);
+int strcasecmp(const char *s1, const char *s2);
+int strncasecmp(const char *s1, const char *s2, size_t n);
+void *memchr(const void *s, int c, size_t n);
+char *strncat(char *dest, const char *src, size_t n);
+char *strpbrk(const char *s, const char *accept);
+size_t strspn(const char *s, const char *accept);
+size_t strcspn(const char *s, const char *reject);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

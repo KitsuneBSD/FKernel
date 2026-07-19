@@ -295,14 +295,74 @@ fk::core::Result<void, fk::core::Error> NVMeController::identify_controller() {
 }
 
 void NVMeController::scan_namespaces() {
-    Namespace ns;
-    ns.nsid = 1;
-    ns.size_blocks = 1024 * 1024 * 4; // 4M blocks = 16GB
-    ns.block_size = 4096;
-    ns.active = true;
-    m_namespaces.push_back(ns);
-    
-    fk::algorithms::klog("NVMe", "Namespace scan complete (placeholder)");
+    // Step 1: Identify Active Namespace List (CNS=0x02)
+    uintptr_t ns_list_phys = PhysicalMemoryManager::the().alloc_page();
+    MemoryManager::the().map_page(ns_list_phys, ns_list_phys,
+        PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+    memset(reinterpret_cast<void*>(ns_list_phys), 0, 4096);
+
+    Command cmd;
+    memset(&cmd, 0, sizeof(Command));
+    cmd.cdw0 = NVME_CMD_IDENTIFY;
+    cmd.prp1 = ns_list_phys;
+    cmd.cdw10 = 0x02; // CNS=0x02: Active NS ID list
+
+    if (submit_command(m_admin_queue, cmd).is_error()) {
+        fk::algorithms::kwarn("NVMe", "Active NS list failed — falling back to NSID=1");
+        Namespace ns;
+        ns.nsid = 1; ns.size_blocks = 0; ns.block_size = 512; ns.active = true;
+        m_namespaces.push_back(ns);
+        return;
+    }
+
+    auto* ns_ids = reinterpret_cast<uint32_t*>(ns_list_phys);
+
+    // Step 2: Identify each namespace (CNS=0x00)
+    uintptr_t ns_data_phys = PhysicalMemoryManager::the().alloc_page();
+    MemoryManager::the().map_page(ns_data_phys, ns_data_phys,
+        PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
+
+    for (int i = 0; i < 1024 && ns_ids[i] != 0; ++i) {
+        uint32_t nsid = ns_ids[i];
+        memset(reinterpret_cast<void*>(ns_data_phys), 0, 4096);
+
+        Command ns_cmd;
+        memset(&ns_cmd, 0, sizeof(Command));
+        ns_cmd.cdw0 = NVME_CMD_IDENTIFY;
+        ns_cmd.nsid = nsid;
+        ns_cmd.prp1 = ns_data_phys;
+        ns_cmd.cdw10 = 0x00; // CNS=0x00: Identify Namespace
+
+        if (submit_command(m_admin_queue, ns_cmd).is_error()) continue;
+
+        auto* data = reinterpret_cast<uint8_t*>(ns_data_phys);
+        uint64_t nsze = *reinterpret_cast<uint64_t*>(data + 0);
+        uint8_t flbas = data[26] & 0x0F;
+        uint32_t lbaf = *reinterpret_cast<uint32_t*>(data + 128 + flbas * 4);
+        uint8_t lbads = (lbaf >> 16) & 0xFF; // log2(block_size)
+        uint32_t block_size = lbads ? (1u << lbads) : 512;
+
+        if (nsze == 0) nsze = 1024 * 1024; // fallback if identify returns 0
+
+        Namespace ns;
+        ns.nsid = nsid;
+        ns.size_blocks = nsze;
+        ns.block_size = block_size;
+        ns.active = true;
+        m_namespaces.push_back(ns);
+
+        fk::algorithms::klog("NVMe", "Found NS %u: %llu blocks * %u bytes",
+                              nsid, (unsigned long long)nsze, block_size);
+    }
+
+    if (m_namespaces.size() == 0) {
+        fk::algorithms::kwarn("NVMe", "No namespaces found — adding NSID=1 as fallback");
+        Namespace ns;
+        ns.nsid = 1; ns.size_blocks = 1024 * 1024; ns.block_size = 512; ns.active = true;
+        m_namespaces.push_back(ns);
+    }
+
+    fk::algorithms::klog("NVMe", "scan_namespaces: found %zu namespace(s)", m_namespaces.size());
 }
 
 void NVMeController::probe() {

@@ -1,6 +1,7 @@
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/signal_frame.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -68,10 +69,19 @@ uint64_t sys_sigprocmask(uint64_t how, uint64_t set_ptr, uint64_t oldset_ptr, ui
     return 0;
 }
 
-uint64_t sys_sigreturn(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*) {
-    // TODO: Implement proper context restoration. 
-    // This requires saving the PtRegs on the user stack and popping it back.
-    return 0;
+uint64_t sys_sigreturn(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs* regs) {
+    if (!regs) return -1;
+
+    // After handler RET, rsp points to saved_regs (pretcode already popped).
+    // Read the KernelSignalFrame that was placed there by handle_pending_signals.
+    uint64_t frame_ptr = regs->rsp;
+    static constexpr uint64_t USERSPACE_MAX = 0x0000800000000000ULL;
+    if (frame_ptr >= USERSPACE_MAX || frame_ptr == 0) return -1;
+
+    const auto* saved = reinterpret_cast<const PtRegs*>(frame_ptr);
+    *regs = *saved;
+    // rax = 0 means the syscall "returns 0" — overwritten by restoring saved_regs
+    return regs->rax;
 }
 
 }

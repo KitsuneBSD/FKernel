@@ -106,19 +106,19 @@ fk::core::Result<uint8_t, fk::core::Error> X2APIC::allocate_msi_vector(const Pci
     uint8_t vector = g_next_msi_vector++;
     if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
 
-    // Configure MSI on the device
-    device.write_config_dword(msi_ptr + 4, 0xFEE00000);
-    
+    uint32_t msi_addr = static_cast<uint32_t>(
+        CPU::the().read_msr(X2APIC_BASE_MSR) & 0xFFFFF000ULL);
+    device.write_config_dword(msi_ptr + 4, msi_addr);
+
     uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
     if (msg_ctrl & (1 << 7)) { // 64-bit support
-        device.write_config_dword(msi_ptr + 8, 0); 
+        device.write_config_dword(msi_ptr + 8, 0);
         device.write_config_word(msi_ptr + 12, vector);
     } else {
         device.write_config_word(msi_ptr + 8, vector);
     }
 
-    // Enable MSI
-    msg_ctrl |= 0x01; 
+    msg_ctrl |= 0x01;
     device.write_config_word(msi_ptr + 2, msg_ctrl);
 
     fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) via x2APIC for device %02x:%02x.%d", 

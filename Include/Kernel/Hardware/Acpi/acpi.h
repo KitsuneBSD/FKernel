@@ -31,6 +31,7 @@ private:
   RSDT *m_rsdt{nullptr};
   XSDT *m_xsdt{nullptr};
   Madt *m_madt{nullptr};
+  uintptr_t m_ioapic_address{0xFEC00000};
 
 public:
   static ACPIManager &the();
@@ -38,4 +39,6 @@ public:
   void initialize();
   void *find_table(const char *signature);
   Madt *get_madt() const { return m_madt; }
+  uintptr_t ioapic_address() const { return m_ioapic_address; }
+  void set_ioapic_address(uintptr_t addr) { m_ioapic_address = addr; }
 };

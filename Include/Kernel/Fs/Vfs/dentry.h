@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/dentry_node_stack.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
@@ -21,7 +22,7 @@ public:
     void push_node(fk::RefPtr<Node> node);
     void pop_node();
     fk::RefPtr<Node> top_node() const;
-    const fk::containers::Vector<fk::RefPtr<Node>>& nodes() const { return m_nodes; }
+    const fk::containers::Vector<fk::RefPtr<Node>>& nodes() const { return m_node_stack.all(); }
 
     // Child Management
     fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> lookup(const char* name);
@@ -36,7 +37,7 @@ private:
     mutable fk::synchronization::Spinlock m_lock;
     fk::text::String m_name;
     fk::RefPtr<Dentry> m_parent;
-    fk::containers::Vector<fk::RefPtr<Node>> m_nodes;
+    DentryNodeStack m_node_stack;
     fk::containers::Vector<fk::RefPtr<Dentry>> m_children;
 };
 

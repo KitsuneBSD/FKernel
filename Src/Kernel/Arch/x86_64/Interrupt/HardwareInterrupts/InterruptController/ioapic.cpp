@@ -1,5 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
@@ -20,8 +21,10 @@ void IOAPIC::write(uint32_t reg, uint32_t value) {
 }
 
 void IOAPIC::initialize() {
-  ioapic_base = IOAPIC_ADDRESS;
-  fk::algorithms::klog("IOAPIC", "Initializing IOAPIC at %p", ioapic_base);
+  uintptr_t acpi_addr = ACPIManager::the().ioapic_address();
+  ioapic_base = (acpi_addr != 0) ? acpi_addr : IOAPIC_ADDRESS;
+  fk::algorithms::klog("IOAPIC", "Initializing IOAPIC at %p (%s)",
+                       ioapic_base, (acpi_addr != 0) ? "MADT" : "hardcoded");
 
   // Map I/O APIC registers
   MemoryManager::the().map_page(ioapic_base, ioapic_base,
@@ -98,20 +101,20 @@ fk::core::Result<uint8_t, fk::core::Error> IOAPIC::allocate_msi_vector(const Pci
     uint8_t vector = g_next_msi_vector++;
     if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
 
-    // Configure MSI on the device
-    // Message Address: 0xFEE00000 (Targeting CPU 0)
-    device.write_config_dword(msi_ptr + 4, 0xFEE00000);
-    
+    uint32_t msi_addr = static_cast<uint32_t>(APIC::the().msi_address_base());
+    if (msi_addr == 0)
+        msi_addr = 0xFEE00000;
+    device.write_config_dword(msi_ptr + 4, msi_addr);
+
     uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
     if (msg_ctrl & (1 << 7)) { // 64-bit support
-        device.write_config_dword(msi_ptr + 8, 0); // Upper address
-        device.write_config_word(msi_ptr + 12, vector); // Message Data
+        device.write_config_dword(msi_ptr + 8, 0);
+        device.write_config_word(msi_ptr + 12, vector);
     } else {
-        device.write_config_word(msi_ptr + 8, vector); // Message Data
+        device.write_config_word(msi_ptr + 8, vector);
     }
 
-    // Enable MSI in Message Control register
-    msg_ctrl |= 0x01; 
+    msg_ctrl |= 0x01;
     device.write_config_word(msi_ptr + 2, msg_ctrl);
 
     fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) for device %02x:%02x.%d", 

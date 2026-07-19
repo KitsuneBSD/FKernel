@@ -1,5 +1,7 @@
 #pragma once
 
+#include <LibFK/Types/types.h>
+
 namespace fk {
 namespace utilities {
 
@@ -28,22 +30,27 @@ template <typename T1, typename T2> struct Pair {
    */
   constexpr Pair(const T1 &a, const T2 &b) : first(a), second(b) {}
 
-  /**
-   * @brief Copy constructor.
-   * @param other Another pair to copy from
-   */
+  constexpr Pair(T1 &&a, T2 &&b)
+      : first(fk::types::move(a)), second(fk::types::move(b)) {}
+
   constexpr Pair(const Pair &other)
       : first(other.first), second(other.second) {}
 
-  /**
-   * @brief Copy assignment operator.
-   * @param other Another pair to copy from
-   * @return Reference to this pair
-   */
+  constexpr Pair(Pair &&other)
+      : first(fk::types::move(other.first)), second(fk::types::move(other.second)) {}
+
   Pair &operator=(const Pair &other) {
     if (this != &other) {
       first = other.first;
       second = other.second;
+    }
+    return *this;
+  }
+
+  Pair &operator=(Pair &&other) {
+    if (this != &other) {
+      first = fk::types::move(other.first);
+      second = fk::types::move(other.second);
     }
     return *this;
   }

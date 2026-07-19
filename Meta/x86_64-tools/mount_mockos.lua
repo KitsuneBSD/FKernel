@@ -104,7 +104,11 @@ if Iso.prepare_grub(MOCKOS, "Config/grub.cfg", "build/FKernel.bin") then
 end
 
 if not OSInteract.FileExists("build/FKernel-HDA.qcow2") then
-  RunCommand("qemu-img create -f qcow2 build/FKernel-HDA.qcow2 4G >/dev/null 2>&1")
+  PrintMessage(false, "Creating partitioned disk image...")
+  if not RunCommand("lua Meta/x86_64-tools/create_hda.lua") then
+    PrintMessage(true, "create_hda.lua failed — creating blank fallback image")
+    RunCommand("qemu-img create -f qcow2 build/FKernel-HDA.qcow2 4G >/dev/null 2>&1")
+  end
 end
 
 PrintMessage(false, "FKernel build process completed.")

@@ -13,6 +13,7 @@ class Notification {
     fk::synchronization::Spinlock m_lock;
     uint64_t m_pending_bits{0};
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_waiting_tasks;
+    uint64_t m_generation{0};
 
 public:
     Notification() = default;
@@ -25,6 +26,11 @@ public:
 
     /// @brief Non-blocking poll.
     uint64_t poll();
+
+    /// @brief Revoke all capabilities pointing to this notification.
+    void revoke() { ++m_generation; }
+    const uint64_t* generation_ptr() const { return &m_generation; }
+    uint64_t generation() const { return m_generation; }
 };
 
 }

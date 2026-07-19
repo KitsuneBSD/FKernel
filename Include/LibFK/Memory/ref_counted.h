@@ -10,11 +10,11 @@ template <typename T>
 class RefCounted {
 public:
     void ref() const {
-        m_ref_count++;
+        __sync_fetch_and_add(&m_ref_count, 1);
     }
 
     void unref() const {
-        if (--m_ref_count == 0) {
+        if (__sync_sub_and_fetch(&m_ref_count, 1) == 0) {
             delete static_cast<const T*>(this);
         }
     }
