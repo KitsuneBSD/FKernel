@@ -34,4 +34,10 @@ public:
   void write_config_byte(uint8_t offset, uint8_t value) const;
 
   uint8_t find_capability(uint8_t cap_id) const;
+
+  // BAR accessors (BAR index 0–5)
+  uintptr_t bar_base(uint8_t index) const;
+  size_t    bar_size(uint8_t index) const;
+  bool      bar_is_io(uint8_t index) const;
+  bool      bar_is_64bit(uint8_t index) const;
 };

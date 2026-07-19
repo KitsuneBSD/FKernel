@@ -2,6 +2,8 @@
 #include <Kernel/Boot/Stages/init.h>
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
+#include <Kernel/Driver/Mouse/ps2_mouse.h>
+#include <Kernel/Io/kernel_puts.h>
 #include <Kernel/Driver/Storage/Ata/ata_controller.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Vga/display_framebuffer.h>
@@ -14,6 +16,9 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
 void init() {
+  // 0. Register kernel puts hook (routes libc_puts to serial/VGA/DebugFS)
+  fkernel::io::initialize_kernel_puts();
+
   // 0. Pre-init: Force serial logs for real hardware debugging
   fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial);
   fk::algorithms::klog("SYSTEM", "FKernel Live-Minimal starting on real hardware...");
@@ -61,6 +66,10 @@ void init() {
   // 2. Inicializa Teclado (legacy PS/2 device, not PCI)
   PS2Keyboard::the().initialize();
   driver_manager.register_device(fk::RefPtr<Node>(&PS2Keyboard::the()));
+
+  // 3. Inicializa Mouse (legacy PS/2 IRQ12)
+  PS2Mouse::the().initialize();
+  driver_manager.register_device(fk::RefPtr<Node>(&PS2Mouse::the()));
 
   SchedulerManager::the().initialize();
   SyscallManager::the().initialize();

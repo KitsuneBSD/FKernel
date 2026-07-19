@@ -65,6 +65,8 @@ void ACPIManager::process_madt_entries() {
         auto *ioapic = (MADT_IOAPIC *)entry;
         fk::algorithms::klog("MADT", "  Entry %u: I/O APIC (ID: %u, Address: %p, GSI Base: %u)",
                              entry_count, ioapic->ioapic_id, (void *)(uintptr_t)ioapic->address, ioapic->gsi_base);
+        if (ioapic->address != 0 && ioapic->gsi_base == 0)
+          set_ioapic_address(static_cast<uintptr_t>(ioapic->address));
         break;
       }
       case 2: { // Interrupt Source Override

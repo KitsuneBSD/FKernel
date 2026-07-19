@@ -52,6 +52,13 @@ public:
     }
 
     void clear() {
+        if (!__is_trivially_destructible(T)) {
+            for (size_t i = 0; i < m_size; ++i) {
+                size_t idx = (m_tail + i) % N;
+                m_data[idx].~T();
+                new (&m_data[idx]) T{};
+            }
+        }
         m_head = 0;
         m_tail = 0;
         m_size = 0;

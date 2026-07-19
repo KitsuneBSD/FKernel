@@ -6,10 +6,16 @@ extern syscall_stub_post_dispatch
 section .text
 bits 64
 
-; void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr)
+; void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr,
+;                     void* prev_fx, void* next_fx)
 ; rdi = pointer to prev_stack_ptr
 ; rsi = next_stack_ptr
+; rdx = prev_fx (16-byte aligned, always valid)
+; rcx = next_fx (16-byte aligned, always valid)
 switch_context:
+    ; Save FPU/SSE state for outgoing task
+    fxsave [rdx]
+
     ; Save callee-saved registers
     push rbx
     push rbp
@@ -31,6 +37,9 @@ switch_context:
     pop r12
     pop rbp
     pop rbx
+
+    ; Restore FPU/SSE state for incoming task
+    fxrstor [rcx]
 
     ret
 

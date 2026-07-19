@@ -60,6 +60,26 @@ public:
     m_data[--m_metadata.size].~T();
   }
 
+  void insert_at(size_t index, const T &value) {
+    ensure_capacity(m_metadata.size + 1);
+    for (size_t i = m_metadata.size; i > index; --i) {
+      new (&m_data[i]) T(fk::types::move(m_data[i - 1]));
+      m_data[i - 1].~T();
+    }
+    new (&m_data[index]) T(value);
+    ++m_metadata.size;
+  }
+
+  void remove_at(size_t index) {
+    ASSERT(index < m_metadata.size);
+    m_data[index].~T();
+    for (size_t i = index + 1; i < m_metadata.size; ++i) {
+      new (&m_data[i - 1]) T(fk::types::move(m_data[i]));
+      m_data[i].~T();
+    }
+    --m_metadata.size;
+  }
+
   T &operator[](size_t index) {
     ASSERT(index < m_metadata.size);
     return m_data[index];

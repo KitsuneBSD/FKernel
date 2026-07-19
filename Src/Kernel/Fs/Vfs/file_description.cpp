@@ -35,7 +35,7 @@ FileDescription::read(size_t size, uint8_t *buffer) {
     return result.error();
   }
 
-  m_current_offset += result.value();
+  __sync_fetch_and_add(&m_current_offset, result.value());
   return result;
 }
 
@@ -64,7 +64,7 @@ FileDescription::write(size_t size, const uint8_t *buffer) {
     return result.error();
   }
 
-  m_current_offset += result.value();
+  __sync_fetch_and_add(&m_current_offset, result.value());
   return result;
 }
 

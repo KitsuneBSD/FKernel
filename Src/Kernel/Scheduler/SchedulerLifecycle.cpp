@@ -4,7 +4,6 @@
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
-#include <Kernel/Driver/Vga/display.h>
 
 using namespace fk::synchronization;
 
@@ -28,7 +27,7 @@ void SchedulerManager::zombify_current() {
   if (!proc.current_task) return;
 
   Task* task = proc.current_task;
-  task->control.lifecycle.state = TaskState::Blocked;
+  task->control.lifecycle.state = TaskState::Zombie;
   task->control.lifecycle.terminated = true;
   {
     ScopedLock lock(m_lock);
@@ -60,6 +59,7 @@ void SchedulerManager::reap_zombie(Task* task) {
     m_zombie_queue.remove(task);
   }
   task->invalidate();
+  delete task;
 }
 
 void SchedulerManager::wake_task(Task* task) {
@@ -82,6 +82,8 @@ void SchedulerManager::wake_task(Task* task) {
       break;
     }
   }
+  if (target_cpu >= m_processor_count)
+    target_cpu = 0;
 
   {
     ScopedLock lock(m_processors[target_cpu].run_queue_lock);
@@ -109,6 +111,19 @@ void SchedulerManager::terminate_current(int status) {
   schedule();
 }
 
+static uint32_t find_least_loaded_cpu(fkernel::Processor* processors, uint32_t count) {
+  uint32_t best_cpu = 0;
+  size_t min_tasks = processors[0].run_queue.size();
+  for (uint32_t i = 1; i < count; ++i) {
+    size_t tasks = processors[i].run_queue.size();
+    if (tasks < min_tasks) {
+      min_tasks = tasks;
+      best_cpu = i;
+    }
+  }
+  return best_cpu;
+}
+
 void SchedulerManager::add_task(Task* task) {
   if (!task || !task->is_valid()) return;
   ScopedInterruptDisabler intr_disabler;
@@ -124,11 +139,10 @@ void SchedulerManager::add_task(Task* task) {
         break;
       }
     }
+    if (target_cpu >= m_processor_count) target_cpu = 0;
   } else {
-    target_cpu = APIC::the().get_id();
+    target_cpu = find_least_loaded_cpu(m_processors, m_processor_count);
   }
-
-  if (target_cpu >= 32) target_cpu = 0;
 
   {
     ScopedLock lock(m_processors[target_cpu].run_queue_lock);
@@ -159,8 +173,7 @@ void SchedulerManager::on_tick() {
   uint64_t now = TickManager::the().get_ticks();
   auto& proc = current_processor();
 
-  if (proc.id == 0) {
-    Display::the().background_flush();
+  {
     ScopedLock lock(m_lock);
     for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end();) {
       Task* task = &*it;

@@ -1,5 +1,26 @@
 #pragma once
 
+#ifdef __GLIBC__
+
+// Hosted/test environment: use system stdio for standard types and functions.
+// Only declare kernel-specific hooks here.
+#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void kprintf(const char *fmt, ...);
+void libc_puts(char *c);
+void libc_set_heap_ready();
+void libc_register_puts_hook(void (*fn)(const char *));
+
+#ifdef __cplusplus
+}
+#endif
+
+#else // !__GLIBC__ — freestanding kernel environment
+
 #include <LibC/stdarg.h>
 #include <LibC/stdbool.h>
 #include <LibC/stddef.h>
@@ -9,51 +30,70 @@
 extern "C" {
 #endif
 
+#ifndef __FILE_defined
+#define __FILE_defined 1
+typedef struct FILE_s {
+    int fd;
+    int error_flag;
+    int eof_flag;
+} FILE;
+#endif
+
+extern FILE* stdin;
+extern FILE* stdout;
+extern FILE* stderr;
+
+#ifndef EOF
+#define EOF (-1)
+#endif
+#ifndef SEEK_SET
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+#endif
+
+// Internal hooks (set by kernel)
 void libc_puts(char *c);
+void libc_set_heap_ready();
+void libc_register_puts_hook(void (*fn)(const char *));
 
-/**
- * @brief Write formatted data to a string using a variable argument list.
- *
- * @param str  Pointer to the buffer where the formatted string will be stored.
- * @param size Maximum number of characters to write, including the null
- * terminator.
- * @param fmt  Format string specifying how to format the output.
- * @param args Variable argument list initialized with ::va_start.
- * @return The number of characters that would have been written if @p size was
- * unlimited, not including the terminating null byte. If the return value is >=
- * @p size, the output was truncated.
- *
- * @note This is the low-level implementation used by snprintf and kprintf.
- */
 int vsnprintf(char *str, size_t size, const char *fmt, va_list args);
-
-/**
- * @brief Write formatted data to a string.
- *
- * @param str  Pointer to the buffer where the formatted string will be stored.
- * @param size Maximum number of characters to write, including the null
- * terminator.
- * @param fmt  Format string specifying how to format the output.
- * @param ...  Variable arguments corresponding to @p fmt.
- * @return The number of characters that would have been written if @p size was
- * unlimited, not including the terminating null byte. If the return value is >=
- * @p size, the output was truncated.
- *
- * @note This is a safer version of sprintf since it requires a buffer size.
- */
 int snprintf(char *str, size_t size, const char *fmt, ...);
-
-/**
- * @brief Print formatted output to the kernel console.
- *
- * The output is written to both the VGA text buffer and the serial port,
- * making it useful for debugging even when VGA is unavailable.
- *
- * @param fmt Format string specifying how to format the output.
- * @param ... Variable arguments corresponding to @p fmt.
- */
 void kprintf(const char *fmt, ...);
+
+// Standard formatted output
+int printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+int vprintf(const char *fmt, va_list args);
+int fprintf(FILE *stream, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+int vfprintf(FILE *stream, const char *fmt, va_list args);
+
+// Character output
+int putchar(int c);
+int puts(const char *s);
+int fputs(const char *s, FILE *stream);
+int fputc(int c, FILE *stream);
+
+// FILE operations
+FILE *fopen(const char *path, const char *mode);
+int   fclose(FILE *stream);
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+int   feof(FILE *stream);
+int   ferror(FILE *stream);
+void  clearerr(FILE *stream);
+int   fflush(FILE *stream);
+long  ftell(FILE *stream);
+int   fseek(FILE *stream, long offset, int whence);
+int   fgetc(FILE *stream);
+int   getchar(void);
+char *fgets(char *s, int n, FILE *stream);
+
+int sprintf(char *str, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+int vsprintf(char *str, const char *fmt, va_list args);
+int sscanf(const char *str, const char *fmt, ...);
 
 #ifdef __cplusplus
 }
 #endif
+
+#endif // __GLIBC__

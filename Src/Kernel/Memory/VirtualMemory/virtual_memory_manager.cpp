@@ -1,5 +1,6 @@
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
+#include <Kernel/Memory/VirtualMemory/RegionSplitter/region_splitter.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibC/string.h>
@@ -157,6 +158,16 @@ void VirtualMemoryManager::unmap_page(uintptr_t virt) {
   }
 }
 
+void VirtualMemoryManager::protect_page(uintptr_t virt, PageFlags flags) {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  uint64_t* pte = get_pte(virt, false);
+  if (!pte || !(*pte & static_cast<uint64_t>(PageFlags::Present)))
+    return;
+  uintptr_t phys = *pte & 0x000FFFFFFFFFF000ULL;
+  *pte = phys | static_cast<uint64_t>(flags);
+  invlpg(virt);
+}
+
 uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
   assert((virt % PAGE_SIZE) == 0);
 
@@ -192,6 +203,7 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
 }
 
 fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flags(uintptr_t virt) {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
   size_t pml4_idx = (virt >> 39) & 0x1FF;
   size_t pdpt_idx = (virt >> 30) & 0x1FF;
   size_t pd_idx = (virt >> 21) & 0x1FF;
@@ -268,27 +280,34 @@ void VirtualMemoryManager::switch_address_space(uintptr_t cr3) {
   write_on_cr3(reinterpret_cast<void*>(cr3));
 }
 
+static PageTable* get_or_create_table(PageTable* parent, size_t index, bool create) {
+  if (parent->entries[index] & static_cast<uint64_t>(PageFlags::Present))
+    return reinterpret_cast<PageTable*>(parent->entries[index] & 0x000FFFFFFFFFF000);
+  if (!create) return nullptr;
+  uintptr_t new_table = PhysicalMemoryManager::the().alloc_page();
+  if (!new_table) return nullptr;
+  memset(reinterpret_cast<void*>(new_table), 0, PAGE_SIZE);
+  parent->entries[index] = new_table | static_cast<uint64_t>(PageFlags::Present)
+                         | static_cast<uint64_t>(PageFlags::Writable)
+                         | static_cast<uint64_t>(PageFlags::User);
+  return reinterpret_cast<PageTable*>(new_table);
+}
+
 uint64_t* VirtualMemoryManager::get_pte(uintptr_t virt, bool create) {
   size_t pml4_idx = (virt >> 39) & 0x1FF;
   size_t pdpt_idx = (virt >> 30) & 0x1FF;
   size_t pd_idx = (virt >> 21) & 0x1FF;
   size_t pt_idx = (virt >> 12) & 0x1FF;
 
-  if (!(m_pml4->entries[pml4_idx] & static_cast<uint64_t>(PageFlags::Present))) {
-    if (!create)
-      return nullptr;
-    return nullptr;
-  }
+  PageTable* pdpt = get_or_create_table(m_pml4, pml4_idx, create);
+  if (!pdpt) return nullptr;
 
-  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
-  if (!(pdpt->entries[pdpt_idx] & static_cast<uint64_t>(PageFlags::Present)))
-    return nullptr;
+  PageTable* pd = get_or_create_table(pdpt, pdpt_idx, create);
+  if (!pd) return nullptr;
 
-  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
-  if (!(pd->entries[pd_idx] & static_cast<uint64_t>(PageFlags::Present)))
-    return nullptr;
+  PageTable* pt = get_or_create_table(pd, pd_idx, create);
+  if (!pt) return nullptr;
 
-  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
   return &pt->entries[pt_idx];
 }
 
@@ -328,59 +347,8 @@ fk::core::Result<int, fk::core::Error> VirtualMemoryManager::munmap(uintptr_t ad
     return fk::core::Error::PermissionDenied;
 
   auto& regions = current_task->resources.memory.regions.list;
-
-  for (size_t i = 0; i < regions.size();) {
-    auto& region = regions[i];
-    uintptr_t r_start = region.start;
-    uintptr_t r_end = region.end;
-
-    // Case 1: Fully outside
-    if (r_end <= addr || r_start >= aligned_end) {
-      i++;
-      continue;
-    }
-
-    // Case 2: Fully inside -> Remove
-    if (r_start >= addr && r_end <= aligned_end) {
-      // Manual erase: shift left
-      for (size_t j = i; j < regions.size() - 1; ++j) {
-        regions[j] = fk::types::move(regions[j + 1]);
-      }
-      regions.pop_back();
-      continue; // Don't increment i
-    }
-
-    // Case 3: Cut head -> Shrink end
-    if (r_start < addr && r_end <= aligned_end && r_end > addr) {
-      region.end = addr;
-      i++;
-      continue;
-    }
-
-    // Case 4: Cut tail -> Shrink start
-    if (r_start >= addr && r_start < aligned_end && r_end > aligned_end) {
-      region.start = aligned_end;
-      i++;
-      continue;
-    }
-
-    // Case 5: Split
-    if (r_start < addr && r_end > aligned_end) {
-      ::fkernel::MemoryRegion right_part = region;
-      right_part.start = aligned_end;
-      region.end = addr;
-
-      // Manual insert: push back and then shift
-      regions.push_back(fk::types::move(right_part));
-      // The split region i is already correct (pre-split part).
-      // The new region is at the end, which is fine for simple accounting.
-      i++;
-      continue;
-    }
-
-    i++;
-  }
-
+  fkernel::RegionSplitter splitter(regions);
+  splitter.split(addr, aligned_end);
   return 0;
 }
 

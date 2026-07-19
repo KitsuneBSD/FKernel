@@ -1,10 +1,11 @@
 #include <LibC/assert.h>
+#include <LibC/ctype.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Memory/heap_malloc.h>
-#include <LibFK/Types/types.h> // For fk::types::move
+#include <LibFK/Types/types.h>
 
 namespace fk {
 namespace text {
@@ -151,7 +152,8 @@ String &String::append(const char *s) {
 }
 
 String &String::append(const String &str) {
-  _append_data(str.m_data.ptr(), str.m_metadata.first);
+  if (str.m_data && str.m_metadata.first > 0)
+    _append_data(str.m_data.ptr(), str.m_metadata.first);
   return *this;
 }
 
@@ -206,6 +208,170 @@ String::ensure_capacity(size_t min_cap) {
   m_data = OwnPtr<char[]>(new_data); 
   m_metadata.second = new_cap;
   return fk::core::Result<void>();
+}
+
+String String::substr(size_t pos, size_t count) const {
+  if (pos >= m_metadata.first)
+    return String();
+  size_t available = m_metadata.first - pos;
+  size_t len = (count == NPOS || count > available) ? available : count;
+  String result;
+  if (result._append_data(m_data.ptr() + pos, len).is_error())
+    return String();
+  return result;
+}
+
+size_t String::find(char c, size_t pos) const {
+  for (size_t i = pos; i < m_metadata.first; ++i) {
+    if (m_data.ptr()[i] == c)
+      return i;
+  }
+  return NPOS;
+}
+
+size_t String::find(const char *s, size_t pos) const {
+  if (!s || !m_data)
+    return NPOS;
+  size_t slen = strlen(s);
+  if (slen == 0)
+    return pos;
+  for (size_t i = pos; i + slen <= m_metadata.first; ++i) {
+    if (memcmp(m_data.ptr() + i, s, slen) == 0)
+      return i;
+  }
+  return NPOS;
+}
+
+size_t String::find(const String &s, size_t pos) const {
+  return find(s.c_str(), pos);
+}
+
+size_t String::rfind(char c, size_t pos) const {
+  if (m_metadata.first == 0)
+    return NPOS;
+  size_t i = (pos == NPOS || pos >= m_metadata.first) ? m_metadata.first - 1 : pos;
+  while (true) {
+    if (m_data.ptr()[i] == c)
+      return i;
+    if (i == 0)
+      break;
+    --i;
+  }
+  return NPOS;
+}
+
+size_t String::rfind(const char *s, size_t pos) const {
+  if (!s || !m_data)
+    return NPOS;
+  size_t slen = strlen(s);
+  if (slen == 0)
+    return m_metadata.first;
+  size_t start = (pos == NPOS || pos + slen > m_metadata.first)
+                 ? m_metadata.first - slen
+                 : pos;
+  for (size_t i = start + 1; i-- > 0;) {
+    if (memcmp(m_data.ptr() + i, s, slen) == 0)
+      return i;
+  }
+  return NPOS;
+}
+
+bool String::starts_with(const char *s) const {
+  if (!s)
+    return true;
+  size_t slen = strlen(s);
+  if (slen > m_metadata.first)
+    return false;
+  return memcmp(c_str(), s, slen) == 0;
+}
+
+bool String::starts_with(const String &s) const {
+  return starts_with(s.c_str());
+}
+
+bool String::ends_with(const char *s) const {
+  if (!s)
+    return true;
+  size_t slen = strlen(s);
+  if (slen > m_metadata.first)
+    return false;
+  return memcmp(c_str() + m_metadata.first - slen, s, slen) == 0;
+}
+
+bool String::ends_with(const String &s) const {
+  return ends_with(s.c_str());
+}
+
+bool String::contains(const char *s) const {
+  return find(s) != NPOS;
+}
+
+bool String::contains(const String &s) const {
+  return find(s.c_str()) != NPOS;
+}
+
+String &String::trim() {
+  if (!m_data || m_metadata.first == 0)
+    return *this;
+  size_t start = 0;
+  while (start < m_metadata.first && isspace((unsigned char)m_data.ptr()[start]))
+    ++start;
+  size_t end = m_metadata.first;
+  while (end > start && isspace((unsigned char)m_data.ptr()[end - 1]))
+    --end;
+  size_t new_len = end - start;
+  if (start > 0)
+    memmove(m_data.ptr(), m_data.ptr() + start, new_len);
+  m_metadata.first = new_len;
+  m_data.ptr()[new_len] = '\0';
+  return *this;
+}
+
+String String::to_upper() const {
+  String result(*this);
+  for (size_t i = 0; i < result.m_metadata.first; ++i)
+    result.m_data.ptr()[i] = (char)toupper((unsigned char)result.m_data.ptr()[i]);
+  return result;
+}
+
+String String::to_lower() const {
+  String result(*this);
+  for (size_t i = 0; i < result.m_metadata.first; ++i)
+    result.m_data.ptr()[i] = (char)tolower((unsigned char)result.m_data.ptr()[i]);
+  return result;
+}
+
+String &String::erase(size_t pos, size_t count) {
+  if (pos >= m_metadata.first)
+    return *this;
+  size_t available = m_metadata.first - pos;
+  size_t actual = (count == NPOS || count > available) ? available : count;
+  memmove(m_data.ptr() + pos, m_data.ptr() + pos + actual,
+          m_metadata.first - pos - actual);
+  m_metadata.first -= actual;
+  m_data.ptr()[m_metadata.first] = '\0';
+  return *this;
+}
+
+String &String::insert(size_t pos, const char *s) {
+  if (!s || pos > m_metadata.first)
+    return *this;
+  size_t slen = strlen(s);
+  if (slen == 0)
+    return *this;
+  if (ensure_capacity(m_metadata.first + slen + 1).is_error())
+    return *this;
+  memmove(m_data.ptr() + pos + slen, m_data.ptr() + pos,
+          m_metadata.first - pos + 1);
+  memcpy(m_data.ptr() + pos, s, slen);
+  m_metadata.first += slen;
+  return *this;
+}
+
+String &String::replace(size_t pos, size_t count, const char *s) {
+  erase(pos, count);
+  insert(pos, s);
+  return *this;
 }
 
 } // namespace text

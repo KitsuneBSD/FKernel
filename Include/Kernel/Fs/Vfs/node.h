@@ -74,6 +74,14 @@ public:
     return fk::core::Error::NotImplemented;
   }
 
+  virtual fk::core::Result<void, fk::core::Error> truncate([[maybe_unused]] uint64_t size) {
+    return fk::core::Error::NotImplemented;
+  }
+
+  virtual fk::core::Result<void, fk::core::Error> fsync() {
+    return {};
+  }
+
   virtual bool is_directory() const { return false; }
   virtual bool is_symlink() const { return false; }
   virtual bool is_block_device() const { return false; }
@@ -102,10 +110,19 @@ public:
   Node(const Node&) = delete;
   Node& operator=(const Node&) = delete;
 
-  // Allow default constructor
-  Node() = default;
+  Node() : m_inode(allocate_inode()) {}
+
+  uint64_t inode() const { return m_inode; }
 
 protected:
   fk::text::String m_name;
   fk::RefPtr<Node> m_parent;
+
+private:
+  uint64_t m_inode;
+
+  static uint64_t allocate_inode() {
+    static uint64_t s_next_inode = 1;
+    return __sync_fetch_and_add(&s_next_inode, 1);
+  }
 };

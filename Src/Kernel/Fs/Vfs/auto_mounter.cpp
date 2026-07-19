@@ -1,4 +1,5 @@
 #include <Kernel/Fs/Vfs/auto_mounter.h>
+#include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Fs/Fat12/fat_12_fs.h>
 #include <Kernel/Fs/Fat16/fat_16_fs.h>
 #include <Kernel/Fs/Fat32/fat_32_fs.h>
@@ -70,4 +71,46 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
 
     fk::algorithms::klog("AUTO-MOUNT", "No supported filesystem found on %s", device->name().c_str());
 }
+
+void AutoMounter::mount_all_partitions() {
+    const auto& partitions = PartitionManager::the().partitions().all();
+    for (size_t i = 0; i < partitions.size(); ++i) {
+        auto& part = partitions[i];
+        if (!part) continue;
+        try_mount(fk::RefPtr<StorageDevice>(part.ptr()));
+    }
+}
+
+bool AutoMounter::try_mount_at(fk::RefPtr<StorageDevice> device, const char* target_path) {
+    if (!device || !target_path) return false;
+
+    auto fat12_res = Fat12FileSystem::create(device);
+    if (fat12_res.is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, fat12_res.value()).is_ok()) {
+            fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT12) at %s", device->name().c_str(), target_path);
+            return true;
+        }
+    }
+
+    auto fat16_res = Fat16FileSystem::create(device);
+    if (fat16_res.is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, fat16_res.value()).is_ok()) {
+            fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT16) at %s", device->name().c_str(), target_path);
+            return true;
+        }
+    }
+
+    auto fat32_res = Fat32FileSystem::create(device);
+    if (fat32_res.is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, fat32_res.value()).is_ok()) {
+            fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT32) at %s", device->name().c_str(), target_path);
+            return true;
+        }
+    }
+
+    fk::algorithms::kwarn("AUTO-MOUNT", "No supported filesystem found on %s for mount at %s",
+                           device->name().c_str(), target_path);
+    return false;
+}
+
 }

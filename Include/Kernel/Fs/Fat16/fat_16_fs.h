@@ -12,6 +12,7 @@ class Fat16FileSystem : public Node {
     uint32_t m_fat_sector;
     uint32_t m_root_dir_sectors;
     uint32_t m_fat_size;
+    uint32_t m_sectors_per_cluster;
 
 public:
     static fk::core::Result<fk::RefPtr<Fat16FileSystem>, fk::core::Error>
@@ -29,8 +30,17 @@ public:
     virtual fk::core::Result<void, fk::core::Error>
     list_dir(fk::containers::Vector<DirectoryEntry>& entries) override;
 
+    virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
+    lookup(const char* name) override;
+
+    fk::core::Result<size_t, fk::core::Error>
+    read_from_cluster_chain(uint32_t first_cluster, uint64_t offset, size_t size, uint8_t* buffer);
+
+    uint32_t cluster_to_sector(uint32_t cluster) const;
+    uint32_t get_next_cluster(uint32_t cluster);
+
 private:
-    Fat16FileSystem(fk::RefPtr<StorageDevice> device) : m_device(device) {}
+    Fat16FileSystem(fk::RefPtr<StorageDevice> device) : m_device(device), m_sectors_per_cluster(1) {}
 };
 
 }

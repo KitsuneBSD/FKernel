@@ -26,6 +26,7 @@ public:
   }
 
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
+  uintptr_t msi_address_base() const { return lapic_base & ~static_cast<uintptr_t>(0xFFF); }
 
   uint32_t get_id() const;
 
@@ -51,6 +52,8 @@ public:
   void unmask_interrupt(uint8_t irq) override;
 
   fk::core::Result<uint8_t, fk::core::Error> allocate_msi_vector(const PciDevice& device) override;
+  fk::core::Result<uint8_t, fk::core::Error> allocate_msix_vector(const PciDevice& device,
+                                                                    uint16_t entry) override;
   void enable_msi(uint8_t vector) override;
   void disable_msi(uint8_t vector) override;
 

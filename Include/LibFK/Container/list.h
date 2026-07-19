@@ -86,16 +86,16 @@ public:
 
         IntrusiveListNode<T>& node = obj->m_list_node;
         node.prev = nullptr;
-        node.next = m_head;
+        node.next = m_metadata.m_head;
 
         if (empty()) {
-            m_head = obj;
-            m_tail = obj;
+            m_metadata.m_head = obj;
+            m_metadata.m_tail = obj;
         } else {
-            m_head->m_list_node.prev = obj;
-            m_head = obj;
+            m_metadata.m_head->m_list_node.prev = obj;
+            m_metadata.m_head = obj;
         }
-        m_size++;
+        m_metadata.m_size++;
     }
 
     /**
@@ -116,19 +116,18 @@ public:
         if (node.prev) {
             node.prev->m_list_node.next = node.next;
         } else {
-            m_head = node.next; // obj was the head
+            m_metadata.m_head = node.next;
         }
 
         if (node.next) {
             node.next->m_list_node.prev = node.prev;
         } else {
-            m_tail = node.prev; // obj was the tail
+            m_metadata.m_tail = node.prev;
         }
 
-        // Reset pointers in the removed node to indicate it's no longer in a list
         node.prev = nullptr;
         node.next = nullptr;
-        m_size--;
+        m_metadata.m_size--;
     }
 
     /**
@@ -139,8 +138,8 @@ public:
         if (empty()) {
             return nullptr;
         }
-        T* obj = m_head;
-        remove(obj); // Reuse remove logic
+        T* obj = m_metadata.m_head;
+        remove(obj);
         return obj;
     }
 
@@ -152,7 +151,7 @@ public:
         if (empty()) {
             return nullptr;
         }
-        T* obj = m_tail;
+        T* obj = m_metadata.m_tail;
         remove(obj); // Reuse remove logic
         return obj;
     }
@@ -163,16 +162,16 @@ public:
      * pointers are reset and the list's internal pointers are cleared.
      */
     void clear() {
-        T* current = m_head;
+        T* current = m_metadata.m_head;
         while (current) {
             T* next_obj = current->m_list_node.next;
             current->m_list_node.prev = nullptr;
             current->m_list_node.next = nullptr;
             current = next_obj;
         }
-        m_head = nullptr;
-        m_tail = nullptr;
-        m_size = 0;
+        m_metadata.m_head = nullptr;
+        m_metadata.m_tail = nullptr;
+        m_metadata.m_size = 0;
     }
 
     /**
@@ -180,7 +179,7 @@ public:
      * @return A pointer to the front object, or nullptr if the list is empty.
      */
     T* front() {
-        return m_head;
+        return m_metadata.m_head;
     }
 
     /**
@@ -188,7 +187,7 @@ public:
      * @return A const pointer to the front object, or nullptr if the list is empty.
      */
     const T* front() const {
-        return m_head;
+        return m_metadata.m_head;
     }
 
     /**
@@ -196,7 +195,7 @@ public:
      * @return A pointer to the back object, or nullptr if the list is empty.
      */
     T* back() {
-        return m_tail;
+        return m_metadata.m_tail;
     }
 
     /**
@@ -204,7 +203,7 @@ public:
      * @return A const pointer to the back object, or nullptr if the list is empty.
      */
     const T* back() const {
-        return m_tail;
+        return m_metadata.m_tail;
     }
 
     /**
@@ -212,7 +211,7 @@ public:
      * @return The current size of the list.
      */
     size_t size() const {
-        return m_size;
+        return m_metadata.m_size;
     }
 
     /**
@@ -220,7 +219,11 @@ public:
      * @return True if the list contains no elements, false otherwise.
      */
     bool empty() const {
-        return m_size == 0;
+        return m_metadata.m_size == 0;
+    }
+
+    bool is_empty() const {
+        return empty();
     }
 
     // --- Iterator support ---
@@ -294,14 +297,14 @@ public:
         bool operator!=(const const_iterator& other) const { return m_current != other.m_current; }
     };
 
-    iterator begin() { return iterator(m_head); }
-    iterator end() { return iterator(nullptr); } // Sentinel for end
+    iterator begin() { return iterator(m_metadata.m_head); }
+    iterator end() { return iterator(nullptr); }
 
-    const_iterator begin() const { return const_iterator(m_head); }
-    const_iterator end() const { return const_iterator(nullptr); } // Sentinel for end
+    const_iterator begin() const { return const_iterator(m_metadata.m_head); }
+    const_iterator end() const { return const_iterator(nullptr); }
 
-    const_iterator cbegin() const { return const_iterator(m_head); }
-    const_iterator cend() const { return const_iterator(nullptr); } // Sentinel for end
+    const_iterator cbegin() const { return const_iterator(m_metadata.m_head); }
+    const_iterator cend() const { return const_iterator(nullptr); }
 
 private:
   struct ListMetadata {

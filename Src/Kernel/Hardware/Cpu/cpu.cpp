@@ -70,9 +70,15 @@ void CPU::detect_cpu_features() {
 
   // Check for NX support (CPUID 0x80000001, EDX bit 20)
   cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
-  if (edx & (1 << 20)) {
+  if (edx & (1 << 20))
     m_has_nx = true;
-  }
+
+  // Check for SMEP (bit 7) and SMAP (bit 20) via CPUID leaf 7, subleaf 0
+  cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+  if (ebx & (1 << 7))
+    m_has_smep = true;
+  if (ebx & (1 << 20))
+    m_has_smap = true;
 }
 
 void CPU::initialize_features() {
@@ -85,8 +91,12 @@ void CPU::initialize_features() {
   asm volatile("mov %0, %%cr0" ::"r"(cr0));
 
   asm volatile("mov %%cr4, %0" : "=r"(cr4));
-  cr4 |= (1ULL << 9);  // Set OSFXSR (FXSAVE/FXRSTOR support)
-  cr4 |= (1ULL << 10); // Set OSXMMEXCPT (SIMD Exception support)
+  cr4 |= (1ULL << 9);  // OSFXSR: FXSAVE/FXRSTOR support
+  cr4 |= (1ULL << 10); // OSXMMEXCPT: SIMD exception support
+  if (m_has_smep)
+    cr4 |= (1ULL << 20); // SMEP: prevent kernel from executing user-space pages
+  if (m_has_smap)
+    cr4 |= (1ULL << 21); // SMAP: prevent kernel from accessing user-space pages directly
   asm volatile("mov %0, %%cr4" ::"r"(cr4));
 
   // Enable NX if supported

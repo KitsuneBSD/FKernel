@@ -7,6 +7,7 @@
 #include <Kernel/Loader/Domains/interpreter_domain.h>
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
+#include <Kernel/Loader/Domains/dynamic_domain.h>
 
 namespace fkernel {
 
@@ -19,6 +20,7 @@ private:
     elf_domains::InterpreterDomain m_interpreter;
     elf_domains::LoadDomain m_loader;
     elf_domains::MemoryDomain m_memory;
+    elf_domains::DynamicDomain m_dynamic;
     
 public:
     explicit ElfLoaderCore(fk::RefPtr<Node> node);
@@ -31,6 +33,8 @@ private:
     fk::core::Result<void, fk::core::Error> parse_and_validate();
     fk::core::Result<void, fk::core::Error> handle_interpreter();
     fk::core::Result<void, fk::core::Error> load_segments();
+    fk::core::Result<void, fk::core::Error> process_dynamic();
+    void apply_relro(const fk::containers::Vector<Elf64_Phdr>& headers);
     ElfLoadOperationResult calculate_entry_point();
     
     fk::containers::Vector<elf_domains::MemoryRegion> 

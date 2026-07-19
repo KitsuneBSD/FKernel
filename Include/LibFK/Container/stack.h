@@ -24,7 +24,7 @@ public:
     if (is_full())
       return false;
 
-    m_stack[++top_index] = value;
+    m_stack[top_index++] = value;
     return true;
   }
 

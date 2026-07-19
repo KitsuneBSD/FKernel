@@ -147,25 +147,69 @@ fk::core::Result<uint8_t, fk::core::Error> APIC::allocate_msi_vector(const PciDe
     uint8_t vector = g_next_msi_vector++;
     if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
 
-    // Configure MSI on the device
-    device.write_config_dword(msi_ptr + 4, 0xFEE00000);
-    
+    uint32_t msi_addr = static_cast<uint32_t>(msi_address_base());
+    device.write_config_dword(msi_ptr + 4, msi_addr);
+
     uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
     if (msg_ctrl & (1 << 7)) { // 64-bit support
-        device.write_config_dword(msi_ptr + 8, 0); 
+        device.write_config_dword(msi_ptr + 8, 0);
         device.write_config_word(msi_ptr + 12, vector);
     } else {
         device.write_config_word(msi_ptr + 8, vector);
     }
 
-    // Enable MSI
-    msg_ctrl |= 0x01; 
+    msg_ctrl |= 0x01;
     device.write_config_word(msi_ptr + 2, msg_ctrl);
 
-    fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) via APIC for device %02x:%02x.%d", 
-                         vector, device.address().bus(), device.address().device(), 
+    fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) via APIC at 0x%x for device %02x:%02x.%d",
+                         vector, msi_addr, device.address().bus(), device.address().device(),
                          device.address().function());
 
+    return vector;
+}
+
+fk::core::Result<uint8_t, fk::core::Error>
+APIC::allocate_msix_vector(const PciDevice& device, uint16_t entry) {
+    constexpr uint8_t MSIX_CAP_ID = 0x11;
+    uint8_t cap_ptr = device.find_capability(MSIX_CAP_ID);
+    if (cap_ptr == 0) return fk::core::Error::NotImplemented;
+
+    uint16_t ctrl = device.read_config_word(cap_ptr + 2);
+    uint16_t table_size = (ctrl & 0x7FF) + 1;
+    if (entry >= table_size) return fk::core::Error::InvalidParameter;
+
+    uint8_t vector = g_next_msi_vector++;
+    if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
+
+    uint32_t table_info = device.read_config_dword(cap_ptr + 4);
+    uint8_t  bir        = static_cast<uint8_t>(table_info & 0x7);
+    uint32_t table_off  = table_info & ~0x7U;
+
+    uintptr_t bar_phys  = device.bar_base(bir);
+    uintptr_t table_phys = bar_phys + table_off;
+    uintptr_t table_virt = table_phys;
+
+    MemoryManager::the().map_page(table_virt, table_phys,
+                                  PageFlags::Present | PageFlags::Writable |
+                                  PageFlags::WriteThrough);
+
+    struct MsixEntry {
+        volatile uint64_t msg_addr;
+        volatile uint32_t msg_data;
+        volatile uint32_t vector_ctrl;
+    };
+    auto* msix_table = reinterpret_cast<MsixEntry*>(table_virt);
+    msix_table[entry].msg_addr    = static_cast<uint64_t>(msi_address_base());
+    msix_table[entry].msg_data    = vector;
+    msix_table[entry].vector_ctrl = 0; // unmask
+
+    ctrl |= (1 << 15); // Enable MSI-X
+    ctrl &= ~(1 << 14); // Clear function mask
+    device.write_config_word(cap_ptr + 2, ctrl);
+
+    fk::algorithms::klog("MSI-X", "Entry %u -> Vector 0x%x for %02x:%02x.%d",
+                         entry, vector, device.address().bus(),
+                         device.address().device(), device.address().function());
     return vector;
 }
 

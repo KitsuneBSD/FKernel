@@ -6,31 +6,79 @@
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
+#include <Kernel/Fs/Vfs/file_description.h>
+#include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibC/string.h>
 
+static constexpr uint64_t PROT_WRITE = 0x2;
+static constexpr uint64_t PROT_EXEC  = 0x4;
+static constexpr uint64_t MAP_ANONYMOUS = 0x20;
+
+static uintptr_t reserve_mmap_range(Task* task, uintptr_t hint, uint64_t len) {
+    if (hint != 0) return hint;
+    uintptr_t addr = task->memory().regions.mmap_end;
+    task->memory().regions.mmap_end += (len + 0xFFF) & ~0xFFFULL;
+    return addr;
+}
+
+static PageFlags prot_to_page_flags(uint64_t prot) {
+    PageFlags flags = PageFlags::Present | PageFlags::User;
+    if (prot & PROT_WRITE) flags = flags | PageFlags::Writable;
+    if (!(prot & PROT_EXEC)) flags = flags | PageFlags::ExecuteDisable;
+    return flags;
+}
+
+static uint64_t mmap_file(Task* task, uintptr_t addr, uint64_t len, uint64_t prot,
+                           uint64_t fd, uint64_t offset) {
+    auto file = task->get_file_descriptor(static_cast<int>(fd));
+    if (!file) {
+        fk::algorithms::kwarn("sys_mmap", "invalid fd=%lu", fd);
+        return fkernel::return_error(fk::core::Error::InvalidParameter);
+    }
+
+    uintptr_t target = reserve_mmap_range(task, addr, len);
+    PageFlags flags = prot_to_page_flags(prot);
+    uint64_t pages = (len + 0xFFF) >> 12;
+
+    for (uint64_t i = 0; i < pages; ++i) {
+        uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
+        if (!phys) return fkernel::return_error(fk::core::Error::OutOfMemory);
+        memset(reinterpret_cast<void*>(phys + 0xFFFF800000000000ULL), 0, 4096);
+        VirtualMemoryManager::the().map_page(target + i * 4096, phys, flags);
+    }
+
+    uint8_t* dest = reinterpret_cast<uint8_t*>(target);
+    size_t remaining = static_cast<size_t>(len);
+    uint64_t file_offset = offset;
+    size_t done = 0;
+
+    while (done < remaining) {
+        size_t chunk = remaining - done;
+        if (chunk > 4096) chunk = 4096;
+        auto res = file->node()->read(file_offset + done, chunk, dest + done);
+        if (res.is_error()) break;
+        size_t read = res.value();
+        if (read == 0) break;
+        done += read;
+    }
+
+    return target;
+}
+
 extern "C" {
 
-uint64_t sys_mmap(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t prot, uint64_t flags,
-                  uint64_t fd, [[maybe_unused]] uint64_t offset, [[maybe_unused]] PtRegs* regs) {
+uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
+                  uint64_t fd, uint64_t offset, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
-    bool anonymous = (flags & 0x20);
-    if (!anonymous) {
-        fk::algorithms::kwarn("SYSCALL", "sys_mmap: file-backed mapping not supported (fd=%ld)", fd);
-        return fkernel::return_error(fk::core::Error::NotImplemented);
+    if (flags & MAP_ANONYMOUS) {
+        uintptr_t target_addr = reserve_mmap_range(task, addr, len);
+        return target_addr;
     }
 
-    uintptr_t target_addr = addr;
-    if (target_addr == 0) {
-        target_addr = task->memory().regions.mmap_end;
-        task->memory().regions.mmap_end += (len + 0xFFF) & ~0xFFFULL;
-    }
-
-    // No need to map anything here. The PF handler will take care of it.
-    // We just return the reserved address.
-    return target_addr;
+    return mmap_file(task, addr, len, prot, fd, offset);
 }
 
 uint64_t sys_munmap(uint64_t addr, uint64_t length, [[maybe_unused]] uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*) {

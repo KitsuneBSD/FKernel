@@ -28,6 +28,7 @@ private:
     size_t size;
     bool is_free;
     BlockHeader *next;
+    BlockHeader *prev;
     static constexpr uint32_t MAGIC = 0xC0FFEE;
     uint32_t magic;
   };

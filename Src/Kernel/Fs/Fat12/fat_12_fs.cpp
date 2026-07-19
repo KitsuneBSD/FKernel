@@ -1,4 +1,5 @@
 #include <Kernel/Fs/Fat12/fat_12_fs.h>
+#include <Kernel/Fs/Fat12/fat_12_node.h>
 #include <Kernel/Fs/Fat12/bpb.h>
 #include <Kernel/Fs/Fat12/directory_entry.h>
 #include <LibFK/Memory/heap_malloc.h>
@@ -108,8 +109,29 @@ fk::core::Result<uint32_t, fk::core::Error> Fat12FileSystem::allocate_cluster() 
 }
 
 fk::core::Result<size_t, fk::core::Error>
-Fat12FileSystem::read_from_cluster_chain([[maybe_unused]] uint32_t first_cluster, [[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* buffer) {
-    return fk::core::Error::NotImplemented;
+Fat12FileSystem::read_from_cluster_chain(uint32_t first_cluster, uint64_t offset, size_t size, uint8_t* buffer) {
+    constexpr uint32_t CLUSTER_SIZE = 512;
+    uint32_t current_cluster = first_cluster;
+
+    uint64_t clusters_to_skip = offset / CLUSTER_SIZE;
+    for (uint64_t i = 0; i < clusters_to_skip && current_cluster < 0x0FF8; ++i)
+        current_cluster = get_next_cluster(current_cluster);
+
+    uint64_t cluster_offset = offset % CLUSTER_SIZE;
+    size_t bytes_read = 0;
+
+    while (bytes_read < size && current_cluster < 0x0FF8) {
+        uint8_t temp[512];
+        m_device->read(cluster_to_sector(current_cluster) * 512, 512, temp);
+        size_t to_copy = size - bytes_read;
+        if (to_copy > (size_t)(CLUSTER_SIZE - cluster_offset))
+            to_copy = (size_t)(CLUSTER_SIZE - cluster_offset);
+        fk::memory::copy(buffer + bytes_read, temp + cluster_offset, to_copy);
+        bytes_read += to_copy;
+        cluster_offset = 0;
+        current_cluster = get_next_cluster(current_cluster);
+    }
+    return bytes_read;
 }
 
 fk::core::Result<size_t, fk::core::Error>
@@ -122,6 +144,53 @@ Fat12FileSystem::write_to_cluster_chain([[maybe_unused]] uint32_t first_cluster,
     uint64_t bytes_written = 0;
     // ... logic to find cluster at offset and write ...
     return bytes_written;
+}
+
+static bool fat12_name_eq(const char* raw_name, const char* raw_ext, const char* query) {
+    char formatted[13];
+    int name_len = 8;
+    while (name_len > 0 && raw_name[name_len - 1] == ' ') name_len--;
+    int ext_len = 3;
+    while (ext_len > 0 && raw_ext[ext_len - 1] == ' ') ext_len--;
+    int pos = 0;
+    for (int k = 0; k < name_len; ++k) formatted[pos++] = raw_name[k];
+    if (ext_len > 0) {
+        formatted[pos++] = '.';
+        for (int k = 0; k < ext_len; ++k) formatted[pos++] = raw_ext[k];
+    }
+    formatted[pos] = '\0';
+    const char* a = formatted;
+    const char* b = query;
+    while (*a && *b) {
+        char ca = (*a >= 'a' && *a <= 'z') ? (char)(*a - 32) : *a;
+        char cb = (*b >= 'a' && *b <= 'z') ? (char)(*b - 32) : *b;
+        if (ca != cb) return false;
+        a++; b++;
+    }
+    return *a == 0 && *b == 0;
+}
+
+fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
+Fat12FileSystem::lookup(const char* name) {
+    uint8_t sector[512];
+    uint32_t root_start = m_first_data_sector - m_root_dir_sectors;
+
+    for (uint32_t i = 0; i < m_root_dir_sectors; ++i) {
+        m_device->read((root_start + i) * 512, 512, sector);
+        auto* dir = reinterpret_cast<Fat12DirectoryEntry*>(sector);
+        for (int j = 0; j < 16; ++j) {
+            if (dir[j].name[0] == 0) return fk::core::Error::NotFound;
+            if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) continue;
+            if (dir[j].attr == 0x0F) continue;
+            if (!fat12_name_eq(dir[j].name, dir[j].ext, name)) continue;
+            uint32_t cluster = (static_cast<uint32_t>(dir[j].cluster_high) << 16) | dir[j].cluster_low;
+            bool is_dir = (dir[j].attr & 0x10) != 0;
+            auto node = fk::adopt_ref(new Fat12Node(fk::RefPtr<Fat12FileSystem>(this), cluster, dir[j].size, is_dir));
+            if (!node) return fk::core::Error::OutOfMemory;
+            return fk::RefPtr<Node>(node.ptr());
+        }
+    }
+    return fk::core::Error::NotFound;
 }
 
 fk::core::Result<void, fk::core::Error>

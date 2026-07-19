@@ -129,6 +129,47 @@ void PciDevice::write_config_dword(uint8_t offset, uint32_t value) const { PciMa
 void PciDevice::write_config_word(uint8_t offset, uint16_t value) const { PciManager::the().write_config_word(m_address, offset, value); }
 void PciDevice::write_config_byte(uint8_t offset, uint8_t value) const { PciManager::the().write_config_byte(m_address, offset, value); }
 
+static constexpr uint8_t BAR_OFFSET = 0x10;
+
+bool PciDevice::bar_is_io(uint8_t index) const {
+  return (read_config_dword(BAR_OFFSET + index * 4) & 0x1) != 0;
+}
+
+bool PciDevice::bar_is_64bit(uint8_t index) const {
+  uint32_t bar = read_config_dword(BAR_OFFSET + index * 4);
+  return (bar & 0x1) == 0 && ((bar >> 1) & 0x3) == 0x2;
+}
+
+uintptr_t PciDevice::bar_base(uint8_t index) const {
+  if (index > 5) return 0;
+  uint32_t bar = read_config_dword(BAR_OFFSET + index * 4);
+  if (bar & 0x1) {
+    return static_cast<uintptr_t>(bar & ~0x3u);
+  }
+  if (((bar >> 1) & 0x3) == 0x2 && index < 5) {
+    uint64_t lo = bar & ~0xFu;
+    uint64_t hi = read_config_dword(BAR_OFFSET + (index + 1) * 4);
+    return static_cast<uintptr_t>(lo | (hi << 32));
+  }
+  return static_cast<uintptr_t>(bar & ~0xFu);
+}
+
+size_t PciDevice::bar_size(uint8_t index) const {
+  if (index > 5) return 0;
+  uint8_t reg = BAR_OFFSET + index * 4;
+  uint32_t orig = read_config_dword(reg);
+  write_config_dword(reg, 0xFFFFFFFF);
+  uint32_t sz = read_config_dword(reg);
+  write_config_dword(reg, orig);
+  if (orig & 0x1) {
+    sz &= ~0x3u;
+  } else {
+    sz &= ~0xFu;
+  }
+  if (sz == 0) return 0;
+  return static_cast<size_t>(~sz + 1);
+}
+
 uint8_t PciDevice::find_capability(uint8_t cap_id) const {
     uint16_t status = read_config_word(0x06);
     if (!(status & (1 << 4))) return 0; // No capabilities list

@@ -4,6 +4,8 @@
 #include <Kernel/Driver/Storage/Ahci/ahci_controller.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_controller.h>
 #include <Kernel/Driver/Network/E1000/e1000.h>
+#include <Kernel/Driver/Storage/Partitions/partition_manager.h>
+#include <Kernel/Fs/Vfs/auto_mounter.h>
 #include <LibFK/Traits/type_traits.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -56,6 +58,11 @@ void DriverRegistry::register_pci_driver(uint8_t class_code, uint8_t subclass) {
             auto controller = ControllerClass::create(device);
             if (controller) {
                 DriverManager::the().register_device(controller);
+                if constexpr (fk::traits::is_base_of_v<StorageDevice, ControllerClass>) {
+                    PartitionManager::the().scan(controller);
+                    if (!PartitionManager::the().has_partitions_for_device(controller))
+                        AutoMounter::try_mount(controller);
+                }
             }
             return controller;
         }

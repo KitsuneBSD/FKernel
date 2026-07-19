@@ -92,6 +92,8 @@ uint64_t sys_exit_group(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64
 uint64_t sys_ipc_send(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_ipc_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_cap_revoke(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_openpty(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_pipe(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -116,6 +118,9 @@ uint64_t sys_getgroups(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_
 uint64_t sys_setgroups(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getrlimit(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_setrlimit(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_truncate(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_ftruncate(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_fsync(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 }
 
 extern "C" void initialize_syscalls() {
@@ -180,6 +185,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IPC_SEND, sys_ipc_send);
   SyscallManager::the().register_syscall(SYS_IPC_RECEIVE, sys_ipc_receive);
   SyscallManager::the().register_syscall(SYS_IPC_CALL, sys_ipc_call);
+  SyscallManager::the().register_syscall(SYS_CAP_REVOKE, sys_cap_revoke);
   SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
   SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
   SyscallManager::the().register_syscall(SYS_POLL, sys_poll);
@@ -203,6 +209,10 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_SETGROUPS, sys_setgroups);
   SyscallManager::the().register_syscall(SYS_GETRLIMIT, sys_getrlimit);
   SyscallManager::the().register_syscall(SYS_SETRLIMIT, sys_setrlimit);
+  SyscallManager::the().register_syscall(SYS_TRUNCATE, sys_truncate);
+  SyscallManager::the().register_syscall(SYS_FTRUNCATE, sys_ftruncate);
+  SyscallManager::the().register_syscall(SYS_FSYNC, sys_fsync);
+  SyscallManager::the().register_syscall(SYS_OPENPTY, sys_openpty);
 }
 extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
                                        uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs) {

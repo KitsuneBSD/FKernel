@@ -3,6 +3,12 @@
 namespace fkernel {
 #define EI_NIDENT 16
 
+// Machine types
+#define EM_X86_64       62
+
+// Limits
+#define ELF_MAX_PHNUM   256
+
 // Standard program header types
 #define PT_NULL         0
 #define PT_LOAD         1

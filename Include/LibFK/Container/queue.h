@@ -1,7 +1,7 @@
 #pragma once
 
-#include <LibC/stddef.h> // For size_t
-#include <LibFK/Container/intrusive_list.h> // Include IntrusiveList
+#include <LibC/stddef.h>
+#include <LibFK/Container/list.h>
 
 namespace fk {
 namespace containers {
@@ -81,6 +81,10 @@ public:
      * @brief Checks if the queue is empty.
      * @return True if the queue contains no elements, false otherwise.
      */
+    bool is_empty() const {
+        return m_list.is_empty();
+    }
+
     bool empty() const {
         return m_list.empty();
     }
@@ -103,7 +107,7 @@ public:
     }
 
 private:
-    IntrusiveList<T> m_list;
+    List<T> m_list;
 };
 
 } // namespace containers

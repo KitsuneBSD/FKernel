@@ -14,6 +14,8 @@ public:
   using iterator = char *;
   using const_iterator = const char *;
 
+  static constexpr size_t NPOS = ~size_t(0);
+
   String();
   String(const char *s);
   String(const String &other);
@@ -25,20 +27,18 @@ public:
   String &operator=(String &&other) noexcept;
   String &operator=(const char *s);
 
-  // Access length and capacity from the metadata pair
   size_t length() const { return m_metadata.first; }
-  size_t size() const { return m_metadata.first; } // Alias for length
+  size_t size() const { return m_metadata.first; }
   size_t capacity() const { return m_metadata.second; }
 
   bool is_empty() const { return length() == 0; }
-  const char *c_str() const { 
+  const char *c_str() const {
     return (m_data.ptr()) ? m_data.ptr() : "";
   }
   char *data() { return m_data.ptr(); }
   const char *data() const { return m_data.ptr(); }
 
   void clear();
-  // Changed return type to Result
   fk::core::Result<void, fk::core::Error> reserve(size_t new_cap);
 
   String &append(const char *s);
@@ -58,6 +58,28 @@ public:
   const_iterator cbegin() const { return m_data.ptr(); }
   const_iterator cend() const { return m_data.ptr() + length(); }
 
+  String substr(size_t pos, size_t count = NPOS) const;
+  size_t find(char c, size_t pos = 0) const;
+  size_t find(const char *s, size_t pos = 0) const;
+  size_t find(const String &s, size_t pos = 0) const;
+  size_t rfind(char c, size_t pos = NPOS) const;
+  size_t rfind(const char *s, size_t pos = NPOS) const;
+
+  bool starts_with(const char *s) const;
+  bool starts_with(const String &s) const;
+  bool ends_with(const char *s) const;
+  bool ends_with(const String &s) const;
+  bool contains(const char *s) const;
+  bool contains(const String &s) const;
+
+  String &trim();
+  String to_upper() const;
+  String to_lower() const;
+
+  String &erase(size_t pos, size_t count = NPOS);
+  String &insert(size_t pos, const char *s);
+  String &replace(size_t pos, size_t count, const char *s);
+
 private:
   // Changed return type to Result
   fk::core::Result<void, fk::core::Error> ensure_capacity(size_t min_cap);
@@ -76,10 +98,8 @@ private:
 
 inline String operator+(const String &lhs, const String &rhs) {
   String result;
-  // Note: reserve now returns a Result, so this needs to be handled if we want
-  // robust error propagation. For now, assuming reserve succeeds or
-  // panics/logs.
-  result.reserve(lhs.length() + rhs.length() + 1);
+  if (result.reserve(lhs.length() + rhs.length() + 1).is_error())
+    return result;
   result.append(lhs);
   result.append(rhs);
   return result;
@@ -89,7 +109,8 @@ inline String operator+(const String &lhs, const char *rhs) {
   if (!rhs)
     return lhs;
   String result;
-  result.reserve(lhs.length() + strlen(rhs) + 1);
+  if (result.reserve(lhs.length() + strlen(rhs) + 1).is_error())
+    return result;
   result.append(lhs);
   result.append(rhs);
   return result;
@@ -99,7 +120,8 @@ inline String operator+(const char *lhs, const String &rhs) {
   if (!lhs)
     return rhs;
   String result;
-  result.reserve(strlen(lhs) + rhs.length() + 1);
+  if (result.reserve(strlen(lhs) + rhs.length() + 1).is_error())
+    return result;
   result.append(lhs);
   result.append(rhs);
   return result;

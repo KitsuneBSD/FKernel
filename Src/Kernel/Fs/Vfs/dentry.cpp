@@ -14,27 +14,19 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::create(fk::text::S
 }
 
 void Dentry::push_node(fk::RefPtr<Node> node) {
+    if (!node) return;
     fk::synchronization::ScopedLock lock(m_lock);
-    if (node) {
-        m_nodes.push_back(node);
-    }
+    m_node_stack.push(node);
 }
 
 void Dentry::pop_node() {
     fk::synchronization::ScopedLock lock(m_lock);
-    if (!m_nodes.is_empty()) {
-        m_nodes.pop_back();
-    }
+    m_node_stack.pop();
 }
 
 fk::RefPtr<Node> Dentry::top_node() const {
-    // We need to lock even for read because nodes can be pushed/popped
-    // But since it's a const method, we need a mutable lock or cast.
-    // I'll make the lock mutable in the header.
-    auto& mutable_this = const_cast<Dentry&>(*this);
-    fk::synchronization::ScopedLock lock(mutable_this.m_lock);
-    if (m_nodes.is_empty()) return nullptr;
-    return m_nodes[m_nodes.size() - 1];
+    fk::synchronization::ScopedLock lock(m_lock);
+    return m_node_stack.top();
 }
 
 fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char* name) {
@@ -49,26 +41,27 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
     }
 
     // Not in cache, try lookups in the node stack
-    // We keep m_lock unlocked during I/O lookup to allow parallelism
-    // and avoid deadlocks if lookup() calls VFS.
-    for (int i = static_cast<int>(m_nodes.size()) - 1; i >= 0; --i) {
-        auto res = m_nodes[i]->lookup(name);
-        if (res.is_ok()) {
-            auto new_dentry = TRY(Dentry::create(name, this));
-            new_dentry->push_node(res.value());
-            
-            // Check if this new dentry itself shadows other nodes in the underlying stack
-            for (int j = i - 1; j >= 0; --j) {
-                auto sub_res = m_nodes[j]->lookup(name);
-                if (sub_res.is_ok()) {
-                    new_dentry->push_node(sub_res.value());
-                }
-            }
-            
-            fk::synchronization::ScopedLock lock(m_lock);
-            m_children.push_back(new_dentry);
-            return new_dentry;
+    const auto& all_nodes = m_node_stack.all();
+    for (int i = static_cast<int>(all_nodes.size()) - 1; i >= 0; --i) {
+        auto res = all_nodes[i]->lookup(name);
+        if (!res.is_ok())
+            continue;
+
+        auto new_dentry = TRY(Dentry::create(name, this));
+        new_dentry->push_node(res.value());
+
+        for (int j = i - 1; j >= 0; --j) {
+            auto sub_res = all_nodes[j]->lookup(name);
+            if (sub_res.is_ok())
+                new_dentry->push_node(sub_res.value());
         }
+
+        fk::synchronization::ScopedLock lock(m_lock);
+        for (auto& child : m_children) {
+            if (child->name() == name) return child;
+        }
+        m_children.push_back(new_dentry);
+        return new_dentry;
     }
 
     return fk::core::Error::NotFound;

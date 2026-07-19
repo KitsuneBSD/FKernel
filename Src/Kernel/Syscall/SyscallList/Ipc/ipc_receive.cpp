@@ -15,6 +15,8 @@ extern "C" uint64_t sys_ipc_receive(uint64_t handle, uint64_t, uint64_t,
   Capability cap = task->ipc().cspace->get(static_cast<uint32_t>(handle));
   if (cap.type() != CapabilityType::Endpoint)
     return (uint64_t)-1;
+  if (!cap.can_recv())
+    return -static_cast<uint64_t>(fk::core::Error::PermissionDenied);
 
   Endpoint *endpoint = static_cast<Endpoint *>(cap.object());
   auto result = endpoint->receive();

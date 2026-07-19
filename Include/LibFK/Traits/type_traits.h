@@ -194,5 +194,36 @@ public:
 template <typename Base, typename Derived>
 inline constexpr bool is_base_of_v = is_base_of<Base, Derived>::value;
 
+template <typename T> struct remove_pointer      { using type = T; };
+template <typename T> struct remove_pointer<T *>  { using type = T; };
+template <typename T> struct remove_pointer<T * const> { using type = T; };
+template <typename T> using remove_pointer_t = typename remove_pointer<T>::type;
+
+template <typename T> struct is_pointer { static constexpr bool value = false; };
+template <typename T> struct is_pointer<T *> { static constexpr bool value = true; };
+template <typename T> inline constexpr bool is_pointer_v = is_pointer<T>::value;
+
+template <typename T> struct is_floating_point { static constexpr bool value = false; };
+template <> struct is_floating_point<float>       { static constexpr bool value = true; };
+template <> struct is_floating_point<double>      { static constexpr bool value = true; };
+template <> struct is_floating_point<long double> { static constexpr bool value = true; };
+template <typename T> inline constexpr bool is_floating_point_v = is_floating_point<T>::value;
+
+template <typename T> struct is_signed { static constexpr bool value = false; };
+template <> struct is_signed<signed char>  { static constexpr bool value = true; };
+template <> struct is_signed<short>        { static constexpr bool value = true; };
+template <> struct is_signed<int>          { static constexpr bool value = true; };
+template <> struct is_signed<long>         { static constexpr bool value = true; };
+template <> struct is_signed<long long>    { static constexpr bool value = true; };
+template <> struct is_signed<float>        { static constexpr bool value = true; };
+template <> struct is_signed<double>       { static constexpr bool value = true; };
+template <> struct is_signed<long double>  { static constexpr bool value = true; };
+template <typename T> inline constexpr bool is_signed_v = is_signed<T>::value;
+
+template <bool B, typename T, typename F> struct conditional      { using type = T; };
+template <typename T, typename F> struct conditional<false, T, F> { using type = F; };
+template <bool B, typename T, typename F>
+using conditional_t = typename conditional<B, T, F>::type;
+
 } // namespace traits
 } // namespace fk

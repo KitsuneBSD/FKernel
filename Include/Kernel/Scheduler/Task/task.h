@@ -75,6 +75,7 @@ struct TaskContext {
     uint64_t saved_rflags{0};
     uint64_t fs_base{0};
     uint64_t gs_base{0};
+    alignas(16) uint8_t fx_state[512]{};
 };
 
 /**
@@ -115,6 +116,7 @@ struct Task {
     // Intrusive nodes MUST be direct members for pointer-to-member templates
     fk::containers::IntrusiveListNode<Task> run_node;
     fk::containers::IntrusiveListNode<Task> wait_node;
+    fk::containers::IntrusiveListNode<Task> recv_wait_node;
     fk::containers::IntrusiveListNode<Task> sleep_node;
     fk::containers::IntrusiveListNode<Task> zombie_node;
 

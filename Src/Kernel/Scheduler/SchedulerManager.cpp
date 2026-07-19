@@ -14,7 +14,8 @@
 #include <LibFK/Synchronization/interrupt_disabler.h>
 
 extern CpuControlBlock g_cpu_block;
-extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr);
+extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr,
+                               void* prev_fx, void* next_fx);
 
 SchedulerManager::SchedulerManager() {
   for (int i = 0; i < 32; ++i) {
@@ -37,20 +38,67 @@ void SchedulerManager::initialize() {
   fk::algorithms::klog("SCHEDULER MANAGER", "Initializing SMP Scheduler Manager...");
 }
 
+static Task* highest_priority_task(fk::containers::IntrusiveList<Task, &Task::run_node>& queue) {
+  Task* best = nullptr;
+  for (auto& task : queue) {
+    if (!best || task.control.lifecycle.priority > best->control.lifecycle.priority)
+      best = &task;
+  }
+  return best;
+}
+
+static Task* lowest_priority_task(fk::containers::IntrusiveList<Task, &Task::run_node>& queue) {
+  Task* worst = nullptr;
+  for (auto& task : queue) {
+    if (!worst || task.control.lifecycle.priority < worst->control.lifecycle.priority)
+      worst = &task;
+  }
+  return worst;
+}
+
+Task* SchedulerManager::steal_task(uint32_t stealing_cpu) {
+  uint32_t busiest_cpu = stealing_cpu;
+  size_t max_tasks = 1; // only steal if target has > 1 task
+  for (uint32_t i = 0; i < m_processor_count; ++i) {
+    if (i == stealing_cpu) continue;
+    size_t count = m_processors[i].run_queue.size();
+    if (count > max_tasks) {
+      max_tasks = count;
+      busiest_cpu = i;
+    }
+  }
+  if (busiest_cpu == stealing_cpu) return nullptr;
+  fk::synchronization::ScopedLock lock(m_processors[busiest_cpu].run_queue_lock);
+  if (m_processors[busiest_cpu].run_queue.empty()) return nullptr;
+  Task* victim = lowest_priority_task(m_processors[busiest_cpu].run_queue);
+  if (!victim) return nullptr;
+  m_processors[busiest_cpu].run_queue.remove(victim);
+  return victim;
+}
+
 Task* SchedulerManager::pick_next() {
   auto& proc = current_processor();
   {
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
-    if (proc.run_queue.empty()) {
-      proc.current_task = proc.idle_task;
-    } else {
-      Task* next = proc.run_queue.front();
-      proc.run_queue.pop_front();
+    if (!proc.run_queue.empty()) {
+      Task* next = highest_priority_task(proc.run_queue);
+      proc.run_queue.remove(next);
       next->control.lifecycle.state = TaskState::Running;
       next->control.lifecycle.time_slice_ticks = m_default_quantum;
       proc.current_task = next;
+      proc.need_resched = false;
+      return proc.current_task;
     }
   }
+  Task* stolen = steal_task(proc.id);
+  if (stolen) {
+    stolen->control.lifecycle.state = TaskState::Running;
+    stolen->control.lifecycle.time_slice_ticks = m_default_quantum;
+    proc.current_task = stolen;
+    proc.need_resched = false;
+    return proc.current_task;
+  }
+  proc.current_task = proc.idle_task;
   proc.need_resched = false;
   return proc.current_task;
 }
@@ -107,9 +155,13 @@ void SchedulerManager::schedule() {
 
   if (prev_task) {
     switch_context(&prev_task->resources.context.stack_pointer,
-                   next_task->resources.context.stack_pointer);
+                   next_task->resources.context.stack_pointer,
+                   prev_task->resources.context.fx_state,
+                   next_task->resources.context.fx_state);
   } else {
     uint64_t dummy;
-    switch_context(&dummy, next_task->resources.context.stack_pointer);
+    alignas(16) static uint8_t s_dummy_fx[512]{};
+    switch_context(&dummy, next_task->resources.context.stack_pointer,
+                   s_dummy_fx, next_task->resources.context.fx_state);
   }
 }

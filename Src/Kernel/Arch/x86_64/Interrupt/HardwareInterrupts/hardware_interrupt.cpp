@@ -96,6 +96,13 @@ HardwareInterruptManager::allocate_msi_vector(const PciDevice& device) {
   return m_controller->allocate_msi_vector(device);
 }
 
+fk::core::Result<uint8_t, fk::core::Error>
+HardwareInterruptManager::allocate_msix_vector(const PciDevice& device, uint16_t entry) {
+  if (!m_controller)
+    return fk::core::Error::NotImplemented;
+  return m_controller->allocate_msix_vector(device, entry);
+}
+
 void HardwareInterruptManager::enable_msi(uint8_t vector) {
   if (m_controller)
     m_controller->enable_msi(vector);
