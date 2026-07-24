@@ -3,8 +3,8 @@
 #include <Kernel/Driver/Network/network_device.h>
 #include <Kernel/Net/Eth/ethernet_frame.h>
 #include <Kernel/Net/Ip/ip_address.h>
-#include <LibC/stdint.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Types/types.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
@@ -13,17 +13,20 @@ namespace net {
 class UdpSocket;
 class TcpSocket;
 
-static constexpr size_t MAX_UDP_SOCKETS = 64;
-static constexpr size_t MAX_TCP_SOCKETS = 64;
+static constexpr size_t MAX_UDP_BINDINGS = 64;
+static constexpr size_t MAX_TCP_BINDINGS = 64;
+
+struct UdpBinding { uint16_t port{0}; UdpSocket* socket{nullptr}; };
+struct TcpBinding { uint16_t port{0}; TcpSocket* socket{nullptr}; };
 
 class NetworkStack {
   NetworkDevice* m_device;
   IPv4Address    m_ip;
 
-  UdpSocket*    m_udp_sockets[MAX_UDP_SOCKETS]{};
+  UdpBinding m_udp_sockets[MAX_UDP_BINDINGS]{};
   fk::synchronization::Spinlock m_udp_lock;
 
-  TcpSocket*    m_tcp_sockets[MAX_TCP_SOCKETS]{};
+  TcpBinding m_tcp_sockets[MAX_TCP_BINDINGS]{};
   fk::synchronization::Spinlock m_tcp_lock;
 
 public:

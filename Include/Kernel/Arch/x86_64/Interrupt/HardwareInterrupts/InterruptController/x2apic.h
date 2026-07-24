@@ -54,7 +54,8 @@ public:
   void calibrate_timer();
 
   /**
-   * @brief Configure periodic APIC timer
+   * @brief Configure periodic APIC timer at the given frequency.
+   * @param frequency_hz Interrupts per second (e.g., 1000 = 1 kHz tick)
    */
-  void setup_timer(uint64_t ms);
+  void setup_timer(uint64_t frequency_hz);
 };

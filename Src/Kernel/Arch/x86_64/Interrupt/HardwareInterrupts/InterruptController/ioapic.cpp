@@ -1,7 +1,9 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
-#include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
 #include <Kernel/Memory/memory_manager.h>
@@ -78,6 +80,7 @@ void IOAPIC::send_eoi([[maybe_unused]] uint8_t irq) {
 
 void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
                        uint32_t flags) {
+  fk::algorithms::kdebug("IOAPIC", "Remap IRQ %u -> vector %u (lapic %u)", irq, vector, lapic_id);
   uint64_t entry = vector | ((uint64_t)lapic_id << 56) | flags;
 
   uint32_t reg_low = IOAPIC_REG_TABLE_BASE + irq * 2;
@@ -87,41 +90,9 @@ void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
   write(reg_high, (uint32_t)(entry >> 32));
 }
 
-extern uint8_t g_next_msi_vector;
-
-fk::core::Result<uint8_t, fk::core::Error> IOAPIC::allocate_msi_vector(const PciDevice& device) {
-    uint8_t msi_ptr = device.find_capability(0x05); // MSI Capability ID
-    if (msi_ptr == 0) {
-        fk::algorithms::kwarn("MSI", "Device %02x:%02x.%d does not support MSI", 
-                             device.address().bus(), device.address().device(), 
-                             device.address().function());
-        return fk::core::Error::NotImplemented;
-    }
-
-    uint8_t vector = g_next_msi_vector++;
-    if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
-
-    uint32_t msi_addr = static_cast<uint32_t>(APIC::the().msi_address_base());
-    if (msi_addr == 0)
-        msi_addr = 0xFEE00000;
-    device.write_config_dword(msi_ptr + 4, msi_addr);
-
-    uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
-    if (msg_ctrl & (1 << 7)) { // 64-bit support
-        device.write_config_dword(msi_ptr + 8, 0);
-        device.write_config_word(msi_ptr + 12, vector);
-    } else {
-        device.write_config_word(msi_ptr + 8, vector);
-    }
-
-    msg_ctrl |= 0x01;
-    device.write_config_word(msi_ptr + 2, msg_ctrl);
-
-    fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) for device %02x:%02x.%d", 
-                         vector, device.address().bus(), device.address().device(), 
-                         device.address().function());
-
-    return vector;
+fk::core::Result<uint8_t, fk::core::Error>
+IOAPIC::allocate_msi_vector(const PciDevice& device) {
+  return msi::allocate_msi_vector(device);
 }
 
 void IOAPIC::enable_msi(uint8_t vector) {

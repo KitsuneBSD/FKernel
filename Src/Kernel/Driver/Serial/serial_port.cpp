@@ -1,4 +1,4 @@
-#include <Kernel/Driver/SerialPort/serial_port.h>
+#include <Kernel/Driver/Serial/serial_port.h>
 
 void serial::init() {
   outb(COM1 + 1, 0x00);
@@ -16,23 +16,36 @@ void serial::write_char(char c) {
   outb(COM1, c);
 }
 
-void serial::write(const char *str) {
-  for (size_t i = 0; str[i] != '\0'; i++) {
-    write_char(str[i]);
+void serial::write_buffer(const char *data, size_t len) {
+  static constexpr size_t FIFO_DEPTH = 16;
+  size_t i = 0;
+  while (i < len) {
+    while (!is_transmit_empty())
+      ;
+    size_t chunk = len - i;
+    if (chunk > FIFO_DEPTH) chunk = FIFO_DEPTH;
+    for (size_t j = 0; j < chunk; ++j)
+      outb(COM1, data[i + j]);
+    i += chunk;
   }
+}
+
+void serial::write(const char *str) {
+  size_t len = 0;
+  while (str[len]) ++len;
+  write_buffer(str, len);
 }
 
 void serial::write_dec(int64_t value) {
   char buffer[20] = {};
   bool negative = value < 0;
   size_t i = 0;
-  if (negative)
-    value = -value;
+  uint64_t uvalue = negative ? (~static_cast<uint64_t>(value) + 1u) : static_cast<uint64_t>(value);
 
   do {
-    buffer[i++] = '0' + (value % 10);
-    value /= 10;
-  } while (value && i < sizeof(buffer));
+    buffer[i++] = '0' + (uvalue % 10);
+    uvalue /= 10;
+  } while (uvalue && i < sizeof(buffer));
 
   if (negative)
     buffer[i++] = '-';

@@ -1,4 +1,4 @@
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
@@ -16,18 +16,22 @@
 extern "C" void flush_idt(void *idtr);
 
 void InterruptController::initialize() {
+  if (m_initialized) {
+    fk::algorithms::kwarn("INTERRUPT", "IDT already initialized, skipping");
+    return;
+  }
   fk::algorithms::klog("INTERRUPT", "Initializing IDT and Hardware Interrupts...");
   disable_interrupt();
 
   clear();
 
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
-    // Disable IST for standard interrupts/exceptions to allow safe task switching.
-    // Critical faults like Double Fault should ideally use IST, but for now we simplify.
     set_gate(i, g_isr_stubs[i], GateType::InterruptGate, 0x08, 0);
-
     register_interrupt(default_handler, i);
   }
+
+  // Double fault (#8) uses IST1: dedicated stack prevents triple fault on stack corruption.
+  set_gate(8, g_isr_stubs[8], GateType::InterruptGate, 0x08, 1);
 
   // NOTE: Interrupt Exception
   register_interrupt(divide_by_zero_handler, 0);
@@ -69,14 +73,7 @@ void InterruptController::initialize() {
   HardwareInterruptManager::the().initialize();
   ClockManager::the().initialize();
 
-  HardwareInterruptManager::the().unmask_interrupt(0);  // Timer
-  HardwareInterruptManager::the().unmask_interrupt(1);  // Keyboard
-  HardwareInterruptManager::the().unmask_interrupt(8);  // Clock
-  HardwareInterruptManager::the().unmask_interrupt(12); // PS/2 Mouse
-  HardwareInterruptManager::the().unmask_interrupt(14); // Primary ATA
-  HardwareInterruptManager::the().unmask_interrupt(15); // Secondary ATA
-
-  enable_interrupt();
+  m_initialized = true;
   fk::algorithms::klog("INTERRUPT",
                        "Interrupt descriptor table initialized using %s",
                        HardwareInterruptManager::the().get_name().c_str());

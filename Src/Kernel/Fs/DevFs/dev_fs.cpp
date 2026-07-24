@@ -1,5 +1,7 @@
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Synchronization/spinlock.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -15,25 +17,22 @@ DevFs& DevFs::the() {
 fk::core::Result<void, fk::core::Error> DevFs::register_device(fk::RefPtr<Node> node, const char* name) {
     if (!node || !name) return fk::core::Error::InvalidParameter;
 
-    // Verifica se já existe
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (auto& entry : m_devices) {
         if (entry.name == name) return fk::core::Error::PermissionDenied;
     }
 
     m_devices.push_back({name, node});
     fk::algorithms::klog("DEVFS", "Registered device: /dev/%s", name);
-    
-    // TODO: Aqui poderíamos disparar um evento estilo udev para o userspace
     return {};
 }
 
 fk::core::Result<void, fk::core::Error> DevFs::unregister_device(const char* name) {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (size_t i = 0; i < m_devices.size(); ++i) {
         if (m_devices[i].name == name) {
-            // Em um sistema real, removeríamos da lista. 
-            // Nossa Vector precisa de um método remove_at ou similar.
-            // Por enquanto, apenas invalidamos.
-            m_devices[i].node = nullptr;
+            m_devices[i] = fk::types::move(m_devices[m_devices.size() - 1]);
+            m_devices.pop_back();
             return {};
         }
     }
@@ -43,25 +42,22 @@ fk::core::Result<void, fk::core::Error> DevFs::unregister_device(const char* nam
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> DevFs::lookup(const char* name) {
     if (!name) return fk::core::Error::InvalidParameter;
 
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (auto& entry : m_devices) {
-        if (entry.node && strcmp(entry.name.c_str(), name) == 0) {
+        if (entry.node && fk::memory::compare(entry.name.c_str(), name) == 0) {
             return entry.node;
         }
-    }
-    
-    fk::algorithms::kdebug("DEVFS", "lookup failed for: '%s'. Registered devices:", name);
-    for (auto& entry : m_devices) {
-        fk::algorithms::kdebug("DEVFS", "  - %s", entry.name.c_str());
     }
     return fk::core::Error::NotFound;
 }
 
 fk::core::Result<void, fk::core::Error> DevFs::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (auto& entry : m_devices) {
         if (!entry.node) continue;
         
         DirectoryEntry de;
-        strncpy(de.name, entry.name.c_str(), sizeof(de.name) - 1);
+        fk::memory::copy_n(de.name, entry.name.c_str(), sizeof(de.name) - 1);
         de.name[sizeof(de.name) - 1] = '\0';
         
         if (entry.node->is_directory()) {

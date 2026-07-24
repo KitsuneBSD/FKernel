@@ -1,7 +1,7 @@
 #pragma once
 
-#include <LibC/stdint.h>
-#include <LibC/stddef.h>
+#include <LibFK/Types/types.h>
+#include <LibFK/Types/types.h>
 
 namespace fkernel {
 namespace net {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Memory/ref_ptr.h>
 
 namespace fkernel::elf_domains {

@@ -17,10 +17,16 @@
  * It uses the RSDP to locate the RSDT or XSDT, and then allows
  * querying for specific ACPI tables. 
 **/
+namespace fkernel {
+
 class ACPIManager {
+  bool m_is_initialized{false};
+
 private:
   ACPIManager();
   ~ACPIManager();
+  ACPIManager(const ACPIManager &) = delete;
+  ACPIManager &operator=(const ACPIManager &) = delete;
 
   static bool validate_checksum(const void *table, size_t length);
   static RSDP *find_rsdp();
@@ -36,9 +42,14 @@ private:
 public:
   static ACPIManager &the();
 
+  bool is_initialized() const { return m_is_initialized; }
   void initialize();
   void *find_table(const char *signature);
   Madt *get_madt() const { return m_madt; }
   uintptr_t ioapic_address() const { return m_ioapic_address; }
   void set_ioapic_address(uintptr_t addr) { m_ioapic_address = addr; }
 };
+
+} // namespace fkernel
+
+using fkernel::ACPIManager;

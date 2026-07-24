@@ -1,12 +1,12 @@
 #include <Kernel/Driver/Pty/pty_buffer.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
 size_t PtyBuffer::read(uint8_t* dst, size_t len) {
   size_t n = m_data.size() < len ? m_data.size() : len;
   if (n == 0) return 0;
-  memcpy(dst, m_data.begin(), n);
+  fk::memory::copy(dst, m_data.begin(), n);
   for (size_t i = n; i < m_data.size(); ++i)
     m_data[i - n] = m_data[i];
   for (size_t i = 0; i < n; ++i)

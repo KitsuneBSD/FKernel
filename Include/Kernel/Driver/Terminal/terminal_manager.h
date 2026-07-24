@@ -48,7 +48,9 @@ public:
     
     // Initialize default terminals
     void initialize();
-    
+
+    bool is_initialized() const { return m_is_initialized; }
+
     // Get terminal count by type
     size_t vga_terminal_count() const { return m_vga_terminals.size(); }
 
@@ -66,6 +68,7 @@ private:
     TerminalManager() = default;
     ~TerminalManager() = default;
     
+    bool m_is_initialized{false};
     TerminalId m_next_id{1};
     fk::containers::Vector<fk::OwnPtr<VGATerminal>> m_vga_terminals;
     int m_active_terminal_index{0};

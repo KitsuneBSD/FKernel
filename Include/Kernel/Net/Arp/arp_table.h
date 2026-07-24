@@ -4,6 +4,7 @@
 #include <Kernel/Net/Ip/ip_address.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/optional.h>
+#include <LibFK/Types/types.h>
 
 namespace fkernel {
 namespace net {
@@ -11,6 +12,7 @@ namespace net {
 struct ArpEntry {
     IPv4Address ip;
     MACAddress  mac;
+    uint64_t    created_at_ticks{0};
 };
 
 class ArpTable {
@@ -22,6 +24,7 @@ public:
   void update(IPv4Address ip, const MACAddress& mac);
   fk::memory::optional<MACAddress> lookup(IPv4Address ip) const;
   void remove(IPv4Address ip);
+  void expire_old_entries();
 };
 
 } // namespace net

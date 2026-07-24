@@ -1,7 +1,6 @@
 #include <Kernel/Driver/Device/BlockDevice/block_device.h>
 #include <LibFK/Memory/heap_malloc.h>
-#include <LibFK/Utilities/size_checking.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -27,7 +26,7 @@ BlockDevice::read(uint64_t offset, size_t size, uint8_t* buffer) {
             return read_res.error();
         }
 
-        memcpy(buffer + bytes_read, temp + sector_offset, to_copy);
+        fk::memory::copy(buffer + bytes_read, temp + sector_offset, to_copy);
         bytes_read += to_copy;
         current_offset += to_copy;
     }
@@ -61,7 +60,7 @@ BlockDevice::write(uint64_t offset, size_t size, const uint8_t* buffer) {
             }
         }
 
-        memcpy(temp + sector_offset, buffer + bytes_written, to_copy);
+        fk::memory::copy(temp + sector_offset, buffer + bytes_written, to_copy);
         
         auto write_res = write_sectors(lba, 1, temp);
         if (write_res.is_error()) {

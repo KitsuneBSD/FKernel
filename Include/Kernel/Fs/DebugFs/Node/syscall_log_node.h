@@ -2,6 +2,7 @@
 
 #include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Container/vector.h>
+#include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 
 namespace fkernel {
@@ -22,6 +23,7 @@ public:
   static fk::RefPtr<SyscallLogNode> the();
 
 private:
+  mutable fk::synchronization::Spinlock m_lock;
   fk::containers::Vector<uint8_t> m_buffer;
   static constexpr size_t MAX_LOG_SIZE = 128 * 1024; // 128KB log buffer
 };

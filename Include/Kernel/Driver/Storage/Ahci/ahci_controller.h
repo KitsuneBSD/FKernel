@@ -3,6 +3,7 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Driver/Storage/storage_device.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Memory/Dma/dma_buffer.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -139,6 +140,9 @@ public:
         uint32_t sig;  // Port signature (SATA, ATAPI, etc.)
         uint64_t sectors;
         volatile HBA_PORT* regs;
+        DmaBuffer cmd_list;
+        DmaBuffer fis_buffer;
+        DmaBuffer cmd_tables;
     };
 
 protected:
@@ -154,6 +158,7 @@ private:
     bool m_initialized{false};
 
     int find_cmd_slot(uint32_t port_idx);
+    fk::core::Result<uint64_t, fk::core::Error> identify_port(uint32_t port_idx);
     
     // AHCI register offsets
     static constexpr uint32_t HBA_CAP = 0x00;
@@ -174,6 +179,7 @@ private:
     // ATA Commands
     static constexpr uint8_t ATA_CMD_READ_DMA_EX = 0x25;
     static constexpr uint8_t ATA_CMD_WRITE_DMA_EX = 0x35;
+    static constexpr uint8_t ATA_CMD_IDENTIFY = 0xEC;
     static constexpr uint8_t FIS_TYPE_REG_H2D = 0x27;
 };
 

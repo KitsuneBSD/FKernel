@@ -2,7 +2,7 @@
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Keyboard/keymap_manager.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 
 static constexpr uint16_t PS2_DATA_PORT = 0x60;     ///< PS/2 data port

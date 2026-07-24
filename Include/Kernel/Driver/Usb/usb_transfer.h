@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 
 class USBTransfer {
 public:

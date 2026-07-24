@@ -1,7 +1,7 @@
 #pragma once
 
-#include <LibC/stdint.h>
-#include <LibFK/Types/processId.h>
+#include <LibFK/Types/types.h>
+#include <LibFK/Types/process_id.h>
 
 namespace fkernel {
 

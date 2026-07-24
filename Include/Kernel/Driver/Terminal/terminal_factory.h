@@ -4,7 +4,7 @@
 #include <Kernel/Driver/Terminal/vga_terminal.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <LibFK/Memory/own_ptr.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel {
 namespace terminal {

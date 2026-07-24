@@ -1,8 +1,9 @@
 #include <Kernel/Fs/RamDisk/ram_disk.h>
-#include <LibC/string.h>
+
+#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/new.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -36,12 +37,12 @@ void RamDiskNode::parse_tar() {
     }
 
     // Lenient magic check: some TARs don't have ustar magic
-    if (header->magic[0] != '\0' && strncmp(header->magic, "ustar", 5) != 0) {
+    if (header->magic[0] != '\0' && fk::memory::compare_n(header->magic, "ustar", 5) != 0) {
       fk::algorithms::kwarn("RAMDISK", "Suspicious TAR magic at %p: '%.6s'", ptr, header->magic);
     }
 
     char safe_filename[101];
-    strncpy(safe_filename, header->filename, 100);
+    fk::memory::copy_n(safe_filename, header->filename, 100);
     safe_filename[100] = '\0';
 
     size_t file_size = fk::archive::TarParser::octal_to_int(header->size, 12);
@@ -64,7 +65,7 @@ void RamDiskNode::parse_tar() {
       if (!file_node_res.is_error()) {
         auto file_node = file_node_res.value();
 
-        const char* name_ptr = strrchr(final_filename, '/', 100);
+        const char* name_ptr = strrnchr(final_filename, '/', 100);
         if (name_ptr)
           name_ptr++;
         else
@@ -80,13 +81,13 @@ void RamDiskNode::parse_tar() {
     } else if (header->typeflag[0] == '5') {
       // Explicit directory entry
       // Strip trailing slash if present for consistency
-      size_t len = strlen(final_filename);
+      size_t len = fk::memory::length(final_filename);
       char temp[256];
       if (len > 0 && final_filename[len - 1] == '/') {
-        strncpy(temp, final_filename, len - 1);
+        fk::memory::copy_n(temp, final_filename, len - 1);
         temp[len - 1] = '\0';
       } else {
-        strncpy(temp, final_filename, sizeof(temp) - 1);
+        fk::memory::copy_n(temp, final_filename, sizeof(temp) - 1);
         temp[sizeof(temp) - 1] = '\0';
       }
       m_directories.push_back(temp);
@@ -94,14 +95,14 @@ void RamDiskNode::parse_tar() {
     } else if (header->typeflag[0] == '2') {
       // Symbolic link
       char link_target[100];
-      strncpy(link_target, header->linkname, 100);
+      fk::memory::copy_n(link_target, header->linkname, 100);
       link_target[99] = '\0';
 
       auto symlink_node_res = fk::make_ref<RamSymlinkNode>(link_target);
       if (!symlink_node_res.is_error()) {
         auto symlink_node = symlink_node_res.value();
 
-        const char* name_ptr = strrchr(final_filename, '/', 100);
+        const char* name_ptr = strrnchr(final_filename, '/', 100);
         if (name_ptr)
           name_ptr++;
         else
@@ -122,9 +123,9 @@ void RamDiskNode::parse_tar() {
 }
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const char* name) {
-  if (!name || name[0] == '\0' || strcmp(name, ".") == 0)
+  if (!name || name[0] == '\0' || fk::memory::compare(name, ".") == 0)
     return fk::RefPtr<Node>(this);
-  if (strcmp(name, "..") == 0) {
+  if (fk::memory::compare(name, "..") == 0) {
     if (m_parent)
       return m_parent;
     return fk::RefPtr<Node>(this);
@@ -133,7 +134,7 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
   const char* clean_name = (name[0] == '/') ? name + 1 : name;
   char full_lookup[512];
   if (m_prefix.is_empty()) {
-    strncpy(full_lookup, clean_name, sizeof(full_lookup) - 1);
+    fk::memory::copy_n(full_lookup, clean_name, sizeof(full_lookup) - 1);
   } else {
     snprintf(full_lookup, sizeof(full_lookup), "%s%s", m_prefix.c_str(), clean_name);
   }
@@ -152,7 +153,7 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
 
   bool found_prefix = false;
   for (auto& entry : m_files) {
-    if (strncmp(entry.name.c_str(), dir_prefix, strlen(dir_prefix)) == 0) {
+    if (fk::memory::compare_n(entry.name.c_str(), dir_prefix, fk::memory::length(dir_prefix)) == 0) {
       found_prefix = true;
       break;
     }
@@ -192,7 +193,7 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
   size_t prefix_len = m_prefix.length();
 
   for (auto& entry : m_files) {
-    if (prefix_len > 0 && strncmp(entry.name.c_str(), m_prefix.c_str(), prefix_len) != 0)
+    if (prefix_len > 0 && fk::memory::compare_n(entry.name.c_str(), m_prefix.c_str(), prefix_len) != 0)
       continue;
 
     const char* relative_name = entry.name.c_str() + prefix_len;
@@ -200,51 +201,42 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
       continue;
 
     char component[256];
-    const char* slash = strchr(relative_name, '/', 256);
+    const char* slash = strnchr(relative_name, '/', 256);
     bool is_dir = false;
 
     if (slash) {
       size_t len = slash - relative_name;
       if (len == 0) { // Entry started with / but we already skipped prefix
         relative_name++;
-        slash = strchr(relative_name, '/', 256);
+        slash = strnchr(relative_name, '/', 256);
         if (slash)
           len = slash - relative_name;
         else {
-          strncpy(component, relative_name, sizeof(component) - 1);
+          fk::memory::copy_n(component, relative_name, sizeof(component) - 1);
           is_dir = false;
           goto skip_slash_logic;
         }
       }
-      strncpy(component, relative_name, len);
+      fk::memory::copy_n(component, relative_name, len);
       component[len] = '\0';
       is_dir = true;
     } else {
-      strncpy(component, relative_name, sizeof(component) - 1);
+      fk::memory::copy_n(component, relative_name, sizeof(component) - 1);
       component[sizeof(component) - 1] = '\0';
       is_dir = false;
     }
 
   skip_slash_logic:
-    bool already_added = false;
-    for (auto& existing : entries) {
-      if (strcmp(existing.name, component) == 0) {
-        already_added = true;
-        break;
-      }
-    }
-
-    if (!already_added) {
+    if (fk::algorithms::find_if(entries.begin(), entries.size(),
+          [&](const DirectoryEntry& e) { return fk::memory::compare(e.name, component) == 0; })
+        == entries.size()) {
       DirectoryEntry de;
-      memset(&de, 0, sizeof(de));
-      strncpy(de.name, component, sizeof(de.name) - 1);
+      fk::memory::set(&de, 0, sizeof(de));
+      fk::memory::copy_n(de.name, component, sizeof(de.name) - 1);
       if (is_dir) {
         de.type = 1; // DT_DIR
       } else {
-        if (entry.node->is_symlink())
-          de.type = 2; // DT_LNK
-        else
-          de.type = 0; // DT_REG
+        de.type = entry.node->is_symlink() ? 2 : 0; // DT_LNK : DT_REG
       }
       entries.push_back(de);
     }
@@ -252,7 +244,7 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
 
   // Add explicit directories that might be empty (not implied by files)
   for (const auto& dir_path : m_directories) {
-    if (prefix_len > 0 && strncmp(dir_path.c_str(), m_prefix.c_str(), prefix_len) != 0)
+    if (prefix_len > 0 && fk::memory::compare_n(dir_path.c_str(), m_prefix.c_str(), prefix_len) != 0)
       continue;
 
     const char* relative_name = dir_path.c_str() + prefix_len;
@@ -260,30 +252,24 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
       continue;
 
     char component[256];
-    const char* slash = strchr(relative_name, '/', 256);
+    const char* slash = strnchr(relative_name, '/', 256);
 
     if (slash) {
       // Should not happen if m_directories contains clean paths, but safe to handle
       size_t len = slash - relative_name;
-      strncpy(component, relative_name, len);
+      fk::memory::copy_n(component, relative_name, len);
       component[len] = '\0';
     } else {
-      strncpy(component, relative_name, sizeof(component) - 1);
+      fk::memory::copy_n(component, relative_name, sizeof(component) - 1);
       component[sizeof(component) - 1] = '\0';
     }
 
-    bool already_added = false;
-    for (auto& existing : entries) {
-      if (strcmp(existing.name, component) == 0) {
-        already_added = true;
-        break;
-      }
-    }
-
-    if (!already_added) {
+    if (fk::algorithms::find_if(entries.begin(), entries.size(),
+          [&](const DirectoryEntry& e) { return fk::memory::compare(e.name, component) == 0; })
+        == entries.size()) {
       DirectoryEntry de;
-      memset(&de, 0, sizeof(de));
-      strncpy(de.name, component, sizeof(de.name) - 1);
+      fk::memory::set(&de, 0, sizeof(de));
+      fk::memory::copy_n(de.name, component, sizeof(de.name) - 1);
       de.type = 1; // DT_DIR
       entries.push_back(de);
     }

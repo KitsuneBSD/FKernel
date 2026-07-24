@@ -30,7 +30,7 @@ template <> struct Traits<int> {
    * @return Hash value
    */
   static unsigned hash(int i) {
-#ifdef __x86_64
+#ifdef __x86_64__
     return crc32(&i, sizeof(i));
 #else
     return djb2(&i, sizeof(i));
@@ -56,7 +56,7 @@ template <> struct Traits<unsigned> {
    * @return Hash value
    */
   static unsigned hash(unsigned i) {
-#ifdef __x86_64
+#ifdef __x86_64__
     return crc32(&i, sizeof(i));
 #else
     return djb2(&i, sizeof(i));

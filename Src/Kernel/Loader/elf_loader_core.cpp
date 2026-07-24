@@ -41,7 +41,7 @@ ElfLoadOperationResult ElfLoaderCore::execute_load_with_base(uintptr_t load_base
 fk::core::Result<void, fk::core::Error> ElfLoaderCore::parse_and_validate() {
   auto header_res = m_parser.validate_header();
   if (header_res.is_error()) {
-    fk::algorithms::kerror("ELF", "Invalid ELF header");
+    fk::algorithms::kwarn("ELF", "Invalid ELF header");
     return header_res.error();
   }
 
@@ -175,12 +175,22 @@ ElfLoadOperationResult ElfLoaderCore::calculate_entry_point() {
     }
   }
 
+  uintptr_t highest_load_end = 0;
+  for (const auto& phdr : headers) {
+    if (phdr.p_type != PT_LOAD)
+      continue;
+    uintptr_t seg_end = (phdr.p_vaddr + m_context.load_base + phdr.p_memsz + 0xFFF) & ~0xFFFULL;
+    if (seg_end > highest_load_end)
+      highest_load_end = seg_end;
+  }
+
   return ElfLoadResult{.entry = entry,
                        .ph_addr = ph_addr,
                        .ph_num = m_context.header.e_phnum,
                        .ph_ent = m_context.header.e_phentsize,
                        .stack_executable = stack_executable,
-                       .tls = tls};
+                       .tls = tls,
+                       .highest_load_end = highest_load_end};
 }
 
 fk::core::Result<void, fk::core::Error> ElfLoaderCore::initialize_context(uintptr_t load_base) {

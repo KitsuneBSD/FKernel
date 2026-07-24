@@ -1,5 +1,5 @@
 #include <Kernel/Fs/PipeFs/pipe_node.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -16,10 +16,18 @@ PipeNode::PipeNode() {
 fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64_t offset, size_t size, uint8_t* buffer) {
     if (size == 0) return 0;
 
-    while (m_read_pos == m_write_pos && !m_eof)
+    // Release lock before blocking, re-acquire after waking
+    m_lock.lock();
+    while (m_read_pos == m_write_pos && !m_eof) {
+        m_lock.unlock();
         m_data_notification.wait();
+        m_lock.lock();
+    }
 
-    if (m_read_pos == m_write_pos && m_eof) return 0;
+    if (m_read_pos == m_write_pos && m_eof) {
+        m_lock.unlock();
+        return 0;
+    }
 
     size_t available = (m_write_pos >= m_read_pos)
                        ? (m_write_pos - m_read_pos)
@@ -30,6 +38,7 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64
         buffer[i] = m_buffer[m_read_pos];
         m_read_pos = (m_read_pos + 1) % PIPE_BUFFER_SIZE;
     }
+    m_lock.unlock();
 
     m_space_notification.signal(1);
     return to_read;
@@ -37,14 +46,23 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64
 
 fk::core::Result<size_t, fk::core::Error> PipeNode::write([[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buffer) {
     if (size == 0) return 0;
+    if (m_reader_count == 0) return fk::core::Error::BrokenPipe;
 
     size_t total_written = 0;
+    m_lock.lock();
     while (total_written < size) {
+        if (m_reader_count == 0) {
+            m_lock.unlock();
+            return fk::core::Error::BrokenPipe;
+        }
+
         size_t used = (m_write_pos >= m_read_pos) ? (m_write_pos - m_read_pos) : (PIPE_BUFFER_SIZE - m_read_pos + m_write_pos);
         size_t space = PIPE_BUFFER_SIZE - used - 1;
 
         if (space == 0) {
+            m_lock.unlock();
             m_space_notification.wait();
+            m_lock.lock();
             continue;
         }
 
@@ -57,8 +75,11 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::write([[maybe_unused]] uint6
         }
 
         total_written += to_write;
+        m_lock.unlock();
         m_data_notification.signal(1);
+        m_lock.lock();
     }
+    m_lock.unlock();
 
     return total_written;
 }

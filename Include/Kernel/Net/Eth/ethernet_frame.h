@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 #include <Kernel/Driver/Network/mac_address.h>
 
 namespace fkernel {

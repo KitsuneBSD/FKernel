@@ -17,7 +17,7 @@ int tolower(int c) {
 void capitalize(char *str, size_t maxlen) {
   ASSERT(str != NULL);
   ASSERT(maxlen > 0);
-  ASSERT(strnlen(str, maxlen) > 0);
+  if (str[0] == '\0') return;
 
   str[0] = toupper(str[0]);
 

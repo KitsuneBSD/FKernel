@@ -70,27 +70,21 @@ public:
 
 private:
   size_t lower_bound(const K &key) const {
-    size_t lo = 0;
-    size_t hi = m_entries.size();
+    size_t lo = 0, hi = m_entries.size();
     while (lo < hi) {
       size_t mid = lo + (hi - lo) / 2;
-      if (m_entries[mid].first < key)
-        lo = mid + 1;
-      else
-        hi = mid;
+      if (m_entries[mid].first < key) lo = mid + 1;
+      else hi = mid;
     }
     return lo;
   }
 
   size_t upper_bound(const K &key) const {
-    size_t lo = 0;
-    size_t hi = m_entries.size();
+    size_t lo = 0, hi = m_entries.size();
     while (lo < hi) {
       size_t mid = lo + (hi - lo) / 2;
-      if (!(key < m_entries[mid].first))
-        lo = mid + 1;
-      else
-        hi = mid;
+      if (!(key < m_entries[mid].first)) lo = mid + 1;
+      else hi = mid;
     }
     return lo;
   }

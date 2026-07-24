@@ -33,9 +33,22 @@ typedef void (*sighandler_t)(int);
 #define SIG_IGN ((sighandler_t)1)
 #define SIG_ERR ((sighandler_t)-1)
 
+// Must match the Linux rt_sigaction kernel struct layout (syscall 13):
+//   offset  0: sa_handler  (8 bytes)
+//   offset  8: sa_flags    (8 bytes)
+//   offset 16: sa_restorer (8 bytes)
+//   offset 24: sa_mask     (8 bytes)
+#define SA_NOCLDSTOP  0x00000001UL
+#define SA_NOCLDWAIT  0x00000002UL
+#define SA_SIGINFO    0x00000004UL
+#define SA_RESTORER   0x04000000UL
+#define SA_RESTART    0x10000000UL
+#define SA_NODEFER    0x40000000UL
+#define SA_RESETHAND  0x80000000UL
+
 struct sigaction {
     sighandler_t sa_handler;
     uint64_t sa_flags;
-    uint64_t sa_mask;
     void (*sa_restorer)(void);
+    uint64_t sa_mask;
 };

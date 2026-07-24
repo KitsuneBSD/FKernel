@@ -4,8 +4,8 @@
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Container/static_vector.h>
 #include <LibFK/Text/fixed_string.h>
-#include <LibFK/Types/processId.h>
-#include <LibFK/Types/virtualAddress.h>
+#include <LibFK/Types/process_id.h>
+#include <LibFK/Types/virtual_address.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <Kernel/Hardware/Cpu/cpu_context.h>
 #include <Kernel/Scheduler/Task/task_state.h>
@@ -18,13 +18,29 @@ namespace fkernel::ipc {
     class Notification;
 }
 
+namespace fkernel {
+    class SignalFdNode;
+}
+
 /**
  * @brief Task Identity information
  */
 struct TaskIdentity {
     fk::ProcessId id;
     fk::ProcessId ppid;
+    fk::ProcessId pgid;
+    fk::ProcessId sid;
     fk::text::fixed_string<64> name;
+    uint32_t umask{0022};
+    bool is_session_leader{false};
+    uint32_t uid{0};
+    uint32_t gid{0};
+    uint32_t euid{0};
+    uint32_t egid{0};
+    uint32_t suid{0};
+    uint32_t sgid{0};
+    uint32_t supplementary_gids[16]{};
+    uint32_t ngroups{0};
 };
 
 /**
@@ -32,6 +48,7 @@ struct TaskIdentity {
  */
 struct TaskMemory {
     uintptr_t cr3{0};
+    uintptr_t prev_cr3{0};
     struct {
         uintptr_t heap_start{0};
         uintptr_t heap_break{0};
@@ -41,12 +58,14 @@ struct TaskMemory {
     } regions{};
 };
 
+static constexpr size_t MAX_OPEN_FILES = 128;
+
 /**
  * @brief Task Files and filesystem state
  */
 struct TaskFiles {
     fk::text::fixed_string<256> cwd{"/"};
-    fk::containers::static_vector<fk::RefPtr<FileDescription>, 128> descriptors;
+    fk::containers::static_vector<fk::RefPtr<FileDescription>, MAX_OPEN_FILES> descriptors;
 };
 
 /**
@@ -60,7 +79,13 @@ struct TaskIpc {
         sigaction actions[NSIG];
         uintptr_t trampoline{0};
     } signals{};
+    struct {
+        void* ss_sp{nullptr};
+        size_t ss_size{0};
+        int ss_flags{0}; // SS_DISABLE=2, SS_ONSTACK=0
+    } alt_stack{};
     ::fkernel::ipc::Notification *signal_notification{nullptr};
+    ::fkernel::SignalFdNode *signal_fd{nullptr};
 };
 
 /**
@@ -84,6 +109,7 @@ struct TaskContext {
 struct TaskLifecycle {
     TaskState state;
     uint8_t priority;
+    int8_t nice{0};
     uint64_t cpu_affinity;
     uint64_t time_slice_ticks{0};
     uint64_t wake_up_time_ticks{0};
@@ -94,6 +120,13 @@ struct TaskLifecycle {
     bool vfork_waiting{false};
     fk::ProcessId vfork_parent_id;
     bool is_vfork_sharing_address_space{false};
+    bool in_wait_queue{false};
+    struct {
+        uint64_t remaining_ticks{0};   // current timer value in ticks
+        uint64_t interval_ticks{0};    // reload value (0 = one-shot)
+        int signo{14};                 // signal to deliver (SIGALRM=14)
+        bool active{false};
+    } itimers[3]{};  // 0=ITIMER_REAL, 1=ITIMER_VIRTUAL, 2=ITIMER_PROF
 };
 
 /**
@@ -167,6 +200,15 @@ struct Task {
 
     void dump_file_descriptors() const;
     void print_info() const;
+
+    void destroy();
+
+    // Refcount for safe cross-lock access via fk::RefPtr<Task>.
+    // Starts at 1 (scheduler owns). ref()/unref() must be called
+    // while a scheduler lock is held to close the UAF window.
+    uint32_t m_ref_count{1};
+    void ref()   { __sync_fetch_and_add(&m_ref_count, 1u); }
+    void unref() { if (__sync_fetch_and_sub(&m_ref_count, 1u) == 1u) delete this; }
 };
 
 Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,

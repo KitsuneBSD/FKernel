@@ -1,17 +1,20 @@
 #pragma once
 
-#include "LibFK/Core/Result.h"
+#include "LibFK/Core/result.h"
 #include <Kernel/Fs/Vfs/definitions.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 class Node;
 namespace fkernel { class Dentry; }
 
 class FileDescription : public fk::memory::RefCounted<FileDescription> {
   fk::RefPtr<fkernel::Dentry> m_dentry;
+  mutable fk::synchronization::Spinlock m_offset_lock;
   uint64_t m_current_offset{0};
   int m_flags{0};
+  bool m_cloexec{false};
 
 public:
   virtual ~FileDescription() override;
@@ -27,6 +30,11 @@ public:
 
   uint64_t offset() const { return m_current_offset; }
   void set_offset(uint64_t offset) { m_current_offset = offset; }
+
+  int  open_flags()        const { return m_flags; }
+  void set_open_flags(int f)    { m_flags = f; }
+  bool is_cloexec()        const { return m_cloexec; }
+  void set_cloexec(bool v)      { m_cloexec = v; }
 
   fk::RefPtr<fkernel::Dentry> dentry() const;
   fk::RefPtr<Node> node() const;

@@ -13,5 +13,5 @@ public:
 private:
   static fk::core::Result<void, fk::core::Error>
   parse_extended(fk::RefPtr<StorageDevice> device, uint32_t ebr_lba,
-                 uint32_t base_ebr_lba, int& partition_count);
+                 uint32_t base_ebr_lba, int& partition_count, int depth = 0);
 };

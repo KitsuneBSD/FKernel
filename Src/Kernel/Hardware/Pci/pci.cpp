@@ -15,14 +15,18 @@ void PciManager::initialize() {
     size_t entries_count = (mcfg->header.length - sizeof(MCFGTable)) / sizeof(MCFGEntry);
     if (entries_count > 0) {
       m_mcfg_base = mcfg->entries[0].base_address;
+      m_mcfg_start_bus = mcfg->entries[0].start_bus_number;
+      m_mcfg_end_bus   = mcfg->entries[0].end_bus_number;
       m_has_mcfg = true;
-      fk::algorithms::klog("PCI", "MCFG found at %p, covering buses %d-%d", 
-                           (void*)m_mcfg_base, mcfg->entries[0].start_bus_number, 
-                           mcfg->entries[0].end_bus_number);
-      
-      // Map first few buses for scanning (e.g., 32MB covers 32 buses)
-      // In a real kernel, we should map more or use a dynamic mapper
-      for (uintptr_t addr = m_mcfg_base; addr < m_mcfg_base + (32 * 1024 * 1024); addr += 4096) {
+      fk::algorithms::klog("PCI", "MCFG found at %p, covering buses %u-%u",
+                           (void*)m_mcfg_base, m_mcfg_start_bus, m_mcfg_end_bus);
+
+      // Each bus occupies 32 devices × 8 functions × 4096 bytes = 1 MiB.
+      // Map only the range that the MCFG table declares, capped at 256 MiB.
+      size_t bus_count  = static_cast<size_t>(m_mcfg_end_bus - m_mcfg_start_bus) + 1;
+      size_t mmio_bytes = bus_count * 32UL * 8UL * 4096UL;
+      uintptr_t mmio_base = m_mcfg_base + static_cast<uintptr_t>(m_mcfg_start_bus) * 32UL * 8UL * 4096UL;
+      for (uintptr_t addr = mmio_base; addr < mmio_base + mmio_bytes; addr += 4096) {
           MemoryManager::the().map_page(addr, addr, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
       }
     }
@@ -47,6 +51,7 @@ void PciManager::initialize() {
   }
 
   fk::algorithms::klog("PCI", "Manager initialized");
+  m_is_initialized = true;
 }
 
 void PciManager::detect_legacy_ports() {
@@ -219,14 +224,19 @@ void PciManager::auto_discover() {
 }
 
 void PciManager::scan_bus() {
-  fk::algorithms::klog("PCI", "Starting PCI bus scan...");
-  for (uint16_t bus = 0; bus < 256; ++bus) {
+  uint16_t first = m_has_mcfg ? m_mcfg_start_bus : 0u;
+  uint16_t last  = m_has_mcfg ? m_mcfg_end_bus   : 255u;
+  fk::algorithms::klog("PCI", "Starting PCI bus scan (buses %u-%u)...", first, last);
+  for (uint16_t bus = first; bus <= last; ++bus) {
+    // If no device exists at slot 0, the bus is unpopulated — skip it.
+    PciAddress bus0(static_cast<uint8_t>(bus), 0, 0);
+    if ((read_config_dword(bus0, 0) & 0xFFFF) == 0xFFFF)
+      continue;
     for (uint8_t device = 0; device < 32; ++device) {
-      check_device(bus, device);
+      check_device(static_cast<uint8_t>(bus), device);
     }
   }
-  fk::algorithms::klog("PCI", "Scan complete. Found %d devices.",
-                       m_devices.size());
+  fk::algorithms::klog("PCI", "Scan complete. Found %d devices.", m_devices.size());
 }
 
 void PciManager::check_device(uint8_t bus, uint8_t device) {
@@ -285,9 +295,11 @@ void PciManager::scan_for_new_devices() {
     if (!m_hotplug_enabled) return;
     
     fk::algorithms::klog("PCI", "Scanning for new devices...");
-    for (uint16_t bus = 0; bus < 256; ++bus) {
+    uint16_t first = m_has_mcfg ? m_mcfg_start_bus : 0u;
+    uint16_t last  = m_has_mcfg ? m_mcfg_end_bus   : 255u;
+    for (uint16_t bus = first; bus <= last; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
-            handle_hotplug_event(bus, device, 0);
+            handle_hotplug_event(static_cast<uint8_t>(bus), device, 0);
             
             // Check if we should scan more functions
             PciAddress addr(bus, device, 0);

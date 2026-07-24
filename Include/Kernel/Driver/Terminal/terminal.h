@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Text/string.h>
 
 namespace fkernel {

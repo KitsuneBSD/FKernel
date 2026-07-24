@@ -1,5 +1,5 @@
 #include <Kernel/Io/kernel_puts.h>
-#include <Kernel/Driver/SerialPort/serial_port.h>
+#include <Kernel/Driver/Serial/serial_port.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <Kernel/Fs/DebugFs/debug_fs.h>
 #include <LibC/stdio.h>
@@ -23,6 +23,10 @@ namespace io {
 
 void initialize_kernel_puts() {
     libc_register_puts_hook(kernel_puts_impl);
+}
+
+void set_log_target_bits(unsigned int targets) {
+    fk::algorithms::set_log_targets(static_cast<uint32_t>(targets));
 }
 
 } // namespace io

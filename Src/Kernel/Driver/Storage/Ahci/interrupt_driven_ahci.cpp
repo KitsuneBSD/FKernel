@@ -309,8 +309,11 @@ void AhciInterruptHandler::register_handler(fk::RefPtr<InterruptDrivenAhciContro
   fk::algorithms::klog("AHCI-INT", "Registered interrupt handler for IRQ %d (vector %d)", irq, vector);
 }
 
-// Stubs para o linker
-fk::core::Result<void, fk::core::Error> InterruptDrivenAhciController::setup_dma_buffers() { return {}; }
+// Async DMA operations not yet implemented — callers get DeviceError
+fk::core::Result<void, fk::core::Error> InterruptDrivenAhciController::setup_dma_buffers() {
+    fk::algorithms::kwarn("AHCI-INT", "setup_dma_buffers: async DMA not implemented");
+    return fk::core::Error::NotImplemented;
+}
 void InterruptDrivenAhciController::setup_command_header(uint32_t, uint32_t, uint32_t, bool) {}
 void InterruptDrivenAhciController::setup_fis(uint32_t, uint32_t, uint64_t, uint32_t, bool) {}
 void InterruptDrivenAhciController::start_command(uint32_t, uint32_t) {}

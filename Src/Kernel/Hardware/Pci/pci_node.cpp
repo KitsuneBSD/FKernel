@@ -1,6 +1,6 @@
 #include <Kernel/Hardware/Pci/pci_node.h>
 #include <LibFK/Algorithms/math.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 

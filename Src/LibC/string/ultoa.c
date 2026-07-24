@@ -1,11 +1,8 @@
-#include <LibC/assert.h>
 #include <LibC/string.h>
 
 size_t ultoa(unsigned long value, char *buffer, unsigned int base) {
-  ASSERT(buffer != NULL);
-  ASSERT(base >= 2 && base <= 16);
-  if (base < 2 || base > 16) {
-    buffer[0] = '\0';
+  if (!buffer || base < 2 || base > 16) {
+    if (buffer) buffer[0] = '\0';
     return 0;
   }
 

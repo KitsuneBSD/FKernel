@@ -1,7 +1,8 @@
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::elf_domains {
 
@@ -69,13 +70,20 @@ MemoryDomain::map_pages(uintptr_t start_vaddr, uintptr_t end_vaddr, PageFlags fl
 
 bool MemoryDomain::is_already_mapped(uintptr_t vaddr) {
   uintptr_t aligned_vaddr = vaddr & ~0xFFFULL;
-  uintptr_t existing_phys = VirtualMemoryManager::the().translate(aligned_vaddr);
-  return existing_phys != 0;
+  auto flags_res = VirtualMemoryManager::the().get_page_flags(aligned_vaddr);
+  if (flags_res.is_error())
+    return false;
+  // Kernel-only pages (no User bit) must not be reused for user segments.
+  return static_cast<uint64_t>(flags_res.value()) & static_cast<uint64_t>(PageFlags::User);
 }
 
 fk::core::Result<void, fk::core::Error> MemoryDomain::map_single_page(uintptr_t vaddr,
                                                                       PageFlags flags) {
   uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
+  if (phys == 0) {
+    fk::algorithms::kwarn("DOMAIN", "map_single_page: alloc_page failed at %p", (void*)vaddr);
+    return fk::core::Error::OutOfMemory;
+  }
   // Zero out the physical page using its identity mapping (since we are in kernel)
   // or map it temporarily. Assuming phys is identity mapped for simplicity if it's < 1GB
   // or using memset on vaddr AFTER mapping ONLY if it was not mapped.

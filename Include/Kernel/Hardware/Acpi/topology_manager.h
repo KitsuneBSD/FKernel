@@ -2,7 +2,7 @@
 
 #include <Kernel/Hardware/Acpi/srat.h>
 #include <LibFK/Container/vector.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel::acpi {
 

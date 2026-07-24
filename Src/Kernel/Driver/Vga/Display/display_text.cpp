@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Vga/display.h>
+#include <LibFK/Utilities/memory.h>
 
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/io.h>
@@ -170,12 +171,12 @@ void DisplayText::copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_x, uint
   fk::synchronization::ScopedLock lock(Display::lock());
   // Simplified: only support full-width line copying for now as used by terminal
   if (width == WIDTH && src_x == 0 && dst_x == 0) {
-      memmove((void*)&buffer[dst_y * WIDTH], (void*)&buffer[src_y * WIDTH], height * WIDTH * 2);
+      fk::memory::move((void*)&buffer[dst_y * WIDTH], (void*)&buffer[src_y * WIDTH], height * WIDTH * 2);
   }
 }
 
 void DisplayText::write_ansi(const char *str) {
-  write_ansi_n(str, strlen(str));
+  write_ansi_n(str, fk::memory::length(str));
 }
 
 void DisplayText::write_ansi_n(const char *str, size_t size) {

@@ -29,6 +29,13 @@ public:
     void add_child(fk::RefPtr<Dentry> child);
     fk::containers::Vector<fk::RefPtr<Dentry>>& children() { return m_children; }
 
+    template <typename Fn>
+    void for_each_child(Fn&& fn) const {
+        fk::synchronization::ScopedLock lock(m_lock);
+        for (auto& child : m_children)
+            fn(child);
+    }
+
     fk::text::String get_path() const;
 
     Dentry(fk::text::String name, fk::RefPtr<Dentry> parent);

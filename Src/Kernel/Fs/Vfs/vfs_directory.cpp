@@ -1,8 +1,9 @@
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/file_description.h>
-#include <LibC/string.h>
-#include <LibFK/Utilities/Memory.h>
+
+#include <LibFK/Algorithms/container_algorithms.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -21,12 +22,12 @@ VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEnt
       }
   }
   
-  for (auto& child : dentry->children()) {
+  dentry->for_each_child([&](const fk::RefPtr<Dentry>& child) {
       DirectoryEntry de;
-      strncpy(de.name, child->name().c_str(), sizeof(de.name) - 1);
+      fk::memory::copy_n(de.name, child->name().c_str(), sizeof(de.name) - 1);
       de.type = child->top_node() && child->top_node()->is_directory() ? 1 : 0;
       add_directory_entry(entries, de);
-  }
+  });
 
   return {};
 }
@@ -37,8 +38,8 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   fk::containers::Vector<DirectoryEntry> entries;
-  DirectoryEntry dot; strcpy(dot.name, "."); dot.type = 1; add_directory_entry(entries, dot);
-  DirectoryEntry dotdot; strcpy(dotdot.name, ".."); dotdot.type = 1; add_directory_entry(entries, dotdot);
+  DirectoryEntry dot; fk::memory::copy_string(dot.name, "."); dot.type = 1; add_directory_entry(entries, dot);
+  DirectoryEntry dotdot; fk::memory::copy_string(dotdot.name, ".."); dotdot.type = 1; add_directory_entry(entries, dotdot);
 
   auto dentry = description->dentry();
   for (auto& node : dentry->nodes()) {
@@ -49,19 +50,19 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
       }
   }
 
-  for (auto& child : dentry->children()) {
+  dentry->for_each_child([&](const fk::RefPtr<Dentry>& child) {
       DirectoryEntry de;
-      strncpy(de.name, child->name().c_str(), sizeof(de.name) - 1);
+      fk::memory::copy_n(de.name, child->name().c_str(), sizeof(de.name) - 1);
       de.type = child->top_node() && child->top_node()->is_directory() ? 1 : 0;
       add_directory_entry(entries, de);
-  }
+  });
 
   uint64_t bytes_written = 0;
   uint64_t start_idx = description->offset();
 
   for (size_t i = start_idx; i < entries.size(); ++i) {
     auto &entry = entries[i];
-    size_t name_len = strlen(entry.name);
+    size_t name_len = fk::memory::length(entry.name);
     size_t reclen = (offsetof(linux_dirent64, d_name) + name_len + 1 + 7) & ~7;
 
     if (bytes_written + reclen > max_bytes) break;
@@ -81,10 +82,8 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
 }
 
 void VirtualFileSystem::add_directory_entry(fk::containers::Vector<DirectoryEntry>& entries, const DirectoryEntry& entry) {
-    for (auto& existing : entries) {
-        if (strcmp(existing.name, entry.name) == 0) return;
-    }
-    entries.push_back(entry);
+    fk::algorithms::insert_if_absent(entries, entry,
+        [](const DirectoryEntry& a, const DirectoryEntry& b) { return fk::memory::compare(a.name, b.name) == 0; });
 }
 
 } // namespace fkernel

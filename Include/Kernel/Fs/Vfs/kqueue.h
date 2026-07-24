@@ -3,6 +3,7 @@
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Ipc/notification.h>
 #include <LibFK/Container/vector.h>
+#include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
 
@@ -47,6 +48,7 @@ private:
         bool enabled{true};
     };
 
+    mutable fk::synchronization::Spinlock m_lock;
     fk::containers::Vector<RegisteredEvent> m_registered_events;
     ipc::Notification m_notification;
 };

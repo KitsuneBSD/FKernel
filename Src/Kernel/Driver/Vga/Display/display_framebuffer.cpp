@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Driver/Vga/vesa.h>
 #include <Kernel/Driver/Vga/display_framebuffer.h>
@@ -8,7 +9,8 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Text/string.h>
-#include <LibC/stddef.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Types/types.h>
 
 DisplayFramebuffer::DisplayFramebuffer() : cursor_x(0), cursor_y(0), m_current_font(Vga::default_font) { initialize_framebuffer(); }
 void DisplayFramebuffer::select_best_font() { m_current_font = Vga::default_font; m_current_font.scale = 1; }
@@ -129,7 +131,7 @@ void DisplayFramebuffer::scroll() {
   uint32_t font_h = m_current_font.height * m_current_font.scale; uint32_t max_rows = get_height();
   if (cursor_y < max_rows) return;
   uint32_t scroll_bytes = font_h * fb_pitch; uint32_t total_bytes = fb_height * fb_pitch;
-  if (scroll_bytes < total_bytes) memmove(target, target + scroll_bytes, total_bytes - scroll_bytes);
+  if (scroll_bytes < total_bytes) fk::memory::move(target, target + scroll_bytes, total_bytes - scroll_bytes);
   uint32_t bg_pixel = color_to_pixel(current_bg);
   for (uint32_t y = (max_rows - 1) * font_h; y < fb_height; ++y) {
     uint8_t* line = target + (y * fb_pitch);
@@ -215,7 +217,7 @@ void DisplayFramebuffer::clear() {
   
   // Clear entire memory area (including pitch padding)
   if (back_buffer) {
-      if (bg_pixel == 0) memset(back_buffer, 0, fb_height * fb_pitch);
+      if (bg_pixel == 0) fk::memory::set(back_buffer, 0, fb_height * fb_pitch);
       else {
           for (uint32_t y = 0; y < fb_height; ++y) {
               uint8_t* line = back_buffer + (y * fb_pitch);
@@ -226,7 +228,7 @@ void DisplayFramebuffer::clear() {
   }
   
   if (framebuffer) {
-      if (bg_pixel == 0) memset(framebuffer, 0, fb_height * fb_pitch);
+      if (bg_pixel == 0) fk::memory::set(framebuffer, 0, fb_height * fb_pitch);
       else {
           for (uint32_t y = 0; y < fb_height; ++y) {
               uint8_t* line = framebuffer + (y * fb_pitch);
@@ -237,7 +239,7 @@ void DisplayFramebuffer::clear() {
   }
 
   // Force all tiles to be marked clean since we just synced manually
-  if (m_dirty_tiles) memset(m_dirty_tiles, 0, (m_tiles_x * m_tiles_y + 7) / 8);
+  if (m_dirty_tiles) fk::memory::set(m_dirty_tiles, 0, (m_tiles_x * m_tiles_y + 7) / 8);
   
   cursor_x = 0; cursor_y = 0; m_full_redraw_requested = false;
 }
@@ -262,10 +264,10 @@ void DisplayFramebuffer::copy_rect(uint32_t src_x, uint32_t src_y, uint32_t dst_
   fk::synchronization::ScopedLockIRQ lock(Display::lock());
   uint8_t *target = get_render_buffer(); if (!target) return;
   uint32_t bpp_bytes = fb_bpp / 8;
-  if (src_x == 0 && dst_x == 0 && width == fb_width) memmove(target + dst_y * fb_pitch, target + src_y * fb_pitch, height * fb_pitch);
+  if (src_x == 0 && dst_x == 0 && width == fb_width) fk::memory::move(target + dst_y * fb_pitch, target + src_y * fb_pitch, height * fb_pitch);
   else { for (uint32_t i = 0; i < height; ++i) {
       uint32_t sy = (dst_y < src_y) ? i : (height - 1 - i);
-      memmove(target + (dst_y + sy) * fb_pitch + dst_x * bpp_bytes, target + (src_y + sy) * fb_pitch + src_x * bpp_bytes, width * bpp_bytes);
+      fk::memory::move(target + (dst_y + sy) * fb_pitch + dst_x * bpp_bytes, target + (src_y + sy) * fb_pitch + src_x * bpp_bytes, width * bpp_bytes);
   }}
   mark_dirty(dst_x, dst_y, width, height);
 }
@@ -274,21 +276,21 @@ void DisplayFramebuffer::set_color(Color fg, Color bg) { fk::synchronization::Sc
 void DisplayFramebuffer::set_colors_rgb(uint32_t fg, uint32_t bg) { fk::synchronization::ScopedLockIRQ lock(Display::lock()); current_fg_rgb = fg; current_bg_rgb = bg; use_rgb_color = true; }
 void DisplayFramebuffer::set_cursor_pos(uint32_t x, uint32_t y) { fk::synchronization::ScopedLockIRQ lock(Display::lock()); erase_cursor(); cursor_x = x; cursor_y = y; draw_cursor(); }
 void DisplayFramebuffer::show_cursor(bool visible) { if (visible) draw_cursor(); else erase_cursor(); }
-void DisplayFramebuffer::write_ansi(const char *str) { write_ansi_n(str, strlen(str)); }
+void DisplayFramebuffer::write_ansi(const char *str) { write_ansi_n(str, fk::memory::length(str)); }
 void DisplayFramebuffer::write_ansi_n([[maybe_unused]] const char *str, [[maybe_unused]] size_t size) { /* Implementação ANSI processada pelo delegate VGATerminal */ }
 
 void DisplayFramebuffer::allocate_back_buffer() {
   if (back_buffer) return;
   size_t buffer_size = fb_height * fb_pitch;
   back_buffer = static_cast<uint8_t*>(MemoryManager::the().allocate(buffer_size));
-  if (back_buffer) { double_buffering_enabled = true; memset(back_buffer, 0, buffer_size); if (framebuffer) memcpy(back_buffer, framebuffer, buffer_size); }
+  if (back_buffer) { double_buffering_enabled = true; fk::memory::set(back_buffer, 0, buffer_size); if (framebuffer) fk::memory::copy(back_buffer, framebuffer, buffer_size); }
 }
 void DisplayFramebuffer::free_back_buffer() { if (back_buffer) { MemoryManager::the().free(back_buffer); back_buffer = nullptr; double_buffering_enabled = false; } }
 void DisplayFramebuffer::wait_vblank() {
-    while (inb(0x3DA) & 8) { asm volatile("pause"); }
-    while (!(inb(0x3DA) & 8)) { asm volatile("pause"); }
+    while (inb(0x3DA) & 8) { arch_cpu_relax(); }
+    while (!(inb(0x3DA) & 8)) { arch_cpu_relax(); }
 }
-void DisplayFramebuffer::swap_buffers() { if (!double_buffering_enabled || !back_buffer || !framebuffer) return; memcpy(framebuffer, back_buffer, fb_height * fb_pitch); }
+void DisplayFramebuffer::swap_buffers() { if (!double_buffering_enabled || !back_buffer || !framebuffer) return; fk::memory::copy(framebuffer, back_buffer, fb_height * fb_pitch); }
 
 void DisplayFramebuffer::mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
   if (!m_dirty_tiles) return;
@@ -304,7 +306,7 @@ void DisplayFramebuffer::mark_dirty(uint32_t x, uint32_t y, uint32_t width, uint
 
 void DisplayFramebuffer::update_dirty_rectangles() {
   if (!m_dirty_tiles || !double_buffering_enabled) return;
-  if (m_full_redraw_requested) { memcpy(framebuffer, back_buffer, fb_height * fb_pitch); m_full_redraw_requested = false; return; }
+  if (m_full_redraw_requested) { fk::memory::copy(framebuffer, back_buffer, fb_height * fb_pitch); m_full_redraw_requested = false; return; }
   uint32_t bpp_bytes = fb_bpp / 8;
   for (uint32_t ty = 0; ty < m_tiles_y; ++ty) {
     for (uint32_t tx = 0; tx < m_tiles_x; ++tx) {
@@ -313,7 +315,7 @@ void DisplayFramebuffer::update_dirty_rectangles() {
         uint32_t x = tx * TILE_SIZE; uint32_t y = ty * TILE_SIZE; uint32_t w = TILE_SIZE; uint32_t h = TILE_SIZE;
         if (x + w > fb_width) w = fb_width - x; if (y + h > fb_height) h = fb_height - y;
         uint32_t line_size = w * bpp_bytes;
-        for (uint32_t i = 0; i < h; ++i) memcpy(framebuffer + (y + i) * fb_pitch + x * bpp_bytes, back_buffer + (y + i) * fb_pitch + x * bpp_bytes, line_size);
+        for (uint32_t i = 0; i < h; ++i) fk::memory::copy(framebuffer + (y + i) * fb_pitch + x * bpp_bytes, back_buffer + (y + i) * fb_pitch + x * bpp_bytes, line_size);
         m_dirty_tiles[tile_idx / 8] &= ~(1 << (tile_idx % 8));
       }
     }
@@ -335,10 +337,10 @@ void DisplayFramebuffer::allocate_dirty_tiles() {
   m_tiles_x = (fb_width + TILE_SIZE - 1) / TILE_SIZE; m_tiles_y = (fb_height + TILE_SIZE - 1) / TILE_SIZE;
   size_t bitset_size = (m_tiles_x * m_tiles_y + 7) / 8;
   m_dirty_tiles = static_cast<uint8_t*>(MemoryManager::the().allocate(bitset_size));
-  if (m_dirty_tiles) memset(m_dirty_tiles, 0xFF, bitset_size);
+  if (m_dirty_tiles) fk::memory::set(m_dirty_tiles, 0xFF, bitset_size);
 }
 void DisplayFramebuffer::free_dirty_tiles() { if (m_dirty_tiles) { MemoryManager::the().free(m_dirty_tiles); m_dirty_tiles = nullptr; } }
 void DisplayFramebuffer::finalize_initialization() { allocate_back_buffer(); allocate_dirty_tiles(); }
-void DisplayFramebuffer::save_screen() { if (!back_buffer) return; size_t buffer_size = fb_height * fb_pitch; if (!saved_buffer) saved_buffer = static_cast<uint8_t*>(MemoryManager::the().allocate(buffer_size)); if (saved_buffer) memcpy(saved_buffer, back_buffer, buffer_size); }
-void DisplayFramebuffer::restore_screen() { if (!back_buffer || !saved_buffer) return; size_t buffer_size = fb_height * fb_pitch; memcpy(back_buffer, saved_buffer, buffer_size); m_full_redraw_requested = true; }
+void DisplayFramebuffer::save_screen() { if (!back_buffer) return; size_t buffer_size = fb_height * fb_pitch; if (!saved_buffer) saved_buffer = static_cast<uint8_t*>(MemoryManager::the().allocate(buffer_size)); if (saved_buffer) fk::memory::copy(saved_buffer, back_buffer, buffer_size); }
+void DisplayFramebuffer::restore_screen() { if (!back_buffer || !saved_buffer) return; size_t buffer_size = fb_height * fb_pitch; fk::memory::copy(back_buffer, saved_buffer, buffer_size); m_full_redraw_requested = true; }
 void DisplayFramebuffer::test_render() {}

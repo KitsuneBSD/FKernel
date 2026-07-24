@@ -2,7 +2,7 @@
 
 #include <Kernel/Ipc/capability.h>
 #include <LibFK/Container/vector.h>
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 
 namespace fkernel {
 namespace ipc {

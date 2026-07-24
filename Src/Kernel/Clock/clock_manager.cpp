@@ -5,8 +5,11 @@
 
 void ClockManager::initialize() {
   select_and_configure_clock();
+  m_initialized = true;
   fk::algorithms::klog("CLOCK MANAGER", "Clock manager initialized.");
 }
+
+static constexpr uint32_t RTC_DEFAULT_FREQUENCY = 1024;
 
 void ClockManager::select_and_configure_clock() {
   static RTCClock rtc_clock_instance;
@@ -15,7 +18,7 @@ void ClockManager::select_and_configure_clock() {
   Clock *new_clock = nullptr;
   fk::text::String clock_name = "None";
 
-  if (rtc_clock_instance.initialize(1024).is_ok()) {
+  if (rtc_clock_instance.initialize(RTC_DEFAULT_FREQUENCY).is_ok()) {
     new_clock = &rtc_clock_instance;
     clock_name = "RTC";
   } else {

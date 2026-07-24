@@ -7,7 +7,7 @@ metadata:
   originSessionId: 1686e31e-efd2-496d-a14d-65ed12b5622a
 ---
 
-Implementation of TODO.md started 2026-07-18, active through 2026-07-19.
+Implementation of TODO.md started 2026-07-18, active through 2026-07-20.
 
 **Why:** User requested full implementation of all 9 phases of the FKernel TODO roadmap.
 
@@ -70,6 +70,20 @@ Implementation of TODO.md started 2026-07-18, active through 2026-07-19.
 - **IPC**: CapabilityRights bitmask (Send/Receive/Manage); CSpace O(1) free list; cspace_insert() for transfer
 - **ELF**: e_machine == EM_X86_64 validation; e_phnum bounds check (max 256); e_phoff overlap check
 
+### Phase 7 — TCP/IP Stack ✅
+- E1000 NIC driver with MMIO, RX/TX rings, MAC initialization
+- IPv4: ARP, ICMP, UDP, TCP protocols
+- Socket layer: AF_UNIX, AF_INET
+- Full TCP state machine: connect, accept, three-way handshake
+- DHCP client, DNS resolver
+- Routing table, network interface management
+
+### Phase 8 — USB & Advanced Drivers ✅
+- PTY: Unix98 pseudo-terminals with /dev/ptmx
+- Serial: VFS-integrated serial driver
+- PS/2 Mouse: /dev/mouse with event handling
+- (USB/xHCI remains as future work)
+
 ### Phase 9 — Code Quality ✅
 - **Dead code**: Removed TaskQueueCollection header, duplicate Domains/elf_domain.cpp
 - **Type wrappers**: buddy_order.h, frame_index.h, file_offset.h, file_flags.h, thread_id.h, signal_number.h
@@ -79,14 +93,51 @@ Implementation of TODO.md started 2026-07-18, active through 2026-07-19.
 - **pick_next()**: priority-based selection (highest priority task wins, O(n) scan)
 - **Tests**: 55 total tests (29 LibC + 2 circular buffer + 14 containers + 10 smart pointers), all pass
 
+### Phase 10 — Userspace Bootstrap ✅
+- Minimal init process (PID 1) mounting /dev, /proc, spawning shell
+- FAT32 drivers rewritten (lookup, list_dir, subdirectory traversal, LFN)
+- sys_mount/umount2/getppid implemented
+- AHCI/NVMe partition scanning
+- Disk partitioning + FAT32 filesystem creation
+- BusyBox 1.36.1 boots to shell prompt
+
+### Phase 12 — BusyBox Full Compatibility ✅
+- Syscall number collisions fixed (readlink=89, symlink=88)
+- Signal defaults fixed (SIGSTOP/SIGCONT/SIGPIPE)
+- setsid/setpgid implemented
+- pipe2/dup3/mprotect implemented
+- /dev/null, /dev/zero, /dev/urandom, /dev/ptmx registered
+- PTY blocking reads fixed
+- select/poll blocking with timeout
+- TCP connect/accept implemented (three-way handshake)
+- *at() syscall family implemented (12 syscalls)
+- Controlling terminal + foreground process group tracking
+
+### Phase 14 — POSIX Compliance (Partial) ✅
+- Process groups and sessions (pgid, sid, session leader)
+- Signal delivery (SIGSTOP/SIGTSTP/SIGTTIN/SIGTOU/SIGCONT)
+- Environment variables (getenv/setenv/putenv/unsetenv)
+- FD_CLOEXEC tracking
+- chroot syscall
+
 ## Remaining
 
-### Phase 7 — TCP/IP Stack (not started)
-ARP, IPv4, ICMP, UDP, TCP, AF_INET sockets
+### Phase 14d-14f — POSIX Compliance (In Progress)
+- P0: File locking (flock, fcntl F_SETLK/F_SETLKW/F_GETLK)
+- P1: Time subsystem (gettimeofday TSC, clock_getres, clock_nanosleep)
+- P2: User/group management (setuid/setgid/chmod/chown)
+- P2: Permission checks in VFS open()
 
-### Phase 8 — USB & Advanced Drivers (not started)
-xHCI, PTY, Serial-to-VFS, PS/2 Mouse
+### Phase 15 — OpenRC Integration (Future)
+- Filesystem structure (/etc/rc.conf, /etc/init.d/, /etc/runlevels/)
+- OpenRC as PID 1 replacement
+- Service management
+
+### Long-term
+- SMP multi-core (per-CPU structures exist, AP startup not done)
+- USB/xHCI
+- Full POSIX compliance -> OpenRC boot
 
 ### Still pending:
-- P6: PT_DYNAMIC/PLT/GOT/ASLR in ELF loader; full capability revocation
 - P9: test coverage for Kernel critical paths (scheduler, VFS stat/open)
+- P9: test coverage for LibFK containers (only CircularBuffer tested)

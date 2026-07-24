@@ -4,12 +4,21 @@
 #include <Kernel/Driver/Storage/Partitions/partition_list.h>
 #include <LibFK/Container/vector.h>
 
+namespace fkernel {
+
 class PartitionManager {
   PartitionList m_partitions;
+  bool m_is_initialized{false};
+
   PartitionManager() = default;
+  PartitionManager(const PartitionManager &) = delete;
+  PartitionManager &operator=(const PartitionManager &) = delete;
 
 public:
   static PartitionManager &the();
+
+  bool is_initialized() const { return m_is_initialized; }
+  void initialize();
 
   void scan(fk::RefPtr<StorageDevice> device);
   void add_partition(fk::RefPtr<Partition> partition);
@@ -18,3 +27,7 @@ public:
 
   const PartitionList &partitions() const { return m_partitions; }
 };
+
+} // namespace fkernel
+
+using fkernel::PartitionManager;

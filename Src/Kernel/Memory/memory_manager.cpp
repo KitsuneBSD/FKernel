@@ -1,16 +1,17 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/iommu.h>
 #include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
 #include <Kernel/Boot/boot_info.h>
-#include <LibFK/Core/Assertions.h>
-#include <LibC/stdio.h>
-#include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Memory/allocator_backend.h>
+#include <LibFK/Utilities/memory.h>
 
 #ifdef __x86_64__
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
@@ -37,6 +38,7 @@ void MemoryManager::initialize() {
   ClockManager::the().set_memory_manager(true);
 
   m_is_initialized = true;
+  fk::algorithms::klog("MEMORY", "MemoryManager initialized");
 }
 
 fkernel::IOMMU* MemoryManager::get_iommu() const {
@@ -48,6 +50,13 @@ fkernel::IOMMU* MemoryManager::get_iommu() const {
 
 void MemoryManager::initialize_heap() {
     if (m_heap_initialized) return;
+
+    static fk::memory::AllocatorBackend backend = {
+        .allocate = [](size_t size) -> void* { return the().allocate(size); },
+        .reallocate = [](void* ptr, size_t size) -> void* { return the().reallocate(ptr, size); },
+        .free = [](void* ptr) { the().free(ptr); }
+    };
+    fk::memory::set_allocator_backend(&backend);
 
     uintptr_t start_addr = (reinterpret_cast<uintptr_t>(__heap_start) + 15) & ~15;
     uintptr_t end_addr = reinterpret_cast<uintptr_t>(__heap_end) & ~15;
@@ -68,13 +77,11 @@ void MemoryManager::initialize_heap() {
 }
 
 static inline uint64_t save_and_disable_interrupts() {
-    uint64_t flags;
-    asm volatile("pushfq ; popq %0 ; cli" : "=r"(flags) : : "memory");
-    return flags;
+    return arch_save_flags_and_disable();
 }
 
 static inline void restore_interrupts(uint64_t flags) {
-    asm volatile("pushq %0 ; popfq" : : "g"(flags) : "memory");
+    arch_restore_flags(flags);
 }
 
 void* MemoryManager::allocate(size_t size) {
@@ -89,9 +96,8 @@ void* MemoryManager::allocate(size_t size) {
     BlockHeader* current = m_heap_head;
     while (current) {
         if (current->magic != BlockHeader::MAGIC) {
-            fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption at %p! Magic: 0x%lx Expected: 0x%lx", 
+            fk::algorithms::kfatal("MEMORY", "Kernel Heap Corruption at %p! Magic: 0x%lx Expected: 0x%lx", 
                                   current, (uint64_t)current->magic, (uint64_t)BlockHeader::MAGIC);
-            while(1) asm volatile("hlt");
         }
 
         if (current->is_free && current->size >= size) {
@@ -142,10 +148,7 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     );
 
     if (header->magic != BlockHeader::MAGIC) {
-        fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption (realloc) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
-        m_heap_lock.unlock();
-        restore_interrupts(flags);
-        while(1) asm volatile("hlt");
+        fk::algorithms::kfatal("MEMORY", "Kernel Heap Corruption (realloc) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
     }
 
     size_t old_size = header->size;
@@ -160,7 +163,7 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     void* new_ptr = allocate(size);
     if (!new_ptr) return nullptr;
 
-    memcpy(new_ptr, ptr, old_size);
+    fk::memory::copy(new_ptr, ptr, old_size);
     free(ptr);
     
     return new_ptr;
@@ -177,11 +180,7 @@ void MemoryManager::free(void* ptr) {
     );
 
     if (header->magic != BlockHeader::MAGIC) {
-        fk::algorithms::kerror("MEMORY", "Kernel Heap Corruption (free) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
-        m_heap_lock.unlock();
-        restore_interrupts(flags);
-        while(1) asm volatile("hlt");
-        return;
+        fk::algorithms::kfatal("MEMORY", "Kernel Heap Corruption (free) at %p! Magic: 0x%lx", ptr, (uint64_t)header->magic);
     }
 
     if (header->is_free) {
@@ -241,4 +240,16 @@ uintptr_t MemoryManager::allocate_contiguous(size_t order, ZoneType preferred, u
 
 void MemoryManager::free_contiguous(uintptr_t phys, size_t order) {
     PhysicalMemoryManager::the().free_contiguous(phys, order);
+}
+
+void MemoryManager::heap_stats(size_t& total_out, size_t& free_out) const {
+    total_out = 0;
+    free_out = 0;
+    if (!m_heap_head) return;
+    BlockHeader* curr = m_heap_head;
+    while (curr) {
+        total_out += curr->size;
+        if (curr->is_free) free_out += curr->size;
+        curr = curr->next;
+    }
 }

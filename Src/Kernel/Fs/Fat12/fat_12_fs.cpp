@@ -2,8 +2,10 @@
 #include <Kernel/Fs/Fat12/fat_12_node.h>
 #include <Kernel/Fs/Fat12/bpb.h>
 #include <Kernel/Fs/Fat12/directory_entry.h>
+#include <LibFK/Algorithms/fat_name.h>
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/heap_malloc.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -88,13 +90,20 @@ Fat12FileSystem::write(uint64_t, size_t, const uint8_t*) {
 void Fat12FileSystem::write_fat_entry(uint32_t cluster, uint32_t value) {
     uint32_t fat_offset = cluster + (cluster / 2);
     uint8_t buffer[2];
-    m_device->read(m_fat_sector * 512 + fat_offset, 2, buffer);
+    auto read_res = m_device->read(m_fat_sector * 512 + fat_offset, 2, buffer);
+    if (read_res.is_error()) {
+        fk::algorithms::kwarn("FAT12", "write_fat_entry: read failed at cluster %u", cluster);
+        return;
+    }
 
     uint16_t val = *reinterpret_cast<uint16_t*>(buffer);
     if (cluster & 1) val = (val & 0x000F) | (value << 4);
     else val = (val & 0xF000) | (value & 0x0FFF);
 
-    m_device->write(m_fat_sector * 512 + fat_offset, 2, reinterpret_cast<uint8_t*>(&val));
+    auto write_res = m_device->write(m_fat_sector * 512 + fat_offset, 2, reinterpret_cast<uint8_t*>(&val));
+    if (write_res.is_error()) {
+        fk::algorithms::kwarn("FAT12", "write_fat_entry: write failed at cluster %u", cluster);
+    }
 }
 
 fk::core::Result<uint32_t, fk::core::Error> Fat12FileSystem::allocate_cluster() {
@@ -122,7 +131,11 @@ Fat12FileSystem::read_from_cluster_chain(uint32_t first_cluster, uint64_t offset
 
     while (bytes_read < size && current_cluster < 0x0FF8) {
         uint8_t temp[512];
-        m_device->read(cluster_to_sector(current_cluster) * 512, 512, temp);
+        auto res = m_device->read(cluster_to_sector(current_cluster) * 512, 512, temp);
+        if (res.is_error()) {
+            fk::algorithms::kwarn("FAT12", "read_from_cluster_chain: read failed at cluster %u", current_cluster);
+            return bytes_read;
+        }
         size_t to_copy = size - bytes_read;
         if (to_copy > (size_t)(CLUSTER_SIZE - cluster_offset))
             to_copy = (size_t)(CLUSTER_SIZE - cluster_offset);
@@ -147,27 +160,7 @@ Fat12FileSystem::write_to_cluster_chain([[maybe_unused]] uint32_t first_cluster,
 }
 
 static bool fat12_name_eq(const char* raw_name, const char* raw_ext, const char* query) {
-    char formatted[13];
-    int name_len = 8;
-    while (name_len > 0 && raw_name[name_len - 1] == ' ') name_len--;
-    int ext_len = 3;
-    while (ext_len > 0 && raw_ext[ext_len - 1] == ' ') ext_len--;
-    int pos = 0;
-    for (int k = 0; k < name_len; ++k) formatted[pos++] = raw_name[k];
-    if (ext_len > 0) {
-        formatted[pos++] = '.';
-        for (int k = 0; k < ext_len; ++k) formatted[pos++] = raw_ext[k];
-    }
-    formatted[pos] = '\0';
-    const char* a = formatted;
-    const char* b = query;
-    while (*a && *b) {
-        char ca = (*a >= 'a' && *a <= 'z') ? (char)(*a - 32) : *a;
-        char cb = (*b >= 'a' && *b <= 'z') ? (char)(*b - 32) : *b;
-        if (ca != cb) return false;
-        a++; b++;
-    }
-    return *a == 0 && *b == 0;
+    return fk::algorithms::fat_name_eq_83(raw_name, raw_ext, query);
 }
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
@@ -176,13 +169,27 @@ Fat12FileSystem::lookup(const char* name) {
     uint32_t root_start = m_first_data_sector - m_root_dir_sectors;
 
     for (uint32_t i = 0; i < m_root_dir_sectors; ++i) {
-        m_device->read((root_start + i) * 512, 512, sector);
+        auto res = m_device->read((root_start + i) * 512, 512, sector);
+        if (res.is_error()) {
+            fk::algorithms::kwarn("FAT12", "lookup: read failed at sector %u", root_start + i);
+            return fk::core::Error::IOError;
+        }
         auto* dir = reinterpret_cast<Fat12DirectoryEntry*>(sector);
+        char lfn_buf[256] = {};
+        bool has_lfn = false;
         for (int j = 0; j < 16; ++j) {
             if (dir[j].name[0] == 0) return fk::core::Error::NotFound;
-            if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) continue;
-            if (dir[j].attr == 0x0F) continue;
-            if (!fat12_name_eq(dir[j].name, dir[j].ext, name)) continue;
+            if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) { has_lfn = false; continue; }
+            if (dir[j].attr == 0x0F) {
+                const uint8_t* raw = reinterpret_cast<const uint8_t*>(&dir[j]);
+                int order = raw[0] & 0x1F;
+                if (raw[0] & 0x40) { fk::memory::set(lfn_buf, 0, sizeof(lfn_buf)); has_lfn = true; }
+                if (order >= 1 && order <= 20) fk::algorithms::lfn_fill_chars(raw, order, lfn_buf);
+                continue;
+            }
+            bool match = has_lfn ? fk::algorithms::iequal(lfn_buf, name) : false;
+            has_lfn = false;
+            if (!match && !fat12_name_eq(dir[j].name, dir[j].ext, name)) continue;
             uint32_t cluster = (static_cast<uint32_t>(dir[j].cluster_high) << 16) | dir[j].cluster_low;
             bool is_dir = (dir[j].attr & 0x10) != 0;
             auto node = fk::adopt_ref(new Fat12Node(fk::RefPtr<Fat12FileSystem>(this), cluster, dir[j].size, is_dir));
@@ -199,15 +206,28 @@ Fat12FileSystem::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
     uint32_t root_start = m_first_data_sector - m_root_dir_sectors;
 
     for (uint32_t i = 0; i < m_root_dir_sectors; ++i) {
-        m_device->read((root_start + i) * 512, 512, sector);
+        auto res = m_device->read((root_start + i) * 512, 512, sector);
+        if (res.is_error()) {
+            fk::algorithms::kwarn("FAT12", "list_dir: read failed at sector %u", root_start + i);
+            return fk::core::Error::IOError;
+        }
         auto* dir = reinterpret_cast<Fat12DirectoryEntry*>(sector);
+        char lfn_buf[256] = {};
+        bool has_lfn = false;
         for (int j = 0; j < 16; ++j) {
             if (dir[j].name[0] == 0) return {};
-            if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) continue;
-            
+            if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) { has_lfn = false; continue; }
+            if (dir[j].attr == 0x0F) {
+                const uint8_t* raw = reinterpret_cast<const uint8_t*>(&dir[j]);
+                int order = raw[0] & 0x1F;
+                if (raw[0] & 0x40) { fk::memory::set(lfn_buf, 0, sizeof(lfn_buf)); has_lfn = true; }
+                if (order >= 1 && order <= 20) fk::algorithms::lfn_fill_chars(raw, order, lfn_buf);
+                continue;
+            }
             DirectoryEntry entry;
-            fk::memory::copy(entry.name, dir[j].name, 11);
-            entry.name[11] = '\0';
+            if (!has_lfn) fk::algorithms::format_83_name(dir[j].name, dir[j].ext, entry.name);
+            if (has_lfn) fk::memory::copy(entry.name, lfn_buf, 256);
+            has_lfn = false;
             entry.type = (dir[j].attr & 0x10) != 0 ? 1 : 0;
             entries.push_back(entry);
         }

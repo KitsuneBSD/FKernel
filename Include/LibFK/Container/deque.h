@@ -1,6 +1,5 @@
 #pragma once
 
-#include <LibC/assert.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Types/types.h>
 
@@ -24,25 +23,13 @@ public:
       m_data.remove_at(0);
   }
 
-  T &front() {
-    ASSERT(!is_empty());
-    return m_data[0];
-  }
+  T &front() { return m_data[0]; }
 
-  const T &front() const {
-    ASSERT(!is_empty());
-    return m_data[0];
-  }
+  const T &front() const { return m_data[0]; }
 
-  T &back() {
-    ASSERT(!is_empty());
-    return m_data[m_data.size() - 1];
-  }
+  T &back() { return m_data[m_data.size() - 1]; }
 
-  const T &back() const {
-    ASSERT(!is_empty());
-    return m_data[m_data.size() - 1];
-  }
+  const T &back() const { return m_data[m_data.size() - 1]; }
 
   T &operator[](size_t index) { return m_data[index]; }
   const T &operator[](size_t index) const { return m_data[index]; }

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Error.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Memory/heap_malloc.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Traits/type_traits.h> // Added missing include
@@ -36,7 +36,7 @@ public:
    */
   explicit RetainPtr(T *ptr) : m_ptr(ptr) {
     if (m_ptr) {
-      m_refcount = fk::memory::allocate<size_t>();
+      m_refcount = fk::memory::allocate<uint32_t>();
       if (m_refcount) {
         *m_refcount = 1;
       } else {
@@ -52,24 +52,21 @@ public:
   }
 
   /**
-   * @brief Adopt a pointer without creating a new reference count.
+   * @brief Adopt a pointer that was already heap-allocated.
+   *
+   * Allocates a fresh refcount at 1 without calling retain on the object.
+   * Used by make_retain() to wrap a newly allocated object as the first owner.
    * @param Adopt Tag (Adopt::Yes)
-   * @param ptr Pointer to adopt
+   * @param ptr Pointer to adopt (caller must not delete it)
    */
-  RetainPtr(Adopt, T *ptr) : m_ptr(ptr) {
+  RetainPtr(Adopt, T *ptr) : m_ptr(ptr), m_refcount(nullptr) {
     if (m_ptr) {
-      m_refcount = fk::memory::allocate<size_t>();
+      m_refcount = fk::memory::allocate<uint32_t>();
       if (m_refcount) {
         *m_refcount = 1;
       } else {
-        // Clean up the pointer since we can't manage it
-        m_ptr->~T();
-        fk::memory::deallocate(m_ptr);
         m_ptr = nullptr;
-        m_refcount = nullptr;
       }
-    } else {
-      m_refcount = nullptr;
     }
   }
 
@@ -82,7 +79,7 @@ public:
   RetainPtr(const RetainPtr<U> &other) noexcept
       : m_ptr(other.get()), m_refcount(other.getRefCount()) {
     if (m_refcount)
-      ++(*m_refcount);
+      __sync_fetch_and_add(m_refcount, 1u);
   }
 
   /** @brief Move constructor. Transfers ownership from another RetainPtr. */
@@ -96,7 +93,7 @@ public:
    * @brief Provide access to the refcount for derived->base conversions.
    *        Only intended to be used by RetainPtr.
    */
-  size_t *getRefCount() const { return m_refcount; }
+  uint32_t *getRefCount() const { return m_refcount; }
 
   /**
    * @brief Copy constructor. Increments the reference count.
@@ -105,7 +102,7 @@ public:
   RetainPtr(const RetainPtr &other)
       : m_ptr(other.m_ptr), m_refcount(other.m_refcount) {
     if (m_refcount)
-      ++(*m_refcount);
+      __sync_fetch_and_add(m_refcount, 1u);
   }
 
   /** @brief Destructor. Releases the managed object if this is the last
@@ -122,7 +119,7 @@ public:
   RetainPtr &operator=(const RetainPtr &other) {
     if (this != &other) {
       if (other.m_refcount)
-        ++(*other.m_refcount);
+        __sync_fetch_and_add(other.m_refcount, 1u);
       clear();
       m_ptr = other.m_ptr;
       m_refcount = other.m_refcount;
@@ -157,7 +154,7 @@ public:
       clear();
       if (ptr) {
         m_ptr = ptr;
-        m_refcount = fk::memory::allocate<size_t>();
+        m_refcount = fk::memory::allocate<uint32_t>();
         if (m_refcount) {
           *m_refcount = 1;
         } else {
@@ -178,7 +175,7 @@ public:
     clear();
     m_ptr = ptr;
     if (ptr) {
-      m_refcount = fk::memory::allocate<size_t>();
+      m_refcount = fk::memory::allocate<uint32_t>();
       if (m_refcount) {
         *m_refcount = 1;
       } else {
@@ -197,7 +194,7 @@ public:
     clear();
     if (ptr) {
       m_ptr = ptr;
-      m_refcount = fk::memory::allocate<size_t>();
+      m_refcount = fk::memory::allocate<uint32_t>();
       if (m_refcount) {
         *m_refcount = 1;
       } else {
@@ -241,7 +238,7 @@ public:
    */
   void swap(RetainPtr &other) {
     T *tmp_ptr = m_ptr;
-    size_t *tmp_ref = m_refcount;
+    uint32_t *tmp_ref = m_refcount;
     m_ptr = other.m_ptr;
     m_refcount = other.m_refcount;
     other.m_ptr = tmp_ptr;
@@ -263,8 +260,8 @@ public:
   bool operator!=(const RetainPtr &other) const { return m_ptr != other.m_ptr; }
 
 private:
-  T *m_ptr;           ///< Managed pointer
-  size_t *m_refcount; ///< Internal reference counter
+  T *m_ptr;             ///< Managed pointer
+  uint32_t *m_refcount; ///< Internal reference counter (atomic)
 
   /**
    * @brief Clear the managed pointer. Decrements refcount and deletes
@@ -276,16 +273,15 @@ private:
       return;
     }
     
-    // Better validation to prevent underflow and corruption
-    uint32_t old_count = *m_refcount;
+    uint32_t old_count = __sync_fetch_and_sub(m_refcount, 1u);
     if (old_count == 0) {
       fk::algorithms::kerror("RetainPtr", "Refcount already zero! possible double clear at %p", m_ptr);
       m_ptr = nullptr;
       m_refcount = nullptr;
       return;
     }
-    
-    uint32_t new_count = --(*m_refcount);
+
+    uint32_t new_count = old_count - 1;
     if (new_count == 0) {
       if (m_ptr) {
         // Validate pointer before virtual destructor call

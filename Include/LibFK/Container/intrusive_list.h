@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibFK/Core/Assertions.h>
 
 namespace fk {
 namespace containers {
@@ -48,7 +47,8 @@ public:
       return;
 
     auto &node = obj->*NodeMember;
-    ASSERT(node.prev == nullptr && node.next == nullptr && "Node already in a list!");
+    if (node.prev != nullptr || node.next != nullptr)
+      return;
 
     node.prev = m_tail;
     node.next = nullptr;
@@ -68,7 +68,8 @@ public:
       return;
 
     auto &node = obj->*NodeMember;
-    ASSERT(node.prev == nullptr && node.next == nullptr && "Node already in a list!");
+    if (node.prev != nullptr || node.next != nullptr)
+      return;
 
     node.prev = nullptr;
     node.next = m_head;

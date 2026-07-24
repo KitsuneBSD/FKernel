@@ -1,4 +1,3 @@
-#include <LibC/assert.h>
 #include <LibC/stdarg.h>
 #include <LibC/stdbool.h>
 #include <LibC/stdint.h>

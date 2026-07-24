@@ -1,7 +1,8 @@
 #pragma once
 
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 #include <Kernel/Net/byte_order.h>
+#include <LibFK/Algorithms/internet_checksum.h>
 
 namespace fkernel {
 namespace net {
@@ -30,7 +31,7 @@ struct __attribute__((packed)) IPv4Header {
         dscp_ecn       = 0;
         total_length   = htons((uint16_t)(20 + payload_len));
         id             = 0;
-        flags_fragment = htons(0x4000); // don't fragment
+        flags_fragment = htons(0x4000);
         ttl            = 64;
         protocol       = proto;
         checksum       = 0;
@@ -40,11 +41,7 @@ struct __attribute__((packed)) IPv4Header {
     }
 
     uint16_t ip_checksum() const {
-        const uint16_t* ptr = reinterpret_cast<const uint16_t*>(this);
-        uint32_t sum = 0;
-        for (int i = 0; i < 10; ++i) sum += ptr[i];
-        while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
-        return (uint16_t)(~sum);
+        return fk::algorithms::InternetChecksum::compute(this, 20);
     }
 };
 

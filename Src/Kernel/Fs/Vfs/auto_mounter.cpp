@@ -36,36 +36,36 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
     // Try FAT12
     auto fat12_res = Fat12FileSystem::create(device);
     if (fat12_res.is_ok()) {
-        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat12_res.value());
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat12_res.value(), "fat12");
         if (mount_res.is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT12) at %s", device->name().c_str(), mount_path);
             return;
         } else {
-            fk::algorithms::kwarn("AUTO-MOUNT", "Failed to mount %s as FAT12: %s", device->name().c_str(), mount_path);
+            fk::algorithms::kwarn("AUTO-MOUNT", "Failed to mount %s as FAT12: error=%d", device->name().c_str(), (int)mount_res.error());
         }
     }
 
 // Try FAT16
     auto fat16_res = Fat16FileSystem::create(device);
     if (fat16_res.is_ok()) {
-        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat16_res.value());
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat16_res.value(), "fat16");
         if (mount_res.is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT16) at %s", device->name().c_str(), mount_path);
             return;
         } else {
-            fk::algorithms::kwarn("AUTO-MOUNT", "Failed to mount %s as FAT16: %s", device->name().c_str(), mount_path);
+            fk::algorithms::kwarn("AUTO-MOUNT", "Failed to mount %s as FAT16: error=%d", device->name().c_str(), (int)mount_res.error());
         }
     }
 
     // Try FAT32
     auto fat32_res = Fat32FileSystem::create(device);
     if (fat32_res.is_ok()) {
-        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat32_res.value());
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, fat32_res.value(), "fat32");
         if (mount_res.is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT32) at %s", device->name().c_str(), mount_path);
             return;
         } else {
-            fk::algorithms::kwarn("AUTO-MOUNT", "Failed to mount %s as FAT32: %s", device->name().c_str(), mount_path);
+            fk::algorithms::kwarn("AUTO-MOUNT", "Failed to mount %s as FAT32: error=%d", device->name().c_str(), (int)mount_res.error());
         }
     }
 
@@ -86,7 +86,7 @@ bool AutoMounter::try_mount_at(fk::RefPtr<StorageDevice> device, const char* tar
 
     auto fat12_res = Fat12FileSystem::create(device);
     if (fat12_res.is_ok()) {
-        if (VirtualFileSystem::the().mount(target_path, fat12_res.value()).is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, fat12_res.value(), "fat12").is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT12) at %s", device->name().c_str(), target_path);
             return true;
         }
@@ -94,7 +94,7 @@ bool AutoMounter::try_mount_at(fk::RefPtr<StorageDevice> device, const char* tar
 
     auto fat16_res = Fat16FileSystem::create(device);
     if (fat16_res.is_ok()) {
-        if (VirtualFileSystem::the().mount(target_path, fat16_res.value()).is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, fat16_res.value(), "fat16").is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT16) at %s", device->name().c_str(), target_path);
             return true;
         }
@@ -102,7 +102,7 @@ bool AutoMounter::try_mount_at(fk::RefPtr<StorageDevice> device, const char* tar
 
     auto fat32_res = Fat32FileSystem::create(device);
     if (fat32_res.is_ok()) {
-        if (VirtualFileSystem::the().mount(target_path, fat32_res.value()).is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, fat32_res.value(), "fat32").is_ok()) {
             fk::algorithms::klog("AUTO-MOUNT", "Mounted %s (FAT32) at %s", device->name().c_str(), target_path);
             return true;
         }

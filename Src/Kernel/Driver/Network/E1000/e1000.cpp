@@ -1,11 +1,12 @@
 #include <Kernel/Driver/Network/E1000/e1000.h>
+#include <Kernel/Memory/Dma/dma_buffer.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Hardware/Pci/pci.h>
+#include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Assertions.h>
+#include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/ref_ptr.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -51,9 +52,8 @@ fk::core::Result<void, fk::core::Error> E1000Controller::initialize_hardware() {
     initialize_rx();
     initialize_tx();
 
-    // Enable interrupts
-    write_command(REG_IMASK, 0x1F6DC);
-    write_command(REG_IMASK, 0xFF & ~4);
+    // Enable interrupts (combined mask: 0x1F6DC with bit 2 cleared)
+    write_command(REG_IMASK, 0x1F6DC & ~static_cast<uint32_t>(4));
     read_command(0xc0);
 
     fk::algorithms::klog("E1000", "Initialized successfully");
@@ -80,21 +80,27 @@ void E1000Controller::read_mac_address() {
 }
 
 void E1000Controller::initialize_rx() {
-    uintptr_t descs_phys = PhysicalMemoryManager::the().alloc_page();
-    MemoryManager::the().map_page(descs_phys, descs_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
-    m_rx_descs = reinterpret_cast<e1000_rx_desc*>(descs_phys);
-    memset(m_rx_descs, 0, 4096);
+    auto ring_result = dma_alloc_buffer(sizeof(e1000_rx_desc) * 128);
+    if (ring_result.is_error()) {
+        fk::algorithms::kerror("E1000", "Failed to allocate RX descriptor ring");
+        return;
+    }
+    m_rx_ring = ring_result.value();
+    m_rx_descs = reinterpret_cast<e1000_rx_desc*>(m_rx_ring.vaddr);
 
     for (int i = 0; i < 128; i++) {
-        uintptr_t buf_phys = PhysicalMemoryManager::the().alloc_page();
-        MemoryManager::the().map_page(buf_phys, buf_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
-        m_rx_buffer[i] = reinterpret_cast<uint8_t*>(buf_phys);
-        m_rx_descs[i].addr = buf_phys;
+        auto buf_result = dma_alloc_buffer(2048);
+        if (buf_result.is_error()) {
+            fk::algorithms::kerror("E1000", "Failed to allocate RX buffer %d", i);
+            return;
+        }
+        m_rx_buffers[i] = buf_result.value();
+        m_rx_descs[i].addr = m_rx_buffers[i].phys;
         m_rx_descs[i].status = 0;
     }
 
-    write_command(REG_RXADDRL, (uint32_t)descs_phys);
-    write_command(REG_RXADDRH, (uint32_t)(descs_phys >> 32));
+    write_command(REG_RXADDRL, (uint32_t)m_rx_ring.phys);
+    write_command(REG_RXADDRH, (uint32_t)(m_rx_ring.phys >> 32));
     write_command(REG_RXLEN, 128 * sizeof(e1000_rx_desc));
     write_command(REG_RXHEAD, 0);
     write_command(REG_RXTAIL, 127);
@@ -108,21 +114,27 @@ void E1000Controller::initialize_rx() {
 }
 
 void E1000Controller::initialize_tx() {
-    uintptr_t descs_phys = PhysicalMemoryManager::the().alloc_page();
-    MemoryManager::the().map_page(descs_phys, descs_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
-    m_tx_descs = reinterpret_cast<e1000_tx_desc*>(descs_phys);
-    memset(m_tx_descs, 0, 4096);
+    auto ring_result = dma_alloc_buffer(sizeof(e1000_tx_desc) * 128);
+    if (ring_result.is_error()) {
+        fk::algorithms::kerror("E1000", "Failed to allocate TX descriptor ring");
+        return;
+    }
+    m_tx_ring = ring_result.value();
+    m_tx_descs = reinterpret_cast<e1000_tx_desc*>(m_tx_ring.vaddr);
 
     for (int i = 0; i < 128; i++) {
-        uintptr_t buf_phys = PhysicalMemoryManager::the().alloc_page();
-        MemoryManager::the().map_page(buf_phys, buf_phys, PageFlags::Present | PageFlags::Writable | PageFlags::CacheDisabled);
-        m_tx_buffer[i] = reinterpret_cast<uint8_t*>(buf_phys);
-        m_tx_descs[i].addr = buf_phys;
+        auto buf_result = dma_alloc_buffer(2048);
+        if (buf_result.is_error()) {
+            fk::algorithms::kerror("E1000", "Failed to allocate TX buffer %d", i);
+            return;
+        }
+        m_tx_buffers[i] = buf_result.value();
+        m_tx_descs[i].addr = m_tx_buffers[i].phys;
         m_tx_descs[i].status = 0;
     }
 
-    write_command(REG_TXADDRL, (uint32_t)descs_phys);
-    write_command(REG_TXADDRH, (uint32_t)(descs_phys >> 32));
+    write_command(REG_TXADDRL, (uint32_t)m_tx_ring.phys);
+    write_command(REG_TXADDRH, (uint32_t)(m_tx_ring.phys >> 32));
     write_command(REG_TXLEN, 128 * sizeof(e1000_tx_desc));
     write_command(REG_TXHEAD, 0);
     write_command(REG_TXTAIL, 0);
@@ -143,7 +155,7 @@ fk::core::Result<void, fk::core::Error> E1000Controller::send_packet(const uint8
     m_tx_descs[m_tx_current].len = (uint16_t)size;
     m_tx_descs[m_tx_current].status = 0;
     m_tx_descs[m_tx_current].lower_setup = (1 << 3) | (1 << 0) | (1 << 1); // RS, EOP, IFCS
-    memcpy(m_tx_buffer[m_tx_current], data, size);
+    fk::memory::copy(m_tx_buffers[m_tx_current].vaddr, data, size);
 
     uint16_t old_tx = m_tx_current;
     m_tx_current = (m_tx_current + 1) % 128;
@@ -153,10 +165,15 @@ fk::core::Result<void, fk::core::Error> E1000Controller::send_packet(const uint8
 
     // Polling for completion
     int timeout = 1000000;
-    while (!(m_tx_descs[old_tx].status & 0xF) && timeout > 0) timeout--;
+    while (!(m_tx_descs[old_tx].status & 0xF) && timeout > 0) {
+        timeout--;
+        if (timeout % 1000 == 0) {
+            SchedulerManager::the().yield();
+        }
+    }
     
     if (timeout == 0) {
-        fk::algorithms::kerror("E1000", "Packet transmission timeout");
+        fk::algorithms::kwarn("E1000", "Packet transmission timeout");
         return fk::core::Error::DeviceError;
     }
 
@@ -171,7 +188,7 @@ fk::core::Result<size_t, fk::core::Error> E1000Controller::receive_packet(uint8_
 
     if (size > max_size) size = max_size;
 
-    memcpy(buffer, m_rx_buffer[m_rx_current], size);
+    fk::memory::copy(buffer, m_rx_buffers[m_rx_current].vaddr, size);
 
     m_rx_descs[m_rx_current].status = 0;
     uint16_t old_rx = m_rx_current;

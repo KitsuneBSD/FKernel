@@ -1,7 +1,7 @@
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::elf_domains {
 

@@ -4,7 +4,7 @@
 #include <LibC/stdio.h>
 
 namespace fk {
-namespace algorithms { // Or fk::logging if preferred
+namespace algorithms {
 
 enum LogTarget : uint32_t {
     None = 0,
@@ -14,10 +14,20 @@ enum LogTarget : uint32_t {
     All = 0xFFFFFFFF
 };
 
+enum LogLevel : uint32_t {
+    LevelDebug = 0,
+    LevelInfo  = 1,
+    LevelWarn  = 2,
+    LevelError = 3,
+    LevelFatal = 4,
+    LevelSilent = 5
+};
+
 void set_log_targets(uint32_t targets);
 uint32_t get_log_targets();
+void set_log_level(LogLevel level);
+LogLevel get_log_level();
 
-/** ANSI color codes for kernel logging */
 #define KLOG_COLOR_RESET "\033[0m"
 #define KLOG_COLOR_RED "\033[31m"
 #define KLOG_COLOR_GREEN "\033[32m"
@@ -28,36 +38,29 @@ uint32_t get_log_targets();
 #define KLOG_COLOR_WHITE "\033[37m"
 
 /**
- * @brief Print a formatted kernel log message in red and block by default.
- *
- *
- * @param prefix Prefix to display before the message (e.g., module name)
- * @param fmt printf-style format string
- * @param ... Variadic arguments for formatting
+ * @brief Print a formatted kernel log message in red and halt the CPU.
+ * Use only for truly unrecoverable errors (heap corruption, hardware init failure).
  */
-inline void kerror(const char *prefix, const char *fmt, ...) {
-  char buf[512]; ///< Temporary buffer for formatted message
+inline void kfatal(const char *prefix, const char *fmt, ...) {
+  char buf[512];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
 
-  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
+  kprintf("%s[FATAL][%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
 
   while (true) {
     asm("cli;hlt");
   }
 }
+
 /**
- * @brief Print a formatted kernel log message in red by default.
- *
- *
- * @param prefix Prefix to display before the message (e.g., module name)
- * @param fmt printf-style format string
- * @param ... Variadic arguments for formatting
+ * @brief Print a formatted kernel log message in red.
+ * Does NOT halt — use kfatal() for unrecoverable errors that must stop execution.
  */
-inline void kexception(const char *prefix, const char *fmt, ...) {
-  char buf[512]; ///< Temporary buffer for formatted message
+inline void kerror(const char *prefix, const char *fmt, ...) {
+  char buf[512];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
@@ -66,57 +69,74 @@ inline void kexception(const char *prefix, const char *fmt, ...) {
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
 }
 
-inline void kwarn(const char *prefix, const char *fmt, ...) {
-  char buf[512]; ///< Temporary buffer for formatted message
+/** Print a formatted kernel log message in red (exception context). */
+inline void kexception(const char *prefix, const char *fmt, ...) {
+  char buf[512];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
 
+  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
+}
+
+/**
+ * Compile-time log level gate.
+ * -DFKERNEL_LOG_LEVEL=0  → only kfatal/kerror (silent release)
+ * -DFKERNEL_LOG_LEVEL=1  → +kwarn
+ * -DFKERNEL_LOG_LEVEL=2  → +klog  (recommended release)
+ * -DFKERNEL_LOG_LEVEL=3  → +kdebug (default debug build)
+ * Unset → all levels enabled (same as 3).
+ */
+#ifndef FKERNEL_LOG_LEVEL
+# define FKERNEL_LOG_LEVEL 3
+#endif
+
+/** Print a formatted kernel log message in yellow. No-op when FKERNEL_LOG_LEVEL < 1. */
+#if FKERNEL_LOG_LEVEL >= 1
+inline void kwarn(const char *prefix, const char *fmt, ...) {
+  char buf[512];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_YELLOW, prefix, KLOG_COLOR_RESET, buf);
 }
+#else
+inline void kwarn(const char*, const char*, ...) {}
+#endif
 
+/** Print a formatted kernel log message in white. No-op when FKERNEL_LOG_LEVEL < 3. */
+#if FKERNEL_LOG_LEVEL >= 3
 inline void kdebug(const char *prefix, const char *fmt, ...) {
-  char buf[512]; ///< Temporary buffer for formatted message
+  if (get_log_level() > LevelDebug) return;
+  char buf[512];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
-
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_WHITE, prefix, KLOG_COLOR_RESET, buf);
 }
+#else
+inline void kdebug(const char*, const char*, ...) {}
+#endif
 
-// #ifdef FKERNEL_DEBUG
-
-/**
- * @brief Print a formatted kernel log message in green by default.
- *
- * This function only works in debug mode. In release mode, it is omitted.
- *
- * @param prefix Prefix to display before the message (e.g., module name)
- * @param fmt printf-style format string
- * @param ... Variadic arguments for formatting
- */
+/** Print a formatted kernel log message in green. No-op when FKERNEL_LOG_LEVEL < 2. */
+#if FKERNEL_LOG_LEVEL >= 2
 inline void klog(const char *prefix, const char *fmt, ...) {
-  char buf[512]; ///< Temporary buffer for formatted message
+  if (get_log_level() > LevelInfo) return;
+  char buf[512];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
-
   kprintf("%s[%s]%s: %s\n", KLOG_COLOR_GREEN, prefix, KLOG_COLOR_RESET, buf);
 }
+#else
+inline void klog(const char*, const char*, ...) {}
+#endif
 
-/**
- * @brief Print a formatted kernel log message in a specified ANSI color.
- *
- * This function only works in debug mode. In release mode, it is omitted.
- *
- * @param prefix Prefix to display before the message
- * @param color ANSI color code to use for the prefix
- * @param fmt printf-style format string
- * @param ... Variadic arguments for formatting
- */
+/** Print a formatted kernel log message in a specified ANSI color. */
 inline void klog_color(const char *prefix, const char *color, const char *fmt,
                        ...) {
   char buf[512];
@@ -127,14 +147,6 @@ inline void klog_color(const char *prefix, const char *color, const char *fmt,
 
   kprintf("%s[%s]%s: %s\n", color, prefix, KLOG_COLOR_RESET, buf);
 }
-// #else
-// /// In release mode, kdebug does nothing
-// #define kdebug(...) ((void)0)
-// /// In release mode, klog does nothing
-// #define klog(...) ((void)0)
-// /// In release mode, klog_color does nothing
-// #define klog_color(...) ((void)0)
-// #endif
 
 } // namespace algorithms
 } // namespace fk

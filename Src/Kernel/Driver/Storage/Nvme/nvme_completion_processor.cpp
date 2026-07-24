@@ -1,5 +1,6 @@
 #include <Kernel/Driver/Storage/Nvme/nvme_completion_processor.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/log.h>
 
 namespace fkernel {
 
@@ -8,7 +9,7 @@ void NvmeCompletionProcessor::process_admin_completions() {
 
   while (true) {
     NvmeCompletion completion;
-    memcpy(&completion, const_cast<const NvmeCompletion*>(&cq[m_admin_queue.cq_head]),
+    fk::memory::copy(&completion, const_cast<const NvmeCompletion*>(&cq[m_admin_queue.cq_head]),
            sizeof(NvmeCompletion));
 
     if ((completion.status & 0x1) != (m_admin_queue.cq_phase ? 1 : 0))
@@ -32,7 +33,7 @@ void NvmeCompletionProcessor::process_io_completions() {
 
     while (true) {
       NvmeCompletion completion;
-      memcpy(&completion, const_cast<const NvmeCompletion*>(&cq[m_queue.cq_head]),
+      fk::memory::copy(&completion, const_cast<const NvmeCompletion*>(&cq[m_queue.cq_head]),
              sizeof(NvmeCompletion));
 
       if ((completion.status & 0x1) != (m_queue.cq_phase ? 1 : 0))
@@ -42,7 +43,7 @@ void NvmeCompletionProcessor::process_io_completions() {
       IoCompletionStatus status = IoCompletionStatus::Success;
 
       if ((completion.status >> 1) != 0) {
-        fk::algorithms::kerror("NVMe-INT", "Command %d failed: 0x%x", cmd_id,
+        fk::algorithms::kwarn("NVMe", "IO command %d failed: 0x%x", cmd_id,
                                completion.status >> 1);
         status = IoCompletionStatus::Error;
       }

@@ -2,6 +2,7 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace terminal {
@@ -102,16 +103,18 @@ fk::memory::optional<Terminal *> TerminalManager::find_terminal(TerminalId id) {
 }
 
 void TerminalManager::initialize() {
+  if (m_is_initialized) return;
   // Create default VGA terminals
   for (int i = 0; i < 6; ++i) {
     auto result = create_terminal(TerminalType::VGA);
     if (result.is_error()) {
-      fk::algorithms::klog("TERMINAL MANAGER",
+      fk::algorithms::klog("TERMINAL_MANAGER",
                            "Failed to create default VGA terminal %d", i);
     }
   }
   // Set default active terminal
   m_active_terminal_index = 0;
+  m_is_initialized = true;
 }
 
 void TerminalManager::handle_input(char c) {
@@ -145,7 +148,7 @@ void TerminalManager::switch_to(int index) {
   terminal->clear();
   char msg[64];
   snprintf(msg, sizeof(msg), "\n--- Switched to TTY%d ---\n", index);
-  terminal->write(0, strlen(msg), reinterpret_cast<const uint8_t*>(msg));
+  terminal->write(0, fk::memory::length(msg), reinterpret_cast<const uint8_t*>(msg));
 }
 
 VGATerminal* TerminalManager::active_terminal() const {

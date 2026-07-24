@@ -65,5 +65,5 @@ public:
   /**
    * @brief Configure periodic APIC timer
    */
-  void setup_timer(uint64_t ms);
+  void setup_timer(uint64_t frequency_hz);
 };

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <LibC/assert.h>
 #include <LibC/string.h>
 #include <LibFK/Memory/heap_malloc.h>
 #include <LibFK/Memory/new.h>
@@ -60,6 +59,20 @@ public:
     m_data[--m_metadata.size].~T();
   }
 
+  // Append `count` elements from `data` in bulk.
+  // Uses memcpy for trivially-constructible types; element copy otherwise.
+  void push_range(const T* data, size_t count) {
+    if (!data || count == 0) return;
+    ensure_capacity(m_metadata.size + count);
+    if (__is_trivially_constructible(T)) {
+      memcpy(m_data + m_metadata.size, data, count * sizeof(T));
+      m_metadata.size += count;
+    } else {
+      for (size_t i = 0; i < count; ++i)
+        new (&m_data[m_metadata.size++]) T(data[i]);
+    }
+  }
+
   void insert_at(size_t index, const T &value) {
     ensure_capacity(m_metadata.size + 1);
     for (size_t i = m_metadata.size; i > index; --i) {
@@ -71,7 +84,7 @@ public:
   }
 
   void remove_at(size_t index) {
-    ASSERT(index < m_metadata.size);
+    if (index >= m_metadata.size) return;
     m_data[index].~T();
     for (size_t i = index + 1; i < m_metadata.size; ++i) {
       new (&m_data[i - 1]) T(fk::types::move(m_data[i]));
@@ -80,15 +93,9 @@ public:
     --m_metadata.size;
   }
 
-  T &operator[](size_t index) {
-    ASSERT(index < m_metadata.size);
-    return m_data[index];
-  }
+  T &operator[](size_t index) { return m_data[index]; }
 
-  const T &operator[](size_t index) const {
-    ASSERT(index < m_metadata.size);
-    return m_data[index];
-  }
+  const T &operator[](size_t index) const { return m_data[index]; }
 
   size_t size() const { return m_metadata.size; }
   size_t capacity() const { return m_metadata.capacity; }
@@ -138,7 +145,7 @@ private:
 
   void reallocate_to(size_t new_capacity) {
     T *new_data = static_cast<T *>(kmalloc(new_capacity * sizeof(T)));
-    ASSERT(new_data);
+    if (!new_data) return;
 
     move_elements(new_data);
     free_old();

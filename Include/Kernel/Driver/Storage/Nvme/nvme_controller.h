@@ -3,6 +3,7 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Driver/Storage/storage_device.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Memory/Dma/dma_buffer.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -30,7 +31,9 @@ public:
     virtual fk::core::Result<size_t, fk::core::Error>
     write_sectors(uint64_t start_sector, size_t count, const uint8_t *buffer) override;
 
-    virtual SectorSize sector_size() const override { return SectorSize(512); } // Standard for now
+    virtual SectorSize sector_size() const override {
+        return SectorSize(m_namespaces.is_empty() ? 512u : m_namespaces[0].block_size);
+    }
     virtual SectorCount sector_count() const override;
 
     // Node interface (VFS integration)
@@ -48,7 +51,7 @@ public:
     fk::core::Result<void, fk::core::Error> initialize_controller();
     fk::core::Result<void, fk::core::Error> reset_controller();
     fk::core::Result<void, fk::core::Error> identify_controller();
-    void configure_admin_queue();
+    fk::core::Result<void, fk::core::Error> configure_admin_queue();
     fk::core::Result<void, fk::core::Error> create_io_queues();
     void scan_namespaces();
     
@@ -64,8 +67,10 @@ public:
     struct QueuePair {
         volatile uint32_t* sq_tail_db{nullptr};  // Submission queue tail doorbell
         volatile uint32_t* cq_head_db{nullptr};  // Completion queue head doorbell
-        void* sq_memory{nullptr};                // Submission queue memory
-        void* cq_memory{nullptr};                // Completion queue memory
+        DmaBuffer sq_buffer;                      // Submission queue DMA buffer
+        DmaBuffer cq_buffer;                      // Completion queue DMA buffer
+        void* sq_memory{nullptr};                // CPU virtual pointer to SQ
+        void* cq_memory{nullptr};                // CPU virtual pointer to CQ
         uint16_t sq_size{0};
         uint16_t cq_size{0};
         uint16_t sq_tail{0};

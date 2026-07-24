@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Algorithms/binary_search.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/optional.h>
 #include <LibFK/Utilities/pair.h>
@@ -72,16 +73,9 @@ public:
 
 private:
   size_t lower_bound(const K &key) const {
-    size_t lo = 0;
-    size_t hi = m_entries.size();
-    while (lo < hi) {
-      size_t mid = lo + (hi - lo) / 2;
-      if (m_entries[mid].first < key)
-        lo = mid + 1;
-      else
-        hi = mid;
-    }
-    return lo;
+    return fk::algorithms::lower_bound(
+        m_entries.begin(), m_entries.size(), Entry{key, V{}},
+        [](const Entry& a, const Entry& b) { return a.first < b.first; });
   }
 
   Vector<Entry> m_entries;

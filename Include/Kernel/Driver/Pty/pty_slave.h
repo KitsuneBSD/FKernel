@@ -24,6 +24,11 @@ public:
   size_t size() const override { return 0; }
   bool is_directory() const override { return false; }
   bool is_character_device() const override { return true; }
+  short poll() const override {
+    short r = POLLOUT;
+    if (m_from_master && !m_from_master->is_empty()) r |= POLLIN;
+    return r;
+  }
 
 private:
   fk::RefPtr<PtyBuffer> m_from_master;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Kernel/Driver/Storage/Ata/ata_transfer_strategy.h>
+#include <Kernel/Memory/Dma/dma_buffer.h>
+#include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -9,6 +11,8 @@ class DMAStrategy : public ATATransferStrategy {
     uint16_t m_io_base;
     uint16_t m_bm_base; // Bus Master base address
     bool m_is_master;
+    fk::synchronization::Spinlock m_transfer_lock;
+    DmaBuffer m_prdt_buffer;
 
     // Bus Master IDE Registers (relative to m_bm_base)
     static constexpr uint8_t BM_COMMAND_REG = 0x0;

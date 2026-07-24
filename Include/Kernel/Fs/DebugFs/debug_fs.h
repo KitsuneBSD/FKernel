@@ -5,8 +5,6 @@
 #include <LibFK/Text/string.h>
 
 #include <Kernel/Fs/DebugFs/Node/debug_log_node.h>
-#include <Kernel/Fs/DebugFs/Node/stderr_log_node.h>
-#include <Kernel/Fs/DebugFs/Node/stdout_log_node.h>
 #include <Kernel/Fs/DebugFs/Node/syscall_log_node.h>
 #include <Kernel/Ipc/ipc_log_node.h>
 

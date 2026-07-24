@@ -2,7 +2,7 @@
 
 #include <Kernel/Driver/Storage/Ahci/ahci_controller.h>
 #include <Kernel/Driver/async_io.h>
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 #include <LibFK/Container/array.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Scheduler/scheduler.h>

@@ -1,9 +1,7 @@
-#include <LibC/assert.h>
 #include <LibC/string.h>
 
 int strncmp(const char *s1, const char *s2, size_t n) {
-  ASSERT(s1 != NULL);
-  ASSERT(s2 != NULL);
+  if (!s1 || !s2) return -1;
   if (n == 0)
     return 0;
 

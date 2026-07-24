@@ -1,8 +1,8 @@
 #pragma once
 
-#include <LibFK/Core/Result.h>
-#include <LibFK/Core/Error.h>
-#include <LibC/stdint.h>
+#include <LibFK/Core/result.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Types/types.h>
 #include <Kernel/Driver/Usb/usb_transfer.h>
 #include <Kernel/Driver/Usb/usb_device.h>
 

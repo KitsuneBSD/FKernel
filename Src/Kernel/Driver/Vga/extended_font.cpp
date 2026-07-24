@@ -1,5 +1,5 @@
 #include <Kernel/Driver/Vga/extended_font.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace VgaExtended {
 
@@ -20,7 +20,7 @@ void ExtendedFont::initialize_ascii_glyphs() {
 
 void ExtendedFont::initialize_extended_glyphs() {
     // Extended glyphs initialization
-    memset(extended_glyphs, 0, sizeof(extended_glyphs));
+    fk::memory::set(extended_glyphs, 0, sizeof(extended_glyphs));
 }
 
 const ExtendedFont::Glyph* ExtendedFont::get_ascii_glyph(uint8_t c) const {

@@ -9,6 +9,12 @@ DriverManager& DriverManager::the() {
   return instance;
 }
 
+void DriverManager::initialize() {
+  if (m_is_initialized) return;
+  fk::algorithms::klog("DRIVER_MANAGER", "DriverManager initialized");
+  m_is_initialized = true;
+}
+
 fk::core::Result<void, fk::core::Error>
 DriverManager::register_driver(fk::memory::OwnPtr<Driver> driver) {
   if (!driver) {

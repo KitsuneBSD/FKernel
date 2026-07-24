@@ -2,7 +2,7 @@
 #include <Kernel/Driver/Storage/Partitions/partition.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Storage/storage_device_name.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Algorithms/crc32.h>
 #include <LibFK/Memory/heap_malloc.h>

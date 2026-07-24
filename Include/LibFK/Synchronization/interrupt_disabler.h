@@ -1,26 +1,24 @@
 #pragma once
 
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
-
 namespace fk::synchronization {
 
 /**
  * @brief RAII wrapper to disable interrupts and restore state on destruction.
+ * Uses direct x86 cli/sti/pushfq so LibFK does not depend on Kernel headers.
  */
 class ScopedInterruptDisabler {
 public:
     ScopedInterruptDisabler() {
-        m_previous_state = InterruptController::the().get_interrupt_state();
-        InterruptController::the().disable_interrupt();
+        uint64_t rflags;
+        asm volatile("pushfq ; popq %0" : "=r"(rflags));
+        m_previous_state = (rflags & (1ULL << 9)) != 0;
+        asm volatile("cli" ::: "memory");
     }
 
     ~ScopedInterruptDisabler() {
-        if (m_previous_state) {
-            InterruptController::the().enable_interrupt();
-        }
+        if (m_previous_state) asm volatile("sti" ::: "memory");
     }
 
-    // Explicitly delete copy constructor and assignment operator
     ScopedInterruptDisabler(const ScopedInterruptDisabler&) = delete;
     ScopedInterruptDisabler& operator=(const ScopedInterruptDisabler&) = delete;
 

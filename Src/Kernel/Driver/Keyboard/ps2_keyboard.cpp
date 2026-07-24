@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>

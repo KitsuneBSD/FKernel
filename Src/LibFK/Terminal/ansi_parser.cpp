@@ -98,9 +98,6 @@ void AnsiParser::handle_csi(char c) {
         case 'm': { // SGR - Select Graphic Rendition
             uint8_t fg = 7;
             uint8_t bg = 0;
-            static uint32_t fg_rgb = 0xAAAAAA;
-            static uint32_t bg_rgb = 0x000000;
-            static bool use_rgb = false;
 
             if (m_parameters.is_empty()) {
                 m_delegate.set_colors(fg, bg);
@@ -109,29 +106,28 @@ void AnsiParser::handle_csi(char c) {
             
             for (size_t i = 0; i < m_parameters.size(); ++i) {
                 uint16_t param = m_parameters[i];
-                if (param == 0) { fg = 7; bg = 0; use_rgb = false; }
-                else if (param >= 30 && param <= 37) { fg = param - 30; use_rgb = false; }
-                else if (param >= 40 && param <= 47) { bg = param - 40; use_rgb = false; }
-                else if (param >= 90 && param <= 97) { fg = (param - 90) + 8; use_rgb = false; }
-                else if (param >= 100 && param <= 107) { bg = (param - 100) + 8; use_rgb = false; }
+                if (param == 0) { fg = 7; bg = 0; m_use_rgb = false; }
+                else if (param >= 30 && param <= 37) { fg = param - 30; m_use_rgb = false; }
+                else if (param >= 40 && param <= 47) { bg = param - 40; m_use_rgb = false; }
+                else if (param >= 90 && param <= 97) { fg = (param - 90) + 8; m_use_rgb = false; }
+                else if (param >= 100 && param <= 107) { bg = (param - 100) + 8; m_use_rgb = false; }
                 else if (param == 38 || param == 48) {
                     bool is_fg = (param == 38);
                     if (i + 2 < m_parameters.size() && m_parameters[i+1] == 5) {
                         // 256 colors
                         uint8_t n = m_parameters[i+2];
-                        // Simplistic mapping for 256 to 16 for now if no RGB
                         if (is_fg) fg = n % 16; else bg = n % 16;
                         i += 2;
                     } else if (i + 4 < m_parameters.size() && m_parameters[i+1] == 2) {
                         // TrueColor: 38;2;r;g;b
                         uint32_t rgb = (m_parameters[i+2] << 16) | (m_parameters[i+3] << 8) | m_parameters[i+4];
-                        if (is_fg) fg_rgb = rgb; else bg_rgb = rgb;
-                        use_rgb = true;
+                        if (is_fg) m_fg_rgb = rgb; else m_bg_rgb = rgb;
+                        m_use_rgb = true;
                         i += 4;
                     }
                 }
             }
-            if (use_rgb) m_delegate.set_colors_rgb(fg_rgb, bg_rgb);
+            if (m_use_rgb) m_delegate.set_colors_rgb(m_fg_rgb, m_bg_rgb);
             else m_delegate.set_colors(fg, bg);
             break;
         }

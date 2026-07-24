@@ -1,8 +1,7 @@
-#include <LibC/assert.h>
 #include <LibC/string.h>
 
 long stol(const char *str) {
-  ASSERT(str != NULL);
+  if (!str) return 0;
 
   long result = 0;
   int sign = 1;
@@ -15,7 +14,7 @@ long stol(const char *str) {
   }
 
   if (count == MAX_ATOI_LEN)
-    return 0; // Or handle error appropriately
+    return 0;
 
   count = 0;
   if (*str == '-') {
@@ -24,8 +23,6 @@ long stol(const char *str) {
   } else if (*str == '+') {
     str++;
   }
-  ASSERT(*str >= '0' && *str <= '9'); // Ensure there's at least one digit
-
   while ((*str >= '0' && *str <= '9') && count < MAX_ATOI_LEN) {
     result = result * 10 + (*str - '0');
     str++;

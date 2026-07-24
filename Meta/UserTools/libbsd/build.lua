@@ -45,7 +45,7 @@ local CC = Toolchain.get_clang()
 print("Configuring LibBSD...")
 -- LibBSD might need LIBMD_CFLAGS and LIBMD_LIBS if pkg-config is not set up correctly for cross-compiling
 local cmd_configure = string.format(
-    "cd %s && CC='%s --target=%s --sysroot=%s' LIBMD_CFLAGS='-I%s/include' LIBMD_LIBS='-L%s/lib -lmd' ./configure --host=x86_64-fkernel --prefix= --disable-shared",
+    "cd %s && CC='%s --target=%s --sysroot=%s' LIBMD_CFLAGS='-I%s/include' LIBMD_LIBS='-L%s/lib -lmd' ./configure --host=x86_64-linux-musl --prefix= --disable-shared",
     src_dir, CC, Toolchain.TRIPLE, SYSROOT, SYSROOT, SYSROOT
 )
 

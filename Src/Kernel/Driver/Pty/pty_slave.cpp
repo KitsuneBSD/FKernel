@@ -24,7 +24,8 @@ PtySlave::PtySlave(fk::RefPtr<PtyBuffer> from_master,
 fk::core::Result<size_t, fk::core::Error>
 PtySlave::read(uint64_t, size_t size, uint8_t* buf) {
   if (!buf || size == 0) return fk::core::Error::InvalidParameter;
-  if (m_from_master->is_empty()) return (size_t)0;
+  while (m_from_master->is_empty())
+    m_from_master->data_ready().wait();
   return m_from_master->read(buf, size);
 }
 

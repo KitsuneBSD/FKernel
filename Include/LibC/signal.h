@@ -52,6 +52,7 @@ typedef uint64_t sigset_t;
 #define SA_NOCLDSTOP 0x00000001
 #define SA_NOCLDWAIT 0x00000002
 #define SA_SIGINFO   0x00000004
+#define SA_RESTORER  0x04000000
 #define SA_ONSTACK   0x08000000
 #define SA_RESTART   0x10000000
 #define SA_NODEFER   0x40000000
@@ -74,12 +75,16 @@ typedef uint64_t sigset_t;
 #define SIG_UNBLOCK 1
 #define SIG_SETMASK 2
 
+// Must match the kernel struct sigaction layout (syscall 13):
+//   offset  0: sa_handler  (8 bytes)
+//   offset  8: sa_flags    (8 bytes)
+//   offset 16: sa_restorer (8 bytes)
+//   offset 24: sa_mask     (8 bytes)
 struct sigaction {
     void (*sa_handler)(int);
-    void (*sa_sigaction)(int, void *, void *);
-    sigset_t sa_mask;
-    int      sa_flags;
+    uint64_t sa_flags;
     void (*sa_restorer)(void);
+    sigset_t sa_mask;
 };
 
 void (*signal(int sig, void (*handler)(int)))(int);

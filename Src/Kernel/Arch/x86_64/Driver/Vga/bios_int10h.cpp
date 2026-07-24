@@ -2,7 +2,7 @@
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Boot/Multiboot/multiboot_interpreter.h>
 #include <Kernel/Boot/Multiboot/multiboot2.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::drivers::vesa {
 
@@ -15,14 +15,14 @@ extern "C" bool bios_int10h_vesa_get_controller_info(VbeInfoBlock* info) {
         multiboot2::MultibootParser parser(mb_ptr);
         auto vbe_tag = parser.find_tag<multiboot2::TagVBE>(multiboot2::TagType::VBE);
         if (vbe_tag) {
-            memcpy(info, vbe_tag->vbe_control_info, sizeof(VbeInfoBlock));
+            fk::memory::copy(info, vbe_tag->vbe_control_info, sizeof(VbeInfoBlock));
             return true;
         }
     }
 
     // Fallback: Fill with minimal info if we have a framebuffer from bootloader
     if (boot::BootInfo::the().has_framebuffer()) {
-        memcpy(info->signature, "VESA", 4);
+        fk::memory::copy(info->signature, "VESA", 4);
         info->version = 0x0200; // Assume VBE 2.0
         return true;
     }
@@ -42,7 +42,7 @@ extern "C" bool bios_int10h_vesa_get_mode_info(uint16_t mode, VbeModeInfoBlock* 
         multiboot2::MultibootParser parser(mb_ptr);
         auto vbe_tag = parser.find_tag<multiboot2::TagVBE>(multiboot2::TagType::VBE);
         if (vbe_tag && vbe_tag->vbe_mode == real_mode) {
-            memcpy(info, vbe_tag->vbe_mode_info, sizeof(VbeModeInfoBlock));
+            fk::memory::copy(info, vbe_tag->vbe_mode_info, sizeof(VbeModeInfoBlock));
             return true;
         }
     }

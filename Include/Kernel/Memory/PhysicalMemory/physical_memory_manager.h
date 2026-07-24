@@ -51,6 +51,8 @@ public:
     return instance;
   }
 
+  bool is_initialized() const { return m_is_initialized; }
+
   /**
    * @brief Scans the system memory map and initializes the manager.
    */

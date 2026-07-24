@@ -39,12 +39,12 @@ The GEMINI validator checks:
 
 ### ✅ CORRECT
 ```cpp
-// cpuContext.h
+// cpu_context.h
 class CpuContext {
     // CPU context implementation
 };
 
-// ataController.h  
+// ata_controller.h  
 class AtaController {
     // ATA controller implementation
 };
@@ -56,7 +56,7 @@ class AtaController {
 class AtaController { /* ... */ };
 class NvmeController { /* ... */ };  // ❌ Multiple classes
 
-// cpuContext.h
+// cpu_context.h
 class CpuContext { /* ... */ };
 struct CpuRegister { /* ... */ };      // ❌ Mixed types
 ```
@@ -68,15 +68,15 @@ With domain-based directories, this creates a **perfectly discoverable structure
 ```
 Include/Kernel/Driver/Storage/
 ├── Ata/
-│   ├── ataController.h    // class AtaController
-│   ├── ataDevice.h        // class AtaDevice
-│   └── pioStrategy.h     // class PioStrategy
+│   ├── ata_controller.h    // class AtaController
+│   ├── ata_device.h        // class AtaDevice
+│   └── pio_strategy.h     // class PioStrategy
 ├── Ahci/
-│   ├── ahciController.h   // class AhciController  
-│   └── ahciPort.h        // class AhciPort
+│   ├── ahci_controller.h   // class AhciController  
+│   └── ahci_port.h        // class AhciPort
 └── Nvme/
-    ├── nvmeController.h   // class NvmeController
-    └── nvmeQueue.h        // class NvmeQueue
+    ├── nvme_controller.h   // class NvmeController
+    └── nvme_queue.h        // class NvmeQueue
 ```
 
 ## Domain Knowledge

@@ -2,9 +2,8 @@
 
 #include <LibC/stddef.h>
 #include <LibC/string.h>       // For strcmp, strlen
-#include <LibFK/Core/Result.h> // Include Result for return types
-#include <LibFK/Memory/own_ptr.h>
-#include <LibFK/Utilities/pair.h> // Include Pair definition
+#include <LibFK/Core/result.h>
+#include <LibFK/Utilities/pair.h>
 
 namespace fk {
 namespace text { // As per GEMINI.md
@@ -29,14 +28,12 @@ public:
 
   size_t length() const { return m_metadata.first; }
   size_t size() const { return m_metadata.first; }
-  size_t capacity() const { return m_metadata.second; }
+  size_t capacity() const { return m_is_sso() ? SSO_CAP : m_metadata.second; }
 
   bool is_empty() const { return length() == 0; }
-  const char *c_str() const {
-    return (m_data.ptr()) ? m_data.ptr() : "";
-  }
-  char *data() { return m_data.ptr(); }
-  const char *data() const { return m_data.ptr(); }
+  const char *c_str() const { return m_data_ptr(); }
+  char *data() { return m_data_ptr(); }
+  const char *data() const { return m_data_ptr(); }
 
   void clear();
   fk::core::Result<void, fk::core::Error> reserve(size_t new_cap);
@@ -51,12 +48,12 @@ public:
   char &operator[](size_t index);
   const char &operator[](size_t index) const;
 
-  iterator begin() { return m_data.ptr(); }
-  iterator end() { return m_data.ptr() + length(); }
-  const_iterator begin() const { return m_data.ptr(); }
-  const_iterator end() const { return m_data.ptr() + length(); }
-  const_iterator cbegin() const { return m_data.ptr(); }
-  const_iterator cend() const { return m_data.ptr() + length(); }
+  iterator begin() { return m_data_ptr(); }
+  iterator end() { return m_data_ptr() + length(); }
+  const_iterator begin() const { return m_data_ptr(); }
+  const_iterator end() const { return m_data_ptr() + length(); }
+  const_iterator cbegin() const { return m_data_ptr(); }
+  const_iterator cend() const { return m_data_ptr() + length(); }
 
   String substr(size_t pos, size_t count = NPOS) const;
   size_t find(char c, size_t pos = 0) const;
@@ -81,19 +78,26 @@ public:
   String &replace(size_t pos, size_t count, const char *s);
 
 private:
-  // Changed return type to Result
+  static constexpr size_t SSO_CAP = 15;
+
   fk::core::Result<void, fk::core::Error> ensure_capacity(size_t min_cap);
-  fk::core::Result<void, fk::core::Error> _initialize_buffer(size_t initial_cap);
   fk::core::Result<void, fk::core::Error> _copy_from_cstring(const char* s, size_t len);
   fk::core::Result<void, fk::core::Error> _copy_from_string(const String& other);
   fk::core::Result<void, fk::core::Error> _append_data(const char* data, size_t len);
 
-  // Changed m_data to OwnPtr for automatic memory management
-  fk::memory::OwnPtr<char[]> m_data;
-  // Group length and capacity into a Pair to satisfy the two-instance-variable
-  // rule.
-  fk::utilities::Pair<size_t, size_t>
-      m_metadata; // first: length, second: capacity
+  // m_metadata.second == 0  →  SSO mode (data stored inline in m_data.sso)
+  // m_metadata.second  > 0  →  heap mode (data at m_data.heap_ptr)
+  union DataStorage {
+    char* heap_ptr;
+    char  sso[SSO_CAP + 1];
+    DataStorage() : heap_ptr(nullptr) {}
+  } m_data;
+  fk::utilities::Pair<size_t, size_t> m_metadata; // {length, capacity}
+
+  bool  m_is_sso() const { return m_metadata.second == 0; }
+  char* m_data_ptr() const {
+    return m_is_sso() ? const_cast<char*>(m_data.sso) : m_data.heap_ptr;
+  }
 };
 
 inline String operator+(const String &lhs, const String &rhs) {

@@ -6,7 +6,7 @@
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel {
 

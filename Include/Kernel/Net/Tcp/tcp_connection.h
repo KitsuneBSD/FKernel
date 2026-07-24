@@ -1,9 +1,10 @@
 #pragma once
 
+#include <Kernel/Ipc/notification.h>
 #include <Kernel/Net/Ip/ip_address.h>
 #include <Kernel/Net/Tcp/tcp_header.h>
 #include <LibFK/Container/vector.h>
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 
 namespace fkernel {
 namespace net {
@@ -33,6 +34,7 @@ public:
   uint16_t             peer_window{65535};   // peer's advertised window
   uint32_t             send_unacked{0};      // oldest unacknowledged seq
   fk::containers::Vector<uint8_t> recv_buf;
+  fkernel::ipc::Notification state_changed;
 
   uint16_t recv_window() const {
     size_t used = recv_buf.size();
@@ -45,6 +47,7 @@ public:
   const TcpEndpoint& local()  const { return m_local; }
   const TcpEndpoint& remote() const { return m_remote; }
   void set_local_port(uint16_t port) { m_local.port = port; }
+  void set_remote(TcpEndpoint ep) { m_remote = ep; }
 
   bool matches(uint32_t src_ip, uint16_t src_port,
                uint32_t dst_ip, uint16_t dst_port) const;

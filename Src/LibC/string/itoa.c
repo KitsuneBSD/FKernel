@@ -1,11 +1,8 @@
-#include <LibC/assert.h>
 #include <LibC/string.h>
 
 int itoa(int val, char *buf, int base) {
-  ASSERT(buf != NULL);
-  ASSERT(base >= 2 && base <= 16);
+  if (!buf || base < 2 || base > 16) return 0;
   char tmp[32];
-  ASSERT(sizeof(tmp) >= 32); // Ensure temporary buffer is large enough
   int i = 0, j = 0;
   int is_negative = 0;
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel::drivers {
 

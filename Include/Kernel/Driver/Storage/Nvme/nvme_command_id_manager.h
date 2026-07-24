@@ -1,7 +1,6 @@
 #pragma once
 
-#include <LibC/stddef.h>
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 #include <LibFK/Container/array.h>
 
 namespace fkernel {

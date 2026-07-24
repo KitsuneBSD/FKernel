@@ -2,67 +2,80 @@
 #include <LibC/dirent.h>
 #include <LibC/sys/stat.h>
 #include <LibC/stdlib.h>
+#include <LibC/errno.h>
+#include <LibC/unistd.h>
 
-/* These are user-space POSIX stubs. The kernel uses VFS directly. */
+/* These are user-space POSIX stubs. The kernel uses VFS directly.
+ * Native programs linked against FKernel LibC get ENOSYS instead of abort. */
 
 int open(const char *path, int flags, ...) {
   (void)path; (void)flags;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int close(int fd) {
   (void)fd;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int fcntl(int fd, int cmd, ...) {
   (void)fd; (void)cmd;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int stat(const char *path, struct stat *buf) {
   (void)path; (void)buf;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int fstat(int fd, struct stat *buf) {
   (void)fd; (void)buf;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int lstat(const char *path, struct stat *buf) {
   (void)path; (void)buf;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int mkdir(const char *path, unsigned int mode) {
   (void)path; (void)mode;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 int chmod(const char *path, unsigned int mode) {
   (void)path; (void)mode;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 DIR *opendir(const char *path) {
   (void)path;
-  abort();
+  errno = ENOSYS;
+  return (DIR *)0;
 }
 
 struct dirent *readdir(DIR *dir) {
   (void)dir;
-  abort();
+  errno = ENOSYS;
+  return (struct dirent *)0;
 }
 
 int closedir(DIR *dir) {
   (void)dir;
-  abort();
+  errno = ENOSYS;
+  return -1;
 }
 
 void rewinddir(DIR *dir) {
   (void)dir;
-  abort();
 }
 
 /* termios stubs */
@@ -118,7 +131,7 @@ int pthread_create(pthread_t *t, const pthread_attr_t *a, void *(*fn)(void*), vo
 }
 int pthread_join(pthread_t t, void **r)         { (void)t; (void)r; return 0; }
 int pthread_detach(pthread_t t)                 { (void)t; return 0; }
-void pthread_exit(void *r)                      { (void)r; abort(); }
+void pthread_exit(void *r)                      { (void)r; for(;;) __asm__("cli; hlt"); }
 pthread_t pthread_self(void)                    { return (pthread_t)1; }
 int pthread_equal(pthread_t a, pthread_t b)     { return a == b; }
 
@@ -153,3 +166,21 @@ int pthread_attr_init(pthread_attr_t *a)                    { if(a) *a=0; return
 int pthread_attr_destroy(pthread_attr_t *a)                 { (void)a; return 0; }
 int pthread_attr_setdetachstate(pthread_attr_t *a, int d)   { (void)a; (void)d; return 0; }
 int pthread_attr_getdetachstate(const pthread_attr_t *a, int *d) { (void)a; if(d) *d=0; return 0; }
+
+ssize_t read(int fd, void *buf, size_t count) {
+  (void)fd; (void)buf; (void)count;
+  errno = ENOSYS;
+  return -1;
+}
+
+ssize_t write(int fd, const void *buf, size_t count) {
+  (void)fd; (void)buf; (void)count;
+  errno = ENOSYS;
+  return -1;
+}
+
+off_t lseek(int fd, off_t offset, int whence) {
+  (void)fd; (void)offset; (void)whence;
+  errno = ENOSYS;
+  return (off_t)-1;
+}

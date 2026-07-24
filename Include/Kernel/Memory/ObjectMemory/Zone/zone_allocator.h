@@ -3,7 +3,7 @@
 #include <Kernel/Memory/ObjectMemory/Zone/zone_defs.h>
 #include <Kernel/Memory/ObjectMemory/Zone/zone_types.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Assertions.h>
+#include <LibFK/Core/assertions.h>
 #include <LibFK/Container/bitmap.h>
 #include <LibFK/Types/types.h>
 

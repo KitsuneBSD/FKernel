@@ -3,7 +3,7 @@
 #include <Kernel/Ipc/message_info.h>
 #include <Kernel/Scheduler/Task/task.h>
 #include <LibFK/Container/intrusive_list.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 #include <LibFK/Synchronization/spinlock.h>
 

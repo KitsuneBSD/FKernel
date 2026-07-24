@@ -1,14 +1,13 @@
-#include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibC/string.h>
 
 void *memset(void *s, int c, size_t n) {
-  unsigned char *p = (unsigned char *)s;
-  unsigned char byte = (unsigned char)c;
-
-  for (size_t i = 0; i < n; ++i) {
-    p[i] = byte;
-  }
-
-  return s;
+  void *orig = s;
+  __asm__ volatile(
+    "rep stosb"
+    : "+D"(s), "+c"(n)
+    : "a"((unsigned char)c)
+    : "memory"
+  );
+  return orig;
 }

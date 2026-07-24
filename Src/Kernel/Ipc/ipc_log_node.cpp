@@ -1,5 +1,5 @@
 #include <Kernel/Ipc/ipc_log_node.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/new.h>
 
 namespace fkernel {
@@ -13,10 +13,10 @@ fk::RefPtr<IpcLogNode> IpcLogNode::the() {
 }
 
 void IpcLogNode::append(const char* str, size_t len) {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (size_t i = 0; i < len; ++i) {
-        if (m_buffer.size() >= MAX_LOG_SIZE) {
+        if (m_buffer.size() >= MAX_LOG_SIZE)
             m_buffer.clear();
-        }
         m_buffer.push_back(static_cast<uint8_t>(str[i]));
     }
 }
@@ -62,7 +62,7 @@ void IpcLogNode::log_signal_delivery(uint32_t task_id, int signal, uint64_t tram
 fk::core::Result<size_t, fk::core::Error> IpcLogNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
     if (offset >= m_buffer.size()) return 0;
     size_t to_read = (offset + size > m_buffer.size()) ? (m_buffer.size() - offset) : size;
-    memcpy(buffer, m_buffer.begin() + offset, to_read);
+    fk::memory::copy(buffer, m_buffer.begin() + offset, to_read);
     return to_read;
 }
 

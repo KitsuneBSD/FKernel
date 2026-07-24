@@ -1,6 +1,5 @@
 #pragma once
 
-#include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
 
@@ -12,10 +11,8 @@ extern "C" {
 
 static inline void itoa_unsigned(uint64_t value, char *buf, int base,
                                  int uppercase) {
-  ASSERT(buf != NULL);
-  ASSERT(base >= 2 && base <= 16);
+  if (!buf || base < 2 || base > 16) return;
   char tmp[65];
-  ASSERT(sizeof(tmp) >= 65);
   const char *digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
   int i = 0;
 
@@ -36,8 +33,7 @@ static inline void itoa_unsigned(uint64_t value, char *buf, int base,
 }
 
 static inline void itoa_signed(int64_t value, char *buf, int base) {
-  ASSERT(buf != NULL);
-  ASSERT(base >= 2 && base <= 16);
+  if (!buf || base < 2 || base > 16) return;
   if (value < 0) {
     *buf++ = '-';
     itoa_unsigned((uint64_t)(-value), buf, base, 0);
@@ -47,8 +43,6 @@ static inline void itoa_signed(int64_t value, char *buf, int base) {
 }
 
 static inline void itoa_size(size_t value, char *buf, int base) {
-  ASSERT(buf != NULL);
-  ASSERT(base >= 2 && base <= 16);
   itoa_unsigned((uint64_t)value, buf, base, 0);
 }
 
@@ -130,7 +124,10 @@ int strcmp(const char *s1, const char *s2);
  * @param c Character to search for (interpreted as unsigned char).
  * @return Pointer to the first occurrence of @p c, or NULL if not found.
  */
-char *strchr(const char *s, int c, size_t maxlen);
+#ifdef __fkernel__
+char *strchr(const char *s, int c);
+#endif
+char *strnchr(const char *s, int c, size_t maxlen);
 
 /**
  * @brief Concatenate two null-terminated strings.
@@ -206,7 +203,10 @@ size_t ultoa(unsigned long value, char *buffer, unsigned int base);
  * @param c Character to search for (interpreted as unsigned char).
  * @return Pointer to the last occurrence of @p c, or NULL if not found.
  */
-char *strrchr(const char *s, int c, size_t maxlen);
+#ifdef __fkernel__
+char *strrchr(const char *s, int c);
+#endif
+char *strrnchr(const char *s, int c, size_t maxlen);
 
 /**
  * @brief Tokenize a string using delimiters.
@@ -218,7 +218,6 @@ char *strrchr(const char *s, int c, size_t maxlen);
  */
 char *strtok(char *str, const char *delim);
 char *strtok_r(char *str, const char *delim, char **saveptr);
-char *strnchr(const char *s, int c, size_t n);
 
 /**
  * @brief Compare two strings up to a specified number of characters.
@@ -255,6 +254,13 @@ char *strpbrk(const char *s, const char *accept);
 size_t strspn(const char *s, const char *accept);
 size_t strcspn(const char *s, const char *reject);
 #endif
+
+/* Locale-aware comparison (no-locale stubs — same as strcmp/strncpy) */
+int strcoll(const char *s1, const char *s2);
+size_t strxfrm(char *dest, const char *src, size_t n);
+
+/* Copy until character found or count exhausted */
+void *memccpy(void *dest, const void *src, int c, size_t n);
 
 #ifdef __cplusplus
 }

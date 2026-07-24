@@ -15,7 +15,7 @@ void HPETTimer::write_reg(uint64_t reg, uint64_t value) {
 void HPETTimer::initialize(uint32_t frequency) {
   auto *hpet_table = static_cast<HPETTable *>(ACPIManager::the().find_table("HPET"));
   if (!hpet_table) {
-    fk::algorithms::kerror("HPET", "HPET table not found!");
+    fk::algorithms::kwarn("HPET", "HPET table not found, falling back to PIT");
     return;
   }
 

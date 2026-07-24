@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <LibFK/Memory/new.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 #include <LibFK/Synchronization/spinlock.h>
 
@@ -30,8 +30,8 @@ fk::RefPtr<Node> Dentry::top_node() const {
 }
 
 fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char* name) {
-    if (strcmp(name, ".") == 0) return fk::RefPtr<Dentry>(this);
-    if (strcmp(name, "..") == 0) return m_parent ? m_parent : fk::RefPtr<Dentry>(this);
+    if (fk::memory::compare(name, ".") == 0) return fk::RefPtr<Dentry>(this);
+    if (fk::memory::compare(name, "..") == 0) return m_parent ? m_parent : fk::RefPtr<Dentry>(this);
 
     {
         fk::synchronization::ScopedLock lock(m_lock);

@@ -30,12 +30,21 @@ void libc_register_puts_hook(void (*fn)(const char *));
 extern "C" {
 #endif
 
+#ifndef BUFSIZ
+#define BUFSIZ 1024
+#endif
+
 #ifndef __FILE_defined
 #define __FILE_defined 1
 typedef struct FILE_s {
-    int fd;
-    int error_flag;
-    int eof_flag;
+    int    fd;
+    int    error_flag;
+    int    eof_flag;
+    int    mode;        /* O_RDONLY / O_WRONLY / O_RDWR */
+    int    is_heap;     /* 1 if allocated with malloc, 0 if static */
+    size_t buf_pos;     /* next byte to read from buf */
+    size_t buf_len;     /* valid bytes in buf */
+    char   buf[BUFSIZ];
 } FILE;
 #endif
 
@@ -91,6 +100,7 @@ char *fgets(char *s, int n, FILE *stream);
 int sprintf(char *str, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 int vsprintf(char *str, const char *fmt, va_list args);
 int sscanf(const char *str, const char *fmt, ...);
+int vsscanf(const char *str, const char *fmt, va_list args);
 
 #ifdef __cplusplus
 }

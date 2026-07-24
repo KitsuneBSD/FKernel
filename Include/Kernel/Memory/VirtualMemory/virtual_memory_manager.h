@@ -3,12 +3,13 @@
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_table.h>
 
-#include <LibFK/Core/Error.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 extern "C" void write_on_cr3(void *pml4_virt_addr);
 extern "C" uintptr_t read_on_cr3();
+extern "C" int invalid_tlb(uintptr_t addr);
 
 /**
  * @class VirtualMemoryManager
@@ -19,6 +20,7 @@ private:
   fk::synchronization::Spinlock m_lock;
   PageTable *m_pml4 = nullptr; ///< Pointer to the active PML4 table.
   uintptr_t m_pml4_phys = 0;   ///< Physical address of the PML4.
+  uintptr_t m_kernel_pml4_phys = 0; ///< Physical address of the kernel's PML4 (never freed).
 
 protected:
   /** @brief Allocates and zeroes a new page table. */
@@ -38,13 +40,17 @@ protected:
                                       uint16_t pd_idx = 0,
                                       uint16_t pt_idx = 0) const;
 
-public:
+  bool m_is_initialized{false};
+
   VirtualMemoryManager();
   VirtualMemoryManager(const VirtualMemoryManager &) = delete;
   VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
 
+public:
   /** @return The singleton instance. */
   static VirtualMemoryManager &the();
+
+  bool is_initialized() const { return m_is_initialized; }
 
   /**
    * @brief Initializes the virtual memory manager, sets up PML4 and initial
@@ -81,6 +87,9 @@ public:
 
   /** @brief Switches the current CPU address space by updating CR3. */
   void switch_address_space(uintptr_t cr3);
+
+  /** @brief Frees all user-space physical pages and page tables for a given CR3. */
+  void free_address_space(uintptr_t cr3);
 
   /** @brief Unmaps a region of virtual memory. */
   fk::core::Result<int, fk::core::Error> munmap(uintptr_t addr, size_t length);

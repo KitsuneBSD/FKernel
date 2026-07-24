@@ -1,6 +1,6 @@
 #include <Kernel/Driver/Vga/dirty_tracker.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -12,7 +12,7 @@ void DirtyTracker::initialize(uint32_t width, uint32_t height) {
     m_tiles_y = (height + TILE_SIZE - 1) / TILE_SIZE;
     size_t size = (m_tiles_x * m_tiles_y + 7) / 8;
     m_bitset = static_cast<uint8_t*>(MemoryManager::the().allocate(size));
-    if (m_bitset) memset(m_bitset, 0xFF, size); // Start fully dirty
+    if (m_bitset) fk::memory::set(m_bitset, 0xFF, size); // Start fully dirty
 }
 
 void DirtyTracker::mark_dirty(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
@@ -47,7 +47,7 @@ void DirtyTracker::mark_clean(uint32_t tx, uint32_t ty) {
 
 void DirtyTracker::mark_all_clean() {
     if (!m_bitset) return;
-    memset(m_bitset, 0, (m_tiles_x * m_tiles_y + 7) / 8);
+    fk::memory::set(m_bitset, 0, (m_tiles_x * m_tiles_y + 7) / 8);
 }
 
 void DirtyTracker::reset() {
