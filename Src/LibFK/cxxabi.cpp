@@ -41,14 +41,23 @@ extern "C" void __cxa_pure_virtual() {
 void __cxa_finalize(void *f) { (void)f; }
 
 extern "C" int __cxa_guard_acquire(uint64_t *guard) {
-  return !(*guard & 0xFF);
+  auto* guard_byte = reinterpret_cast<uint8_t*>(guard);
+  // CAS 0→1: wins the init race, returns 1 (caller should initialize)
+  if (__sync_bool_compare_and_swap(guard_byte, (uint8_t)0, (uint8_t)1))
+    return 1;
+  // Lost the race — spin until the winner marks it done (0xFF)
+  while (*guard_byte == 1)
+    asm volatile("pause" ::: "memory");
+  return 0;
 }
 
 extern "C" void __cxa_guard_release(uint64_t *guard) {
-  *guard |= 0xFF;
+  __sync_synchronize();
+  *reinterpret_cast<uint8_t*>(guard) = 0xFF;
 }
 
 extern "C" void __cxa_guard_abort(uint64_t *guard) {
-  (void)guard;
+  *reinterpret_cast<uint8_t*>(guard) = 0;
+  __sync_synchronize();
 }
 }

@@ -2,7 +2,7 @@
 
 #include <Kernel/Net/Ip/ip_address.h>
 #include <Kernel/Net/socket.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel {
 namespace net {

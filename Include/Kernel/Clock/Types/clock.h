@@ -1,10 +1,10 @@
 #pragma once
 
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 
-#include <Kernel/Clock/Types/Datetime.h>
+#include <Kernel/Clock/Types/datetime.h>
 
 class Clock {
 public:

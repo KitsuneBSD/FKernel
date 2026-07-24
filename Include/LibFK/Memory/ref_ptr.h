@@ -2,7 +2,7 @@
 
 #include <LibFK/Types/types.h>
 #include <LibFK/Traits/type_traits.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Memory/heap_malloc.h>
 
 namespace fk {

@@ -118,4 +118,9 @@ public:
    * @brief Frees a previously allocated memory block.
    */
   void free(void *ptr);
+
+  /**
+   * @brief Returns total and free bytes in the kernel heap by walking the block list.
+   */
+  void heap_stats(size_t& total_out, size_t& free_out) const;
 };

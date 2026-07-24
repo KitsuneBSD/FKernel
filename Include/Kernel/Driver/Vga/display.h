@@ -2,8 +2,8 @@
 
 #include <Kernel/Boot/boot_info.h>
 #include <Kernel/Driver/Vga/font.h>
-#include <LibFK/Core/Error.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Synchronization/spinlock.h>
 

@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Clock/ClockController/rtc.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Utilities/converter.h>
@@ -17,14 +18,14 @@ void RTCClock::write_register(uint8_t reg, uint8_t value) {
 fk::core::Result<void> RTCClock::initialize(uint32_t frequency) {
   m_frequency = frequency;
 
-  asm volatile("cli");
+  arch_disable_interrupts();
 
   uint8_t prev_b = read_register(RTC_REG_B);
   write_register(RTC_REG_B, prev_b | 0x40); // Enable periodic IRQ
 
   set_frequency(frequency);
 
-  asm volatile("sti");
+  arch_enable_interrupts();
 
   fk::algorithms::klog("RTC", "RTC timer initialized at ~%u Hz", m_frequency);
   return fk::core::Result<void>();
@@ -62,7 +63,7 @@ void RTCClock::set_frequency(uint32_t frequency) {
 
   m_frequency = 32768 >> (rate - 1);
 
-  asm volatile("cli");
+  arch_disable_interrupts();
 
   uint8_t prev_a = read_register(RTC_REG_A);
   write_register(RTC_REG_A, (prev_a & 0xF0) | rate);

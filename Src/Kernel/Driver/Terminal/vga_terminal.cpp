@@ -1,7 +1,9 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Terminal/vga_terminal.h>
+#include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace terminal {
@@ -29,6 +31,22 @@ VGATerminal& VGATerminal::the() {
 void VGATerminal::on_char(char c) {
   fk::synchronization::ScopedLock lock(m_lock);
   bool is_active = (TerminalManager::the().active_terminal() == this);
+
+  // Control character signal delivery (ISIG)
+  if (!m_state.raw_mode && m_state.foreground_pgid > 0) {
+    if (c == '\x03') { // Ctrl+C → SIGINT
+      SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGINT);
+      return;
+    }
+    if (c == '\x1C') { // Ctrl+\ → SIGQUIT
+      SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGQUIT);
+      return;
+    }
+    if (c == '\x1A') { // Ctrl+Z → SIGTSTP
+      SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGTSTP);
+      return;
+    }
+  }
 
   if (c == '\b' && !m_state.raw_mode) {
     if (m_state.line_chars > 0) {
@@ -233,14 +251,59 @@ void VGATerminal::set_line_drawing_mode(bool e) {
 
 fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint64_t arg) {
   fk::synchronization::ScopedLock lock(m_lock);
+
+  // Linux struct termios (x86_64 ABI: 4x uint32 + cc_t[19])
+  struct linux_termios {
+    unsigned int c_iflag, c_oflag, c_cflag, c_lflag;
+    unsigned char c_line;
+    unsigned char c_cc[19];
+  };
+  static constexpr unsigned int ICANON = 0x2;
+  static constexpr unsigned int ECHO   = 0x8;
+  static constexpr unsigned int ISIG   = 0x1;
+
+  if (request == 0x5401 /* TCGETS */) {
+    auto* t = reinterpret_cast<linux_termios*>(arg);
+    if (!t) return fk::core::Error::InvalidParameter;
+    fk::memory::set(t, 0, sizeof(*t));
+    t->c_cflag = 0xBF;  // B9600 | CS8
+    if (m_state.echo_enabled) t->c_lflag |= ECHO;
+    if (!m_state.raw_mode)    t->c_lflag |= ICANON;
+    t->c_lflag |= ISIG;
+    t->c_cc[4] = 1;  // VMIN
+    t->c_cc[5] = 0;  // VTIME
+    return 0;
+  }
+  if (request == 0x5402 /* TCSETS */ || request == 0x5403 /* TCSETSW */ ||
+      request == 0x5404 /* TCSETSF */) {
+    auto* t = reinterpret_cast<const linux_termios*>(arg);
+    if (!t) return fk::core::Error::InvalidParameter;
+    m_state.echo_enabled = (t->c_lflag & ECHO)   != 0;
+    m_state.raw_mode     = (t->c_lflag & ICANON) == 0;
+    return 0;
+  }
   if (request == 0x5413 /* TIOCGWINSZ */) {
-    struct ws {
-      uint16_t r, c, x, y;
-    }* w = (ws*)arg;
-    if (!w)
-      return fk::core::Error::InvalidParameter;
+    struct ws { uint16_t r, c, x, y; }* w = (ws*)arg;
+    if (!w) return fk::core::Error::InvalidParameter;
     w->r = m_state.rows;
     w->c = m_state.cols;
+    return 0;
+  }
+  if (request == 0x540F /* TIOCGPGRP */) {
+    int* pgid_ptr = reinterpret_cast<int*>(arg);
+    if (!pgid_ptr) return fk::core::Error::InvalidParameter;
+    *pgid_ptr = m_state.foreground_pgid;
+    return 0;
+  }
+  if (request == 0x5410 /* TIOCSPGRP */) {
+    const int* pgid_ptr = reinterpret_cast<const int*>(arg);
+    if (!pgid_ptr) return fk::core::Error::InvalidParameter;
+    m_state.foreground_pgid = *pgid_ptr;
+    return 0;
+  }
+  if (request == 0x540E /* TIOCSCTTY */) {
+    Task* task = SchedulerManager::the().current();
+    if (task) m_state.foreground_pgid = (int)task->control.identity.pgid.value();
     return 0;
   }
   return fk::core::Error::NotImplemented;

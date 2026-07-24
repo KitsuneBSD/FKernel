@@ -1,8 +1,11 @@
 #include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Fadt/fadt.h>
-#include <LibC/string.h>
-#include <LibFK/Core/Assertions.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/byte_checksum.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Core/assertions.h>
+
+extern void initialize_fadt_from_acpi(fkernel::ACPIManager *);
 
 ACPIManager &ACPIManager::the() {
   static ACPIManager instance;
@@ -35,10 +38,10 @@ void ACPIManager::initialize() {
   }
 
   // Initialize FADT support via the FadtManager
-  extern void initialize_fadt_from_acpi(ACPIManager *);
   initialize_fadt_from_acpi(this);
 
   initialize_madt();
+  m_is_initialized = true;
 }
 
 
@@ -47,7 +50,7 @@ void *ACPIManager::find_table(const char *signature) {
     int entries = (m_xsdt->header.length - sizeof(SDTHeader)) / 8;
     for (int i = 0; i < entries; i++) {
       SDTHeader *h = (SDTHeader *)((uintptr_t)m_xsdt->sdt_pointers[i]);
-      if (strncmp(h->signature, signature, 4) == 0) {
+      if (fk::memory::compare_n(h->signature, signature, 4) == 0) {
         if (validate_checksum(h, h->length)) {
           return h;
         }
@@ -57,7 +60,7 @@ void *ACPIManager::find_table(const char *signature) {
     int entries = (m_rsdt->header.length - sizeof(SDTHeader)) / 4;
     for (int i = 0; i < entries; i++) {
       SDTHeader *h = (SDTHeader *)((uintptr_t)m_rsdt->sdt_pointers[i]);
-      if (strncmp(h->signature, signature, 4) == 0) {
+      if (fk::memory::compare_n(h->signature, signature, 4) == 0) {
         if (validate_checksum(h, h->length)) {
           return h;
         }
@@ -68,17 +71,12 @@ void *ACPIManager::find_table(const char *signature) {
 }
 
 bool ACPIManager::validate_checksum(const void *table, size_t length) {
-  uint8_t sum = 0;
-  const uint8_t *data = (const uint8_t *)table;
-  for (size_t i = 0; i < length; i++) {
-    sum += data[i];
-  }
-  return sum == 0;
+  return fk::algorithms::byte_checksum_valid(table, length);
 }
 
 RSDP *ACPIManager::find_rsdp() {
   for (char *p = (char *)0xE0000; p < (char *)0xFFFFF; p += 16) {
-    if (strncmp(p, "RSD PTR ", 8) == 0) {
+    if (fk::memory::compare_n(p, "RSD PTR ", 8) == 0) {
       RSDP *rsdp = (RSDP *)p;
       if (validate_checksum(rsdp, 20)) {
         if (rsdp->revision >= 2) {

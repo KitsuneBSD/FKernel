@@ -1,3 +1,5 @@
+#include <Kernel/Arch/x86_64/arch_defs.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/boot_info.h>
@@ -12,10 +14,10 @@
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Scheduler/task_entries.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Error.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Core/result.h>
 
 extern "C" void enter_user_mode(uintptr_t rip, uintptr_t rsp);
 
@@ -24,7 +26,7 @@ using namespace fkernel;
 static bool setup_initial_filesystem() {
   auto& modules = boot::BootInfo::the().get_modules();
   if (modules.is_empty()) {
-    fk::algorithms::kerror("INIT", "No RamDisk module found!");
+    fk::algorithms::kfatal("INIT", "No RamDisk module found!");
     return false;
   }
 
@@ -32,7 +34,7 @@ static bool setup_initial_filesystem() {
   auto& ramdisk_mod = modules[0];
   auto ramdisk_res = RamDiskNode::create(ramdisk_mod.start, ramdisk_mod.end);
   if (ramdisk_res.is_error()) {
-    fk::algorithms::kerror("INIT", "Failed to create RamDisk");
+    fk::algorithms::kfatal("INIT", "Failed to create RamDisk");
     return false;
   }
 
@@ -84,7 +86,7 @@ static uintptr_t setup_user_stack() {
     VirtualMemoryManager::the().map_page(USER_STACK_TOP - (i + 1) * 0x1000, stack_phys,
                                          PageFlags::Present | PageFlags::Writable |
                                              PageFlags::User);
-    memset(reinterpret_cast<void*>(USER_STACK_TOP - (i + 1) * 0x1000), 0, 0x1000);
+    fk::memory::set(reinterpret_cast<void*>(USER_STACK_TOP - (i + 1) * 0x1000), 0, 0x1000);
   }
   return USER_STACK_TOP;
 }
@@ -93,8 +95,8 @@ static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintp
                                                           const ElfLoadResult& elf_res) {
   // Setup initial stack frame for Musl/BusyBox
   char* string_area = reinterpret_cast<char*>(user_stack_top) - 128;
-  strcpy(string_area, "/sbin/init");
-  strcpy(string_area + 32, "PATH=/bin:/sbin:/usr/bin:/usr/sbin");
+  fk::memory::copy_string(string_area, "/sbin/init");
+  fk::memory::copy_string(string_area + 32, "PATH=/bin:/sbin:/usr/bin:/usr/sbin");
   uintptr_t argv0_addr = user_stack_top - 128;
   uintptr_t envp0_addr = user_stack_top - 96;
 
@@ -118,7 +120,7 @@ static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintp
   pointers[idx++] = 5;
   pointers[idx++] = elf_res.ph_num; // AT_PHNUM
   pointers[idx++] = 6;
-  pointers[idx++] = 4096; // AT_PAGESZ
+  pointers[idx++] = PAGE_SIZE; // AT_PAGESZ
   pointers[idx++] = 0;
   pointers[idx++] = 0; // AT_NULL
 
@@ -126,34 +128,30 @@ static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintp
 
   enter_user_mode(entry, final_rsp);
 
-  while (true)
-    asm volatile("hlt");
+  arch_halt_loop();
 }
 
 extern "C" void init_task_entry() {
   fk::algorithms::klog("INIT", "Init process trampoline started.");
 
   if (!setup_initial_filesystem()) {
-    fk::algorithms::kerror("INIT", "Failed to setup initial filesystem. Halting.");
-    while (true)
-      asm volatile("hlt");
+    fk::algorithms::kfatal("INIT", "Failed to setup initial filesystem.");
   }
 
   auto* current = SchedulerManager::the().current();
   if (!setup_initial_file_descriptors(current)) {
-    fk::algorithms::kerror("INIT", "Failed to setup initial file descriptors. Halting.");
-    while (true)
-      asm volatile("hlt");
+    fk::algorithms::kfatal("INIT", "Failed to setup initial file descriptors.");
   }
 
   auto elf_load_res = load_init_executable_and_setup_address_space();
   if (elf_load_res.is_error()) {
-    fk::algorithms::kerror("INIT", "Failed to load /sbin/init ELF (Error %d)",
+    fk::algorithms::kfatal("INIT", "Failed to load /sbin/init ELF (Error %d)",
                            (int)elf_load_res.error());
-    while (true)
-      asm volatile("hlt");
   }
   ElfLoadResult elf_res = elf_load_res.value();
+
+  current->set_heap_regions(elf_res.highest_load_end, elf_res.highest_load_end);
+  current->set_mmap_regions(0x40000000, 0x40000000);
 
   uintptr_t entry = elf_res.entry;
   fk::algorithms::klog("INIT", "Jumping to user-mode init at %p", (void*)entry);

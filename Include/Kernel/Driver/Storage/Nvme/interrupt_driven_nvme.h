@@ -5,7 +5,7 @@
 #include <Kernel/Driver/Storage/Nvme/nvme_controller_state.h>
 #include <Kernel/Driver/Storage/Nvme/nvme_interrupt_line.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
 

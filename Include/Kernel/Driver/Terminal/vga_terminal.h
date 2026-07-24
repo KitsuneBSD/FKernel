@@ -2,7 +2,7 @@
 
 #include <Kernel/Driver/Terminal/terminal.h>
 #include <Kernel/Driver/Terminal/terminal_renderer.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Container/circular_buffer.h>
 #include <LibFK/Terminal/ansi_parser.h>
 #include <LibFK/Synchronization/spinlock.h>
@@ -17,6 +17,7 @@ struct TerminalState {
     size_t line_chars{0};
     uint16_t rows{25};
     uint16_t cols{80};
+    int foreground_pgid{0};
 };
 
 /// @brief VGA Terminal implementation using VGA adapter and PS/2 keyboard

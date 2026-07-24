@@ -35,7 +35,7 @@ local CC = Toolchain.get_clang()
 
 print("Configuring LibMD...")
 local cmd_configure = string.format(
-    "cd %s && CC='%s --target=%s --sysroot=%s' ./configure --host=x86_64-fkernel --prefix= --disable-shared",
+    "cd %s && CC='%s --target=%s --sysroot=%s' ./configure --host=x86_64-linux-musl --prefix= --disable-shared",
     src_dir, CC, Toolchain.TRIPLE, SYSROOT
 )
 

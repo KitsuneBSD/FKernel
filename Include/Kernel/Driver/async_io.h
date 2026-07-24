@@ -1,9 +1,9 @@
 #pragma once
 
-#include <LibC/stdint.h>
-#include <LibC/string.h>
-#include <LibFK/Core/Result.h>
-#include <LibFK/Core/Error.h>
+#include <LibFK/Types/types.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Core/result.h>
+#include <LibFK/Core/error.h>
 #include <LibFK/Memory/ref_ptr.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>

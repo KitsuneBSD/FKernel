@@ -28,6 +28,8 @@ private:
   /// Private constructor for singleton; clears all entries
   InterruptController() { clear(); }
 
+  bool m_initialized = false;
+
   /// Tracks whether interrupts are enabled
   bool is_interrupt_enable = true;
 

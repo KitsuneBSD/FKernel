@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibFK/Core/Assertions.h>
 
 namespace fk {
 namespace containers {
@@ -28,7 +27,6 @@ public:
     }
 
     T dequeue() {
-        assert(!is_empty());
         T value = m_data[m_tail];
         m_tail = (m_tail + 1) % N;
         m_size--;
@@ -41,13 +39,9 @@ public:
         m_size--;
     }
 
-    T& operator[](size_t index) {
-        assert(index < m_size);
-        return m_data[(m_tail + index) % N];
-    }
+    T& operator[](size_t index) { return m_data[(m_tail + index) % N]; }
 
     const T& operator[](size_t index) const {
-        assert(index < m_size);
         return m_data[(m_tail + index) % N];
     }
 

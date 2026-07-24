@@ -39,7 +39,7 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info) {
 
       IpcLogNode::the()->log_endpoint_operation("send_blocked", sender_id, 0, info.raw());
       m_senders.push_back(current);
-      scheduler.block_current();
+      scheduler.block_current_noqueue();
       return MessageInfo(current->registers().rax); // Result set by deliver_message
     }
 

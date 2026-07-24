@@ -11,7 +11,7 @@ fk::core::Result<fk::RefPtr<KQueueNode>, fk::core::Error> KQueueNode::create() {
 
 fk::core::Result<int, fk::core::Error> KQueueNode::kevent(const struct kevent* changelist, int nchanges,
                                                         [[maybe_unused]] struct kevent* eventlist, int nevents) {
-    // Process changes
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (int i = 0; i < nchanges; ++i) {
         const auto& change = changelist[i];
         if (change.flags & EV_ADD) {

@@ -1,7 +1,7 @@
 #include <Kernel/Net/InetSocket/inet_socket.h>
 #include <Kernel/Net/Udp/udp_socket.h>
 #include <Kernel/Net/Tcp/tcp_socket.h>
-#include <LibFK/Utilities/Memory.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace net {

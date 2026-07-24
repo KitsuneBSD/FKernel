@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibC/stddef.h>
-#include <LibC/string.h> // For strlen, memcmp
 
 namespace fk {
 namespace text { // As per GEMINI.md
@@ -32,7 +31,7 @@ public:
      * @param s Null-terminated C-style string.
      */
     constexpr StringView(const char* s) noexcept
-        : m_data(s), m_size(s ? strlen(s) : 0) {}
+        : m_data(s), m_size(s ? __builtin_strlen(s) : 0) {}
 
     /**
      * @brief Construct a StringView from a pointer and a length.
@@ -106,7 +105,7 @@ public:
      */
     constexpr int compare(StringView other) const noexcept {
         size_type len = m_size < other.m_size ? m_size : other.m_size;
-        int result = memcmp(m_data, other.m_data, len);
+        int result = __builtin_memcmp(m_data, other.m_data, len);
         if (result == 0) {
             if (m_size < other.m_size) return -1;
             if (m_size > other.m_size) return 1;
@@ -172,8 +171,12 @@ public:
 
     constexpr bool is_empty() const noexcept { return m_size == 0; }
 
-    constexpr const_reference front() const noexcept { return m_data[0]; }
-    constexpr const_reference back() const noexcept { return m_data[m_size - 1]; }
+    constexpr const_reference front() const noexcept {
+        return m_data[0];
+    }
+    constexpr const_reference back() const noexcept {
+        return m_data[m_size - 1];
+    }
 
     constexpr void remove_prefix(size_type n) noexcept {
         m_data += n;
@@ -211,7 +214,7 @@ public:
 
     constexpr bool starts_with(StringView sv) const noexcept {
         if (sv.m_size > m_size) return false;
-        return memcmp(m_data, sv.m_data, sv.m_size) == 0;
+        return __builtin_memcmp(m_data, sv.m_data, sv.m_size) == 0;
     }
 
     constexpr bool starts_with(char c) const noexcept {

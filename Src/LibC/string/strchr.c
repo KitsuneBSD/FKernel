@@ -1,18 +1,13 @@
-#include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibC/string.h>
 
-char *strchr(const char *s, int c, size_t maxlen) {
-  ASSERT(s != NULL);
-  ASSERT(maxlen > 0);
+char *strchr(const char *s, int c) {
   unsigned char target = (unsigned char)c;
-  for (size_t i = 0; i < maxlen; i++) {
-    if (s[i] == target) {
-      return (char *)&s[i];
-    }
-    if (s[i] == '\0') {
+  while (1) {
+    if ((unsigned char)*s == target)
+      return (char *)s;
+    if (*s == '\0')
       return NULL;
-    }
+    s++;
   }
-  return NULL; // Not found within maxlen
 }

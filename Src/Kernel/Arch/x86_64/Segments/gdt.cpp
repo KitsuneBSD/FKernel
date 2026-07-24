@@ -82,7 +82,7 @@ void GDTController::setupTSS() {
   uint64_t high = base3;
 
   if (TSS_INDEX + 1 >= (sizeof(gdt) / sizeof(gdt[0]))) {
-    fk::algorithms::kerror("TSS", "TSS_INDEX out of range");
+    fk::algorithms::kfatal("TSS", "TSS_INDEX out of range");
   }
 
   gdt[TSS_INDEX] = low;
@@ -143,7 +143,7 @@ void GDTController::initialize() {
   asm volatile("sgdt %0" : "=m"(loaded_gdtr));
 
   if (loaded_gdtr.base != gdtr.base || loaded_gdtr.limit != gdtr.limit) {
-    fk::algorithms::kerror("GDT", "GDTR mismatch after lgdt");
+    fk::algorithms::kfatal("GDT", "GDTR mismatch after lgdt");
   }
 
   loadSegments();
@@ -157,7 +157,7 @@ void GDTController::initialize() {
     fk::algorithms::kwarn(
         "TSS", "Loaded TR (0x%04x) does not match expected selector (0x%04x)",
         tr_val, TSS_SELECTOR);
-    fk::algorithms::kerror("TSS", "Load verification failed (STR mismatch)");
+    fk::algorithms::kfatal("TSS", "Load verification failed (STR mismatch)");
   }
 
   m_initialized = true;

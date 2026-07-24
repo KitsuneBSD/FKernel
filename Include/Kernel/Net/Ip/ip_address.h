@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibC/stdint.h>
+#include <LibFK/Types/types.h>
 #include <LibFK/Text/string_builder.h>
 #include <Kernel/Net/byte_order.h>
 

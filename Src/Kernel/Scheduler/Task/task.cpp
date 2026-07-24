@@ -16,6 +16,10 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
   const size_t STACK_SIZE = 16 * fk::types::KiB;
 
   void* stack_mem = kmalloc(STACK_SIZE);
+  if (!stack_mem) {
+    fk::algorithms::kwarn("TASK", "create_a_new_task: stack allocation failed for task %lu", id.value());
+    return Task{};
+  }
   uint64_t stack_top = reinterpret_cast<uint64_t>(stack_mem) + STACK_SIZE;
 
   // Setup initial stack for switch_context
@@ -39,9 +43,10 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
 
   Task task;
   task.magic = Task::MAGIC;
-  task.control.identity = {.id = id, .ppid = fk::ProcessId(), .name = name};
+  task.control.identity = {.id = id, .ppid = fk::ProcessId(), .pgid = id, .sid = id, .name = name};
   task.control.lifecycle = {.state = TaskState::Ready,
                             .priority = priority,
+                            .nice = 0,
                             .cpu_affinity = cpu_affinity,
                             .time_slice_ticks = 0,
                             .wake_up_time_ticks = 0,
@@ -67,7 +72,40 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
       .fs_base = 0,
       .gs_base = 0};
 
+  fk::algorithms::kdebug("TASK", "Task %lu created (%s)", id.value(), name.c_str());
   return task;
+}
+
+void Task::destroy() {
+  fk::algorithms::kdebug("TASK", "Destroying task %lu", control.identity.id.value());
+  // Unregister signal notification from the global IPC table
+  fkernel::ipc::GlobalEndpointManager::the().remove_notification(
+      control.identity.id.value());
+
+  // Delete the signal notification and capability space
+  delete resources.ipc.signal_notification;
+  resources.ipc.signal_notification = nullptr;
+  delete resources.ipc.cspace;
+  resources.ipc.cspace = nullptr;
+
+  // Free the kernel stack (allocated with kmalloc in fork/create_a_new_task)
+  static constexpr size_t KERNEL_STACK_SIZE = 16 * 1024;
+  if (resources.context.kernel_stack_top) {
+    kfree(reinterpret_cast<void*>(resources.context.kernel_stack_top - KERNEL_STACK_SIZE));
+    resources.context.kernel_stack_top = 0;
+  }
+
+  // Free the pre-execve address space (fork clone deferred from execve)
+  if (resources.memory.prev_cr3) {
+    VirtualMemoryManager::the().free_address_space(resources.memory.prev_cr3);
+    resources.memory.prev_cr3 = 0;
+  }
+
+  // Free the current user address space
+  if (resources.memory.cr3) {
+    VirtualMemoryManager::the().free_address_space(resources.memory.cr3);
+    resources.memory.cr3 = 0;
+  }
 }
 
 void Task::set_heap_regions(uintptr_t start, uintptr_t break_addr) {

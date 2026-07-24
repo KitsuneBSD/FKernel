@@ -1,23 +1,26 @@
 #pragma once
 
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 
-#include <Kernel/Clock/Types/Datetime.h>
+#include <Kernel/Clock/Types/datetime.h>
 #include <Kernel/Clock/Types/clock.h>
 
 class ClockManager {
 private:
   Clock *m_clock = nullptr;
+  bool m_initialized = false;
 
-public:
   ClockManager() = default;
 
+public:
   static ClockManager &the() {
     static ClockManager inst;
     return inst;
   }
+
+  bool is_initialized() const { return m_initialized; }
 
   void initialize();
 

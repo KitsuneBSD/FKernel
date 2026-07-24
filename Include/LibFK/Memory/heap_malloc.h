@@ -2,8 +2,8 @@
 
 #include <LibC/stddef.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Error.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 
 extern "C" {

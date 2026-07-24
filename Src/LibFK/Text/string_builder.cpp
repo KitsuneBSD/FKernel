@@ -10,90 +10,53 @@ void StringBuilder::append(char c) {
 
 void StringBuilder::append(const char* s) {
     if (!s) return;
-    while (*s) {
-        m_buffer.push_back(*s++);
-    }
+    while (*s) m_buffer.push_back(*s++);
 }
 
 void StringBuilder::append(const String& s) {
     append(s.c_str());
 }
 
-void StringBuilder::append_decimal(int n) {
-    if (n < 0) {
-        append('-');
-        append_decimal(static_cast<uint64_t>(-n));
-        return;
+// Shared helper: write `n` in the given base (2/8/10/16) to a stack buffer and
+// append it. `hex_digits` selects lowercase hex for base 16.
+static void append_unsigned_impl(uint64_t n, int base, bool hex_upper,
+                                  fk::containers::Vector<char>& out) {
+    if (n == 0) { out.push_back('0'); return; }
+    char buf[66]; // enough for base-2 64-bit + null
+    int i = 65;
+    buf[i] = '\0';
+    while (n > 0) {
+        unsigned digit = (unsigned)(n % (unsigned)base);
+        if (digit < 10)
+            buf[--i] = (char)('0' + digit);
+        else
+            buf[--i] = (char)((hex_upper ? 'A' : 'a') + digit - 10);
+        n /= (uint64_t)base;
     }
+    const char* p = &buf[i];
+    while (*p) out.push_back(*p++);
+}
+
+void StringBuilder::append_decimal(int n) {
+    if (n < 0) { append('-'); append_decimal(static_cast<uint64_t>(-n)); return; }
     append_decimal(static_cast<uint64_t>(n));
 }
 
 void StringBuilder::append_decimal(uint64_t n) {
-    if (n == 0) {
-        append('0');
-        return;
-    }
-
-    char buf[21];
-    int i = 20;
-    buf[i] = '\0';
-
-    while (n > 0) {
-        buf[--i] = (n % 10) + '0';
-        n /= 10;
-    }
-
-    append(&buf[i]);
+    append_unsigned_impl(n, 10, false, m_buffer);
 }
 
 void StringBuilder::append_hex(uint64_t n, bool prefix) {
-    if (prefix) {
-        append('0');
-        append('x');
-    }
-    if (n == 0) {
-        append('0');
-        return;
-    }
-    char buf[17];
-    int i = 16;
-    buf[i] = '\0';
-    while (n > 0) {
-        uint64_t digit = n & 0xF;
-        buf[--i] = (digit < 10) ? ('0' + digit) : ('a' + digit - 10);
-        n >>= 4;
-    }
-    append(&buf[i]);
+    if (prefix) { append('0'); append('x'); }
+    append_unsigned_impl(n, 16, false, m_buffer);
 }
 
 void StringBuilder::append_octal(uint64_t n) {
-    if (n == 0) {
-        append('0');
-        return;
-    }
-    char buf[23];
-    int i = 22;
-    buf[i] = '\0';
-    while (n > 0) {
-        buf[--i] = '0' + (n & 7);
-        n >>= 3;
-    }
-    append(&buf[i]);
+    append_unsigned_impl(n, 8, false, m_buffer);
 }
 
 void StringBuilder::append_binary(uint64_t n) {
-    if (n == 0) {
-        append('0');
-        return;
-    }
-    char buf[65];
-    int i = 64;
-    buf[i] = '\0';
-    while (n > 0) {
-        buf[--i] = '0' + (n & 1);
-        n >>= 1;
-    }
-    append(&buf[i]);
+    append_unsigned_impl(n, 2, false, m_buffer);
 }
 
 void StringBuilder::append_float(double f, int precision) {
@@ -114,18 +77,10 @@ void StringBuilder::append_float(double f, int precision) {
 }
 
 String StringBuilder::to_string() const {
-    if (m_buffer.is_empty())
-        return String("");
-
-    // Create string directly from buffer data without intermediate buffer
-    // This prevents use-after-free when temp_buffer goes out of scope
+    if (m_buffer.is_empty()) return String("");
     String result;
     result.reserve(m_buffer.size() + 1);
-    
-    for (char c : m_buffer) {
-        result.push_back(c);
-    }
-    
+    for (char c : m_buffer) result.push_back(c);
     return result;
 }
 

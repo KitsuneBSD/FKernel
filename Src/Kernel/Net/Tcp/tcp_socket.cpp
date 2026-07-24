@@ -1,12 +1,36 @@
 #include <Kernel/Net/Tcp/tcp_socket.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Net/Ip/ipv4_header.h>
 #include <Kernel/Net/NetworkStack/network_stack.h>
 #include <Kernel/Net/byte_order.h>
+#include <LibFK/Algorithms/container_algorithms.h>
+#include <LibFK/Algorithms/internet_checksum.h>
 #include <LibFK/Synchronization/spinlock.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/log.h>
 
 namespace fkernel {
 namespace net {
+
+// RFC 793 pseudo-header checksum over TCP segment (header + payload)
+static uint16_t tcp_checksum(IPv4Address dst, const uint8_t* seg, size_t seg_len) {
+    struct __attribute__((packed)) {
+        uint32_t src_ip;
+        uint32_t dst_ip;
+        uint8_t  zero;
+        uint8_t  proto;
+        uint16_t len;
+    } ph;
+    ph.src_ip = NetworkStack::the().ip().to_network();
+    ph.dst_ip = dst.to_network();
+    ph.zero   = 0;
+    ph.proto  = IP_PROTO_TCP;
+    ph.len    = htons((uint16_t)seg_len);
+    fk::algorithms::InternetChecksum cs;
+    cs.accumulate(&ph, sizeof(ph));
+    cs.accumulate(seg, seg_len);
+    return cs.finalize();
+}
 
 TcpSocket::TcpSocket(TcpEndpoint local, TcpEndpoint remote)
     : m_connection(local, remote) {}
@@ -21,20 +45,67 @@ fk::core::Result<void, fk::core::Error> TcpSocket::bind(const char* path) {
     if (!NetworkStack::the().register_tcp_socket(port, this))
         return fk::core::Error::AlreadyExists;
     m_connection.set_local_port(port);
+    fk::algorithms::kdebug("TCP", "bind(%u)", port);
     return {};
 }
 
 fk::core::Result<void, fk::core::Error> TcpSocket::connect(const char* path) {
-    (void)path; return fk::core::Error::NotImplemented;
+    if (!path) return fk::core::Error::InvalidParameter;
+    // path is sockaddr_in*: sin_family(2) + sin_port(2, BE) + sin_addr(4)
+    uint16_t remote_port = ntohs(*reinterpret_cast<const uint16_t*>(path + 2));
+    uint32_t remote_ip_be = *reinterpret_cast<const uint32_t*>(path + 4);
+    fk::algorithms::kdebug("TCP", "connect(%s:%u)",
+        IPv4Address(ntohl(remote_ip_be)).to_string().c_str(), remote_port);
+
+    {
+        fk::synchronization::ScopedLock lock(m_lock);
+        static uint16_t s_ephemeral{49152};
+        uint16_t local_port = __sync_fetch_and_add(&s_ephemeral, 1);
+        m_connection.set_local_port(local_port);
+        m_connection.set_remote({IPv4Address(ntohl(remote_ip_be)), remote_port});
+        NetworkStack::the().register_tcp_socket(local_port, this);
+
+        m_connection.send_next = (uint32_t)TickManager::the().get_ticks();
+        m_connection.send_unacked = m_connection.send_next;
+        m_connection.state = TcpState::SynSent;
+
+        uint8_t syn[TCP_HEADER_SIZE];
+        auto* syn_hdr = reinterpret_cast<TcpHeader*>(syn);
+        syn_hdr->fill(local_port, remote_port, m_connection.send_next, 0,
+                      TCP_FLAG_SYN, 65535);
+        syn_hdr->checksum = tcp_checksum(IPv4Address(ntohl(remote_ip_be)), syn, TCP_HEADER_SIZE);
+        ++m_connection.send_next;
+        NetworkStack::the().send_ipv4(IPv4Address(ntohl(remote_ip_be)),
+                                      IP_PROTO_TCP, syn, TCP_HEADER_SIZE);
+    }
+
+    while (m_connection.state == TcpState::SynSent)
+        m_connection.state_changed.wait();
+
+    if (m_connection.state != TcpState::Established)
+        return fk::core::Error::IOError;
+    return {};
 }
 
 fk::core::Result<void, fk::core::Error> TcpSocket::listen() {
     m_connection.state = TcpState::Listen;
+    fk::algorithms::kdebug("TCP", "listen()");
     return {};
 }
 
 fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> TcpSocket::accept() {
-    return fk::core::Error::NotImplemented;
+    while (true) {
+        {
+            fk::synchronization::ScopedLock lock(m_lock);
+            for (size_t i = 0; i < m_accept_queue.size(); ++i) {
+                if (m_accept_queue[i]->m_connection.state != TcpState::Established) continue;
+                auto child = m_accept_queue[i];
+                m_accept_queue.remove_at(i);
+                return fk::RefPtr<Socket>(child);
+            }
+        }
+        m_connection.state_changed.wait();
+    }
 }
 
 fk::core::Result<size_t, fk::core::Error> TcpSocket::read(
@@ -43,10 +114,8 @@ fk::core::Result<size_t, fk::core::Error> TcpSocket::read(
     auto& rb = m_connection.recv_buf;
     if (rb.is_empty()) return (size_t)0;
     size_t to_copy = size < rb.size() ? size : rb.size();
-    memcpy(buf, rb.begin(), to_copy);
-    for (size_t i = to_copy; i < rb.size(); ++i)
-        rb[i - to_copy] = rb[i];
-    for (size_t i = 0; i < to_copy; ++i) rb.pop_back();
+    fk::memory::copy(buf, rb.begin(), to_copy);
+    fk::algorithms::dequeue_front(rb, to_copy);
     return to_copy;
 }
 
@@ -68,7 +137,8 @@ fk::core::Result<size_t, fk::core::Error> TcpSocket::write(
         hdr->fill(m_connection.local().port, m_connection.remote().port,
                   m_connection.send_next, m_connection.recv_next,
                   TCP_FLAG_ACK | TCP_FLAG_PSH, m_connection.recv_window());
-        memcpy(packet + TCP_HEADER_SIZE, buf + sent, chunk);
+        fk::memory::copy(packet + TCP_HEADER_SIZE, buf + sent, chunk);
+        hdr->checksum = tcp_checksum(m_connection.remote().ip, packet, TCP_HEADER_SIZE + chunk);
         auto res = NetworkStack::the().send_ipv4(
             m_connection.remote().ip, IP_PROTO_TCP, packet, TCP_HEADER_SIZE + chunk);
         if (res.is_error()) return res.error();
@@ -94,27 +164,79 @@ void TcpSocket::on_segment(const TcpHeader* hdr, const uint8_t* data, size_t dat
 }
 
 void TcpSocket::process_handshake(const TcpHeader* hdr, uint8_t flags, uint32_t seq) {
+    if (m_connection.state == TcpState::SynSent) {
+        if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) != (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
+            fk::algorithms::kwarn("TCP", "handshake failed: state=%d", (int)m_connection.state);
+            return;
+        }
+        m_connection.recv_next = seq + 1;
+        m_connection.peer_window = ntohs(hdr->window);
+        m_connection.send_unacked = ntohl(hdr->ack_num);
+        m_connection.state = TcpState::Established;
+        uint8_t ack[TCP_HEADER_SIZE];
+        auto* reply = reinterpret_cast<TcpHeader*>(ack);
+        reply->fill(m_connection.local().port, m_connection.remote().port,
+                    m_connection.send_next, m_connection.recv_next,
+                    TCP_FLAG_ACK, m_connection.recv_window());
+        reply->checksum = tcp_checksum(m_connection.remote().ip, ack, TCP_HEADER_SIZE);
+        NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
+                                      ack, TCP_HEADER_SIZE);
+        m_connection.state_changed.signal(1);
+        return;
+    }
     if (m_connection.state != TcpState::Listen) return;
-    if (!(flags & TCP_FLAG_SYN)) return;
-    m_connection.recv_next = seq + 1;
-    m_connection.peer_window = ntohs(hdr->window);
-    m_connection.state = TcpState::SynReceived;
+    if (!(flags & TCP_FLAG_SYN)) {
+        fk::algorithms::kwarn("TCP", "handshake failed: state=%d", (int)m_connection.state);
+        return;
+    }
+    // Create child socket for this connection
+    TcpEndpoint any_ep{IPv4Address(0u), 0};
+    auto child_res = fk::make_ref<TcpSocket>(m_connection.local(), any_ep);
+    if (child_res.is_error()) return;
+    auto child = child_res.value();
+    child->m_connection.recv_next = seq + 1;
+    child->m_connection.peer_window = ntohs(hdr->window);
+    child->m_connection.send_next = (uint32_t)TickManager::the().get_ticks();
+    child->m_connection.set_remote(m_connection.remote());
+    child->m_connection.state = TcpState::SynReceived;
+
     uint8_t synack[TCP_HEADER_SIZE];
     auto* reply = reinterpret_cast<TcpHeader*>(synack);
     reply->fill(m_connection.local().port, m_connection.remote().port,
-                m_connection.send_next, m_connection.recv_next,
-                TCP_FLAG_SYN | TCP_FLAG_ACK, m_connection.recv_window());
+                child->m_connection.send_next, child->m_connection.recv_next,
+                TCP_FLAG_SYN | TCP_FLAG_ACK, child->m_connection.recv_window());
+    reply->checksum = tcp_checksum(m_connection.remote().ip, synack, TCP_HEADER_SIZE);
+    child->m_connection.send_unacked = child->m_connection.send_next;
+    ++child->m_connection.send_next;
     NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
                                   synack, TCP_HEADER_SIZE);
-    m_connection.send_unacked = m_connection.send_next;
-    ++m_connection.send_next;
+
+    // Parent stays registered; process_ack will complete the handshake via m_accept_queue
+    m_accept_queue.push_back(child);
 }
 
 void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
     if (!(flags & TCP_FLAG_ACK)) return;
-    if (m_connection.state == TcpState::SynReceived)
-        m_connection.state = TcpState::Established;
     uint32_t ack = ntohl(hdr->ack_num);
+
+    if (m_connection.state == TcpState::Listen) {
+        // Complete the 3-way handshake for the matching SynReceived child
+        for (auto& child : m_accept_queue) {
+            if (child->m_connection.state != TcpState::SynReceived) continue;
+            if (ack != child->m_connection.send_next) continue;
+            child->m_connection.state = TcpState::Established;
+            child->m_connection.send_unacked = ack;
+            child->m_connection.peer_window = ntohs(hdr->window);
+            m_connection.state_changed.signal(1);
+            return;
+        }
+        return;
+    }
+
+    if (m_connection.state == TcpState::SynReceived) {
+        m_connection.state = TcpState::Established;
+        m_connection.state_changed.signal(1);
+    }
     if (ack > m_connection.send_unacked && ack <= m_connection.send_next)
         m_connection.send_unacked = ack;
     m_connection.peer_window = ntohs(hdr->window);
@@ -126,14 +248,14 @@ void TcpSocket::process_data(const TcpHeader*, uint8_t, const uint8_t* data, siz
     if (seq != m_connection.recv_next) return;
     uint16_t avail = m_connection.recv_window();
     size_t to_store = data_len < avail ? data_len : avail;
-    for (size_t i = 0; i < to_store; ++i)
-        m_connection.recv_buf.push_back(data[i]);
+    m_connection.recv_buf.push_range(data, to_store);
     m_connection.recv_next += (uint32_t)to_store;
     uint8_t ack_pkt[TCP_HEADER_SIZE];
     auto* ack = reinterpret_cast<TcpHeader*>(ack_pkt);
     ack->fill(m_connection.local().port, m_connection.remote().port,
               m_connection.send_next, m_connection.recv_next,
               TCP_FLAG_ACK, m_connection.recv_window());
+    ack->checksum = tcp_checksum(m_connection.remote().ip, ack_pkt, TCP_HEADER_SIZE);
     NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
                                   ack_pkt, TCP_HEADER_SIZE);
 }
@@ -147,10 +269,85 @@ void TcpSocket::process_fin(const TcpHeader*, uint8_t flags) {
     fa->fill(m_connection.local().port, m_connection.remote().port,
              m_connection.send_next, m_connection.recv_next,
              TCP_FLAG_ACK | TCP_FLAG_FIN, m_connection.recv_window());
+    fa->checksum = tcp_checksum(m_connection.remote().ip, fin_ack, TCP_HEADER_SIZE);
     NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
                                   fin_ack, TCP_HEADER_SIZE);
     ++m_connection.send_next;
     m_connection.state = TcpState::LastAck;
+}
+
+fk::core::Result<void, fk::core::Error> TcpSocket::shutdown(int how) {
+    fk::synchronization::ScopedLock lock(m_lock);
+    if (m_connection.state != TcpState::Established &&
+        m_connection.state != TcpState::CloseWait)
+        return fk::core::Error::InvalidParameter;
+    if (how == 0 || how == 2) // SHUT_RD or SHUT_RDWR
+        m_connection.recv_buf.clear();
+    if (how == 1 || how == 2) { // SHUT_WR or SHUT_RDWR
+        uint8_t fin[TCP_HEADER_SIZE];
+        auto* hdr = reinterpret_cast<TcpHeader*>(fin);
+        hdr->fill(m_connection.local().port, m_connection.remote().port,
+                  m_connection.send_next, m_connection.recv_next,
+                  TCP_FLAG_FIN | TCP_FLAG_ACK, m_connection.recv_window());
+        hdr->checksum = tcp_checksum(m_connection.remote().ip, fin, TCP_HEADER_SIZE);
+        NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
+                                      fin, TCP_HEADER_SIZE);
+        ++m_connection.send_next;
+        m_connection.state = TcpState::FinWait1;
+    }
+    return {};
+}
+
+fk::core::Result<void, fk::core::Error> TcpSocket::getsockname(char* addr, uint32_t* addrlen) {
+    if (!addr || !addrlen || *addrlen < 16) return fk::core::Error::InvalidParameter;
+    *reinterpret_cast<uint16_t*>(addr)     = 2; // AF_INET
+    *reinterpret_cast<uint16_t*>(addr + 2) = htons(m_connection.local().port);
+    *reinterpret_cast<uint32_t*>(addr + 4) = htonl(m_connection.local().ip.value);
+    *addrlen = 16;
+    return {};
+}
+
+fk::core::Result<void, fk::core::Error> TcpSocket::getpeername(char* addr, uint32_t* addrlen) {
+    if (!addr || !addrlen || *addrlen < 16) return fk::core::Error::InvalidParameter;
+    if (m_connection.state != TcpState::Established)
+        return fk::core::Error::InvalidParameter;
+    *reinterpret_cast<uint16_t*>(addr)     = 2; // AF_INET
+    *reinterpret_cast<uint16_t*>(addr + 2) = htons(m_connection.remote().port);
+    *reinterpret_cast<uint32_t*>(addr + 4) = htonl(m_connection.remote().ip.value);
+    *addrlen = 16;
+    return {};
+}
+
+fk::core::Result<void, fk::core::Error> TcpSocket::setsockopt(
+    int level, int optname, const void* optval, uint32_t optlen) {
+    if (!optval || optlen < 4) return fk::core::Error::InvalidParameter;
+    int val = *reinterpret_cast<const int*>(optval);
+    if (level == 1) { // SOL_SOCKET
+        if (optname == 2) { m_so_reuseaddr = (val != 0); return {}; } // SO_REUSEADDR
+        if (optname == 9) { m_so_keepalive = (val != 0); return {}; }  // SO_KEEPALIVE
+        return fk::core::Error::NotImplemented;
+    }
+    if (level == 6) { // IPPROTO_TCP
+        if (optname == 1) { m_tcp_nodelay = (val != 0); return {}; } // TCP_NODELAY
+        return {};
+    }
+    return fk::core::Error::NotImplemented;
+}
+
+fk::core::Result<void, fk::core::Error> TcpSocket::getsockopt(
+    int level, int optname, void* optval, uint32_t* optlen) {
+    if (!optval || !optlen || *optlen < 4) return fk::core::Error::InvalidParameter;
+    if (level == 1) { // SOL_SOCKET
+        if (optname == 4) { *reinterpret_cast<int*>(optval) = m_so_error; *optlen = 4; return {}; } // SO_ERROR
+        if (optname == 2) { *reinterpret_cast<int*>(optval) = m_so_reuseaddr ? 1 : 0; *optlen = 4; return {}; } // SO_REUSEADDR
+        if (optname == 9) { *reinterpret_cast<int*>(optval) = m_so_keepalive ? 1 : 0; *optlen = 4; return {}; } // SO_KEEPALIVE
+        return fk::core::Error::NotImplemented;
+    }
+    if (level == 6) { // IPPROTO_TCP
+        if (optname == 1) { *reinterpret_cast<int*>(optval) = m_tcp_nodelay ? 1 : 0; *optlen = 4; return {}; } // TCP_NODELAY
+        return fk::core::Error::NotImplemented;
+    }
+    return fk::core::Error::NotImplemented;
 }
 
 } // namespace net

@@ -11,7 +11,8 @@ namespace fkernel {
 // returns data written by the slave.
 class PtyMaster final : public CharacterDevice {
 public:
-  PtyMaster(fk::RefPtr<PtyBuffer> to_slave, fk::RefPtr<PtyBuffer> from_slave);
+  PtyMaster(fk::RefPtr<PtyBuffer> to_slave, fk::RefPtr<PtyBuffer> from_slave,
+            uint32_t index = 0);
   virtual ~PtyMaster() override = default;
 
   fk::core::Result<size_t, fk::core::Error>
@@ -20,9 +21,16 @@ public:
   fk::core::Result<size_t, fk::core::Error>
   write(uint64_t offset, size_t size, const uint8_t* buf) override;
 
+  fk::core::Result<int, fk::core::Error> ioctl(uint64_t request, uint64_t arg) override;
+
   size_t size() const override { return 0; }
   bool is_directory() const override { return false; }
   bool is_character_device() const override { return true; }
+  short poll() const override {
+    short r = POLLOUT;
+    if (m_from_slave && !m_from_slave->is_empty()) r |= POLLIN;
+    return r;
+  }
 
 private:
   fk::RefPtr<PtyBuffer> m_to_slave;

@@ -8,19 +8,30 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #endif
 
+namespace fkernel {
+
 class SyscallManager {
+  bool m_is_initialized{false};
+
+  SyscallManager() = default;
+  SyscallManager(const SyscallManager &) = delete;
+  SyscallManager &operator=(const SyscallManager &) = delete;
+
+  syscall_function_t m_syscall_table[SYS_MAX] = {nullptr};
+
 public:
   static SyscallManager &the();
 
+  bool is_initialized() const { return m_is_initialized; }
   void initialize();
   void register_syscall(uint64_t num, syscall_function_t fn);
   uint64_t handle(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
                   uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs);
-
-private:
-  SyscallManager() = default;
-  syscall_function_t m_syscall_table[SYS_MAX] = {nullptr};
 };
+
+} // namespace fkernel
+
+using fkernel::SyscallManager;
 
 #ifdef __cplusplus
 extern "C" {

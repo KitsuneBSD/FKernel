@@ -1,6 +1,6 @@
 #include <Kernel/Driver/Storage/storage_cache.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 StorageCache::CacheEntry* StorageCache::find_entry(uint64_t sector) {
     size_t index = sector % CACHE_SIZE;
@@ -20,7 +20,7 @@ StorageCache::read_sectors(uint64_t start_sector, size_t count, uint8_t* buffer)
         
         if (entry) {
             fk::algorithms::klog("STORAGE CACHE", "Hit for sector %llu", sector);
-            memcpy(buffer + (i * 512), entry->data, 512);
+            fk::memory::copy(buffer + (i * 512), entry->data, 512);
         } else {
             fk::algorithms::klog("STORAGE CACHE", "Miss for sector %llu, loading...", sector);
             size_t index = sector % CACHE_SIZE;
@@ -33,7 +33,7 @@ StorageCache::read_sectors(uint64_t start_sector, size_t count, uint8_t* buffer)
             m_cache[index].valid = true;
             m_cache[index].dirty = false;
             
-            memcpy(buffer + (i * 512), m_cache[index].data, 512);
+            fk::memory::copy(buffer + (i * 512), m_cache[index].data, 512);
         }
     }
     
@@ -48,7 +48,7 @@ StorageCache::write_sectors(uint64_t start_sector, size_t count, const uint8_t* 
         uint64_t sector = start_sector + i;
         size_t index = sector % CACHE_SIZE;
         
-        memcpy(m_cache[index].data, buffer + (i * 512), 512);
+        fk::memory::copy(m_cache[index].data, buffer + (i * 512), 512);
         m_cache[index].sector = sector;
         m_cache[index].valid = true;
         m_cache[index].dirty = true;

@@ -63,6 +63,9 @@ struct timespec {
 int sys_nanosleep(const struct timespec* req, struct timespec* rem);
 int sys_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags, const void* data);
 int sys_umount(const char* target, int flags);
+int sys_setsid(void);
+int sys_setpgid(int pid, int pgid);
+int sys_getpgid(int pid);
 
 // basic LibC-style functions
 static inline void print(const char* str) {

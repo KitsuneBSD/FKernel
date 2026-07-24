@@ -25,12 +25,14 @@ static void ps2_wait_write() {
     for (int i = 0; i < 100000; ++i) {
         if (!(inb(PS2_STATUS_PORT) & 0x02)) return;
     }
+    fk::algorithms::kwarn("MOUSE", "ps2_wait_write timeout");
 }
 
 static void ps2_wait_read() {
     for (int i = 0; i < 100000; ++i) {
         if (inb(PS2_STATUS_PORT) & 0x01) return;
     }
+    fk::algorithms::kwarn("MOUSE", "ps2_wait_read timeout");
 }
 
 void PS2Mouse::send_command(uint8_t cmd) {
@@ -43,6 +45,8 @@ void PS2Mouse::send_command(uint8_t cmd) {
 }
 
 void PS2Mouse::initialize() {
+    if (m_hw_initialized) return;
+
     // Enable mouse port
     ps2_wait_write();
     outb(PS2_STATUS_PORT, PS2_CMD_ENABLE_MOUSE);
@@ -62,13 +66,25 @@ void PS2Mouse::initialize() {
     send_command(MOUSE_CMD_SET_DEFAULTS);
     send_command(MOUSE_CMD_ENABLE_STREAM);
 
+    m_hw_initialized = true;
     fk::algorithms::klog("PS2MOUSE", "PS/2 Mouse initialized");
 }
 
+fk::core::Result<void, fk::core::Error> PS2Mouse::on_open() {
+    initialize();
+    return {};
+}
+
 void PS2Mouse::irq_handler() {
+    if (!m_hw_initialized) { inb(PS2_DATA_PORT); return; } // drain spurious byte
     uint8_t data = inb(PS2_DATA_PORT);
     m_packet[m_packet_byte++] = data;
-    if (m_packet_byte == 3) {
+
+    if (m_packet_byte == 1) {
+        m_packet_size = (data & 0x20) ? 4 : 3;
+    }
+
+    if (m_packet_byte == m_packet_size) {
         m_packet_byte = 0;
         process_packet();
     }
@@ -82,6 +98,7 @@ void PS2Mouse::process_packet() {
     ev.buttons = status & 0x07;
     ev.dx = (int8_t)m_packet[1];
     ev.dy = -(int8_t)m_packet[2]; // Y is inverted in PS/2
+    ev.scroll = (m_packet_size == 4) ? (int8_t)m_packet[3] : 0;
 
     fk::synchronization::ScopedLock lock(m_lock);
     if (m_events.size() < MOUSE_BUFFER_SIZE)

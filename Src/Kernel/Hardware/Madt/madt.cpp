@@ -5,7 +5,7 @@
 #include <Kernel/Hardware/Madt/madt_ioapic.h>
 #include <Kernel/Hardware/Madt/madt_interrupt_source_override.h>
 #include <Kernel/Hardware/Madt/madt_lapic_override.h>
-#include <LibFK/Core/Assertions.h>
+#include <LibFK/Core/assertions.h>
 #include <LibFK/Algorithms/log.h>
 
 void ACPIManager::initialize_madt() {

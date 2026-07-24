@@ -1,31 +1,12 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
-
-constexpr uint8_t APIC_SPURIOUS_VECTOR = 0xFF;
-constexpr uint8_t APIC_TIMER_VECTOR = 0x20;
-
-constexpr uint32_t APIC_BASE_MSR = 0x1B;
-constexpr uint32_t APIC_MSR_ENABLE = 1 << 11;
-constexpr uintptr_t APIC_RANGE_SIZE = 0x1000;
-
-constexpr uint32_t REG_SPURIOUS = 0xF0;
-constexpr uint32_t REG_EOI = 0xB0;
-constexpr uint32_t REG_LVT_TIMER = 0x320;
-constexpr uint32_t REG_INITIAL_COUNT = 0x380;
-constexpr uint32_t REG_CURRENT_COUNT = 0x390;
-constexpr uint32_t REG_DIVIDE_CONFIG = 0x3E0;
-
-constexpr uint32_t APIC_SVR_ENABLE = 1 << 8;
-constexpr uint32_t APIC_LVT_MASK = 1 << 16;
-constexpr uint32_t APIC_LVT_TIMER_MODE_PERIODIC = 1 << 17;
-
-// Divisor base (1, 2, 4, 8, 16, 32, 64, 128)
-constexpr uint32_t APIC_TIMER_DIVISOR = 0x3; // divide by 16
 
 APIC* g_apic_ptr = nullptr;
 
@@ -42,30 +23,20 @@ void APIC::initialize() {
     fk::algorithms::kwarn("APIC", "APIC already initialized.");
     return;
   }
-  
+
   g_apic_ptr = this;
-  
-  /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::kdebug("APIC", "Initializing Local APIC...");
-  */
+
   if (!CPU::the().has_apic()) {
-    fk::algorithms::kerror("APIC", "Local APIC not detected");
+    fk::algorithms::kfatal("APIC", "Local APIC not detected");
     return;
   }
 
   uint64_t apic_msr = CPU::the().read_msr(APIC_BASE_MSR);
   uintptr_t apic_phys = apic_msr & 0xFFFFF000;
 
-  /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::kdebug("APIC", "APIC physical base detected at 0x%lx",
-                         apic_phys);
-
-  */
-  // Enable APIC via MSR
   apic_msr |= APIC_MSR_ENABLE;
   CPU::the().write_msr(APIC_BASE_MSR, apic_msr);
 
-  // Map LAPIC region (1 page)
   for (uintptr_t offset = 0; offset < APIC_RANGE_SIZE; offset += PAGE_SIZE) {
     MemoryManager::the().map_page(apic_phys + offset, apic_phys + offset,
                                   PageFlags::Present | PageFlags::Writable |
@@ -74,8 +45,7 @@ void APIC::initialize() {
 
   lapic_base = apic_phys;
 
-  // Enable LAPIC and set spurious interrupt vector
-  write(REG_SPURIOUS, APIC_SPURIOUS_VECTOR | APIC_SVR_ENABLE);
+  write(APIC_REG_SPURIOUS, APIC_SPURIOUS_VECTOR | APIC_SVR_ENABLE);
 
   fk::algorithms::klog("APIC", "Local APIC enabled with spurious vector 0x%X",
                        APIC_SPURIOUS_VECTOR);
@@ -83,7 +53,7 @@ void APIC::initialize() {
 
 void APIC::send_eoi(uint8_t) {
   if (lapic_base)
-    write(REG_EOI, 0);
+    write(APIC_REG_EOI, 0);
 }
 
 void APIC::mask_interrupt(uint8_t irq) {
@@ -102,115 +72,93 @@ void APIC::calibrate_timer() {
   if (!lapic_base)
     return;
 
-  write(REG_DIVIDE_CONFIG, APIC_TIMER_DIVISOR);
-  write(REG_LVT_TIMER, APIC_LVT_MASK); // Temporarily mask timer
-  write(REG_INITIAL_COUNT, 0xFFFFFFFF);
+  write(APIC_REG_DIVIDE_CONFIG, APIC_TIMER_DIVISOR);
+  write(APIC_REG_LVT_TIMER, APIC_LVT_MASK);
+  write(APIC_REG_INITIAL_COUNT, 0xFFFFFFFF);
 
-  // Espera 10ms usando fonte externa (PIT, HPET ou delay calibrado)
   constexpr uint64_t calib_ms = 10;
   TimerManager::the().sleep(calib_ms);
 
-  uint32_t elapsed = 0xFFFFFFFF - read(REG_CURRENT_COUNT);
+  uint32_t elapsed = 0xFFFFFFFF - read(APIC_REG_CURRENT_COUNT);
 
-  write(REG_INITIAL_COUNT, 0);
+  write(APIC_REG_INITIAL_COUNT, 0);
   apic_ticks_per_ms = elapsed / calib_ms;
 
   fk::algorithms::klog("APIC", "APIC timer calibrated: %u ticks/ms",
                        apic_ticks_per_ms);
 }
 
-void APIC::setup_timer(uint64_t ms) {
+void APIC::setup_timer(uint64_t frequency_hz) {
   if (!lapic_base)
     initialize();
 
   if (apic_ticks_per_ms == 0)
     calibrate_timer();
 
-  uint64_t interval_ms = 1000 / ms;
+  uint64_t interval_ms = 1000 / frequency_hz;
   uint64_t initial_ticks = apic_ticks_per_ms * interval_ms;
 
-  write(REG_DIVIDE_CONFIG, APIC_TIMER_DIVISOR);
-  write(REG_LVT_TIMER, APIC_TIMER_VECTOR | APIC_LVT_TIMER_MODE_PERIODIC);
-  write(REG_INITIAL_COUNT, static_cast<uint32_t>(initial_ticks));
+  write(APIC_REG_DIVIDE_CONFIG, APIC_TIMER_DIVISOR);
+  write(APIC_REG_LVT_TIMER, APIC_TIMER_VECTOR | APIC_LVT_TIMER_MODE_PERIODIC);
+  write(APIC_REG_INITIAL_COUNT, static_cast<uint32_t>(initial_ticks));
 
   fk::algorithms::klog("APIC",
-                       "APIC timer armed at %u Hz (%u ticks per period)", ms,
-                       (uint32_t)initial_ticks);
+                       "APIC timer armed at %llu Hz (%u ticks per period)",
+                       frequency_hz, static_cast<uint32_t>(initial_ticks));
 }
 
-extern uint8_t g_next_msi_vector;
-
-fk::core::Result<uint8_t, fk::core::Error> APIC::allocate_msi_vector(const PciDevice& device) {
-    uint8_t msi_ptr = device.find_capability(0x05); // MSI Capability ID
-    if (msi_ptr == 0) return fk::core::Error::NotImplemented;
-
-    uint8_t vector = g_next_msi_vector++;
-    if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
-
-    uint32_t msi_addr = static_cast<uint32_t>(msi_address_base());
-    device.write_config_dword(msi_ptr + 4, msi_addr);
-
-    uint16_t msg_ctrl = device.read_config_word(msi_ptr + 2);
-    if (msg_ctrl & (1 << 7)) { // 64-bit support
-        device.write_config_dword(msi_ptr + 8, 0);
-        device.write_config_word(msi_ptr + 12, vector);
-    } else {
-        device.write_config_word(msi_ptr + 8, vector);
-    }
-
-    msg_ctrl |= 0x01;
-    device.write_config_word(msi_ptr + 2, msg_ctrl);
-
-    fk::algorithms::klog("MSI", "Enabled MSI (Vector 0x%x) via APIC at 0x%x for device %02x:%02x.%d",
-                         vector, msi_addr, device.address().bus(), device.address().device(),
-                         device.address().function());
-
-    return vector;
+fk::core::Result<uint8_t, fk::core::Error>
+APIC::allocate_msi_vector(const PciDevice& device) {
+  return msi::allocate_msi_vector(device);
 }
 
 fk::core::Result<uint8_t, fk::core::Error>
 APIC::allocate_msix_vector(const PciDevice& device, uint16_t entry) {
-    constexpr uint8_t MSIX_CAP_ID = 0x11;
-    uint8_t cap_ptr = device.find_capability(MSIX_CAP_ID);
-    if (cap_ptr == 0) return fk::core::Error::NotImplemented;
+  constexpr uint8_t MSIX_CAP_ID = 0x11;
+  uint8_t cap_ptr = device.find_capability(MSIX_CAP_ID);
+  if (cap_ptr == 0)
+    return fk::core::Error::NotImplemented;
 
-    uint16_t ctrl = device.read_config_word(cap_ptr + 2);
-    uint16_t table_size = (ctrl & 0x7FF) + 1;
-    if (entry >= table_size) return fk::core::Error::InvalidParameter;
+  uint16_t ctrl = device.read_config_word(cap_ptr + 2);
+  uint16_t table_size = (ctrl & 0x7FF) + 1;
+  if (entry >= table_size)
+    return fk::core::Error::InvalidParameter;
 
-    uint8_t vector = g_next_msi_vector++;
-    if (vector >= 0xF0) return fk::core::Error::OutOfMemory;
+  auto vector_result = msi::allocate_vector();
+  if (!vector_result.is_ok())
+    return vector_result.error();
+  uint8_t vector = vector_result.value();
 
-    uint32_t table_info = device.read_config_dword(cap_ptr + 4);
-    uint8_t  bir        = static_cast<uint8_t>(table_info & 0x7);
-    uint32_t table_off  = table_info & ~0x7U;
+  uint32_t table_info = device.read_config_dword(cap_ptr + 4);
+  uint8_t  bir        = static_cast<uint8_t>(table_info & 0x7);
+  uint32_t table_off  = table_info & ~0x7U;
 
-    uintptr_t bar_phys  = device.bar_base(bir);
-    uintptr_t table_phys = bar_phys + table_off;
-    uintptr_t table_virt = table_phys;
+  uintptr_t bar_phys   = device.bar_base(bir);
+  uintptr_t table_phys = bar_phys + table_off;
+  uintptr_t table_virt = table_phys;
 
-    MemoryManager::the().map_page(table_virt, table_phys,
-                                  PageFlags::Present | PageFlags::Writable |
-                                  PageFlags::WriteThrough);
+  MemoryManager::the().map_page(table_virt, table_phys,
+                                PageFlags::Present | PageFlags::Writable |
+                                    PageFlags::WriteThrough);
 
-    struct MsixEntry {
-        volatile uint64_t msg_addr;
-        volatile uint32_t msg_data;
-        volatile uint32_t vector_ctrl;
-    };
-    auto* msix_table = reinterpret_cast<MsixEntry*>(table_virt);
-    msix_table[entry].msg_addr    = static_cast<uint64_t>(msi_address_base());
-    msix_table[entry].msg_data    = vector;
-    msix_table[entry].vector_ctrl = 0; // unmask
+  struct MsixEntry {
+    volatile uint64_t msg_addr;
+    volatile uint32_t msg_data;
+    volatile uint32_t vector_ctrl;
+  };
+  auto* msix_table = reinterpret_cast<MsixEntry*>(table_virt);
+  msix_table[entry].msg_addr    = static_cast<uint64_t>(msi_address_base());
+  msix_table[entry].msg_data    = vector;
+  msix_table[entry].vector_ctrl = 0;
 
-    ctrl |= (1 << 15); // Enable MSI-X
-    ctrl &= ~(1 << 14); // Clear function mask
-    device.write_config_word(cap_ptr + 2, ctrl);
+  ctrl |= (1 << 15);
+  ctrl &= ~static_cast<uint16_t>(1 << 14);
+  device.write_config_word(cap_ptr + 2, ctrl);
 
-    fk::algorithms::klog("MSI-X", "Entry %u -> Vector 0x%x for %02x:%02x.%d",
-                         entry, vector, device.address().bus(),
-                         device.address().device(), device.address().function());
-    return vector;
+  fk::algorithms::klog("MSI-X", "Entry %u -> Vector 0x%x for %02x:%02x.%d",
+                       entry, vector, device.address().bus(),
+                       device.address().device(), device.address().function());
+  return vector;
 }
 
 void APIC::enable_msi(uint8_t vector) { (void)vector; }

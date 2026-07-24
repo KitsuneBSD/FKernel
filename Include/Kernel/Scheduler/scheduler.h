@@ -1,10 +1,11 @@
-#pragma once 
+#pragma once
 
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Synchronization/spinlock.h>
+#include <LibFK/Memory/ref_ptr.h>
 
 #include <Kernel/Scheduler/Task/task.h>
 #include <Kernel/Hardware/Cpu/processor.h>
@@ -35,9 +36,12 @@ public:
       return fk::ProcessId(__sync_fetch_and_add(&m_next_pid, 1));
     }
 
+    uint64_t last_pid() const { return m_next_pid; }
+
     void initialize();
     void add_task(Task* task);
     void block_current();
+    void block_current_noqueue();
     void zombify_current();
     void sleep_current(uint64_t ticks);
     void yield();
@@ -46,12 +50,15 @@ public:
     void on_tick();
     void schedule();
 
+    uint64_t process_count();
+
     // Debugging / introspection helpers
     void print_all_tasks();
-    Task* find_task(fk::ProcessId id);
-    Task* find_terminated_child(fk::ProcessId ppid);
-    Task* find_any_child(fk::ProcessId ppid);
+    fk::RefPtr<Task> find_task(fk::ProcessId id);
+    fk::RefPtr<Task> find_terminated_child(fk::ProcessId ppid);
+    fk::RefPtr<Task> find_any_child(fk::ProcessId ppid);
     void reap_zombie(Task* task);
+    void send_signal_to_pgrp(int pgid, int signum);
 
     Task* pick_next();
     Task* steal_task(uint32_t stealing_cpu);

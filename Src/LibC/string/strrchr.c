@@ -1,20 +1,32 @@
-#include <LibC/assert.h>
+#include <LibC/stddef.h>
 #include <LibC/string.h>
 
-char *strrchr(const char *s, int c, size_t maxlen) {
-  ASSERT(s != NULL);
-  ASSERT(maxlen > 0);
+char *strrnchr(const char *s, int c, size_t maxlen) {
   const char *last = NULL;
+  unsigned char target = (unsigned char)c;
   for (size_t i = 0; i < maxlen; i++) {
     if (s[i] == '\0')
-      break; // Reached null terminator before maxlen
-    if (s[i] == (char)c)
+      break;
+    if ((unsigned char)s[i] == target)
       last = &s[i];
   }
-  if ((char)c == '\0') { // Special case: finding the null terminator itself
+  if ((unsigned char)c == '\0') {
     size_t len = strnlen(s, maxlen);
     if (len < maxlen)
-      return (char *)&s[len]; // Return pointer to the null terminator
+      return (char *)&s[len];
   }
+  return (char *)last;
+}
+
+char *strrchr(const char *s, int c) {
+  const char *last = NULL;
+  unsigned char target = (unsigned char)c;
+  while (*s) {
+    if ((unsigned char)*s == target)
+      last = s;
+    s++;
+  }
+  if (target == '\0')
+    return (char *)s;
   return (char *)last;
 }

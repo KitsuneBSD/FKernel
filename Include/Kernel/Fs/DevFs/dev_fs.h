@@ -2,6 +2,7 @@
 
 #include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Container/vector.h>
+#include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Utilities/pair.h>
 
@@ -15,6 +16,7 @@ private:
     };
 
     fk::containers::Vector<DeviceEntry> m_devices;
+    mutable fk::synchronization::Spinlock m_lock;
 
 public:
     DevFs();

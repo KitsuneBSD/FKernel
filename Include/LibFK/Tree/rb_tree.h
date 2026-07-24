@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LibFK/Algorithms/log.h> // For kerror
-#include <LibFK/Core/Result.h>    // Include Result for return types
+#include <LibFK/Core/result.h>    // Include Result for return types
 #include <LibFK/Utilities/pair.h> // Include Pair definition
 
 namespace fk {

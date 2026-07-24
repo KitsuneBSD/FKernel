@@ -1,6 +1,7 @@
 #include <Kernel/Fs/TmpFs/tmp_fs.h>
+#include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Error.h>
+#include <LibFK/Core/error.h>
 #include <LibFK/Memory/new.h>
 
 fk::RefPtr<Node> ChildList::find_by_name(const char* name) {
@@ -21,8 +22,7 @@ fk::core::Result<size_t, fk::core::Error> TmpFsNode::read(uint64_t offset, size_
   size_t available = m_data.size() - offset;
   size_t to_read = (size < available) ? size : available;
 
-  for (size_t i = 0; i < to_read; ++i)
-    buffer[i] = m_data[offset + i];
+  fk::memory::copy(buffer, m_data.begin() + offset, to_read);
 
   return to_read;
 }
@@ -34,8 +34,7 @@ fk::core::Result<size_t, fk::core::Error> TmpFsNode::write(uint64_t offset, size
   if (end_offset > m_data.size())
     m_data.resize(end_offset);
 
-  for (size_t i = 0; i < size; ++i)
-    m_data[offset + i] = buffer[i];
+  fk::memory::copy(m_data.begin() + offset, buffer, size);
 
   return size;
 }
@@ -92,7 +91,7 @@ fk::core::Result<void, fk::core::Error>
 TmpFsDirectoryNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
   for (auto& child : m_children.entries()) {
     DirectoryEntry de;
-    strncpy(de.name, child.name().c_str(), sizeof(de.name) - 1);
+    fk::memory::copy_n(de.name, child.name().c_str(), sizeof(de.name) - 1);
     de.name[sizeof(de.name) - 1] = '\0';
 
     if (child.node()->is_directory()) {
@@ -116,7 +115,8 @@ fk::core::Result<void, fk::core::Error> TmpFsDirectoryNode::rmdir(const char* na
   if (!node->is_directory())
     return fk::core::Error::NotADirectory;
 
-  if (m_children.size() > 1)
+  auto* target_dir = static_cast<TmpFsDirectoryNode*>(node.ptr());
+  if (target_dir && target_dir->m_children.size() > 0)
     return fk::core::Error::DirectoryNotEmpty;
 
   if (!m_children.remove_by_name(name))

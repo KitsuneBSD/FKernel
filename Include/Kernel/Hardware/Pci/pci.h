@@ -6,7 +6,7 @@
 #include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Container/hash_map.h>
-#include <LibFK/Functional/Function.h>
+#include <LibFK/Functional/function.h>
 #include <LibFK/Memory/ref_ptr.h>
 #include <LibFK/Types/types.h>
 
@@ -35,9 +35,18 @@ struct PciLegacyPorts {
   bool functional{false};
 };
 
+namespace fkernel {
+
 class PciManager {
+  bool m_is_initialized{false};
+
+  PciManager() = default;
+  PciManager(const PciManager &) = delete;
+  PciManager &operator=(const PciManager &) = delete;
+
 public:
   static PciManager &the();
+  bool is_initialized() const { return m_is_initialized; }
   void initialize();
 
   void scan_bus();
@@ -63,15 +72,15 @@ public:
   void register_hotplug_callback(HotplugCallback callback);
   void scan_for_new_devices();
 
-private:
-  PciManager() = default;
   fk::containers::Vector<PciDevice> m_devices;
   fk::containers::Vector<PciDriverEntry> m_drivers;
   fk::containers::Vector<HotplugCallback> m_hotplug_callbacks;
   fk::containers::HashMap<PciAddress, fk::RefPtr<Node>> m_device_nodes;
-  fk::RefPtr<fkernel::PCIDeviceNode> m_pci_node;
+  fk::RefPtr<PCIDeviceNode> m_pci_node;
 
   uintptr_t m_mcfg_base{0};
+  uint8_t m_mcfg_start_bus{0};
+  uint8_t m_mcfg_end_bus{255};
   bool m_has_mcfg{false};
   bool m_hotplug_enabled{false};
   PciLegacyPorts m_legacy_ports;
@@ -81,3 +90,7 @@ private:
   void check_function(uint8_t bus, uint8_t device, uint8_t function);
   void handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t function);
 };
+
+} // namespace fkernel
+
+using fkernel::PciManager;

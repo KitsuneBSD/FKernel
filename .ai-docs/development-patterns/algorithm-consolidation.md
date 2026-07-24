@@ -8,102 +8,44 @@ This document establishes the policy for consolidating known algorithms used acr
 
 **All known algorithms used across multiple kernel domains MUST be consolidated in `LibFK/Algorithms/` rather than being duplicated in domain-specific implementations.**
 
-## Algorithm Categories
+## Implemented Algorithms
 
-### 1. Archive Algorithms
-- **TAR**: Archive extraction and creation
-- **ZIP**: ZIP archive support
-- **GZIP**: Compression/decompression
-- **Usage**: Filesystem, Loader, Userland tools
+The following algorithms have been consolidated into `LibFK/Algorithms/`:
 
-### 2. Compression Algorithms  
-- **LZ4**: Fast compression
-- **ZLIB**: Standard compression
-- **DEFLATE**: Basic compression
-- **Usage**: Storage devices, Network protocols, Filesystems
+| File | Content | Status |
+|------|---------|--------|
+| `binary_search.h` | `lower_bound`, `upper_bound` | Done |
+| `byte_checksum.h` | ACPI table byte-sum validation | Done |
+| `byte_order.h` | `htons`, `htonl`, `ntohs`, `ntohl` | Done |
+| `container_algorithms.h` | `find_if`, `find_and_remove`, `swap_remove`, `insert_if_absent` | Done |
+| `crc32.h` | CRC32 checksum | Done |
+| `djb2.h` | DJB2 hash function | Done |
+| `fat_name.h` | 8.3 FAT name formatting (trim + concat) | Done |
+| `gather.h` | Gather copy from iovec | Done |
+| `internet_checksum.h` | RFC 1071 internet checksum | Done |
+| `log.h` | Kernel logging utilities | Done |
+| `math.h` | `abs()`, `swap()` | Done |
+| `string_algorithms.h` | Case-insensitive string compare | Done |
 
-### 3. Checksum & Hash Algorithms
-- **CRC32**: Error detection
-- **MD5**: File verification
-- **SHA256**: Cryptographic hashing
-- **Usage**: Storage, Network, Security, Filesystems
+## Planned Algorithms
 
-### 4. Encoding Algorithms
-- **Base64**: Binary-to-text encoding
-- **Hex**: Hexadecimal encoding/decoding
-- **URL Encoding**: URL-safe encoding
-- **Usage**: Network protocols, IPC, Filesystems
+These are planned but not yet implemented:
 
-### 5. Parsing Algorithms
-- **INI**: Configuration file parsing
-- **JSON**: Data format parsing
-- **ELF**: Executable format parsing
-- **PE**: Windows executable parsing
-- **Usage**: Loader, Configuration, Debug tools
-
-### 6. Data Structure Algorithms
-- **Priority Queues**: Scheduling and ordering
-- **Bloom Filters**: Probabilistic membership
-- **LRU Caches**: Memory management
-- **Usage**: All kernel domains
+| Category | Algorithm | Priority |
+|----------|-----------|----------|
+| Archive | TAR, ZIP, GZIP | Medium |
+| Compression | LZ4, ZLIB, DEFLATE | Low |
+| Checksum | MD5, SHA256 | Low |
+| Encoding | Base64, Hex, URL | Low |
+| Parsing | INI, JSON, ELF, PE | Low (ELF parser already in Loader) |
+| Data Structures | Bloom Filter, LRU Cache | Low |
 
 ## Implementation Guidelines
 
 ### File Organization
 ```
 Include/LibFK/Algorithms/
-├── Archive/
-│   ├── tar.h
-│   ├── zip.h
-│   └── gzip.h
-├── Compression/
-│   ├── lz4.h
-│   ├── zlib.h
-│   └── deflate.h
-├── Checksum/
-│   ├── crc32.h
-│   ├── md5.h
-│   └── sha256.h
-├── Encoding/
-│   ├── base64.h
-│   ├── hex.h
-│   └── url_encoding.h
-├── Parsing/
-│   ├── ini.h
-│   ├── json.h
-│   ├── elf.h
-│   └── pe.h
-└── DataStructures/
-    ├── priority_queue.h
-    ├── bloom_filter.h
-    └── lru_cache.h
-
-Src/LibFK/Algorithms/
-├── Archive/
-│   ├── tar.cpp
-│   ├── zip.cpp
-│   └── gzip.cpp
-├── Compression/
-│   ├── lz4.cpp
-│   ├── zlib.cpp
-│   └── deflate.cpp
-├── Checksum/
-│   ├── crc32.cpp
-│   ├── md5.cpp
-│   └── sha256.cpp
-├── Encoding/
-│   ├── base64.cpp
-│   ├── hex.cpp
-│   └── url_encoding.cpp
-├── Parsing/
-│   ├── ini.cpp
-│   ├── json.cpp
-│   ├── elf.cpp
-│   └── pe.cpp
-└── DataStructures/
-    ├── priority_queue.cpp
-    ├── bloom_filter.cpp
-    └── lru_cache.cpp
++-- (flat directory -- all headers at top level for simplicity)
 ```
 
 ### API Design Principles
@@ -113,30 +55,6 @@ Src/LibFK/Algorithms/
 3. **Result-Based**: Return `Result<T, Error>` for fallible operations
 4. **Memory Safe**: Use LibFK memory management, no raw pointers
 5. **Template-Friendly**: Use templates for generic implementations
-
-### Example Implementation
-
-```cpp
-// Include/LibFK/Algorithms/Archive/tar.h
-namespace fk::Algorithms::Archive {
-    class Tar {
-    public:
-        struct Header {
-            // TAR header fields
-        };
-        
-        static Result<fk::Vector<uint8_t>, Error> create_archive(const fk::Vector<fk::String>& files);
-        static Result<void, Error> extract_archive(const uint8_t* data, size_t size, const fk::String& output_path);
-        static Result<bool, Error> validate_archive(const uint8_t* data, size_t size);
-    };
-}
-
-// Usage in domains
-auto result = fk::Algorithms::Archive::Tar::extract_archive(archive_data, archive_size, "/tmp");
-if (result.is_error()) {
-    // Handle error
-}
-```
 
 ## Migration Process
 
@@ -148,7 +66,7 @@ if (result.is_error()) {
 ### 2. Consolidation
 - Extract best implementation from existing duplicates
 - Generalize for domain-agnostic use
-- Move to `LibFK/Algorithms/` with proper categorization
+- Move to `LibFK/Algorithms/` with proper naming
 
 ### 3. Integration
 - Replace domain-specific implementations with LibFK calls
@@ -158,38 +76,16 @@ if (result.is_error()) {
 ### 4. Testing
 - Create comprehensive test suite for consolidated algorithms
 - Test across all use cases from different domains
-- Performance regression testing
 
 ### 5. Documentation
 - Update algorithm documentation
 - Document usage patterns
-- Add migration guide for developers
-
-## Benefits
-
-### For Developers
-- **Single Source of Truth**: One implementation to learn and use
-- **Consistent API**: Same interface across all domains
-- **Reduced Bugs**: One place to fix bugs
-- **Better Performance**: Shared optimizations benefit all
-
-### For the Project
-- **Reduced Code Size**: Eliminate duplication
-- **Easier Maintenance**: Centralized algorithm updates
-- **Better Testing**: One comprehensive test suite
-- **Consistency**: Same behavior across all components
 
 ## Enforcement
 
-### Automated Validation
-- GEMINI validator checks for algorithm duplication
-- CI/CD prevents merging duplicate implementations
-- Automated suggestions for consolidation
-
-### Code Review Guidelines
-- Review new algorithm implementations for consolidation opportunities
-- Require justification for domain-specific algorithms
-- Ensure proper use of consolidated algorithms
+- Code review should flag duplicated algorithm implementations
+- New algorithm implementations should justify staying domain-specific
+- Use existing LibFK algorithms where possible
 
 ## Exception Process
 
@@ -200,8 +96,4 @@ Algorithms can remain domain-specific only if:
 3. **Hardware Dependencies**: Algorithm depends on specific hardware features
 4. **Legacy Compatibility**: Required for compatibility with existing interfaces
 
-Exceptions must be documented and approved by architectural review.
-
----
-
-**This policy ensures maximum code reuse while maintaining domain-specific flexibility when truly necessary.**
+Exceptions must be documented.

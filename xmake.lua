@@ -116,10 +116,12 @@ target("FKernel")
   if is_mode("debug") then
     set_symbols("debug")
     set_optimize("fast")
-    add_defines("FKERNEL_DEBUG")
+    add_defines("FKERNEL_DEBUG", "FKERNEL_LOG_LEVEL=3")
     if is_arch("x86_64", "x64") then
       add_cxflags(flags.x86_64.cxx)
     end
+  elseif is_mode("release") then
+    add_defines("FKERNEL_LOG_LEVEL=2")  -- strip debug; keep warn/error/fatal
   end
 
   add_files("Src/LibC/**.c")
@@ -193,7 +195,15 @@ target("Test")
   add_files("tests/LibFK/test_text.cpp")
   add_files("tests/LibFK/test_multi_containers.cpp")
   add_files("tests/LibFK/test_tuple.cpp")
+  add_files("tests/LibFK/test_stack_queue_staticvec.cpp")
+  add_files("tests/LibFK/test_nonnull_weak_bump.cpp")
+  add_files("tests/LibFK/test_lock_rank_format.cpp")
+  add_files("tests/LibFK/test_string_builder.cpp")
+  add_files("tests/LibFK/test_bitmap_unordered_set.cpp")
+  add_files("tests/LibFK/test_algorithms.cpp")
+  add_files("tests/LibFK/test_string_view.cpp")
   add_files("Src/LibFK/Text/string.cpp")
+  add_files("Src/LibFK/Text/string_builder.cpp")
   add_files("Src/LibFK/Memory/new.cpp")
   add_files("tests/test_mock.c")
 
@@ -250,5 +260,16 @@ task("analyze")
   }
   on_run(function()
     os.execv("lua", {"Meta/x86_64-tools/analyze_kernel_runtime.lua"})
+  end)
+task_end()
+
+-- TASK: check-layers — Verify LibC → LibFK → Kernel layer separation
+task("check-layers")
+  set_menu {
+    usage = "xmake check-layers",
+    description = "Verify LibC → LibFK → Kernel layer separation",
+  }
+  on_run(function()
+    os.execv("lua", {"Meta/x86_64-tools/check_layer_separation.lua"})
   end)
 task_end()

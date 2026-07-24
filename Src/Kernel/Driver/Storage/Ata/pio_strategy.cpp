@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Storage/Ata/pio_strategy.h>
 #include <LibFK/Algorithms/log.h>
@@ -34,7 +35,7 @@ bool PIOStrategy::wait_status(uint8_t mask, uint8_t value,
       return true;
     if (status & ATA_SR_ERR)
       return false;
-    asm volatile("pause");
+    arch_cpu_relax();
   }
   return false;
 }

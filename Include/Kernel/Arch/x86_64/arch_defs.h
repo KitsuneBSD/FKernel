@@ -30,7 +30,7 @@ static constexpr size_t TSS_INDEX = TSS_SELECTOR >> 3; // 0x28 >> 3 = 5
 /**
  * @brief Size of Kernel Stack
  */
-static constexpr size_t KERNEL_STACK_SIZE = 4096 * 4;
+static constexpr size_t KERNEL_STACK_SIZE = 16 * fk::types::KiB;
 
 /**
  * @brief Define a page size as a 4096 KiB;
@@ -98,3 +98,15 @@ static constexpr size_t MAX_TABLES = 512;
  * @brief Maximum number of physical zones
  */
 static constexpr size_t MAX_PHYSICAL_ZONES = 32;
+
+/**
+ * @brief Virtual address range for DMA buffer mappings.
+ *
+ * DMA buffers are mapped here instead of using identity mapping.
+ * This avoids polluting the 0-4 GiB identity-mapped region and
+ * keeps DMA mappings in the kernel PML4 (inherited by all processes).
+ *
+ * Range: 0xFFFF800000000000 - 0xFFFF800040000000 (1 GiB)
+ */
+static constexpr uintptr_t DMA_REGION_BASE = 0xFFFF800000000000;
+static constexpr size_t DMA_REGION_SIZE = 1 * fk::types::GiB;

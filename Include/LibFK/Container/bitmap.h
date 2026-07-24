@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibC/string.h>
-#include <LibFK/Core/Assertions.h>
 #include <LibFK/Types/types.h>
 
 namespace fk {
@@ -13,8 +12,7 @@ public:
   Bitmap() = default;
 
   Bitmap(T* storage, size_t capacity_bits) {
-    assert(storage != nullptr);
-    assert(capacity_bits > 0);
+    if (!storage || capacity_bits == 0) return;
 
     m_bits     = storage;
     m_capacity = capacity_bits;

@@ -9,11 +9,34 @@
 #include <Kernel/Net/Udp/udp_header.h>
 #include <Kernel/Net/Tcp/tcp_socket.h>
 #include <Kernel/Net/Udp/udp_socket.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/internet_checksum.h>
 #include <LibFK/Algorithms/log.h>
 
 namespace fkernel {
 namespace net {
+
+// Returns true if the transport-layer checksum over the pseudo-header + segment is valid.
+// Feeds the segment as-is (checksum field included); a valid segment yields finalize()==0.
+static bool verify_transport_checksum(uint32_t src_ip, uint32_t dst_ip,
+                                      uint8_t proto, const uint8_t* seg, size_t seg_len) {
+    struct __attribute__((packed)) {
+        uint32_t src_ip;
+        uint32_t dst_ip;
+        uint8_t  zero;
+        uint8_t  proto;
+        uint16_t len;
+    } ph;
+    ph.src_ip = src_ip;
+    ph.dst_ip = dst_ip;
+    ph.zero   = 0;
+    ph.proto  = proto;
+    ph.len    = htons((uint16_t)seg_len);
+    fk::algorithms::InternetChecksum cs;
+    cs.accumulate(&ph, sizeof(ph));
+    cs.accumulate(seg, seg_len);
+    return cs.finalize() == 0;
+}
 
 NetworkStack::NetworkStack() : m_device(nullptr), m_ip(IPv4Address::any()) {}
 
@@ -22,9 +45,12 @@ NetworkStack& NetworkStack::the() {
     return instance;
 }
 
-void NetworkStack::set_device(NetworkDevice* dev) { m_device = dev; }
-void NetworkStack::set_ip(IPv4Address ip) { m_ip = ip; }
-void NetworkStack::set_gateway(IPv4Address gw) { RoutingTable::the().set_default_gateway(gw); }
+void NetworkStack::set_device(NetworkDevice* dev) {
+    m_device = dev;
+    fk::algorithms::klog("NET", "Device set: %s", dev->name().c_str());
+}
+void NetworkStack::set_ip(IPv4Address ip) { m_ip = ip; fk::algorithms::klog("NET", "IP set to %s", ip.to_string().c_str()); }
+void NetworkStack::set_gateway(IPv4Address gw) { RoutingTable::the().set_default_gateway(gw); fk::algorithms::klog("NET", "Gateway set to %s", gw.to_string().c_str()); }
 
 static constexpr size_t MAX_FRAME_SIZE = 1514;
 
@@ -39,7 +65,7 @@ fk::core::Result<void, fk::core::Error> NetworkStack::send_packet(
     eth->set_dst(dst);
     eth->set_src(m_device->mac_address());
     eth->ethertype = htons(ethertype);
-    memcpy(frame + ETHERNET_HEADER_SIZE, payload, payload_len);
+    fk::memory::copy(frame + ETHERNET_HEADER_SIZE, payload, payload_len);
     return m_device->send_packet(frame, ETHERNET_HEADER_SIZE + payload_len);
 }
 
@@ -63,6 +89,19 @@ fk::core::Result<void, fk::core::Error> NetworkStack::send_arp_request(IPv4Addre
 fk::core::Result<void, fk::core::Error> NetworkStack::send_ipv4(
     IPv4Address dst_ip, uint8_t proto,
     const uint8_t* payload, size_t payload_len) {
+    static constexpr size_t MAX_IP_SIZE = MAX_FRAME_SIZE - ETHERNET_HEADER_SIZE;
+    size_t ip_size = IPV4_HEADER_SIZE + payload_len;
+    if (ip_size > MAX_IP_SIZE) return fk::core::Error::InvalidParameter;
+    uint8_t ip_packet[MAX_IP_SIZE];
+    auto* iph = reinterpret_cast<IPv4Header*>(ip_packet);
+    iph->fill(proto, m_ip.to_network(), dst_ip.to_network(), (uint16_t)payload_len);
+    fk::memory::copy(ip_packet + IPV4_HEADER_SIZE, payload, payload_len);
+
+    if (dst_ip == IPv4Address::broadcast()) {
+        MACAddress broadcast_mac(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+        return send_packet(broadcast_mac, ETHERTYPE_IPV4, ip_packet, ip_size);
+    }
+
     auto next_hop = RoutingTable::the().lookup(dst_ip);
     IPv4Address arp_target = next_hop.has_value() ? next_hop.value() : dst_ip;
     auto mac_opt = ArpTable::the().lookup(arp_target);
@@ -70,13 +109,6 @@ fk::core::Result<void, fk::core::Error> NetworkStack::send_ipv4(
         send_arp_request(arp_target);
         return fk::core::Error::NotFound;
     }
-    static constexpr size_t MAX_IP_SIZE = MAX_FRAME_SIZE - ETHERNET_HEADER_SIZE;
-    size_t ip_size = IPV4_HEADER_SIZE + payload_len;
-    if (ip_size > MAX_IP_SIZE) return fk::core::Error::InvalidParameter;
-    uint8_t ip_packet[MAX_IP_SIZE];
-    auto* iph = reinterpret_cast<IPv4Header*>(ip_packet);
-    iph->fill(proto, m_ip.to_network(), dst_ip.to_network(), (uint16_t)payload_len);
-    memcpy(ip_packet + IPV4_HEADER_SIZE, payload, payload_len);
     return send_packet(mac_opt.value(), ETHERTYPE_IPV4, ip_packet, ip_size);
 }
 
@@ -91,7 +123,7 @@ void NetworkStack::on_packet(const uint8_t* data, size_t len) {
 }
 
 void NetworkStack::handle_arp(const uint8_t* data, size_t len) {
-    if (len < ARP_PACKET_SIZE) return;
+    if (len < ARP_PACKET_SIZE) { fk::algorithms::kwarn("NET", "ARP: packet too short (%zu bytes)", len); return; }
     const auto* arp = reinterpret_cast<const ArpPacket*>(data);
     IPv4Address sender_ip = IPv4Address::from_network(arp->sender_ip);
     MACAddress  sender_mac(arp->sender_mac[0], arp->sender_mac[1], arp->sender_mac[2],
@@ -115,7 +147,7 @@ void NetworkStack::handle_arp(const uint8_t* data, size_t len) {
 }
 
 void NetworkStack::handle_ipv4(const uint8_t* data, size_t len) {
-    if (len < IPV4_HEADER_SIZE) return;
+    if (len < IPV4_HEADER_SIZE) { fk::algorithms::kwarn("NET", "IPv4: packet too short (%zu bytes)", len); return; }
     const auto* iph = reinterpret_cast<const IPv4Header*>(data);
     if (iph->version() != 4) return;
     uint8_t ihl = iph->ihl();
@@ -128,7 +160,7 @@ void NetworkStack::handle_ipv4(const uint8_t* data, size_t len) {
 }
 
 void NetworkStack::handle_icmp(const uint8_t* data, size_t len, uint32_t src_ip) {
-    if (len < ICMP_HEADER_SIZE) return;
+    if (len < ICMP_HEADER_SIZE) { fk::algorithms::kwarn("NET", "ICMP: packet too short (%zu bytes)", len); return; }
     const auto* icmp = reinterpret_cast<const IcmpHeader*>(data);
     if (icmp->type != ICMP_TYPE_ECHO_REQUEST) return;
     static constexpr size_t MAX_ICMP_SIZE = 1480;
@@ -142,42 +174,67 @@ void NetworkStack::handle_icmp(const uint8_t* data, size_t len, uint32_t src_ip)
     reply->checksum   = 0;
     reply->identifier = icmp->identifier;
     reply->sequence   = icmp->sequence;
-    memcpy(reply_buf + ICMP_HEADER_SIZE, data + ICMP_HEADER_SIZE, payload_len);
+    fk::memory::copy(reply_buf + ICMP_HEADER_SIZE, data + ICMP_HEADER_SIZE, payload_len);
     reply->checksum = reply->compute_checksum(reply_buf + ICMP_HEADER_SIZE, payload_len);
     send_ipv4(IPv4Address::from_network(src_ip), IP_PROTO_ICMP, reply_buf, reply_size);
 }
 
 void NetworkStack::handle_udp(const uint8_t* data, size_t len,
-                               uint32_t src_ip, [[maybe_unused]] uint32_t dst_ip) {
-    if (len < UDP_HEADER_SIZE) return;
+                               uint32_t src_ip, uint32_t dst_ip) {
+    if (len < UDP_HEADER_SIZE) { fk::algorithms::kwarn("NET", "UDP: packet too short (%zu bytes)", len); return; }
     const auto* hdr = reinterpret_cast<const UdpHeader*>(data);
+    // RFC 768: checksum=0 means sender did not compute it; non-zero must be valid
+    if (hdr->checksum != 0 && !verify_transport_checksum(src_ip, dst_ip, IP_PROTO_UDP, data, len)) {
+        fk::algorithms::kwarn("NET", "UDP: bad checksum, dropping datagram");
+        return;
+    }
     uint16_t dst_port = ntohs(hdr->dst_port);
     uint16_t src_port = ntohs(hdr->src_port);
     const uint8_t* payload = data + UDP_HEADER_SIZE;
     size_t payload_len = len - UDP_HEADER_SIZE;
 
     fk::synchronization::ScopedLock lock(m_udp_lock);
-    if (dst_port < MAX_UDP_SOCKETS && m_udp_sockets[dst_port]) {
-        m_udp_sockets[dst_port]->on_receive(
-            IPv4Address::from_network(src_ip), src_port, payload, payload_len);
+    for (size_t i = 0; i < MAX_UDP_BINDINGS; ++i) {
+        if (m_udp_sockets[i].port == dst_port && m_udp_sockets[i].socket) {
+            m_udp_sockets[i].socket->on_receive(
+                IPv4Address::from_network(src_ip), src_port, payload, payload_len);
+            break;
+        }
     }
 }
 
 bool NetworkStack::register_udp_socket(uint16_t port, UdpSocket* socket) {
     fk::synchronization::ScopedLock lock(m_udp_lock);
-    if (port >= MAX_UDP_SOCKETS || m_udp_sockets[port]) return false;
-    m_udp_sockets[port] = socket;
-    return true;
+    for (size_t i = 0; i < MAX_UDP_BINDINGS; ++i) {
+        if (m_udp_sockets[i].socket && m_udp_sockets[i].port == port) return false;
+    }
+    for (size_t i = 0; i < MAX_UDP_BINDINGS; ++i) {
+        if (!m_udp_sockets[i].socket) {
+            m_udp_sockets[i] = {port, socket};
+            fk::algorithms::kdebug("NET", "UDP: bound port %u", port);
+            return true;
+        }
+    }
+    return false;
 }
 
 void NetworkStack::unregister_udp_socket(uint16_t port) {
     fk::synchronization::ScopedLock lock(m_udp_lock);
-    if (port < MAX_UDP_SOCKETS) m_udp_sockets[port] = nullptr;
+    for (size_t i = 0; i < MAX_UDP_BINDINGS; ++i) {
+        if (m_udp_sockets[i].port == port) {
+            m_udp_sockets[i] = {};
+            break;
+        }
+    }
 }
 
 void NetworkStack::handle_tcp(const uint8_t* data, size_t len,
-                               [[maybe_unused]] uint32_t src_ip, [[maybe_unused]] uint32_t dst_ip) {
-    if (len < TCP_HEADER_SIZE) return;
+                               uint32_t src_ip, uint32_t dst_ip) {
+    if (len < TCP_HEADER_SIZE) { fk::algorithms::kwarn("NET", "TCP: packet too short (%zu bytes)", len); return; }
+    if (!verify_transport_checksum(src_ip, dst_ip, IP_PROTO_TCP, data, len)) {
+        fk::algorithms::kwarn("NET", "TCP: bad checksum, dropping segment");
+        return;
+    }
     const auto* hdr = reinterpret_cast<const TcpHeader*>(data);
     uint16_t dst_port = ntohs(hdr->dst_port);
     uint8_t header_len = hdr->header_length();
@@ -186,20 +243,37 @@ void NetworkStack::handle_tcp(const uint8_t* data, size_t len,
     size_t payload_len = len - header_len;
 
     fk::synchronization::ScopedLock lock(m_tcp_lock);
-    if (dst_port < MAX_TCP_SOCKETS && m_tcp_sockets[dst_port])
-        m_tcp_sockets[dst_port]->on_segment(hdr, payload, payload_len);
+    for (size_t i = 0; i < MAX_TCP_BINDINGS; ++i) {
+        if (m_tcp_sockets[i].port == dst_port && m_tcp_sockets[i].socket) {
+            m_tcp_sockets[i].socket->on_segment(hdr, payload, payload_len);
+            break;
+        }
+    }
 }
 
 bool NetworkStack::register_tcp_socket(uint16_t port, TcpSocket* socket) {
     fk::synchronization::ScopedLock lock(m_tcp_lock);
-    if (port >= MAX_TCP_SOCKETS || m_tcp_sockets[port]) return false;
-    m_tcp_sockets[port] = socket;
-    return true;
+    for (size_t i = 0; i < MAX_TCP_BINDINGS; ++i) {
+        if (m_tcp_sockets[i].socket && m_tcp_sockets[i].port == port) return false;
+    }
+    for (size_t i = 0; i < MAX_TCP_BINDINGS; ++i) {
+        if (!m_tcp_sockets[i].socket) {
+            m_tcp_sockets[i] = {port, socket};
+            fk::algorithms::kdebug("NET", "TCP: bound port %u", port);
+            return true;
+        }
+    }
+    return false;
 }
 
 void NetworkStack::unregister_tcp_socket(uint16_t port) {
     fk::synchronization::ScopedLock lock(m_tcp_lock);
-    if (port < MAX_TCP_SOCKETS) m_tcp_sockets[port] = nullptr;
+    for (size_t i = 0; i < MAX_TCP_BINDINGS; ++i) {
+        if (m_tcp_sockets[i].port == port) {
+            m_tcp_sockets[i] = {};
+            break;
+        }
+    }
 }
 
 } // namespace net

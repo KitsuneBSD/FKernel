@@ -2,6 +2,7 @@
 
 #include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Container/vector.h>
+#include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 
 namespace fkernel {
@@ -23,6 +24,7 @@ public:
 
 private:
   fk::containers::Vector<uint8_t> m_buffer;
+  mutable fk::synchronization::Spinlock m_lock;
   static constexpr size_t MAX_LOG_SIZE = 64 * 1024; // 64KB log buffer
 };
 

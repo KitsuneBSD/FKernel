@@ -1,53 +1,15 @@
 #include <Kernel/Fs/Fat32/fat_32_fs.h>
 #include <Kernel/Fs/Fat32/bpb.h>
 #include <Kernel/Fs/Fat32/directory_entry.h>
+#include <LibFK/Algorithms/fat_name.h>
+#include <LibFK/Algorithms/string_algorithms.h>
 #include <LibFK/Memory/heap_malloc.h>
-#include <LibFK/Utilities/Memory.h>
-#include <LibFK/Utilities/size_checking.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/math.h>
 
 #include <Kernel/Fs/Fat32/fat_32_node.h>
 
 namespace fkernel {
-
-static void format_83_name(const Fat32DirectoryEntry& de, char* buf) {
-    int name_len = 8;
-    while (name_len > 0 && de.name[name_len - 1] == ' ') name_len--;
-    int ext_len = 3;
-    while (ext_len > 0 && de.ext[ext_len - 1] == ' ') ext_len--;
-    int pos = 0;
-    for (int k = 0; k < name_len; ++k) buf[pos++] = de.name[k];
-    if (ext_len > 0) {
-        buf[pos++] = '.';
-        for (int k = 0; k < ext_len; ++k) buf[pos++] = de.ext[k];
-    }
-    buf[pos] = '\0';
-}
-
-static bool fat_name_eq(const char* a, const char* b) {
-    while (*a && *b) {
-        char ca = (*a >= 'a' && *a <= 'z') ? (char)(*a - 32) : *a;
-        char cb = (*b >= 'a' && *b <= 'z') ? (char)(*b - 32) : *b;
-        if (ca != cb) return false;
-        a++; b++;
-    }
-    return *a == 0 && *b == 0;
-}
-
-static void lfn_fill_chars(const uint8_t* raw, int order, char* lfn_buf) {
-    int base = (order - 1) * 13;
-    const uint16_t* n1 = reinterpret_cast<const uint16_t*>(raw + 1);
-    const uint16_t* n2 = reinterpret_cast<const uint16_t*>(raw + 14);
-    const uint16_t* n3 = reinterpret_cast<const uint16_t*>(raw + 28);
-
-    auto put = [&](int pos, uint16_t c) {
-        if (pos >= 255) return;
-        lfn_buf[pos] = (c == 0x0000 || c == 0xFFFF) ? '\0' : static_cast<char>(c & 0x7F);
-    };
-
-    for (int i = 0; i < 5; ++i) put(base + i, n1[i]);
-    for (int i = 0; i < 6; ++i) put(base + 5 + i, n2[i]);
-    for (int i = 0; i < 2; ++i) put(base + 11 + i, n3[i]);
-}
 
 fk::core::Result<void, fk::core::Error>
 Fat32FileSystem::list_directory_from(uint32_t first_cluster, fk::containers::Vector<DirectoryEntry>& entries) {
@@ -70,12 +32,12 @@ Fat32FileSystem::list_directory_from(uint32_t first_cluster, fk::containers::Vec
                     const uint8_t* raw = reinterpret_cast<const uint8_t*>(&dir[j]);
                     int order = raw[0] & 0x1F;
                     if (raw[0] & 0x40) { fk::memory::set(lfn_buf, 0, sizeof(lfn_buf)); has_lfn = true; }
-                    if (order >= 1 && order <= 20) lfn_fill_chars(raw, order, lfn_buf);
+                    if (order >= 1 && order <= 20) fk::algorithms::lfn_fill_chars(raw, order, lfn_buf);
                     continue;
                 }
                 DirectoryEntry entry;
+                if (!has_lfn) fk::algorithms::format_83_name(dir[j].name, dir[j].ext, entry.name);
                 if (has_lfn) fk::memory::copy(entry.name, lfn_buf, 256);
-                else format_83_name(dir[j], entry.name);
                 has_lfn = false;
                 entry.type = (dir[j].attr & 0x10) != 0 ? 1 : 0;
                 entries.push_back(entry);
@@ -108,20 +70,23 @@ Fat32FileSystem::find_in_directory(uint32_t first_cluster, const char* name) {
                     const uint8_t* raw = reinterpret_cast<const uint8_t*>(&dir[j]);
                     int order = raw[0] & 0x1F;
                     if (raw[0] & 0x40) { fk::memory::set(lfn_buf, 0, sizeof(lfn_buf)); has_lfn = true; }
-                    if (order >= 1 && order <= 20) lfn_fill_chars(raw, order, lfn_buf);
+                    if (order >= 1 && order <= 20) fk::algorithms::lfn_fill_chars(raw, order, lfn_buf);
                     continue;
                 }
-                bool match = has_lfn ? fat_name_eq(lfn_buf, name) : false;
+                bool match = has_lfn ? fk::algorithms::iequal(lfn_buf, name) : false;
                 has_lfn = false;
                 if (!match) {
                     char sfn[13];
-                    format_83_name(dir[j], sfn);
-                    match = fat_name_eq(sfn, name);
+                    fk::algorithms::format_83_name(dir[j].name, dir[j].ext, sfn);
+                    match = fk::algorithms::iequal(sfn, name);
                 }
                 if (!match) continue;
                 uint32_t cluster = (static_cast<uint32_t>(dir[j].cluster_high) << 16) | dir[j].cluster_low;
                 bool is_dir = (dir[j].attr & 0x10) != 0;
-                auto node = fk::adopt_ref(new Fat32Node(fk::RefPtr<Fat32FileSystem>(this), cluster, dir[j].size, is_dir));
+                uint32_t dir_sector_lba = root_sector + i;
+                auto node = fk::adopt_ref(new Fat32Node(fk::RefPtr<Fat32FileSystem>(this), cluster,
+                                                        dir[j].size, is_dir,
+                                                        dir_sector_lba, (uint8_t)j));
                 if (!node) return fk::core::Error::OutOfMemory;
                 return fk::RefPtr<Node>(node.ptr());
             }
@@ -207,6 +172,8 @@ Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {
     fs->m_root_cluster = bpb.root_cluster;
     fs->m_sectors_per_cluster = bpb.sectors_per_cluster;
     fs->m_first_data_sector = bpb.reserved_sectors + (bpb.fat_count * bpb.fat_size_32);
+    fs->m_fat_size_sectors = bpb.fat_size_32;
+    fs->m_total_clusters = total_clusters;
 
     return fs;
 }
@@ -271,7 +238,7 @@ Fat32FileSystem::read_from_cluster_chain(uint32_t first_cluster, uint64_t offset
         uint8_t* temp = static_cast<uint8_t*>(kmalloc(cluster_size));
         m_device->read(cluster_to_sector(current_cluster) * 512, cluster_size, temp);
         
-        size_t to_copy = fk::utilities::min(size - bytes_read, (size_t)(cluster_size - cluster_offset));
+        size_t to_copy = fk::algorithms::min(size - bytes_read, (size_t)(cluster_size - cluster_offset));
         fk::memory::copy(buffer + bytes_read, temp + cluster_offset, to_copy);
         
         kfree(temp);
@@ -280,6 +247,140 @@ Fat32FileSystem::read_from_cluster_chain(uint32_t first_cluster, uint64_t offset
         current_cluster = get_next_cluster(current_cluster);
     }
     return bytes_read;
+}
+
+fk::core::Result<void, fk::core::Error>
+Fat32FileSystem::write_fat_entry(uint32_t cluster, uint32_t value) {
+    uint32_t fat_byte_offset = cluster * 4;
+    uint32_t sector_offset = fat_byte_offset / 512;
+    uint32_t byte_in_sector = fat_byte_offset % 512;
+
+    uint8_t sector_buf[512];
+    auto res = m_device->read((m_fat_sector + sector_offset) * 512, 512, sector_buf);
+    if (res.is_error()) return fk::core::Error::IOError;
+
+    // Preserve the high 4 bits (reserved by FAT32 spec)
+    uint32_t old_val;
+    fk::memory::copy(&old_val, sector_buf + byte_in_sector, 4);
+    uint32_t new_val = (old_val & 0xF0000000u) | (value & 0x0FFFFFFFu);
+    fk::memory::copy(sector_buf + byte_in_sector, &new_val, 4);
+
+    auto wres = m_device->write((m_fat_sector + sector_offset) * 512, 512, sector_buf);
+    if (wres.is_error()) return wres.error();
+    return {};
+}
+
+fk::core::Result<uint32_t, fk::core::Error>
+Fat32FileSystem::allocate_cluster(uint32_t prev_cluster) {
+    uint8_t sector_buf[512];
+    uint32_t current_sector = ~0u;
+
+    for (uint32_t cluster = 2; cluster < m_total_clusters + 2; ++cluster) {
+        uint32_t fat_byte = cluster * 4;
+        uint32_t sector_idx = fat_byte / 512;
+        uint32_t byte_in_sector = fat_byte % 512;
+
+        if (sector_idx != current_sector) {
+            auto res = m_device->read((m_fat_sector + sector_idx) * 512, 512, sector_buf);
+            if (res.is_error()) return fk::core::Error::IOError;
+            current_sector = sector_idx;
+        }
+
+        uint32_t val;
+        fk::memory::copy(&val, sector_buf + byte_in_sector, 4);
+        if ((val & 0x0FFFFFFF) != 0) continue;
+
+        // Mark new cluster as end-of-chain
+        auto res = write_fat_entry(cluster, 0x0FFFFFFF);
+        if (res.is_error()) return res.error();
+
+        // Link previous cluster to new one
+        if (prev_cluster >= 2 && prev_cluster < 0x0FFFFFF8) {
+            res = write_fat_entry(prev_cluster, cluster);
+            if (res.is_error()) return res.error();
+        }
+        return cluster;
+    }
+    return fk::core::Error::OutOfMemory;
+}
+
+fk::core::Result<size_t, fk::core::Error>
+Fat32FileSystem::write_to_cluster_chain(uint32_t& first_cluster, uint64_t offset,
+                                         size_t size, const uint8_t* buf,
+                                         size_t& file_size_inout) {
+    if (size == 0) return (size_t)0;
+
+    uint32_t cluster_size = m_sectors_per_cluster * 512;
+
+    // Allocate first cluster if file is empty
+    if (first_cluster < 2) {
+        auto res = allocate_cluster(0);
+        if (res.is_error()) return res.error();
+        first_cluster = res.value();
+    }
+
+    // Walk to the cluster containing `offset`, allocating as needed
+    uint64_t clusters_to_skip = offset / cluster_size;
+    uint32_t current_cluster = first_cluster;
+    uint32_t prev_cluster = 0;
+
+    for (uint64_t i = 0; i < clusters_to_skip; ++i) {
+        uint32_t next = get_next_cluster(current_cluster);
+        if (next >= 0x0FFFFFF8) {
+            auto res = allocate_cluster(current_cluster);
+            if (res.is_error()) return res.error();
+            next = res.value();
+        }
+        prev_cluster = current_cluster;
+        current_cluster = next;
+    }
+    (void)prev_cluster;
+
+    uint64_t cluster_offset = offset % cluster_size;
+    size_t bytes_written = 0;
+    uint8_t* cluster_buf = static_cast<uint8_t*>(kmalloc(cluster_size));
+    if (!cluster_buf) return fk::core::Error::OutOfMemory;
+
+    while (bytes_written < size) {
+        uint32_t sector = cluster_to_sector(current_cluster);
+        m_device->read(sector * 512, cluster_size, cluster_buf);
+
+        size_t to_write = fk::algorithms::min(size - bytes_written,
+                                              (size_t)(cluster_size - cluster_offset));
+        fk::memory::copy(cluster_buf + cluster_offset, buf + bytes_written, to_write);
+        m_device->write(sector * 512, cluster_size, cluster_buf);
+
+        bytes_written += to_write;
+        cluster_offset = 0;
+
+        if (bytes_written < size) {
+            uint32_t next = get_next_cluster(current_cluster);
+            if (next >= 0x0FFFFFF8) {
+                auto res = allocate_cluster(current_cluster);
+                if (res.is_error()) { kfree(cluster_buf); return res.error(); }
+                next = res.value();
+            }
+            current_cluster = next;
+        }
+    }
+
+    kfree(cluster_buf);
+
+    uint64_t end = offset + bytes_written;
+    if (end > file_size_inout) file_size_inout = (size_t)end;
+    return bytes_written;
+}
+
+fk::core::Result<void, fk::core::Error>
+Fat32FileSystem::update_dir_entry_size(uint32_t dir_sector_lba, uint8_t entry_idx, uint32_t new_size) {
+    uint8_t sector[512];
+    if (m_device->read((uint64_t)dir_sector_lba * 512, 512, sector).is_error())
+        return fk::core::Error::IOError;
+    auto* dir = reinterpret_cast<Fat32DirectoryEntry*>(sector);
+    dir[entry_idx].size = new_size;
+    if (m_device->write((uint64_t)dir_sector_lba * 512, 512, sector).is_error())
+        return fk::core::Error::IOError;
+    return {};
 }
 
 }

@@ -41,6 +41,9 @@ global sys_getdents64
 global sys_nanosleep
 global sys_mount
 global sys_umount
+global sys_setsid
+global sys_setpgid
+global sys_getpgid
 
 section .text
 
@@ -337,9 +340,21 @@ sys_getcwd:
 
 
 sys_ioctl:
-
     mov rax, SYS_IOCTL
-
     syscall
+    ret
 
+sys_setsid:
+    mov rax, SYS_SETSID
+    syscall
+    ret
+
+sys_setpgid:
+    mov rax, SYS_SETPGID
+    syscall
+    ret
+
+sys_getpgid:
+    mov rax, SYS_GETPGID
+    syscall
     ret

@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Driver/Vga/vesa.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::drivers::vesa {
 
@@ -28,7 +28,7 @@ void VESADriver::discover_vbe() {
     fk::algorithms::klog("VESA", "Discovering VBE controller...");
     
     // Prepare signature for VESA 2.0+
-    memcpy(m_controller_info.signature, "VBE2", 4);
+    fk::memory::copy(m_controller_info.signature, "VBE2", 4);
 
     // Call BIOS bridge
     if (!bios_int10h_vesa_get_controller_info(&m_controller_info)) {
@@ -37,7 +37,7 @@ void VESADriver::discover_vbe() {
         return;
     }
 
-    if (memcmp(m_controller_info.signature, "VESA", 4) != 0) {
+    if (fk::memory::compare(m_controller_info.signature, "VESA", 4) != 0) {
         fk::algorithms::kwarn("VESA", "Invalid VBE signature");
         m_vbe_supported = false;
         return;

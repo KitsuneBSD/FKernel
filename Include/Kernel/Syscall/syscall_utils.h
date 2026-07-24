@@ -1,7 +1,7 @@
 #pragma once
 
-#include <LibFK/Core/Error.h>
-#include <LibC/stdint.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Types/types.h>
 
 namespace fkernel {
 

@@ -2,7 +2,8 @@
 
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Core/Result.h>
+#include <Kernel/Fs/Vfs/path_resolver.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Memory/retain_ptr.h>
 
 #include <LibFK/Container/vector.h>
@@ -20,15 +21,25 @@ class Dentry;
 class VirtualFileSystem {
 private:
   fk::synchronization::Spinlock m_lock;
+  PathResolver m_resolver;
   fk::RefPtr<Dentry> m_root;
-  VirtualFileSystem() = default;
+  VirtualFileSystem();
 
 public:
   static void initialize();
   static VirtualFileSystem& the();
 
+  fk::RefPtr<Dentry> root() const { return m_root; }
+
   void mount_root(fk::RefPtr<Node> node);
-  fk::core::Result<void, fk::core::Error> mount(const char* path, fk::RefPtr<Node> node);
+  fk::core::Result<void, fk::core::Error> mount(const char* path, fk::RefPtr<Node> node,
+                                                 const char* fstype = "auto");
+
+  // Iterate all recorded mount points (path, fstype). Callback receives c-strings.
+  static void for_each_mount(void (*cb)(const char* path, const char* fstype, void* ctx), void* ctx);
+
+  // Return the device ID for the mount point whose path is the longest prefix of `path`.
+  static uint32_t dev_id_for_path(const char* path);
 
   fk::core::Result<fk::RefPtr<FileDescription>, fk::core::Error> open(const char* path, int flags);
 
@@ -54,6 +65,8 @@ public:
 
   fk::core::Result<void, fk::core::Error> truncate(const char* path, uint64_t size);
   fk::core::Result<void, fk::core::Error> fsync(fk::RefPtr<FileDescription> desc);
+  fk::core::Result<void, fk::core::Error> chmod(const char* path, uint32_t mode);
+  fk::core::Result<void, fk::core::Error> chown(const char* path, uint32_t uid, uint32_t gid);
 
   fk::core::Result<void, fk::core::Error> unmount(const char* path);
 

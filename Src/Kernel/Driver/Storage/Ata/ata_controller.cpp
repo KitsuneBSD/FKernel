@@ -7,7 +7,7 @@
 #include <Kernel/Fs/DevFs/dev_fs.h>
 #include <Kernel/Fs/Vfs/auto_mounter.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Assertions.h>
+#include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/own_ptr.h>
 
 void ATAController::initialize() {
@@ -104,11 +104,13 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index,
     uint8_t status = inb(io + 7);
     if (status == 0) continue;
 
-    while (inb(io + 7) & 0x80);
+    { int t = 1000000; uint8_t s; do { s = inb(io + 7); } while ((s & 0x80) && --t > 0);
+      if (t <= 0) { fk::algorithms::kwarn("ATA", "IDENTIFY BSY timeout"); continue; } }
 
     if (inb(io + 4) != 0 || inb(io + 5) != 0) continue;
 
-    while (!(inb(io + 7) & 0x08));
+    { int t = 1000000; uint8_t s; do { s = inb(io + 7); } while (!(s & 0x08) && --t > 0);
+      if (t <= 0) { fk::algorithms::kwarn("ATA", "IDENTIFY DRQ timeout"); continue; } }
 
     uint16_t data[256];
     for (int j = 0; j < 256; ++j) {
@@ -136,8 +138,6 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index,
       fk::algorithms::kwarn("ATA", "Invalid sector count: %llu", sectors);
       continue;
     }
-
-    ASSERT(sectors > 0);
 
     uint64_t total_bytes = sectors * 512;
     uint64_t mib = total_bytes / (1024 * 1024);

@@ -11,6 +11,8 @@ class GlobalEndpointManager {
   fk::containers::HashMap<uint64_t, Endpoint *> m_endpoints;
   fk::containers::HashMap<uint64_t, Notification *> m_notifications;
 
+  GlobalEndpointManager() = default;
+
 public:
   static GlobalEndpointManager &the() {
     static GlobalEndpointManager instance;
@@ -33,6 +35,14 @@ public:
 
   void register_notification(uint64_t id, Notification *notification) {
     m_notifications.insert(id, notification);
+  }
+
+  void remove_notification(uint64_t id) {
+    (void)m_notifications.remove(id);
+  }
+
+  void remove_endpoint(uint64_t id) {
+    (void)m_endpoints.remove(id);
   }
 };
 

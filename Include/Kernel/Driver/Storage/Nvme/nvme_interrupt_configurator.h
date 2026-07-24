@@ -2,7 +2,7 @@
 
 #include <Kernel/Driver/Storage/Nvme/nvme_controller_state.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel {
 

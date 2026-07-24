@@ -12,9 +12,12 @@ class Fat32Node : public Node {
     uint32_t m_first_cluster;
     size_t m_size;
     bool m_is_dir;
+    uint32_t m_dir_sector{0};   // LBA sector of this file's directory entry
+    uint8_t  m_dir_entry_idx{0}; // index of the entry within that sector (0-15)
 
 public:
-    Fat32Node(fk::RefPtr<Fat32FileSystem> fs, uint32_t cluster, size_t size, bool is_dir);
+    Fat32Node(fk::RefPtr<Fat32FileSystem> fs, uint32_t cluster, size_t size, bool is_dir,
+              uint32_t dir_sector = 0, uint8_t dir_entry_idx = 0);
 
     virtual fk::core::Result<size_t, fk::core::Error>
     read(uint64_t offset, size_t size, uint8_t *buffer) override;

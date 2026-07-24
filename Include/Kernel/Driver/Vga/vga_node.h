@@ -3,7 +3,7 @@
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Scheduler/scheduler.h>

@@ -12,6 +12,11 @@ PartitionManager &PartitionManager::the() {
   return instance;
 }
 
+void PartitionManager::initialize() {
+  fk::algorithms::klog("PARTITION", "Partition manager initialized");
+  m_is_initialized = true;
+}
+
 #include <Kernel/Fs/Vfs/auto_mounter.h>
 
 void PartitionManager::add_partition(

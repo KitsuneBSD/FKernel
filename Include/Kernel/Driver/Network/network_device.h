@@ -2,8 +2,8 @@
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Network/mac_address.h>
-#include <LibFK/Core/Result.h>
-#include <LibFK/Core/Error.h>
+#include <LibFK/Core/result.h>
+#include <LibFK/Core/error.h>
 
 namespace fkernel {
 

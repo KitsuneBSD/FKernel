@@ -1,4 +1,3 @@
-#include <LibC/assert.h>
 #include <LibC/stddef.h>
 #include <LibC/string.h>
 

@@ -3,6 +3,7 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Driver/Network/network_device.h>
 #include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Memory/Dma/dma_buffer.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -62,12 +63,15 @@ private:
     PciDevice m_pci_device;
     MACAddress m_mac;
 
-    // Queues
-    uint8_t* m_rx_buffer[128];
+    // RX ring
+    DmaBuffer m_rx_ring;
+    DmaBuffer m_rx_buffers[128];
     e1000_rx_desc* m_rx_descs{nullptr};
     uint16_t m_rx_current{0};
 
-    uint8_t* m_tx_buffer[128];
+    // TX ring
+    DmaBuffer m_tx_ring;
+    DmaBuffer m_tx_buffers[128];
     e1000_tx_desc* m_tx_descs{nullptr};
     uint16_t m_tx_current{0};
 

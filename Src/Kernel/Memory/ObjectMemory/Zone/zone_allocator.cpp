@@ -3,7 +3,7 @@
 #include <Kernel/Memory/ObjectMemory/Zone/zone_types.h>
 
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Assertions.h>
+#include <LibFK/Core/assertions.h>
 #include <LibFK/Types/types.h>
 
 void Zone::populate_zone(uintptr_t base, size_t length, ZoneType type) {

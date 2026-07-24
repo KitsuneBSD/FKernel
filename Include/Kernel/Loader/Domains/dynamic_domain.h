@@ -4,7 +4,7 @@
 #include <Kernel/Loader/Types/elf64_dynamic.h>
 #include <Kernel/Loader/Types/elf64_phdr.h>
 #include <LibFK/Container/vector.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 namespace fkernel::elf_domains {
 

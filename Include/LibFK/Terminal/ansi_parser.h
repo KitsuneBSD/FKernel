@@ -74,11 +74,15 @@ private:
 
     AnsiDelegate& m_delegate;
     State m_state{State::Normal};
-    
+
     fk::containers::Vector<uint16_t> m_parameters;
     uint16_t m_current_parameter{0};
     bool m_has_parameter{false};
     bool m_is_private{false}; // CSI ?
+
+    uint32_t m_fg_rgb{0xAAAAAA};
+    uint32_t m_bg_rgb{0x000000};
+    bool m_use_rgb{false};
 };
 
 } // namespace fk::terminal

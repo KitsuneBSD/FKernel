@@ -3,13 +3,13 @@
 #include <Kernel/Hardware/Fadt/fadt.h>
 #include <LibFK/Types/types.h>
 
-class ACPIManager;
+namespace fkernel { class ACPIManager; }
 
 class FadtManager {
 public:
   static FadtManager &the();
 
-  void initialize(ACPIManager *acpi);
+  void initialize(fkernel::ACPIManager *acpi);
   FADT *get_fadt() const { return m_fadt; }
   uint32_t get_length() const { return m_length; }
   bool has_x_fields() const { return m_has_x_fields; }

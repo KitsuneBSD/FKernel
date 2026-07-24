@@ -61,4 +61,19 @@ fork_child_trampoline:
     ; The syscall_stub_post_dispatch expects to cleanup 24 bytes of arguments/padding
     ; from the stack before restoring registers. We must match this layout.
     sub rsp, 24
+    ; Sync the child's fork-time user context from PtRegs into g_cpu_block so that
+    ; syscall_stub_post_dispatch returns to the right user RSP/RIP/RFLAGS.
+    ; Without this, g_cpu_block holds stale values from whatever syscall the parent
+    ; (or another task) ran last, causing the child to sysret to the wrong address.
+    ;
+    ; After sub rsp,24: PtRegs base = rsp+24, so:
+    ;   PtRegs.rip    = [rsp+128]   (base+104)
+    ;   PtRegs.rflags = [rsp+136]   (base+112)
+    ;   PtRegs.rsp    = [rsp+144]   (base+120)
+    mov rcx, [rsp + 128]   ; PtRegs.rip
+    mov [gs:16], rcx       ; g_cpu_block.saved_rip
+    mov rcx, [rsp + 136]   ; PtRegs.rflags
+    mov [gs:24], rcx       ; g_cpu_block.saved_rflags
+    mov rcx, [rsp + 144]   ; PtRegs.rsp
+    mov [gs:8], rcx        ; g_cpu_block.user_rsp
     jmp syscall_stub_post_dispatch

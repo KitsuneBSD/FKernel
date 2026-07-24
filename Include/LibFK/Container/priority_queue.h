@@ -1,6 +1,5 @@
 #pragma once
 
-#include <LibC/assert.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Types/types.h>
 
@@ -22,10 +21,7 @@ public:
     sift_up(m_heap.size() - 1);
   }
 
-  const T &top() const {
-    ASSERT(!is_empty());
-    return m_heap[0];
-  }
+  const T &top() const { return m_heap[0]; }
 
   void pop() {
     if (is_empty())

@@ -2,8 +2,8 @@
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/definitions.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Core/Result.h>
-#include <LibC/string.h>
+#include <LibFK/Core/result.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::drivers {
 
@@ -51,9 +51,9 @@ void KeymapManager::load_default_abnt2() {
         R16(0, 0, 0, '?', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     };
 
-    memcpy(m_map_normal, abnt2_normal, 128);
-    memcpy(m_map_shift, abnt2_shift, 128);
-    memset(m_map_alt, 0, 128);
+    fk::memory::copy(m_map_normal, abnt2_normal, 128);
+    fk::memory::copy(m_map_shift, abnt2_shift, 128);
+    fk::memory::set(m_map_alt, 0, 128);
 }
 
 void KeymapManager::load_default_us() {
@@ -79,9 +79,9 @@ void KeymapManager::load_default_us() {
         R16(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     };
 
-    memcpy(m_map_normal, us_normal, 128);
-    memcpy(m_map_shift, us_shift, 128);
-    memset(m_map_alt, 0, 128);
+    fk::memory::copy(m_map_normal, us_normal, 128);
+    fk::memory::copy(m_map_shift, us_shift, 128);
+    fk::memory::set(m_map_alt, 0, 128);
 }
 
 fk::core::Result<void, fk::core::Error> KeymapManager::load_from_file(const char* path) {
@@ -96,7 +96,7 @@ fk::core::Result<void, fk::core::Error> KeymapManager::load_from_file(const char
     TRY(file->seek(0, SeekMode::Set));
     TRY(file->read(8, header));
 
-    if (memcmp(header, "FKMAP", 5) != 0) {
+    if (fk::memory::compare(header, "FKMAP", 5) != 0) {
         fk::algorithms::klog("KEYMAP", "Invalid keymap header in %s", path);
         return fk::core::Error::InvalidParameter;
     }

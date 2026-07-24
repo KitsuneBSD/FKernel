@@ -46,7 +46,7 @@ uint64_t Notification::wait() {
 
     IpcLogNode::the()->log_notification_operation("wait_blocked", task_id, m_pending_bits);
     m_waiting_tasks.append(*current);
-    scheduler.block_current();
+    scheduler.block_current_noqueue();
   }
 
   // Result will be set in rax by signal()

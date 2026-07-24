@@ -4,7 +4,7 @@
 #include <Kernel/Loader/Types/elf_constants.h>
 #include <Kernel/Loader/Types/elf64_ehdr.h>
 #include <Kernel/Loader/Types/elf64_phdr.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Container/vector.h>
 
 namespace fkernel {
@@ -27,6 +27,7 @@ struct ElfLoadResult {
     uint16_t  ph_ent;
     bool      stack_executable{false};
     TlsInfo   tls;
+    uintptr_t highest_load_end{0};
 };
 
 using ElfLoadOperationResult = fk::core::Result<ElfLoadResult, fk::core::Error>;

@@ -54,5 +54,12 @@
 %define SYS_EXIT_GROUP 231
 %define SYS_RT_SIGSUSPEND 130
 %define SYS_FCNTL 72
+%define SYS_SETSID 112
+%define SYS_SETPGID 109
+%define SYS_GETPGID 121
+%define SYS_OPEN 2
+%define SYS_STAT 4
+%define SYS_FSTAT 5
+%define SYS_LSTAT 6
 
 %endif

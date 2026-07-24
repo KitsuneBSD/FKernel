@@ -78,7 +78,11 @@ MBRParser::parse(fk::RefPtr<StorageDevice> device) {
 
 fk::core::Result<void, fk::core::Error>
 MBRParser::parse_extended(fk::RefPtr<StorageDevice> device,
-                          uint32_t ebr_lba, uint32_t base_ebr_lba, int& partition_count) {
+                          uint32_t ebr_lba, uint32_t base_ebr_lba, int& partition_count, int depth) {
+  if (depth > 64) {
+      fk::algorithms::kwarn("MBR", "Extended partition chain exceeds 64 levels — possible loop, aborting");
+      return fk::core::Error::InvalidData;
+  }
   size_t sector_size = device->sector_size().value();
   uint8_t* buffer = static_cast<uint8_t*>(kmalloc(sector_size));
   if (!buffer) return fk::core::Error::OutOfMemory;
@@ -114,7 +118,7 @@ MBRParser::parse_extended(fk::RefPtr<StorageDevice> device,
   kfree(buffer);
 
   if (next_ebr_lba != 0) {
-      return parse_extended(device, next_ebr_lba, base_ebr_lba, partition_count);
+      return parse_extended(device, next_ebr_lba, base_ebr_lba, partition_count, depth + 1);
   }
 
   return {};

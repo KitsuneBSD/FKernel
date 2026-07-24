@@ -4,7 +4,7 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibC/string.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::vtd {
 
@@ -43,7 +43,7 @@ void IntelIOMMU::initialize() {
             if (m_re_table_phys == 0) {
                 // Initialize Root Entry Table
                 m_re_table_phys = PhysicalMemoryManager::the().alloc_page();
-                memset(reinterpret_cast<void*>(m_re_table_phys), 0, 4096);
+                fk::memory::set(reinterpret_cast<void*>(m_re_table_phys), 0, 4096);
                 
                 auto* regs = reinterpret_cast<volatile RegisterMap*>(drhd->register_base_address);
                 regs->root_entry_table = m_re_table_phys;
