@@ -1,5 +1,65 @@
 {
-  "general": {
-    "enablePromptCompletion": true
+  "fkernel": {
+    "architecture": {
+      "layers": ["LibC", "LibFK", "Kernel"],
+      "enforcement": "strict_separation"
+    },
+    "object_calisthenics": {
+      "enabled": true,
+      "max_class_lines": 200,
+      "max_method_lines": 20,
+      "max_instance_variables": 2,
+      "forbid_else_keyword": true,
+      "one_dot_per_line": true,
+      "wrap_primitives": true
+    },
+    "testing": {
+      "coverage_targets": {
+        "libc": 90,
+        "libfk": 85,
+        "kernel": 75
+      },
+      "require_unit_tests": true,
+      "require_integration_tests": true,
+      "freestanding_context": true
+    },
+    "code_quality": {
+      "enforce_naming_conventions": true,
+      "require_documentation": true,
+      "validate_error_handling": true,
+      "check_memory_safety": true,
+      "one_struct_per_file": true,
+      "domain_based_directories": true,
+      "deep_autodocumentation": true,
+      "consolidate_algorithms": true
+    },
+    "drivers": {
+      "require_interrupt_driven": true,
+      "validate_hardware_compliance": true,
+      "enforce_dma_safety": true
+    }
+  },
+  "automation": {
+    "ci_validation": {
+      "kernel_boot_test": true,
+      "hardware_emulation": true,
+      "test_coverage": true,
+      "object_calisthenics": true
+    },
+    "documentation": {
+      "auto_generate_api_docs": true,
+      "track_modifications": true,
+      "update_ai_docs": true,
+      "maintain_conceptual_memory": true,
+      "read_ai_docs_as_memory": true,
+      "create_human_documentation": true
+    },
+    "algorithms": {
+      "consolidate_known_algorithms": true,
+      "move_to_libfk": true,
+      "avoid_domain_specific_duplicates": true,
+      "require_single_implementation": true,
+      "algorithm_categories": ["archive", "compression", "checksum", "hash", "encoding", "parsing", "data_structures"]
+    }
   }
 }

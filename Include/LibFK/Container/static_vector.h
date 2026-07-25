@@ -1,12 +1,11 @@
 #pragma once
 
-#include <LibC/assert.h>
+#include <LibFK/Memory/new.h>
 #include <LibFK/Traits/type_traits.h>
 #include <LibFK/Types/types.h>
 
-template <typename T> constexpr T &&move(T &obj) noexcept {
-  return static_cast<T &&>(obj);
-}
+namespace fk {
+namespace containers {
 
 /*
  * @brief Fixed-capacity vector with stack allocation.
@@ -30,7 +29,7 @@ template <typename T, size_t N> struct static_vector {
   bool push_back(T &&value) {
     if (count >= N)
       return false;
-    data[count++] = move(value);
+    data[count++] = fk::types::move(value);
     return true;
   }
 
@@ -51,33 +50,21 @@ template <typename T, size_t N> struct static_vector {
   const T *end() const { return data + count; }
 
   void erase(size_t index) {
-    if (index >= count)
-      return;
+    if (index >= count) return;
     for (size_t i = index; i < count - 1; ++i)
-      data[i] = move(data[i + 1]);
+      data[i] = fk::types::move(data[i + 1]);
+    destroy(&data[count - 1]);
+    new (&data[count - 1]) T{};
     --count;
   }
 
-  T &back() {
-    ASSERT(count > 0);
-    return data[count - 1];
-  }
+  T &back() { return data[count - 1]; }
 
-  const T &back() const {
-    ASSERT(count > 0);
-    return data[count - 1];
-  }
+  const T &back() const { return data[count - 1]; }
 
-  // NEW: access first element (complemento útil)
-  T &front() {
-    ASSERT(count > 0);
-    return data[0];
-  }
+  T &front() { return data[0]; }
 
-  const T &front() const {
-    ASSERT(count > 0);
-    return data[0];
-  }
+  const T &front() const { return data[0]; }
 
   void clear() {
     for (size_t i = 0; i < count; ++i)
@@ -87,3 +74,6 @@ template <typename T, size_t N> struct static_vector {
 
   bool is_full() const { return capacity() == count; }
 };
+
+} // namespace containers
+} // namespace fk

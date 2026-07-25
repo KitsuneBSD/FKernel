@@ -3,12 +3,11 @@
 
 char *strchr(const char *s, int c) {
   unsigned char target = (unsigned char)c;
-  for (size_t i = 0;; i++) {
-    if (s[i] == target) {
-      return (char *)&s[i];
-    }
-    if (s[i] == '\0') {
+  while (1) {
+    if ((unsigned char)*s == target)
+      return (char *)s;
+    if (*s == '\0')
       return NULL;
-    }
+    s++;
   }
 }

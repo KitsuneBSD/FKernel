@@ -1,0 +1,39 @@
+#pragma once
+
+#include <LibFK/Core/errno_codes.h>
+#include <LibC/stdint.h>
+
+namespace fk {
+namespace core {
+
+enum class Error {
+  None = 0,
+  PermissionDenied = 1,             // EPERM
+  NotFound = 2,                     // ENOENT
+  IOError = 5,                      // EIO
+  DeviceError = 6,                  // ENXIO
+  InvalidParameter = 22,            // EINVAL
+  OutOfMemory = 12,                 // ENOMEM
+  InvalidHandle = 9,                // EBADF
+  IsDirectory = 21,                 // EISDIR
+  NotADirectory = 20,               // ENOTDIR
+  EndOfFile = 999,                  // Custom (no real equivalent for EOF in errno)
+  InvalidData = 100,                // fk-specific, distinct from EINVAL
+  Interrupted = 4,                  // EINTR
+  NoChildProcesses = 10,            // ECHILD
+  InappropriateIoctlForDevice = 25, // ENOTTY
+  NoSpaceLeftOnDevice = 28,         // ENOSPC
+  NotASymlink = 101,                // fk-specific, distinct from EINVAL
+  IsASymlink = 40,                  // ELOOP or EINVAL
+  NotImplemented = 38,              // ENOSYS
+  AlreadyExists = 17,               // EEXIST
+  DeviceBusy = 16,                  // EBUSY
+  Timeout = 110,                    // ETIMEDOUT
+  DirectoryNotEmpty = 39,           // ENOTEMPTY
+  BrokenPipe = 32,                  // EPIPE
+  WouldBlock = 11,                  // EAGAIN
+  NotConnected = 107,               // ENOTCONN
+};
+
+} // namespace core
+} // namespace fk

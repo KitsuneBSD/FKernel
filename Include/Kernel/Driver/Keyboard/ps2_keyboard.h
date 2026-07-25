@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Kernel/Driver/Device/CharacterDevice/character_device.h>
+#include <Kernel/Driver/Keyboard/keymap_manager.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 
 static constexpr uint16_t PS2_DATA_PORT = 0x60;     ///< PS/2 data port
@@ -12,14 +15,23 @@ static constexpr size_t KEYBOARD_BUFFER_SIZE = 256; ///< Size of the key buffer
  * Handles PS/2 keyboard input, manages an internal key buffer, and
  * provides a singleton interface for reading key presses.
  */
-class PS2Keyboard {
+class PS2Keyboard final : public fkernel::CharacterDevice {
 private:
   char buffer[KEYBOARD_BUFFER_SIZE]; ///< Circular buffer for pressed keys
-  size_t head = 0;                   ///< Head index of the buffer
-  size_t tail = 0;                   ///< Tail index of the buffer
-  bool shift_pressed = false;        ///< Track shift key state
+  volatile size_t head = 0;                   ///< Head index of the buffer
+  volatile size_t tail = 0;                   ///< Tail index of the buffer
+  bool shift_pressed{false};
+  bool alt_pressed{false};
 
-  PS2Keyboard() = default; ///< Private constructor for singleton
+  PS2Keyboard() {
+      set_name("keyboard");
+  }
+
+public:
+  // CharacterDevice interface
+  virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size, uint8_t* buffer) override;
+  virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t offset, size_t size, const uint8_t* buffer) override;
+  virtual size_t size() const override { return 0; }
 
   /**
    * @brief Push a character into the internal buffer
@@ -33,7 +45,6 @@ private:
    */
   void handle_scancode(uint8_t scancode);
 
-public:
   /**
    * @brief Get the singleton instance of the PS2Keyboard
    * @return Reference to the keyboard instance
@@ -42,6 +53,9 @@ public:
     static PS2Keyboard instance;
     return instance;
   }
+
+  void set_layout(fkernel::drivers::KeyboardLayout layout) { fkernel::drivers::KeymapManager::the().set_layout(layout); }
+  fkernel::drivers::KeyboardLayout layout() const { return fkernel::drivers::KeymapManager::the().layout(); }
 
   /**
    * @brief Initialize the PS/2 keyboard
@@ -54,10 +68,11 @@ public:
   void irq_handler();
 
   /**
-   * @brief Check if a key is available in the buffer
+   * @brief Check if a key is available in the buffer. This will poll the
+   *        PS/2 controller and consume any pending scancode if present.
    * @return true if a key is available, false otherwise
    */
-  bool has_key() const;
+  bool has_key();
 
   /**
    * @brief Pop a key from the buffer

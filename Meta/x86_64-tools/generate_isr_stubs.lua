@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 
 local filename = "isr_stubs.h"
 local max_limit = 255
@@ -22,4 +21,5 @@ end
 file:write("};\n\n")
 
 file:close()
-print("Gerado: " .. filename)
+local PrintMessage = require("Meta.Lib.print_message")
+PrintMessage(false, "Generated: " .. filename)

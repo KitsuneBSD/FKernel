@@ -16,17 +16,17 @@ setup_page_tables:
 	or eax, 0b11 ; present, writable
 	mov [page_table_l3], eax
 
-	mov ecx, 0 ; counter
+	; Fill 512 huge-page (2 MiB) PDE entries by additive accumulation.
+	; Starting address 0x0 | flags 0x9B (P+RW+PWT+PCD+PS).
+	; Adding 0x200000 per iteration avoids mul and the repeated OR.
+	mov ecx, 0
+	mov eax, 0b10011011 ; base=0x0, flags: P+RW+PWT+PCD+PS
 .loop:
-
-	mov eax, 0x200000 ; 2MiB
-	mul ecx
-	or eax, 0b10011011 ; present, writable, huge page, cache disable, write-through
 	mov [page_table_l2 + ecx * 8], eax
-
-	inc ecx ; increment counter
-	cmp ecx, 512 ; checks if the whole table is mapped
-	jne .loop ; if not, continue
+	add eax, 0x00200000       ; advance by 2 MiB
+	inc ecx
+	cmp ecx, 512
+	jne .loop
 
 	ret
 

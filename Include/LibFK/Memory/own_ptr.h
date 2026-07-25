@@ -1,123 +1,138 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
-#include <LibFK/new.h>
+#include <LibFK/Memory/new.h>
 
-/**
- * @brief A simple ownership smart pointer similar to std::unique_ptr.
- *
- * OwnPtr exclusively owns a dynamically allocated object and deletes it
- * when the pointer goes out of scope. Supports move semantics and
- * pointer access, but not copy semantics.
- *
- * @tparam T Type of the object being owned
- */
-template <typename T> class OwnPtr {
+namespace fk {
+namespace memory {
+
+template <typename T>
+class OwnPtr {
 public:
-  /** @brief Default constructor: no object owned */
-  OwnPtr() : m_ptr(nullptr) {}
-
-  /** @brief Construct OwnPtr from raw pointer
-   *  @param ptr Raw pointer to own
-   */
-  explicit OwnPtr(T *ptr) : m_ptr(ptr) {}
-
-  /** @brief Move constructor */
-  OwnPtr(OwnPtr &&other) : m_ptr(other.leakPtr()) {}
-
-  /** @brief Templated move constructor for convertible types */
-  template <typename U>
-  OwnPtr(OwnPtr<U> &&other) : m_ptr(static_cast<T *>(other.leakPtr())) {}
-
-  /** @brief Destructor: deletes owned object */
-  ~OwnPtr() { clear(); }
-
-  /** @brief Construct OwnPtr from nullptr */
-  OwnPtr(nullptr_t) : m_ptr(nullptr) {}
-
-  /** @brief Move assignment operator */
-  OwnPtr &operator=(OwnPtr &&other) {
-    if (this != &other) {
-      clear();
-      m_ptr = other.leakPtr();
+    OwnPtr() : m_ptr(nullptr) {}
+    explicit OwnPtr(T* ptr) : m_ptr(ptr) {}
+    
+    OwnPtr(const OwnPtr&) = delete;
+    OwnPtr& operator=(const OwnPtr&) = delete;
+    
+    OwnPtr(OwnPtr&& other) noexcept : m_ptr(other.m_ptr) {
+        other.m_ptr = nullptr;
     }
-    return *this;
-  }
 
-  /** @brief Templated move assignment operator for convertible types */
-  template <typename U> OwnPtr &operator=(OwnPtr<U> &&other) {
-    if (reinterpret_cast<void *>(this) != reinterpret_cast<void *>(&other)) {
-      clear();
-      m_ptr = static_cast<T *>(other.leakPtr());
+    template <typename U>
+    OwnPtr(OwnPtr<U>&& other) noexcept : m_ptr(other.leak_ptr()) {}
+    
+    OwnPtr& operator=(OwnPtr&& other) noexcept {
+        if (this != &other) {
+            clear();
+            m_ptr = other.m_ptr;
+            other.m_ptr = nullptr;
+        }
+        return *this;
     }
-    return *this;
-  }
 
-  /** @brief Assign from raw pointer */
-  OwnPtr &operator=(T *ptr) {
-    if (m_ptr != ptr)
-      clear();
-    m_ptr = ptr;
-    return *this;
-  }
-
-  /** @brief Assign nullptr, releasing owned object */
-  OwnPtr &operator=(nullptr_t) {
-    clear();
-    return *this;
-  }
-
-  /** @brief Releases ownership and deletes owned object */
-  void clear() {
-    if (m_ptr) {
-      delete m_ptr;
-      m_ptr = nullptr;
+    OwnPtr& operator=(decltype(nullptr)) {
+        clear();
+        return *this;
     }
-  }
 
-  /** @brief Check if pointer is null
-   *  @return true if no object is owned
-   */
-  bool operator!() const { return !m_ptr; }
+    OwnPtr& operator=(T* ptr) {
+        clear();
+        m_ptr = ptr;
+        return *this;
+    }
+    
+    ~OwnPtr() {
+        clear();
+    }
+    
+    T* get() const { return m_ptr; }
+    T* ptr() const { return m_ptr; }
+    T* operator->() const { return m_ptr; }
+    T& operator*() const { return *m_ptr; }
+    explicit operator bool() const { return m_ptr != nullptr; }
+    
+    T* leak_ptr() {
+        T* ptr = m_ptr;
+        m_ptr = nullptr;
+        return ptr;
+    }
 
-  /** @brief Relinquish ownership without deleting
-   *  @return Pointer that was owned
-   */
-  T *leakPtr() {
-    T *leaked = m_ptr;
-    m_ptr = nullptr;
-    return leaked;
-  }
-
-  /** @brief Access owned pointer */
-  T *ptr() { return m_ptr; }
-  const T *ptr() const { return m_ptr; }
-
-  /** @brief Dereference operators */
-  T *operator->() { return m_ptr; }
-  const T *operator->() const { return m_ptr; }
-
-  T &operator*() { return *m_ptr; }
-  const T &operator*() const { return *m_ptr; }
-
-  /** @brief Check if pointer is non-null
-   *  @return true if an object is owned
-   */
-  operator bool() const { return m_ptr != nullptr; }
+    void clear() {
+        if (m_ptr) delete m_ptr;
+        m_ptr = nullptr;
+    }
 
 private:
-  T *m_ptr; ///< Raw pointer to the owned object
+    T* m_ptr;
 };
 
-/**
- * @brief Helper function to construct OwnPtr in-place
- *
- * @tparam T Type to construct
- * @tparam Args Constructor argument types
- * @param args Constructor arguments
- * @return OwnPtr<T> owning the new object
- */
+// Array specialization
+template <typename T>
+class OwnPtr<T[]> {
+public:
+    OwnPtr() : m_ptr(nullptr) {}
+    explicit OwnPtr(T* ptr) : m_ptr(ptr) {}
+    
+    OwnPtr(const OwnPtr&) = delete;
+    OwnPtr& operator=(const OwnPtr&) = delete;
+    
+    OwnPtr(OwnPtr&& other) noexcept : m_ptr(other.m_ptr) {
+        other.m_ptr = nullptr;
+    }
+    
+    OwnPtr& operator=(OwnPtr&& other) noexcept {
+        if (this != &other) {
+            clear();
+            m_ptr = other.m_ptr;
+            other.m_ptr = nullptr;
+        }
+        return *this;
+    }
+
+    OwnPtr& operator=(decltype(nullptr)) {
+        clear();
+        return *this;
+    }
+
+    OwnPtr& operator=(T* ptr) {
+        clear();
+        m_ptr = ptr;
+        return *this;
+    }
+    
+    ~OwnPtr() {
+        clear();
+    }
+    
+    T* get() const { return m_ptr; }
+    T* ptr() const { return m_ptr; }
+    T& operator[](size_t index) const { return m_ptr[index]; }
+    explicit operator bool() const { return m_ptr != nullptr; }
+    
+    T* leak_ptr() {
+        T* ptr = m_ptr;
+        m_ptr = nullptr;
+        return ptr;
+    }
+
+    void clear() {
+        if (m_ptr) delete[] m_ptr;
+        m_ptr = nullptr;
+    }
+
+private:
+    T* m_ptr;
+};
+
 template <typename T, typename... Args>
-inline OwnPtr<T> make_own(Args &&...args) {
-  return OwnPtr<T>(new T(static_cast<Args &&>(args)...));
+inline OwnPtr<T> make_owned(Args&&... args) {
+    return OwnPtr<T>(new T(static_cast<Args&&>(args)...));
 }
+
+} // namespace memory
+
+using memory::OwnPtr;
+using memory::make_owned;
+
+} // namespace fk

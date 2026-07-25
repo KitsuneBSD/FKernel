@@ -1,7 +1,7 @@
-#include <LibC/stddef.h>
 #include <LibC/string.h>
 
 char *strncpy(char *dest, const char *src, size_t n) {
+  if (!dest || !src) return dest;
   size_t i = 0;
   for (; i < n && src[i] != '\0'; i++) {
     dest[i] = src[i];

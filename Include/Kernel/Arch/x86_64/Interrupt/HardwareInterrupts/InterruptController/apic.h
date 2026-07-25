@@ -1,7 +1,7 @@
 #pragma once
 
-#include "LibFK/Container/string.h"
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
+#include <LibFK/Text/string.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
 #include <LibFK/Types/types.h>
 
 /**
@@ -14,10 +14,10 @@ private:
   uintptr_t lapic_base = 0;       ///< Mapped LAPIC base
   uint64_t apic_ticks_per_ms = 0; ///< Timer ticks per ms
 
-  uint32_t read(uint32_t reg);
+  uint32_t read(uint32_t reg) const;
   void write(uint32_t reg, uint32_t value);
 
-  String m_name = "APIC";
+  fk::text::String m_name = "APIC";
 
 public:
   static APIC &the() {
@@ -26,8 +26,11 @@ public:
   }
 
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
+  uintptr_t msi_address_base() const { return lapic_base & ~static_cast<uintptr_t>(0xFFF); }
 
-  String get_name() override { return m_name; }
+  uint32_t get_id() const;
+
+  fk::text::String get_name() override { return m_name; }
   /**
    * @brief Initialize and enable the local APIC
    */
@@ -48,6 +51,12 @@ public:
    */
   void unmask_interrupt(uint8_t irq) override;
 
+  fk::core::Result<uint8_t, fk::core::Error> allocate_msi_vector(const PciDevice& device) override;
+  fk::core::Result<uint8_t, fk::core::Error> allocate_msix_vector(const PciDevice& device,
+                                                                    uint16_t entry) override;
+  void enable_msi(uint8_t vector) override;
+  void disable_msi(uint8_t vector) override;
+
   /**
    * @brief Calibrate APIC timer
    */
@@ -56,5 +65,5 @@ public:
   /**
    * @brief Configure periodic APIC timer
    */
-  void setup_timer(uint64_t ms);
+  void setup_timer(uint64_t frequency_hz);
 };

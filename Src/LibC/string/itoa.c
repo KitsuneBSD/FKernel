@@ -1,6 +1,7 @@
 #include <LibC/string.h>
 
 int itoa(int val, char *buf, int base) {
+  if (!buf || base < 2 || base > 16) return 0;
   char tmp[32];
   int i = 0, j = 0;
   int is_negative = 0;

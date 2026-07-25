@@ -1,145 +1,74 @@
-#include <LibC/assert.h>
-#include <LibC/stdio.h>
+#include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/heap_malloc.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Memory/allocator_backend.h>
+#include <LibFK/Memory/heap_malloc.h>
 
-extern "C" uint64_t __heap_start[];
-extern "C" uint64_t __heap_end[];
+namespace fk {
+namespace memory {
 
-Allocator s_allocator;
+static const AllocatorBackend *s_backend = nullptr;
 
-Allocator &heap_allocator() { return s_allocator; }
-
-void Allocator::initialize() {
-  if (initialized) {
-    kerror("HEAP MALLOC", "Allocator is already initialized!");
-    return;
-  }
-
-  uint64_t *heap_start = __heap_start;
-  uint64_t *heap_end = __heap_end;
-
-  ASSERT(heap_start && heap_end && heap_end > heap_start);
-
-  const size_t heap_size = static_cast<size_t>(heap_end - heap_start);
-
-  size_t required = 0;
-  required += ChunkAllocator<8>::sizeOfAllocationBitmapInBytes() +
-              ChunkAllocator<8>::capacityInBytes();
-  required += ChunkAllocator<16>::sizeOfAllocationBitmapInBytes() +
-              ChunkAllocator<16>::capacityInBytes();
-  required += ChunkAllocator<4096>::sizeOfAllocationBitmapInBytes() +
-              ChunkAllocator<4096>::capacityInBytes();
-  required += ChunkAllocator<16384>::sizeOfAllocationBitmapInBytes() +
-              ChunkAllocator<16384>::capacityInBytes();
-
-  ASSERT(heap_size >= required);
-  auto space = reinterpret_cast<uint64_t *>(heap_start);
-
-  alloc8.initialize(space);
-  alloc16.initialize(alloc8.addressAfterThisAllocator());
-  alloc4096.initialize(alloc16.addressAfterThisAllocator());
-  alloc16384.initialize(alloc4096.addressAfterThisAllocator());
-  initialized = true;
+void set_allocator_backend(const AllocatorBackend *backend) {
+  s_backend = backend;
 }
 
-uint64_t *allocate(size_t size) {
-  ASSERT(size > 0);
+const AllocatorBackend *get_allocator_backend() { return s_backend; }
 
-  if (size <= 8)
-    return heap_allocator().alloc8.allocate();
-  if (size <= 16)
-    return heap_allocator().alloc16.allocate();
-  if (size <= 4096)
-    return heap_allocator().alloc4096.allocate();
-  if (size <= 16384)
-    return heap_allocator().alloc16384.allocate();
+static inline void *backend_allocate(size_t size) {
+  if (s_backend && s_backend->allocate)
+    return s_backend->allocate(size);
   return nullptr;
 }
 
-uint64_t *allocateZeroed(size_t size) {
-  ASSERT(size > 0);
-
-  uint64_t *p = allocate(size);
-  if (!p)
-    return nullptr;
-  memset(p, 0, size);
-  return p;
-}
-
-void free(uint64_t *ptr) {
-  ASSERT(ptr);
-
-  if (heap_allocator().alloc8.isInAllocator(ptr)) {
-    heap_allocator().alloc8.free(ptr);
-    return;
-  }
-  if (heap_allocator().alloc16.isInAllocator(ptr)) {
-    heap_allocator().alloc16.free(ptr);
-    return;
-  }
-  if (heap_allocator().alloc4096.isInAllocator(ptr)) {
-    heap_allocator().alloc4096.free(ptr);
-    return;
-  }
-  if (heap_allocator().alloc16384.isInAllocator(ptr)) {
-    heap_allocator().alloc16384.free(ptr);
-    return;
-  }
-}
-
-uint64_t *reallocate(uint64_t *ptr, size_t size) {
-  ASSERT(ptr || size > 0);
-
-  auto try_move = [&](auto &pool) -> uint64_t * {
-    if (pool.isInAllocator(ptr)) {
-      size_t old = pool.chunk_size();
-      if (size <= old)
-        return ptr;
-      uint64_t *newptr = allocate(size);
-      if (!newptr)
-        return nullptr;
-      memcpy(newptr, ptr, old);
-      pool.free(ptr);
-      return newptr;
-    }
-    return nullptr;
-  };
-
-  if (auto *p = try_move(heap_allocator().alloc8))
-    return p;
-  if (auto *p = try_move(heap_allocator().alloc16))
-    return p;
-  if (auto *p = try_move(heap_allocator().alloc4096))
-    return p;
-  if (auto *p = try_move(heap_allocator().alloc16384))
-    return p;
-
+static inline void *backend_reallocate(void *ptr, size_t size) {
+  if (s_backend && s_backend->reallocate)
+    return s_backend->reallocate(ptr, size);
   return nullptr;
 }
+
+static inline void backend_free(void *ptr) {
+  if (s_backend && s_backend->free)
+    s_backend->free(ptr);
+}
+
+fk::core::Result<uint64_t *, fk::core::Error> allocate(size_t size) {
+  void *ptr = backend_allocate(size);
+  if (!ptr)
+    return fk::core::Error::OutOfMemory;
+  return reinterpret_cast<uint64_t *>(ptr);
+}
+
+fk::core::Result<uint64_t *, fk::core::Error> reallocate(uint64_t *ptr,
+                                                          size_t size) {
+  void *new_ptr = backend_reallocate(ptr, size);
+  if (!new_ptr && size > 0)
+    return fk::core::Error::OutOfMemory;
+  return reinterpret_cast<uint64_t *>(new_ptr);
+}
+
+void free(uint64_t *ptr) { backend_free(ptr); }
+
+} // namespace memory
+} // namespace fk
+
+extern "C" {
+void *heap_malloc(size_t size) { return fk::memory::backend_allocate(size); }
+void heap_free(void *ptr) { fk::memory::backend_free(ptr); }
+void *kmalloc(size_t size) { return fk::memory::backend_allocate(size); }
+void kfree(void *ptr) { fk::memory::backend_free(ptr); }
 
 void *kcalloc(size_t nmemb, size_t size) {
-  if (!nmemb || !size)
+  if (nmemb && size > (size_t)-1 / nmemb)
     return nullptr;
   size_t total = nmemb * size;
-  return reinterpret_cast<void *>(allocateZeroed(static_cast<size_t>(total)));
-}
-
-void *kmalloc(size_t size) {
-  if (!size)
-    return nullptr;
-  return reinterpret_cast<void *>(allocate(static_cast<size_t>(size)));
-}
-
-void kfree(void *ptr) {
-  if (!ptr)
-    return;
-  free(reinterpret_cast<uint64_t *>(ptr));
+  void *ptr = kmalloc(total);
+  if (ptr)
+    memset(ptr, 0, total);
+  return ptr;
 }
 
 void *krealloc(void *ptr, size_t size) {
-  if (!ptr)
-    return kmalloc(size);
-  return reinterpret_cast<void *>(
-      reallocate(reinterpret_cast<uint64_t *>(ptr), static_cast<size_t>(size)));
+  return fk::memory::backend_reallocate(ptr, size);
+}
 }

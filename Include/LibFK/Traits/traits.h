@@ -2,10 +2,12 @@
 
 #include <LibFK/Algorithms/djb2.h>
 #include <LibFK/Algorithms/log.h>
-#ifdef __x86_64
-#include <Kernel/Arch/x86_64/arch_defs.h>
+#ifdef __x86_64__
 #include <LibFK/Algorithms/crc32.h>
 #endif
+
+namespace fk {
+namespace traits {
 
 /**
  * @brief Template traits for generic types.
@@ -28,7 +30,7 @@ template <> struct Traits<int> {
    * @return Hash value
    */
   static unsigned hash(int i) {
-#ifdef __x86_64
+#ifdef __x86_64__
     return crc32(&i, sizeof(i));
 #else
     return djb2(&i, sizeof(i));
@@ -40,7 +42,7 @@ template <> struct Traits<int> {
    *
    * @param i Integer value to print
    */
-  static void dump(int i) { kprintf("%d", i); }
+  static void dump(int i) { kdebug("TRAITS", "dump(int): %d", i); }
 };
 
 /**
@@ -54,7 +56,7 @@ template <> struct Traits<unsigned> {
    * @return Hash value
    */
   static unsigned hash(unsigned i) {
-#ifdef __x86_64
+#ifdef __x86_64__
     return crc32(&i, sizeof(i));
 #else
     return djb2(&i, sizeof(i));
@@ -66,5 +68,8 @@ template <> struct Traits<unsigned> {
    *
    * @param i Unsigned integer value to print
    */
-  static void dump(unsigned i) { kprintf("%u", i); }
+  static void dump(unsigned i) { kdebug("TRAITS", "dump(unsigned): %u", i); }
 };
+
+} // namespace traits
+} // namespace fk

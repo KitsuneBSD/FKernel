@@ -10,6 +10,7 @@ extern multiboot_info_ptr
 section .text
 bits 64
 long_mode_start:
+  cli
   mov rsp, stack_top
 
   mov ax, 0

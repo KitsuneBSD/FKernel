@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+# FKernel boot miscellaneous tasks
+
+description="FKernel system initialization"
+
+depend() {
+    # No mount dependencies - filesystem is already mounted
+}
+
+start() {
+    einfo "Initializing FKernel system"
+    
+    # Create essential directories if they don't exist
+    mkdir -p /tmp /var/run /var/log
+    
+    # Set hostname (hardcoded for FKernel)
+    echo "FKernel" > /proc/sys/kernel/hostname 2>/dev/null || echo "FKernel" > /etc/hostname
+    
+    einfo "FKernel initialization complete"
+    return 0
+}
+
+stop() {
+    einfo "FKernel shutdown preparation"
+    return 0
+}

@@ -1,0 +1,25 @@
+# Developing Updates for FKernel
+
+## Adding a New Subsystem
+1. Create the header in `Include/Kernel/SubsystemName/`.
+2. Implement the logic in `Src/Kernel/SubsystemName/`.
+3. Add the directory to `kernel_non_architecture_related` in `xmake.lua`.
+4. Initialize the subsystem in `Src/Kernel/Init/init.cpp`.
+
+## Adding a System Call
+1. Add the number to `Include/Kernel/Syscall/syscall_numbers.h`.
+2. Implement the handler in `Src/Kernel/Syscall/SyscallList/`.
+3. Register it in `Src/Kernel/Syscall/Syscall.cpp`.
+
+## Modifying Architecture Specific Code
+Architecture specific code resides in `Src/Kernel/Arch/x86_64/`. When updating these:
+- Maintain SystemV ABI compatibility.
+- Ensure any assembly changes are matched with C++ declarations.
+- Update documentation in `Docs/Kernel/Architecture/` if changes affect the memory layout or task switching.
+
+## Porting Real Projects (ash, OpenRC)
+To bring real utilities to FKernel:
+1.  **Toolchain**: Use scripts in `Toolchain/` to download and patch projects.
+2.  **LibC**: Musl is the preferred library. Patch it to use FKernel's `syscall` interface.
+3.  **BusyBox**: Provides `ash` and standard tools (`ls`, `cat`, `mkdir`). It should be compiled statically against Musl.
+4.  **OpenRC**: The init suite. Requires a `/etc/init.d` structure in the RamDisk.

@@ -3,6 +3,9 @@
 #include <LibFK/Container/array.h>
 #include <LibFK/Types/types.h>
 
+namespace fk {
+namespace containers {
+
 template <typename Type, size_t MAX_SIZE = 4096> class Stack {
 private:
   array<Type, MAX_SIZE> m_stack;
@@ -21,7 +24,7 @@ public:
     if (is_full())
       return false;
 
-    m_stack[++top_index] = value;
+    m_stack[top_index++] = value;
     return true;
   }
 
@@ -43,3 +46,6 @@ public:
 
   void clear() { top_index = 0; }
 };
+
+} // namespace containers
+} // namespace fk

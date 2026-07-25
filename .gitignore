@@ -6,3 +6,6 @@ compile_commands.json
 doxyfile
 logs
 ./Toolchain
+.ralph
+.ralph/state.json
+.ralph/*

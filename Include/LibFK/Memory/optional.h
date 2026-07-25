@@ -2,7 +2,11 @@
 
 #include <LibC/stddef.h>
 #include <LibC/string.h>
-#include <LibFK/new.h>
+#include <LibFK/Algorithms/log.h>
+#include <LibFK/Memory/new.h>
+
+namespace fk {
+namespace memory {
 
 /**
  * @brief Minimal freestanding implementation of std::optional.
@@ -34,10 +38,26 @@ public:
   constexpr optional() = default;
 
   /**
-   * @brief Construct optional with a value
+   * @brief Construct optional with a value (move semantics)
    * @param value Value to store
    */
-  optional(const T &value) : has_value_(true) { new (storage) T(value); }
+  optional(T &&value) : has_value_(true) {
+    new (storage) T(static_cast<T &&>(value));
+    /*TODO: Apply this log when we work with LogLevel
+    fk::algorithms::kdebug("OPTIONAL", "Constructed with move value.");
+    */
+  }
+
+  /**
+   * @brief Construct optional with a value (copy semantics)
+   * @param val Value to store
+   */
+  optional(const T &val) : has_value_(true) {
+    new (storage) T(val);
+    /*TODO: Apply this log when we work with LogLevel
+    fk::algorithms::kdebug("OPTIONAL", "Constructed with copy value.");
+    */
+  }
 
   /**
    * @brief Copy constructor
@@ -46,10 +66,31 @@ public:
   optional(const optional &other) : has_value_(other.has_value_) {
     if (has_value_)
       new (storage) T(*other.ptr());
+    /*TODO: Apply this log when we work with LogLevel
+    fk::algorithms::kdebug("OPTIONAL",
+                           "Constructed with copy optional. Has value: %b",
+                           has_value_);
+    */
   }
 
   /** @brief Destructor: destroys stored value if present */
   ~optional() { reset(); }
+
+  /**
+   * @brief Move constructor
+   * @param other Other optional to move from
+   */
+  optional(optional &&other) : has_value_(other.has_value_) {
+    if (has_value_) {
+      new (storage) T(static_cast<T &&>(*other.ptr()));
+      other.reset(); // Ensure the other optional is empty
+    }
+    /*TODO: Apply this log when we work with LogLevel
+    fk::algorithms::kdebug("OPTIONAL",
+                           "Constructed with move optional. Has value: %b",
+                           has_value_);
+    */
+  }
 
   /**
    * @brief Copy assignment
@@ -64,6 +105,10 @@ public:
         has_value_ = true;
       }
     }
+    /*TODO: Apply this log when we work with LogLevel
+    fk::algorithms::kdebug("OPTIONAL", "Copy assigned. Has value: %b",
+                           has_value_);
+    */
     return *this;
   }
 
@@ -77,13 +122,21 @@ public:
    * @brief Access the stored value
    * @return Reference to stored value
    */
-  T &value() { return *ptr(); }
+  T &value() {
+    if (!has_value_)
+      __builtin_trap();
+    return *ptr();
+  }
 
   /**
    * @brief Access the stored value (const version)
    * @return Const reference to stored value
    */
-  const T &value() const { return *ptr(); }
+  const T &value() const {
+    if (!has_value_)
+      __builtin_trap();
+    return *ptr();
+  }
 
   /**
    * @brief Reset the optional, destroying stored value if present
@@ -92,6 +145,12 @@ public:
     if (has_value_) {
       ptr()->~T();
       has_value_ = false;
+      /*TODO: Apply this log when we work with LogLevel
+      fk::algorithms::kdebug("OPTIONAL", "Value destroyed during reset.");
+      */
     }
   }
 };
+
+} // namespace memory
+} // namespace fk

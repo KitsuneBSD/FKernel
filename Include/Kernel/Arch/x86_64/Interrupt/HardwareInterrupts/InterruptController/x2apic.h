@@ -1,7 +1,7 @@
 #pragma once
 
-#include "LibFK/Container/string.h"
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/HardwareInterrupt.h>
+#include <LibFK/Text/string.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
 #include <LibFK/Types/types.h>
 
 /**
@@ -12,7 +12,8 @@
 class X2APIC : public HardwareInterrupt {
 private:
   uint64_t apic_ticks_per_ms = 0; ///< Timer ticks per ms
-  String m_name = "x2APIC";
+  fk::text::String m_name = "x2APIC";
+  bool m_is_initialized = false;
 
 public:
   static X2APIC &the() {
@@ -22,7 +23,7 @@ public:
 
   uint64_t get_ticks_per_ms() const { return apic_ticks_per_ms; }
 
-  String get_name() override { return m_name; }
+  fk::text::String get_name() override { return m_name; }
   /**
    * @brief Initialize and enable the local x2APIC
    */
@@ -43,13 +44,18 @@ public:
    */
   void unmask_interrupt(uint8_t irq) override;
 
+  fk::core::Result<uint8_t, fk::core::Error> allocate_msi_vector(const PciDevice& device) override;
+  void enable_msi(uint8_t vector) override;
+  void disable_msi(uint8_t vector) override;
+
   /**
    * @brief Calibrate APIC timer
    */
   void calibrate_timer();
 
   /**
-   * @brief Configure periodic APIC timer
+   * @brief Configure periodic APIC timer at the given frequency.
+   * @param frequency_hz Interrupts per second (e.g., 1000 = 1 kHz tick)
    */
-  void setup_timer(uint64_t ms);
+  void setup_timer(uint64_t frequency_hz);
 };

@@ -1,8 +1,8 @@
 #include <LibC/string.h>
 
 size_t ultoa(unsigned long value, char *buffer, unsigned int base) {
-  if (base < 2 || base > 16) {
-    buffer[0] = '\0';
+  if (!buffer || base < 2 || base > 16) {
+    if (buffer) buffer[0] = '\0';
     return 0;
   }
 
@@ -15,7 +15,7 @@ size_t ultoa(unsigned long value, char *buffer, unsigned int base) {
     return 1;
   }
 
-  while (value > 0) {
+  while (value > 0 && i < sizeof(temp) - 1) {
     unsigned long digit = value % base;
     if (digit < 10)
       temp[i++] = '0' + digit;

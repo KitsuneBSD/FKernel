@@ -1,5 +1,10 @@
 #pragma once
 
+#include <LibC/stddef.h>
+
+namespace fk {
+namespace traits {
+
 /**
  * @brief Conditional enable_if.
  *
@@ -113,3 +118,112 @@ FK_DEFINE_INTEGRAL(unsigned long long);
  */
 template <typename T>
 inline constexpr bool is_integral_v = is_integral<T>::value;
+
+/**
+ * @brief Checks if a type is an array type.
+ */
+template <typename T> struct is_array {
+  static constexpr bool value = false;
+};
+
+/**
+ * @brief Specialization for unbounded array types.
+ */
+template <typename T> struct is_array<T[]> {
+  static constexpr bool value = true;
+};
+
+/**
+ * @brief Specialization for bounded array types.
+ */
+template <typename T, size_t N> struct is_array<T[N]> {
+  static constexpr bool value = true;
+};
+
+/**
+ * @brief Alias to directly obtain the boolean value for is_array.
+ */
+template <typename T> inline constexpr bool is_array_v = is_array<T>::value;
+
+/**
+ * @brief Removes the outermost array extent from a type.
+ */
+template <typename T> struct remove_extent {
+  using type = T;
+};
+
+/**
+ * @brief Specialization for unbounded array types.
+ */
+template <typename T> struct remove_extent<T[]> {
+  using type = T;
+};
+
+/**
+ * @brief Specialization for bounded array types.
+ */
+template <typename T, size_t N> struct remove_extent<T[N]> {
+  using type = T;
+};
+
+/**
+ * @brief Alias to simplify remove_extent usage.
+ */
+template <typename T> using remove_extent_t = typename remove_extent<T>::type;
+
+/**
+ * @brief Checks whether Base is a base class of Derived.
+ *
+ * Uses SFINAE with pointer conversion to detect inheritance.
+ */
+template <typename Base, typename Derived> struct is_base_of {
+private:
+  // This overload is chosen if Derived* can be converted to Base*
+  static constexpr char test(const Base *);
+  // This overload is chosen otherwise
+  static constexpr int test(...);
+
+public:
+  static constexpr bool value =
+      sizeof(test(static_cast<Derived *>(nullptr))) == sizeof(char);
+};
+
+/**
+ * @brief Alias to directly obtain the boolean value for is_base_of.
+ */
+template <typename Base, typename Derived>
+inline constexpr bool is_base_of_v = is_base_of<Base, Derived>::value;
+
+template <typename T> struct remove_pointer      { using type = T; };
+template <typename T> struct remove_pointer<T *>  { using type = T; };
+template <typename T> struct remove_pointer<T * const> { using type = T; };
+template <typename T> using remove_pointer_t = typename remove_pointer<T>::type;
+
+template <typename T> struct is_pointer { static constexpr bool value = false; };
+template <typename T> struct is_pointer<T *> { static constexpr bool value = true; };
+template <typename T> inline constexpr bool is_pointer_v = is_pointer<T>::value;
+
+template <typename T> struct is_floating_point { static constexpr bool value = false; };
+template <> struct is_floating_point<float>       { static constexpr bool value = true; };
+template <> struct is_floating_point<double>      { static constexpr bool value = true; };
+template <> struct is_floating_point<long double> { static constexpr bool value = true; };
+template <typename T> inline constexpr bool is_floating_point_v = is_floating_point<T>::value;
+
+template <typename T> struct is_signed { static constexpr bool value = false; };
+template <> struct is_signed<signed char>  { static constexpr bool value = true; };
+template <> struct is_signed<short>        { static constexpr bool value = true; };
+template <> struct is_signed<int>          { static constexpr bool value = true; };
+template <> struct is_signed<long>         { static constexpr bool value = true; };
+template <> struct is_signed<long long>    { static constexpr bool value = true; };
+template <> struct is_signed<float>        { static constexpr bool value = true; };
+template <> struct is_signed<double>       { static constexpr bool value = true; };
+template <> struct is_signed<long double>  { static constexpr bool value = true; };
+template <typename T> inline constexpr bool is_signed_v = is_signed<T>::value;
+
+template <bool B, typename T, typename F> struct conditional      { using type = T; };
+template <typename T, typename F> struct conditional<false, T, F> { using type = F; };
+template <bool B, typename T, typename F>
+using conditional_t = typename conditional<B, T, F>::type;
+
+} // namespace traits
+} // namespace fk

@@ -1,23 +1,20 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
-#include <Kernel/Hardware/Cpu.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Driver/Terminal/terminal_manager.h>
+#include <Kernel/Driver/Keyboard/keymap_manager.h>
+#include <LibFK/Algorithms/log.h>
 
-// Layout US QWERTY simplificado
-static const char scancode_set1[128] = {
-    0,   27,  '1',  '2',  '3',  '4', '5', '6',  '7', '8', '9', '0',
-    '-', '=', '\b', '\t', 'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
-    'o', 'p', '[',  ']',  '\n', 0,   'a', 's',  'd', 'f', 'g', 'h',
-    'j', 'k', 'l',  ';',  '\'', '`', 0,   '\\', 'z', 'x', 'c', 'v',
-    'b', 'n', 'm',  ',',  '.',  '/', 0,   '*',  0,   ' ', 0,
-};
+fk::core::Result<size_t, fk::core::Error> PS2Keyboard::read([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* out_buffer) {
+    return fk::core::Error::PermissionDenied;
+}
 
-static const char scancode_set1_shift[128] = {
-    0,   27,  '!',  '@',  '#',  '$', '%', '^', '&', '*', '(', ')',
-    '_', '+', '\b', '\t', 'Q',  'W', 'E', 'R', 'T', 'Y', 'U', 'I',
-    'O', 'P', '{',  '}',  '\n', 0,   'A', 'S', 'D', 'F', 'G', 'H',
-    'J', 'K', 'L',  ':',  '"',  '~', 0,   '|', 'Z', 'X', 'C', 'V',
-    'B', 'N', 'M',  '<',  '>',  '?', 0,   '*', 0,   ' ', 0,
-};
+fk::core::Result<size_t, fk::core::Error> PS2Keyboard::write(uint64_t, size_t, const uint8_t*) {
+    return fk::core::Error::PermissionDenied;
+}
 
 void PS2Keyboard::push_char(char c) {
   size_t next = (head + 1) % KEYBOARD_BUFFER_SIZE;
@@ -27,7 +24,9 @@ void PS2Keyboard::push_char(char c) {
   }
 }
 
-bool PS2Keyboard::has_key() const { return head != tail; }
+bool PS2Keyboard::has_key() {
+  return head != tail;
+}
 
 char PS2Keyboard::pop_key() {
   if (head == tail)
@@ -47,13 +46,27 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
     return;
   }
 
+  if (keycode == 56) { // alt
+    alt_pressed = !key_released;
+    return;
+  }
+
+  // Handle TTY switching (F1-F6)
+  if (!key_released && (keycode >= 0x3B && keycode <= 0x40)) {
+    int tty_index = keycode - 0x3B;
+    fkernel::terminal::TerminalManager::the().switch_to(tty_index);
+    return;
+  }
+
   if (key_released)
     return;
 
-  char c =
-      shift_pressed ? scancode_set1_shift[keycode] : scancode_set1[keycode];
-  if (c)
-    push_char(c);
+  // Delegate translation to the KeymapManager
+  char c = fkernel::drivers::KeymapManager::the().translate(keycode, shift_pressed, alt_pressed);
+
+  if (c) {
+    fkernel::terminal::TerminalManager::the().handle_input(c);
+  }
 }
 
 void PS2Keyboard::irq_handler() {
@@ -62,5 +75,7 @@ void PS2Keyboard::irq_handler() {
 }
 
 void PS2Keyboard::initialize() {
-  klog("Keyboard", "PS/2 keyboard initialized on IRQ1");
+  set_layout(fkernel::drivers::KeyboardLayout::ABNT2);
+  HardwareInterruptManager::the().unmask_interrupt(1);
+  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked, ABNT2, Polling Fallback)");
 }
