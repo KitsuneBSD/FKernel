@@ -1,5 +1,6 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Terminal/vga_terminal.h>
+#include <Kernel/Driver/Keyboard/keymap_manager.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
@@ -46,6 +47,14 @@ void VGATerminal::on_char(char c) {
       SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGTSTP);
       return;
     }
+  }
+
+  // Ctrl+D (EOF): in canonical mode with empty line buffer, signal EOF to reader
+  if (c == '\x04' && !m_state.raw_mode) {
+    if (m_input_queue.is_empty()) {
+      m_state.eof_pending = true;
+    }
+    return;
   }
 
   if (c == '\b' && !m_state.raw_mode) {
@@ -96,6 +105,10 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read(uint64_t, size_t siz
 
   // Canonical mode: wait for full line
   while (true) {
+    if (m_state.eof_pending && m_input_queue.is_empty()) {
+      m_state.eof_pending = false;
+      return 0;
+    }
     for (size_t i = 0; i < m_input_queue.size(); ++i) {
       if (m_input_queue[i] == '\n') {
         size_t to_copy = (i + 1 < size) ? (i + 1) : size;
@@ -304,6 +317,19 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
   if (request == 0x540E /* TIOCSCTTY */) {
     Task* task = SchedulerManager::the().current();
     if (task) m_state.foreground_pgid = (int)task->control.identity.pgid.value();
+    return 0;
+  }
+  // Custom keyboard ioctls (0x4Bxx)
+  if (request == 0x4B01 /* KBDIO_SETLAYOUT */) {
+    auto layout = static_cast<fkernel::drivers::KeyboardLayout>(arg);
+    fkernel::drivers::KeymapManager::the().set_layout(layout);
+    return 0;
+  }
+  if (request == 0x4B02 /* KBDIO_GETLAYOUT */) {
+    return static_cast<int>(fkernel::drivers::KeymapManager::the().layout());
+  }
+  if (request == 0x4B03 /* KBDIO_SETCOMPOSE */) {
+    fkernel::drivers::KeymapManager::the().set_compose_mode(arg != 0);
     return 0;
   }
   return fk::core::Error::NotImplemented;

@@ -23,8 +23,8 @@ graph TD
 | kprintf | `Src/LibC/stdio/kprintf.c` | Printf implementation, 512-byte stack buffer |
 | libc_puts dispatch | `Src/LibC/stdio/_impl/libc_putc.cpp` | Hook registration, target bitmask, SpinlockIRQ |
 | Kernel fan-out | `Src/Kernel/Io/kernel_puts.cpp` | Routes to serial + VGA + DebugLogNode |
-| DebugLogNode | `Src/Kernel/Fs/DebugFs/debug_fs.cpp` | 64 KB ring buffer for dmesg |
-| SyscallLogNode | `Src/Kernel/Fs/DebugFs/debug_fs.cpp` | 128 KB ring buffer for syscall tracing |
+| DebugLogNode | `Src/Kernel/Fs/Virtual/DebugFs/debug_fs.cpp` | 64 KB ring buffer for dmesg |
+| SyscallLogNode | `Src/Kernel/Fs/Virtual/DebugFs/debug_fs.cpp` | 128 KB ring buffer for syscall tracing |
 | IpcLogNode | `Src/Kernel/Ipc/ipc_log_node.cpp` | 64 KB ring buffer for IPC tracing |
 | Panic | `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` | Panic output (currently bypasses logging) |
 

@@ -4,14 +4,18 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Driver/Vga/display.h>
+#include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/qos.h>
 #include <Kernel/Scheduler/task_entries.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
+
+using namespace fkernel::scheduler;
 
 extern CpuControlBlock g_cpu_block;
 extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr,
@@ -25,44 +29,34 @@ SchedulerManager::SchedulerManager() {
 
 void SchedulerManager::initialize() {
   m_is_initialized = true;
-  m_processor_count = 1;
+
+  if (ACPIManager::the().is_initialized()) {
+    uint32_t detected = ACPIManager::the().cpu_count();
+    m_processor_count = (detected > 0) ? detected : 1;
+  } else {
+    m_processor_count = 1;
+  }
 
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     Task* idle = new Task();
-    *idle = create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0);
+    *idle = create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0,
+                              QoSClass::Background);
     m_processors[i].idle_task = idle;
     m_processors[i].current_task = nullptr;
   }
 
   m_next_pid = 2;
-  fk::algorithms::klog("SCHEDULER MANAGER", "Initializing SMP Scheduler Manager...");
-}
-
-static Task* highest_priority_task(fk::containers::IntrusiveList<Task, &Task::run_node>& queue) {
-  Task* best = nullptr;
-  for (auto& task : queue) {
-    if (!best || task.control.lifecycle.priority > best->control.lifecycle.priority)
-      best = &task;
-  }
-  return best;
-}
-
-static Task* lowest_priority_task(fk::containers::IntrusiveList<Task, &Task::run_node>& queue) {
-  Task* worst = nullptr;
-  for (auto& task : queue) {
-    if (!worst || task.control.lifecycle.priority < worst->control.lifecycle.priority)
-      worst = &task;
-  }
-  return worst;
+  fk::algorithms::klog("SCHEDULER", "MLFQ Scheduler initialized (%d levels, %d CPUs)",
+                       MLFQ_LEVELS, m_processor_count);
 }
 
 Task* SchedulerManager::steal_task(uint32_t stealing_cpu) {
   uint32_t busiest_cpu = stealing_cpu;
-  size_t max_tasks = 1; // only steal if target has > 1 task
+  size_t max_tasks = 1;
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     if (i == stealing_cpu) continue;
     fk::synchronization::ScopedLockIRQ peek_lock(m_processors[i].run_queue_lock);
-    size_t count = m_processors[i].run_queue.size();
+    size_t count = m_processors[i].run_queue_total_size();
     if (count > max_tasks) {
       max_tasks = count;
       busiest_cpu = i;
@@ -70,31 +64,36 @@ Task* SchedulerManager::steal_task(uint32_t stealing_cpu) {
   }
   if (busiest_cpu == stealing_cpu) return nullptr;
   fk::synchronization::ScopedLockIRQ lock(m_processors[busiest_cpu].run_queue_lock);
-  if (m_processors[busiest_cpu].run_queue.empty()) return nullptr;
-  Task* victim = lowest_priority_task(m_processors[busiest_cpu].run_queue);
-  if (!victim) return nullptr;
-  m_processors[busiest_cpu].run_queue.remove(victim);
-  return victim;
+
+  for (int level = MLFQ_LEVELS - 1; level >= 0; --level) {
+    if (!m_processors[busiest_cpu].run_queues[level].queue.empty()) {
+      return m_processors[busiest_cpu].run_queues[level].queue.pop_front();
+    }
+  }
+  return nullptr;
 }
 
 Task* SchedulerManager::pick_next() {
   auto& proc = current_processor();
   {
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
-    if (!proc.run_queue.empty()) {
-      Task* next = highest_priority_task(proc.run_queue);
-      proc.run_queue.remove(next);
-      next->control.lifecycle.state = TaskState::Running;
-      next->control.lifecycle.time_slice_ticks = m_default_quantum;
-      proc.current_task = next;
-      proc.need_resched = false;
-      return proc.current_task;
+    for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
+      if (!proc.run_queues[level].queue.empty()) {
+        Task* next = proc.run_queues[level].queue.pop_front();
+        next->control.lifecycle.state = TaskState::Running;
+        next->control.lifecycle.time_slice_ticks = proc.run_queues[level].quantum_ticks;
+        next->control.lifecycle.cpu_time_consumed = 0;
+        proc.current_task = next;
+        proc.need_resched = false;
+        return proc.current_task;
+      }
     }
   }
   Task* stolen = steal_task(proc.id);
   if (stolen) {
     stolen->control.lifecycle.state = TaskState::Running;
     stolen->control.lifecycle.time_slice_ticks = m_default_quantum;
+    stolen->control.lifecycle.cpu_time_consumed = 0;
     proc.current_task = stolen;
     proc.need_resched = false;
     return proc.current_task;
@@ -152,13 +151,12 @@ void SchedulerManager::schedule() {
   if (next_task == prev_task)
     return;
 
-  // If the outgoing task was preempted (still Running, not blocked/sleeping/zombie),
-  // put it back in the run queue so it doesn't get orphaned.
   if (prev_task && prev_task != proc.idle_task &&
       prev_task->control.lifecycle.state == TaskState::Running) {
     prev_task->control.lifecycle.state = TaskState::Ready;
+    uint8_t level = prev_task->control.lifecycle.mlfq_level;
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
-    proc.run_queue.push_back(prev_task);
+    proc.run_queues[level].queue.push_back(prev_task);
   }
 
   switch_address_space_if_needed(prev_task, next_task);

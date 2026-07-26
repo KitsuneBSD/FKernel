@@ -1,4 +1,8 @@
 #include <Kernel/Driver/Pty/pty_master.h>
+#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/scheduler.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -30,20 +34,60 @@ PtyMaster::read(uint64_t, size_t size, uint8_t* buf) {
 fk::core::Result<size_t, fk::core::Error>
 PtyMaster::write(uint64_t, size_t size, const uint8_t* buf) {
   if (!buf || size == 0) return fk::core::Error::InvalidParameter;
-  size_t written = m_to_slave->write(buf, size);
+
+  size_t written = 0;
+  for (size_t i = 0; i < size; ++i) {
+    bool echo = false;
+    int result = m_ldisc.process_input(buf[i], &echo);
+
+    int sig = m_ldisc.pending_signal();
+    if (sig) {
+      m_ldisc.clear_pending_signal();
+      auto* task = SchedulerManager::the().current();
+      if (task) ipc::SignalDelivery::send_signal(task, sig);
+    }
+
+    if (result > 0) {
+      uint8_t c = buf[i];
+      m_to_slave->write(&c, 1);
+      ++written;
+    }
+
+    if (echo) {
+      uint8_t c = buf[i];
+      m_from_slave->write(&c, 1);
+    }
+  }
   return written;
 }
 
 fk::core::Result<int, fk::core::Error>
 PtyMaster::ioctl(uint64_t request, uint64_t arg) {
   static constexpr uint64_t TIOCGPTN = 0x80045430;
-  if (request != TIOCGPTN) return fk::core::Error::NotImplemented;
-  // Parse index from name "ptm{n}"
-  const char* p = name().c_str() + 3; // skip "ptm"
-  unsigned int n = 0;
-  while (*p >= '0' && *p <= '9') n = n * 10 + (unsigned int)(*p++ - '0');
-  *reinterpret_cast<unsigned int*>(arg) = n;
-  return 0;
+  static constexpr uint64_t TCSETS   = 0x5402;
+  static constexpr uint64_t TCGETS   = 0x5401;
+
+  if (request == TIOCGPTN) {
+    const char* p = name().c_str() + 3;
+    unsigned int n = 0;
+    while (*p >= '0' && *p <= '9') n = n * 10 + (unsigned int)(*p++ - '0');
+    *reinterpret_cast<unsigned int*>(arg) = n;
+    return 0;
+  }
+
+  if (request == TCGETS) {
+    auto* t = reinterpret_cast<Termios*>(arg);
+    fk::memory::copy(t, &m_ldisc.termios(), sizeof(Termios));
+    return 0;
+  }
+
+  if (request == TCSETS) {
+    auto* t = reinterpret_cast<const Termios*>(arg);
+    m_ldisc.set_termios(*t);
+    return 0;
+  }
+
+  return fk::core::Error::NotImplemented;
 }
 
-} // namespace fkernel
+}

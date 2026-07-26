@@ -257,4 +257,4 @@ proc/
 
 Each node implements `read()` returning formatted text on demand. No data is cached — it's generated fresh on each read (Linux-compatible behavior).
 
-Key files: `Include/Kernel/Fs/ProcFs/` (18 headers)
+Key files: `Include/Kernel/Fs/Virtual/ProcFs/` (18 headers)

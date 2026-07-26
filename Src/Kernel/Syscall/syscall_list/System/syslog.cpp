@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/DebugFs/Node/debug_log_node.h>
+#include <Kernel/Fs/Virtual/DebugFs/Node/debug_log_node.h>
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Utilities/memory.h>
 

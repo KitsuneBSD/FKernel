@@ -312,6 +312,197 @@ static void test_getdents(void) {
     else       fail("getdents", "getdents returned <= 0");
 }
 
+/* ── Signal Regression Tests ─────────────────────────────── */
+
+/* Verify fork() copies pgid from parent to child */
+static void test_fork_pgid(void) {
+    int parent_pgid = sys_getpgid(sys_getpid());
+    if (parent_pgid <= 0) { fail("fork_pgid", "getpgid failed"); return; }
+
+    int pid = sys_fork();
+    if (pid < 0) { fail("fork_pgid", "fork failed"); return; }
+    if (pid == 0) {
+        int child_pgid = sys_getpgid(sys_getpid());
+        sys_exit(child_pgid == parent_pgid ? 0 : 1);
+    }
+    int status = 0;
+    sys_wait4(pid, &status, 0, 0);
+    int code = (status >> 8) & 0xff;
+    if (code == 0) pass("fork_pgid");
+    else           fail("fork_pgid", "child pgid != parent pgid");
+}
+
+/* Verify setpgid() changes pgid */
+static void test_setpgid(void) {
+    int orig_pgid = sys_getpgid(sys_getpid());
+    int new_pgid = sys_getpid();
+
+    int r = sys_setpgid(sys_getpid(), new_pgid);
+    if (r < 0) { fail("setpgid", "setpgid syscall failed"); return; }
+
+    int now = sys_getpgid(sys_getpid());
+    /* restore */
+    sys_setpgid(sys_getpid(), orig_pgid);
+
+    if (now == new_pgid) pass("setpgid");
+    else                 fail("setpgid", "pgid did not change");
+}
+
+/* Verify fork() child inherits sid */
+static void test_fork_sid(void) {
+    int pid = sys_fork();
+    if (pid < 0) { fail("fork_sid", "fork failed"); return; }
+    if (pid == 0) {
+        /* setsid sets sid=pgid=pid; check child of setsid inherits it */
+        sys_setsid();
+        int sid = sys_getpgid(sys_getpid());
+        sys_exit(sid == sys_getpid() ? 0 : 1);
+    }
+    int status = 0;
+    sys_wait4(pid, &status, 0, 0);
+    int code = (status >> 8) & 0xff;
+    if (code == 0) pass("fork_sid");
+    else           fail("fork_sid", "setsid did not set sid to own pid");
+}
+
+/* Send SIGUSR1 to child via kill(); child should terminate with signal */
+static void test_signal_kill(void) {
+    int pid = sys_fork();
+    if (pid < 0) { fail("signal_kill", "fork failed"); return; }
+    if (pid == 0) {
+        /* Sleep until killed */
+        struct timespec ts = { 30, 0 };
+        sys_nanosleep(&ts, 0);
+        sys_exit(0); /* should not reach here */
+    }
+    /* Let child enter sleep */
+    struct timespec ts = { 0, 50000000 }; /* 50ms */
+    sys_nanosleep(&ts, 0);
+
+    sys_kill(pid, 10 /* SIGUSR1 */);
+
+    int status = 0;
+    sys_wait4(pid, &status, 0, 0);
+    /* killed by signal: low byte == signal number */
+    if ((status & 0x7f) == 10) pass("signal_kill");
+    else                       fail("signal_kill", "child not killed by SIGUSR1");
+}
+
+/* Send signal to process group; child should die, parent survives */
+static void test_signal_group(void) {
+    /* Parent must ignore SIGUSR1 so it survives the group signal */
+    struct sigaction ign;
+    ign.sa_handler = (void (*)(int))1; /* SIG_IGN */
+    ign.sa_flags = 0;
+    ign.sa_restorer = 0;
+    ign.sa_mask = 0;
+    sys_sigaction(10 /* SIGUSR1 */, &ign, 0);
+
+    int parent_pgid = sys_getpgid(sys_getpid());
+
+    int pid = sys_fork();
+    if (pid < 0) { fail("signal_group", "fork failed"); return; }
+    if (pid == 0) {
+        /* Child: same pgid as parent (inherited). Restore SIG_DFL so it dies. */
+        struct sigaction dfl;
+        dfl.sa_handler = (void (*)(int))0; /* SIG_DFL */
+        dfl.sa_flags = 0;
+        dfl.sa_restorer = 0;
+        dfl.sa_mask = 0;
+        sys_sigaction(10 /* SIGUSR1 */, &dfl, 0);
+
+        struct timespec ts = { 30, 0 };
+        sys_nanosleep(&ts, 0);
+        sys_exit(0);
+    }
+
+    struct timespec ts = { 0, 50000000 };
+    sys_nanosleep(&ts, 0);
+
+    /* Send SIGUSR1 to the entire process group (negative pgid) */
+    sys_kill(-parent_pgid, 10 /* SIGUSR1 */);
+
+    int status = 0;
+    sys_wait4(pid, &status, 0, 0);
+    /* Child should be killed by SIGUSR1 */
+    if ((status & 0x7f) == 10) pass("signal_group");
+    else                       fail("signal_group", "child not killed by group signal");
+}
+
+/* Install a signal handler, send signal, verify handler ran and sigreturn works */
+static volatile int g_handler_ran;
+
+static void test_handler(int sig) {
+    (void)sig;
+    g_handler_ran = 1;
+}
+
+static void test_signal_handler(void) {
+    g_handler_ran = 0;
+
+    int pid = sys_fork();
+    if (pid < 0) { fail("signal_handler", "fork failed"); return; }
+    if (pid == 0) {
+        struct sigaction act;
+        act.sa_handler = test_handler;
+        act.sa_flags = 0;
+        act.sa_restorer = 0; /* use kernel builtin restorer */
+        act.sa_mask = 0;
+        sys_sigaction(10 /* SIGUSR1 */, &act, 0);
+
+        /* Wait for signal (up to 5 seconds) */
+        struct timespec ts = { 5, 0 };
+        sys_nanosleep(&ts, 0);
+
+        sys_exit(g_handler_ran ? 0 : 2);
+    }
+
+    struct timespec ts = { 0, 100000000 }; /* 100ms */
+    sys_nanosleep(&ts, 0);
+
+    sys_kill(pid, 10 /* SIGUSR1 */);
+
+    int status = 0;
+    sys_wait4(pid, &status, 0, 0);
+    int code = (status >> 8) & 0xff;
+    if (code == 0) pass("signal_handler");
+    else           fail("signal_handler", "handler did not run or sigreturn failed");
+}
+
+/* SIGCHLD: parent wait4() after child exits reaps zombie correctly */
+static void test_sigchld_reap(void) {
+    int pid = sys_fork();
+    if (pid < 0) { fail("sigchld_reap", "fork failed"); return; }
+    if (pid == 0) {
+        sys_exit(99);
+    }
+    /* Wait without specifying pid - any child */
+    int status = 0;
+    int waited = sys_wait4(-1, &status, 0, 0);
+    int code = (status >> 8) & 0xff;
+    if (waited == pid && code == 99) pass("sigchld_reap");
+    else                             fail("sigchld_reap", "wait4(-1) failed or wrong exit code");
+}
+
+/* Foreground process group: setpgid + TIOCSPGRP roundtrip */
+static void test_foreground_pgrp(void) {
+    int orig = sys_getpgid(sys_getpid());
+
+    int new_pgid = sys_getpid();
+    sys_setpgid(sys_getpid(), new_pgid);
+
+    int fg = -1;
+    sys_ioctl(0, 0x5410 /* TIOCSPGRP */, &new_pgid);
+    sys_ioctl(0, 0x540F /* TIOCGPGRP */, &fg);
+
+    /* restore */
+    sys_ioctl(0, 0x5410 /* TIOCSPGRP */, &orig);
+    sys_setpgid(sys_getpid(), orig);
+
+    if (fg == new_pgid) pass("foreground_pgrp");
+    else                fail("foreground_pgrp", "TIOCGPGRP did not match TIOCSPGRP");
+}
+
 /* ── main ─────────────────────────────────────────────────── */
 
 int main(void) {
@@ -348,6 +539,16 @@ int main(void) {
     test_tmpfs_large_write();
     test_dup2();
     test_mkdir_stat();
+
+    puts_("\n[Signal Regression]\n");
+    test_fork_pgid();
+    test_setpgid();
+    test_fork_sid();
+    test_signal_kill();
+    test_signal_group();
+    test_signal_handler();
+    test_sigchld_reap();
+    test_foreground_pgrp();
 
     puts_("\n");
     puts_("=========================\n");

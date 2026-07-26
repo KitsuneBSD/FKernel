@@ -12,7 +12,7 @@ extern "C" void task_trampoline();
 
 Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name, void (*entry)(),
                        bool kernel_task, uint8_t priority, uint64_t cpu_affinity, uint64_t arg1,
-                       uint64_t arg2) {
+                       uint64_t arg2, fkernel::scheduler::QoSClass qos) {
   const size_t STACK_SIZE = 16 * fk::types::KiB;
 
   void* stack_mem = kmalloc(STACK_SIZE);
@@ -56,7 +56,16 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
                             .clear_child_tid = 0,
                             .vfork_waiting = false,
                             .vfork_parent_id = fk::ProcessId(),
-                            .is_vfork_sharing_address_space = false};
+                            .is_vfork_sharing_address_space = false,
+                            .in_wait_queue = false,
+                            .qos = qos,
+                            .policy = fkernel::scheduler::SchedulingPolicy::Normal,
+                            .base_priority = fkernel::scheduler::priority_for_qos(qos),
+                            .mlfq_level = fkernel::scheduler::qos_level(qos).default_mlfq_level,
+                            .cpu_time_consumed = 0,
+                            .allotment_ticks = fkernel::scheduler::allotment_for_qos(qos),
+                            .boosted = false,
+                            .original_qos = qos};
 
   task.resources.memory = {.cr3 = read_on_cr3()};
   task.resources.files.cwd = "/";

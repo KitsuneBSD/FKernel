@@ -9,6 +9,7 @@
 #include <LibFK/Synchronization/spinlock.h>
 #include <Kernel/Hardware/Cpu/cpu_context.h>
 #include <Kernel/Scheduler/Task/task_state.h>
+#include <Kernel/Scheduler/qos.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
 #include <LibFK/Container/vector.h>
@@ -20,6 +21,10 @@ namespace fkernel::ipc {
 
 namespace fkernel {
     class SignalFdNode;
+}
+
+namespace fkernel::scheduler {
+    struct Turnstile;
 }
 
 /**
@@ -86,6 +91,8 @@ struct TaskIpc {
     } alt_stack{};
     ::fkernel::ipc::Notification *signal_notification{nullptr};
     ::fkernel::SignalFdNode *signal_fd{nullptr};
+    ::fkernel::scheduler::Turnstile *pending_turnstile{nullptr};
+    ::fkernel::scheduler::Turnstile *active_turnstile{nullptr};
 };
 
 /**
@@ -127,6 +134,15 @@ struct TaskLifecycle {
         int signo{14};                 // signal to deliver (SIGALRM=14)
         bool active{false};
     } itimers[3]{};  // 0=ITIMER_REAL, 1=ITIMER_VIRTUAL, 2=ITIMER_PROF
+
+    fkernel::scheduler::QoSClass qos{fkernel::scheduler::QoSClass::Default};
+    fkernel::scheduler::SchedulingPolicy policy{fkernel::scheduler::SchedulingPolicy::Normal};
+    uint8_t base_priority{0};
+    uint8_t mlfq_level{0};
+    uint64_t cpu_time_consumed{0};
+    uint64_t allotment_ticks{0};
+    bool boosted{false};
+    fkernel::scheduler::QoSClass original_qos{fkernel::scheduler::QoSClass::Default};
 };
 
 /**
@@ -214,4 +230,5 @@ struct Task {
 Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
                        void (*entry)(), bool kernel_task, uint8_t priority,
                        uint64_t cpu_affinity, uint64_t arg1 = 0,
-                       uint64_t arg2 = 0);
+                       uint64_t arg2 = 0,
+                       fkernel::scheduler::QoSClass qos = fkernel::scheduler::QoSClass::Default);

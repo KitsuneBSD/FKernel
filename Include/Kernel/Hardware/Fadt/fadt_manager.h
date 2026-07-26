@@ -20,8 +20,11 @@ public:
   bool get_pm1a_control_block(uint32_t &out) const;
   bool get_pm1b_control_block(uint32_t &out) const;
   bool get_smi_command_port(uint32_t &out) const;
-  
+
   bool get_x_pm_timer(GenericAddressStructure &out) const;
+
+  bool get_reset_register(GenericAddressStructure &out) const;
+  bool get_reset_value(uint8_t &out) const;
 
 private:
   FADT *m_fadt{nullptr};

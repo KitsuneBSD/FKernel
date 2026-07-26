@@ -4,7 +4,7 @@
 #include <Kernel/Driver/Storage/Ata/dma_strategy.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Storage/storage_device_name.h>
-#include <Kernel/Fs/DevFs/dev_fs.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Fs/Vfs/auto_mounter.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>

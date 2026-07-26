@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Vfs/auto_mounter.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
-#include <Kernel/Fs/Fat12/fat_12_fs.h>
-#include <Kernel/Fs/Fat16/fat_16_fs.h>
-#include <Kernel/Fs/Fat32/fat_32_fs.h>
+#include <Kernel/Fs/Disk/Fat12/fat_12_fs.h>
+#include <Kernel/Fs/Disk/Fat16/fat_16_fs.h>
+#include <Kernel/Fs/Disk/Fat32/fat_32_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <LibFK/Algorithms/log.h>
 

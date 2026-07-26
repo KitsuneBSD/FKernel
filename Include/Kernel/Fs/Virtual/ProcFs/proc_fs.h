@@ -1,0 +1,19 @@
+#pragma once
+
+#include <Kernel/Fs/Virtual/ProcFs/proc_fs_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_partitions_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_process_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_self_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_version_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_mounts_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_uptime_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_meminfo_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_pid_stat_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_pid_cmdline_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_stat_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_pid_dir_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_sys_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_sys_kernel_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_sys_string_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_loadavg_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_cpuinfo_node.h>

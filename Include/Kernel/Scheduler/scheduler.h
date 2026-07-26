@@ -8,6 +8,7 @@
 #include <LibFK/Memory/ref_ptr.h>
 
 #include <Kernel/Scheduler/Task/task.h>
+#include <Kernel/Scheduler/qos.h>
 #include <Kernel/Hardware/Cpu/processor.h>
 
 class SchedulerManager {
@@ -25,6 +26,8 @@ private:
     bool m_is_initialized = false;
     uint64_t m_default_quantum = 5;
     uint64_t m_next_pid = 1;
+    uint64_t m_global_tick_counter{0};
+    static constexpr uint64_t BOOST_PERIOD_TICKS = 500;
 
 public:
     static SchedulerManager& the() {
@@ -50,9 +53,10 @@ public:
     void on_tick();
     void schedule();
 
+    void priority_boost_all();
+
     uint64_t process_count();
 
-    // Debugging / introspection helpers
     void print_all_tasks();
     fk::RefPtr<Task> find_task(fk::ProcessId id);
     fk::RefPtr<Task> find_terminated_child(fk::ProcessId ppid);
@@ -65,7 +69,7 @@ public:
 
     fkernel::Processor& current_processor();
     Task* current() { return current_processor().current_task; }
-    
+
     bool is_need_resched() { return current_processor().need_resched; }
     void set_need_resched(bool value) { current_processor().need_resched = value; }
     bool is_initialized() const { return m_is_initialized; }

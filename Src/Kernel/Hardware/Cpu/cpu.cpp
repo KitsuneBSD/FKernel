@@ -47,6 +47,7 @@ void CPU::detect_cpu_features() {
     fk::algorithms::kdebug("CPU", "Found APIC support");
     m_has_apic = true;
   }
+  m_lapic_id = static_cast<uint8_t>(ebx >> 24);
 
   // Check for x2APIC
   if (ecx & (1 << 21)) {

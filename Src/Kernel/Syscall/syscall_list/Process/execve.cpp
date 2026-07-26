@@ -2,7 +2,7 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/DebugFs/debug_fs.h>
+#include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Loader/elf_loader.h>

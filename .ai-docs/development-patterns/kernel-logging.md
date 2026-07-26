@@ -77,7 +77,7 @@ The Display target (`vga::the().write_ansi()`) interprets ANSI escape sequences 
 | `Src/LibC/stdio/_impl/libc_putc.cpp` | Central dispatch: hook registration, log target bitmask, SpinlockIRQ |
 | `Src/Kernel/Io/kernel_puts.cpp` | Fan-out router: serial + VGA + DebugLogNode |
 | `Include/Kernel/Io/kernel_puts.h` | Declares set_log_target_bits (NOT IMPLEMENTED) |
-| `Src/Kernel/Fs/DebugFs/debug_fs.cpp` | DebugLogNode + SyscallLogNode ring buffers (with ScopedLockIRQ) |
+| `Src/Kernel/Fs/Virtual/DebugFs/debug_fs.cpp` | DebugLogNode + SyscallLogNode ring buffers (with ScopedLockIRQ) |
 | `Src/Kernel/Ipc/ipc_log_node.cpp` | IpcLogNode ring buffer (with ScopedLockIRQ) |
 | `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` | Panic output (bypasses logging system) |
 

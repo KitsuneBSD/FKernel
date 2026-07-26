@@ -246,6 +246,15 @@ Include/
 │   │   │   └── pts_dir_node.h
 │   │   ├── RamDisk
 │   │   │   └── ram_disk.h
+│   │   ├── SemFs
+│   │   │   ├── sem_node.h
+│   │   │   └── sem_dir_node.h
+│   │   ├── ShmFs  
+│   │   │   ├── shm_node.h
+│   │   │   └── shm_dir_node.h
+│   │   ├── MqueueFs
+│   │   │   ├── mqueue_node.h
+│   │   │   └── mqueue_dir_node.h
 │   │   ├── SignalFd
 │   │   │   └── signal_fd_node.h
 │   │   ├── TimerFd

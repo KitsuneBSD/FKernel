@@ -23,7 +23,11 @@ void general_protection_handler(uint8_t vector, InterruptFrame* frame) {
                     fk::algorithms::klog("GPF",
                         "User-mode privileged insn 0x%02x at RIP=%p, sending SIGILL",
                         (unsigned)insn, (void*)frame->rip);
-                    fkernel::ipc::SignalDelivery::send_signal(task, SIGILL);
+                    siginfo_t si{};
+                    si.si_signo = SIGILL;
+                    si.si_code  = 2;
+                    si.si_addr  = frame->rip;
+                    fkernel::ipc::SignalDelivery::send_signal(task, SIGILL, &si);
                     return;
                 }
             }

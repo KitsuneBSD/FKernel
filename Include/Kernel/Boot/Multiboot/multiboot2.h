@@ -306,4 +306,20 @@ struct alignas(TAG_ALIGN) TagEFIMMap : Tag {
 };
 static_assert(alignof(TagEFIMMap) == 8, "TagEFIMMap must be aligned to 8 bytes");
 
+/**
+ * @brief ACPI 1.0 RSDP tag (Multiboot2 type 14)
+ */
+struct alignas(TAG_ALIGN) TagAcpiOld : Tag {
+  uint8_t rsdp[20]; ///< ACPI 1.0 RSDP (20 bytes)
+};
+static_assert(alignof(TagAcpiOld) == 8, "TagAcpiOld must be aligned to 8 bytes");
+
+/**
+ * @brief ACPI 2.0+ RSDP tag (Multiboot2 type 15)
+ */
+struct alignas(TAG_ALIGN) TagAcpiNew : Tag {
+  uint8_t rsdp[0]; ///< Variable-length ACPI 2.0+ RSDP
+};
+static_assert(alignof(TagAcpiNew) == 8, "TagAcpiNew must be aligned to 8 bytes");
+
 } // namespace multiboot2

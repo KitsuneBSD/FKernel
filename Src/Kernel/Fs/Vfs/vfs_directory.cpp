@@ -25,7 +25,11 @@ VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEnt
   dentry->for_each_child([&](const fk::RefPtr<Dentry>& child) {
       DirectoryEntry de;
       fk::memory::copy_n(de.name, child->name().c_str(), sizeof(de.name) - 1);
-      de.type = child->top_node() && child->top_node()->is_directory() ? 1 : 0;
+      auto* top = child->top_node().ptr();
+      if (top->is_directory())      de.type = 1;
+      else if (top->is_symlink())   de.type = 2;
+      else if (top->is_pipe())      de.type = 3;
+      else                          de.type = 0;
       add_directory_entry(entries, de);
   });
 
@@ -53,7 +57,11 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
   dentry->for_each_child([&](const fk::RefPtr<Dentry>& child) {
       DirectoryEntry de;
       fk::memory::copy_n(de.name, child->name().c_str(), sizeof(de.name) - 1);
-      de.type = child->top_node() && child->top_node()->is_directory() ? 1 : 0;
+      auto* top = child->top_node().ptr();
+      if (top->is_directory())      de.type = 1;
+      else if (top->is_symlink())   de.type = 2;
+      else if (top->is_pipe())      de.type = 3;
+      else                          de.type = 0;
       add_directory_entry(entries, de);
   });
 
@@ -69,7 +77,12 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
 
     auto *dirent = reinterpret_cast<linux_dirent64 *>(buffer + bytes_written);
     dirent->d_ino = i + 1; dirent->d_off = i + 1; dirent->d_reclen = static_cast<uint16_t>(reclen);
-    uint8_t dt_type = (entry.type == 0) ? DT_REG : (entry.type == 1 ? DT_DIR : (entry.type == 2 ? DT_LNK : DT_UNKNOWN));
+    uint8_t dt_type =
+        (entry.type == 0) ? DT_REG :
+        (entry.type == 1) ? DT_DIR :
+        (entry.type == 2) ? DT_LNK :
+        (entry.type == 3) ? DT_FIFO :
+        DT_UNKNOWN;
     dirent->d_type = dt_type;
     fk::memory::copy(dirent->d_name, entry.name, name_len);
     dirent->d_name[name_len] = '\0';

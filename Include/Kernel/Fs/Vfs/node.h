@@ -94,6 +94,9 @@ public:
   virtual bool is_eventfd() const { return false; }
   virtual bool is_timerfd() const { return false; }
   virtual bool is_signalfd() const { return false; }
+  virtual bool is_semaphore() const { return false; }
+  virtual bool is_mqueue() const { return false; }
+  virtual bool is_shm() const { return false; }
   virtual short poll() const { return POLLIN | POLLOUT; }
 
   virtual fk::core::Result<fk::text::String, fk::core::Error> read_link() {
@@ -126,6 +129,7 @@ public:
     if (m_mode != 0) return m_mode;
     if (is_directory()) return 0040755u;
     if (is_symlink()) return 0120777u;
+    if (is_pipe()) return 0010666u;
     if (is_character_device()) return 0020666u;
     if (is_block_device()) return 0060660u;
     return 0100644u;

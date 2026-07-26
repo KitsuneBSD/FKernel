@@ -3,8 +3,8 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/boot_info.h>
-#include <Kernel/Fs/DevFs/dev_fs.h>
-#include <Kernel/Fs/RamDisk/ram_disk.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
+#include <Kernel/Fs/Disk/RamDisk/ram_disk.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Hardware/Cpu/cpu.h>

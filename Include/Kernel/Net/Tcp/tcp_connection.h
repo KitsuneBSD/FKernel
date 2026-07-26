@@ -10,14 +10,14 @@ namespace fkernel {
 namespace net {
 
 enum class TcpState : uint8_t {
-    Closed, Listen, SynSent, SynReceived,
-    Established, FinWait1, FinWait2,
-    CloseWait, LastAck, TimeWait, Closing,
+  Closed, Listen, SynSent, SynReceived,
+  Established, FinWait1, FinWait2,
+  CloseWait, LastAck, TimeWait, Closing,
 };
 
 struct TcpEndpoint {
-    IPv4Address ip;
-    uint16_t    port;
+  IPv4Address ip;
+  uint16_t    port;
 };
 
 static constexpr size_t TCP_RECV_BUFFER_SIZE = 65536;
@@ -30,11 +30,16 @@ public:
   TcpState             state{TcpState::Closed};
   uint32_t             send_next{0};
   uint32_t             recv_next{0};
-  uint16_t             send_window{65535};   // advertised to peer
-  uint16_t             peer_window{65535};   // peer's advertised window
-  uint32_t             send_unacked{0};      // oldest unacknowledged seq
+  uint16_t             send_window{65535};
+  uint16_t             peer_window{65535};
+  uint32_t             send_unacked{0};
   fk::containers::Vector<uint8_t> recv_buf;
   fkernel::ipc::Notification state_changed;
+
+  uint64_t             retransmit_ticks{0};
+  uint8_t              retransmit_count{0};
+  static constexpr uint8_t MAX_RETRANSMITS = 5;
+  static constexpr uint64_t RTO_TICKS = 1000;
 
   uint16_t recv_window() const {
     size_t used = recv_buf.size();
@@ -53,5 +58,5 @@ public:
                uint32_t dst_ip, uint16_t dst_port) const;
 };
 
-} // namespace net
-} // namespace fkernel
+}
+}

@@ -7,63 +7,85 @@ on:
     branches: [ main ]
 
 jobs:
+  layer-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lua5.4 xmake
+        sudo ln -sf /usr/bin/lua5.4 /usr/bin/lua
+
+    - name: Layer separation check
+      run: |
+        xmake check-layers
+
   build-kernel:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld nasm qemu-system-x86 xmake
-        
+
     - name: Build kernel
       run: |
         xmake config --toolchain=clang --mode=release
         xmake -v
-        
+
     - name: Validate kernel boot
       timeout-minutes: 2
       run: |
         timeout 90s xmake run || echo "Kernel boot test completed"
-        
-    - name: Build tests (fixed)
+
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
       run: |
-        # Fix test build by removing incompatible -lc
-        sed -i 's/-lc//g' xmake.lua
+        sudo apt-get update
+        sudo apt-get install -y clang xmake
+
+    - name: Build tests
+      run: |
         xmake -bv Test
-        
-    - name: Run unit tests
+
+    - name: Run tests
       run: |
-        xmake run Test || echo "Tests completed with some failures"
-        
+        xmake run Test
+
   quality-gates:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-        
+
     - name: Run GEMINI validation
       run: |
         python3 .gemini/fkernel_validator.lua
-        
+
     - name: Check Object Calisthenics
       run: |
-        # Count else violations
         else_count=$(find Src/ -name '*.cpp' -o -name '*.h' | xargs grep -c "else {" | awk -F: '{sum += $2} END {print sum}')
         if [ $else_count -gt 50 ]; then
           echo "❌ Object Calisthenics: $else_count else blocks (max: 50)"
           exit 1
         fi
         echo "✅ Object Calisthenics: $else_count else blocks (OK)"
-        
+
     - name: Check class sizes
       run: |
-        # Check for oversized classes
         large_classes=$(find Src/ -name '*.cpp' -exec wc -l {} + | awk '$1 > 200 {print $2 " (" $1 " lines)"}')
         if [ -n "$large_classes" ]; then
           echo "❌ Classes >200 lines found:"
@@ -71,65 +93,62 @@ jobs:
           exit 1
         fi
         echo "✅ All classes under 200 lines"
-        
+
   hardware-validation:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld nasm qemu-system-x86 xmake
-        
+
     - name: Build with HDA image
       run: |
         xmake setup-hda
         xmake build-initrd
         xmake
-        
+
     - name: Test storage drivers
       timeout-minutes: 3
       run: |
-        # Test AHCI/NVMe in emulated hardware
         timeout 120s qemu-system-x86_64 \
           -drive file=build/FKernel-HDA.qcow2,format=qcow2,if=ahci \
           -serial stdio -monitor none -nographic || echo "Storage test completed"
-          
-    - name: Test network drivers  
+
+    - name: Test network drivers
       timeout-minutes: 2
       run: |
-        # Test E1000 in emulated hardware
         timeout 60s qemu-system-x86_64 \
           -netdev user,id=net0 -device e1000,netdev=net0 \
           -drive file=build/FKernel-HDA.qcow2,format=qcow2 \
           -serial stdio -monitor none -nographic || echo "Network test completed"
-          
+
   coverage-report:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Install coverage tools
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld nasm qemu-system-x86 xmake lcov
-        
+
     - name: Build with coverage
       run: |
-        # Add coverage flags to build
         sed -i 's/-O2/-O0 --coverage/g' xmake.lua
         xmake -bv Test
-        
+
     - name: Run tests with coverage
       run: |
         xmake run Test
-        
+
     - name: Generate coverage report
       run: |
         lcov --capture --directory . --output-file coverage.info
         lcov --summary coverage.info
-        
+
     - name: Upload coverage
       uses: codecov/codecov-action@v3
       with:

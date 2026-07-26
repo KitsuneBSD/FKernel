@@ -113,9 +113,17 @@ void BootInfo::initialize_from_multiboot2(void *mb_ptr) {
                                  "(2), ignoring - will use VGA text mode");
   }
 
-  // Get ACPI tables (if available via Multiboot2)
-  // Note: ACPI tables are typically found via RSDP, which is searched in memory
-  // For now, we'll leave ACPI info empty and let ACPIManager find RSDP itself
+  // Get ACPI RSDP via Multiboot2 tags
+  auto acpi_old = parser.find_tag<multiboot2::TagAcpiOld>(multiboot2::TagType::ACPIOld);
+  if (acpi_old) {
+    m_acpi_info.rsdp = const_cast<uint8_t *>(acpi_old->rsdp);
+    fk::algorithms::klog("BOOT", "  ACPI 1.0 RSDP via Multiboot2 tag");
+  }
+  auto acpi_new = parser.find_tag<multiboot2::TagAcpiNew>(multiboot2::TagType::ACPINew);
+  if (acpi_new) {
+    m_acpi_info.rsdp = const_cast<uint8_t *>(acpi_new->rsdp);
+    fk::algorithms::klog("BOOT", "  ACPI 2.0+ RSDP via Multiboot2 tag");
+  }
 
   m_initialized = true;
   fk::algorithms::klog("BOOT", "BootInfo initialized from Multiboot2");

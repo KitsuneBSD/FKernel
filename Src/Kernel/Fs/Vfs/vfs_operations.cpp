@@ -2,6 +2,7 @@
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Utilities/memory.h>
@@ -93,6 +94,29 @@ fk::core::Result<void, fk::core::Error> VirtualFileSystem::mkdir(const char* pat
   auto new_node = TRY(node->mkdir(name.c_str(), mode));
   auto child_dentry = TRY(Dentry::create(name, parent_dentry));
   child_dentry->push_node(new_node);
+  parent_dentry->add_child(child_dentry);
+  return {};
+}
+
+fk::core::Result<void, fk::core::Error> VirtualFileSystem::mkfifo(const char* path, [[maybe_unused]] int mode) {
+  fk::algorithms::kdebug("VFS", "mkfifo(%s)", path);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  auto parent_res = resolve_path_to_parent_unlocked(path);
+  if (parent_res.is_error()) {
+    fk::algorithms::kwarn("VFS", "mkfifo: resolve failed for %s", path);
+    return parent_res.error();
+  }
+
+  auto parent_dentry = parent_res.value().first;
+  auto name = parent_res.value().second;
+
+  auto pipe_res = PipeNode::create();
+  if (pipe_res.is_error())
+    return pipe_res.error();
+  auto pipe = pipe_res.value();
+
+  auto child_dentry = TRY(Dentry::create(name, parent_dentry));
+  child_dentry->push_node(pipe);
   parent_dentry->add_child(child_dentry);
   return {};
 }

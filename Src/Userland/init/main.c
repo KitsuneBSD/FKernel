@@ -26,6 +26,8 @@ int main(int argc, char** argv, char** envp) {
         int pid = sys_fork();
         if (pid == 0) {
             sys_setsid();
+            // Set this process group as the foreground process group of the terminal
+            sys_ioctl(0, 0x540E /* TIOCSCTTY */, 0);
 
             char* sh_argv[] = { "/bin/sh", 0 };
             char* sh_envp[] = {

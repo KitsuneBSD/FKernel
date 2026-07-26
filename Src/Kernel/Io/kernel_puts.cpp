@@ -1,7 +1,7 @@
 #include <Kernel/Io/kernel_puts.h>
 #include <Kernel/Driver/Serial/serial_port.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
-#include <Kernel/Fs/DebugFs/debug_fs.h>
+#include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <LibC/stdio.h>
 #include <LibC/string.h>
 #include <LibFK/Algorithms/log.h>

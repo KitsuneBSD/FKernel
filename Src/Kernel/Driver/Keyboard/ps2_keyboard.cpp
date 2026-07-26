@@ -51,6 +51,11 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
     return;
   }
 
+  if (keycode == 29) { // ctrl
+    ctrl_pressed = !key_released;
+    return;
+  }
+
   // Handle TTY switching (F1-F6)
   if (!key_released && (keycode >= 0x3B && keycode <= 0x40)) {
     int tty_index = keycode - 0x3B;
@@ -62,7 +67,7 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
     return;
 
   // Delegate translation to the KeymapManager
-  char c = fkernel::drivers::KeymapManager::the().translate(keycode, shift_pressed, alt_pressed);
+  char c = fkernel::drivers::KeymapManager::the().translate(keycode, shift_pressed, alt_pressed, ctrl_pressed);
 
   if (c) {
     fkernel::terminal::TerminalManager::the().handle_input(c);
@@ -75,7 +80,7 @@ void PS2Keyboard::irq_handler() {
 }
 
 void PS2Keyboard::initialize() {
-  set_layout(fkernel::drivers::KeyboardLayout::ABNT2);
+  set_layout(fkernel::drivers::KeyboardLayout::US_INTL);
   HardwareInterruptManager::the().unmask_interrupt(1);
-  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked, ABNT2, Polling Fallback)");
+  fk::algorithms::klog("KEYBOARD", "PS/2 keyboard initialized on IRQ1 (Unmasked, US_INTL, Compose ON)");
 }

@@ -15,11 +15,19 @@ ACPIManager &ACPIManager::the() {
 ACPIManager::ACPIManager() {}
 ACPIManager::~ACPIManager() {}
 
-void ACPIManager::initialize() {
-  m_rsdp = find_rsdp();
+void ACPIManager::initialize(RSDP *external_rsdp) {
+  if (external_rsdp) {
+    m_rsdp = external_rsdp;
+    fk::algorithms::klog("ACPI", "Using RSDP from bootloader at %p (Revision: %u)",
+                         m_rsdp, (uint32_t)m_rsdp->revision);
+  } else {
+    m_rsdp = find_rsdp();
+  }
   assert(m_rsdp && "RSDP not found - critical ACPI infrastructure unavailable!");
 
-  fk::algorithms::klog("ACPI", "RSDP found at %p (Revision: %u)", m_rsdp, (uint32_t)m_rsdp->revision);
+  if (!external_rsdp) {
+    fk::algorithms::klog("ACPI", "RSDP found at %p (Revision: %u)", m_rsdp, (uint32_t)m_rsdp->revision);
+  }
 
   if (m_rsdp->revision >= 2 && m_rsdp->xsdt_address) {
     m_xsdt = (XSDT *)((uintptr_t)m_rsdp->xsdt_address);
@@ -37,7 +45,6 @@ void ACPIManager::initialize() {
     fk::algorithms::klog("ACPI", "Using RSDT at %p (Length: %u)", m_rsdt, m_rsdt->header.length);
   }
 
-  // Initialize FADT support via the FadtManager
   initialize_fadt_from_acpi(this);
 
   initialize_madt();
@@ -91,5 +98,3 @@ RSDP *ACPIManager::find_rsdp() {
   }
   return nullptr;
 }
-
-

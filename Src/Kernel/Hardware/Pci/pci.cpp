@@ -3,7 +3,7 @@
 #include <Kernel/Hardware/Acpi/mcfg.h>
 #include <Kernel/Hardware/Pci/pci.h>
 #include <Kernel/Driver/Device/driver_manager.h>
-#include <Kernel/Fs/DevFs/dev_fs.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/log.h>
 

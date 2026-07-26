@@ -16,16 +16,77 @@
 #define SIGPIPE   13
 #define SIGALRM   14
 #define SIGTERM   15
-#define SIGURG    16
+#define SIGSTKFLT 16
 #define SIGCHLD   17
 #define SIGCONT   18
 #define SIGSTOP   19
 #define SIGTSTP   20
 #define SIGTTIN   21
 #define SIGTTOU   22
+#define SIGURG    23
+#define SIGXCPU   24
+#define SIGXFSZ   25
+#define SIGVTALRM 26
+#define SIGPROF   27
 #define SIGWINCH  28
+#define SIGIO     29
+#define SIGPWR    30
+#define SIGSYS    31
 
 #define NSIG 32
+
+#define SI_MAX_SIZE 128
+
+typedef struct {
+    int      si_signo;
+    int      si_errno;
+    int      si_code;
+    int      __pad0;
+    union {
+        int    _pad[(SI_MAX_SIZE - 16) / sizeof(int)];
+        struct {
+            uint32_t si_pid;
+            uint32_t si_uid;
+        } _kill;
+        struct {
+            uint32_t si_tid;
+            uint32_t si_overrun;
+            uint64_t si_sigval;
+        } _timer;
+        struct {
+            uint32_t si_pid;
+            uint32_t si_uid;
+            uint64_t si_sigval;
+        } _rt;
+        struct {
+            uint32_t si_pid;
+            uint32_t si_uid;
+            int      si_status;
+            uint64_t si_utime;
+            uint64_t si_stime;
+        } _sigchld;
+        struct {
+            uint64_t si_addr;
+        } _sigfault;
+        struct {
+            int32_t  si_band;
+            int32_t  si_fd;
+        } _sigpoll;
+    } __attribute__((aligned(8))) _sifields;
+} __attribute__((aligned(8))) siginfo_t;
+
+#define si_pid     _sifields._kill.si_pid
+#define si_uid     _sifields._kill.si_uid
+#define si_addr    _sifields._sigfault.si_addr
+#define si_status  _sifields._sigchld.si_status
+#define si_utime   _sifields._sigchld.si_utime
+#define si_stime   _sifields._sigchld.si_stime
+
+#define SI_USER     0
+#define SI_KERNEL   0x80
+#define SI_QUEUE   -1
+#define SI_TIMER   -2
+#define SI_TKILL   -6
 
 typedef void (*sighandler_t)(int);
 
@@ -33,14 +94,10 @@ typedef void (*sighandler_t)(int);
 #define SIG_IGN ((sighandler_t)1)
 #define SIG_ERR ((sighandler_t)-1)
 
-// Must match the Linux rt_sigaction kernel struct layout (syscall 13):
-//   offset  0: sa_handler  (8 bytes)
-//   offset  8: sa_flags    (8 bytes)
-//   offset 16: sa_restorer (8 bytes)
-//   offset 24: sa_mask     (8 bytes)
 #define SA_NOCLDSTOP  0x00000001UL
 #define SA_NOCLDWAIT  0x00000002UL
 #define SA_SIGINFO    0x00000004UL
+#define SA_ONSTACK    0x08000000UL
 #define SA_RESTORER   0x04000000UL
 #define SA_RESTART    0x10000000UL
 #define SA_NODEFER    0x40000000UL
@@ -52,3 +109,6 @@ struct sigaction {
     void (*sa_restorer)(void);
     uint64_t sa_mask;
 };
+
+static_assert(sizeof(siginfo_t) == 128, "siginfo_t must be 128 bytes");
+static_assert(sizeof(struct sigaction) == 32, "sigaction must be 32 bytes");

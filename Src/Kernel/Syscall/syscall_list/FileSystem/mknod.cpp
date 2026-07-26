@@ -31,10 +31,15 @@ uint64_t sys_mknod(uint64_t path_ptr, uint64_t mode,
     path = absolute_path;
   }
 
-  // S_IFREG regular file only; device files not supported yet
+  // S_IFREG and S_IFIFO supported
   uint32_t type = (uint32_t)mode & 0170000;
-  if (type != 0 && type != 0100000)
-    return (uint64_t)-22; // EINVAL — only regular files supported
+  if (type != 0 && type != 0100000 && type != 0010000)
+    return (uint64_t)-22;
+
+  if (type == 0010000) {
+    return fkernel::VirtualFileSystem::the().mkfifo(path, (int)mode).is_error()
+               ? (uint64_t)-1 : 0;
+  }
 
   auto res = VirtualFileSystem::the().open(path, O_CREAT | O_WRONLY | O_TRUNC);
   if (res.is_error())

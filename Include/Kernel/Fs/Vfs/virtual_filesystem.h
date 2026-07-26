@@ -45,6 +45,8 @@ public:
 
   fk::core::Result<void, fk::core::Error> mkdir(const char* path, int mode);
 
+  fk::core::Result<void, fk::core::Error> mkfifo(const char* path, int mode);
+
   fk::core::Result<void, fk::core::Error> symlink(const char* path, const char* target);
 
   fk::core::Result<void, fk::core::Error> rmdir(const char* path);

@@ -33,7 +33,9 @@ static uint16_t tcp_checksum(IPv4Address dst, const uint8_t* seg, size_t seg_len
 }
 
 TcpSocket::TcpSocket(TcpEndpoint local, TcpEndpoint remote)
-    : m_connection(local, remote) {}
+    : m_connection(local, remote) {
+  register_socket(this);
+}
 
 fk::core::Result<void, fk::core::Error> TcpSocket::bind(const char* path) {
     if (!path) return fk::core::Error::InvalidParameter;
@@ -148,6 +150,12 @@ fk::core::Result<size_t, fk::core::Error> TcpSocket::write(
         else
             m_connection.peer_window = 0;
         sent += chunk;
+
+        m_retransmit_buf.resize(chunk);
+        fk::memory::copy(&m_retransmit_buf[0], buf + sent - chunk, chunk);
+        m_retransmit_seq = m_connection.send_next - (uint32_t)chunk;
+        m_retransmit_len = chunk;
+        arm_retransmit();
     }
     return sent;
 }
@@ -237,8 +245,11 @@ void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
         m_connection.state = TcpState::Established;
         m_connection.state_changed.signal(1);
     }
-    if (ack > m_connection.send_unacked && ack <= m_connection.send_next)
+    if (ack > m_connection.send_unacked && ack <= m_connection.send_next) {
         m_connection.send_unacked = ack;
+        if (m_retransmit_len > 0 && ack >= m_retransmit_seq + (uint32_t)m_retransmit_len)
+            cancel_retransmit();
+    }
     m_connection.peer_window = ntohs(hdr->window);
 }
 
@@ -352,3 +363,80 @@ fk::core::Result<void, fk::core::Error> TcpSocket::getsockopt(
 
 } // namespace net
 } // namespace fkernel
+
+#include <LibFK/Container/vector.h>
+
+namespace fkernel {
+namespace net {
+
+static fk::containers::Vector<TcpSocket*>& tcp_socket_list() {
+  static fk::containers::Vector<TcpSocket*> list;
+  return list;
+}
+
+void TcpSocket::register_socket(TcpSocket* s) {
+  tcp_socket_list().push_back(s);
+}
+
+void TcpSocket::unregister_socket(TcpSocket* s) {
+  auto& list = tcp_socket_list();
+  for (size_t i = 0; i < list.size(); ++i) {
+    if (list[i] == s) {
+      list[i] = list[list.size() - 1];
+      list.pop_back();
+      return;
+    }
+  }
+}
+
+void TcpSocket::tick_all(uint64_t now_ticks) {
+  for (auto* s : tcp_socket_list())
+    s->on_tick(now_ticks);
+}
+
+void TcpSocket::arm_retransmit() {
+  m_connection.retransmit_ticks = TickManager::the().get_ticks() + TcpConnection::RTO_TICKS;
+}
+
+void TcpSocket::cancel_retransmit() {
+  m_connection.retransmit_ticks = 0;
+  m_connection.retransmit_count = 0;
+}
+
+void TcpSocket::do_retransmit() {
+  if (m_retransmit_len == 0) return;
+
+  fk::containers::Vector<uint8_t> packet;
+  packet.resize(TCP_HEADER_SIZE + m_retransmit_len);
+  auto* hdr = reinterpret_cast<TcpHeader*>(&packet[0]);
+  hdr->fill(m_connection.local().port, m_connection.remote().port,
+            m_retransmit_seq, m_connection.recv_next,
+            TCP_FLAG_ACK | TCP_FLAG_PSH, m_connection.recv_window());
+  fk::memory::copy(&packet[0] + TCP_HEADER_SIZE, &m_retransmit_buf[0], m_retransmit_len);
+  hdr->checksum = tcp_checksum(m_connection.remote().ip, &packet[0],
+                                TCP_HEADER_SIZE + m_retransmit_len);
+  auto res = NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
+                                           &packet[0], TCP_HEADER_SIZE + m_retransmit_len);
+  if (res.is_ok()) {
+    ++m_connection.retransmit_count;
+    m_connection.retransmit_ticks = TickManager::the().get_ticks()
+        + TcpConnection::RTO_TICKS * (1ULL << m_connection.retransmit_count);
+    fk::algorithms::kwarn("TCP", "Retransmit seq=%u len=%zu attempt=%u",
+                          m_retransmit_seq, m_retransmit_len, m_connection.retransmit_count);
+  }
+}
+
+void TcpSocket::on_tick(uint64_t now_ticks) {
+  if (m_connection.retransmit_ticks == 0) return;
+  if (now_ticks < m_connection.retransmit_ticks) return;
+  if (m_connection.retransmit_count >= TcpConnection::MAX_RETRANSMITS) {
+    m_connection.state = TcpState::Closed;
+    m_connection.retransmit_ticks = 0;
+    m_connection.state_changed.signal(1);
+    return;
+  }
+  do_retransmit();
+}
+
+}
+}

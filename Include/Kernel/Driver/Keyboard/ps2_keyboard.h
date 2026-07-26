@@ -22,6 +22,7 @@ private:
   volatile size_t tail = 0;                   ///< Tail index of the buffer
   bool shift_pressed{false};
   bool alt_pressed{false};
+  bool ctrl_pressed{false};
 
   PS2Keyboard() {
       set_name("keyboard");

@@ -6,14 +6,17 @@
 #include <Kernel/Driver/Device/CharacterDevice/null_device.h>
 #include <Kernel/Driver/Device/CharacterDevice/urandom_device.h>
 #include <Kernel/Driver/Device/driver_manager.h>
-#include <Kernel/Fs/DebugFs/debug_fs.h>
+#include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <Kernel/Driver/Device/CharacterDevice/ptmx_device.h>
-#include <Kernel/Fs/DevFs/dev_fs.h>
-#include <Kernel/Fs/DevFs/tty.h>
-#include <Kernel/Fs/PtsFs/pts_dir_node.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
+#include <Kernel/Fs/Virtual/DevFs/tty.h>
+#include <Kernel/Fs/Virtual/PtsFs/pts_dir_node.h>
+#include <Kernel/Fs/Virtual/SemFs/sem_dir_node.h>
+#include <Kernel/Fs/Virtual/MqueueFs/mqueue_dir_node.h>
+#include <Kernel/Fs/Virtual/ShmFs/shm_dir_node.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
-#include <Kernel/Fs/ProcFs/proc_fs.h>
-#include <Kernel/Fs/TmpFs/tmp_fs.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_fs.h>
+#include <Kernel/Fs/Virtual/TmpFs/tmp_fs.h>
 #include <Kernel/Fs/Vfs/definitions.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/dentry.h>
@@ -43,6 +46,7 @@ void VirtualFileSystem::initialize() {
   (void)vfs.mkdir("/proc", 0755);
   (void)vfs.mkdir("/debug", 0755);
   (void)vfs.mkdir("/mnt", 0755);
+  (void)vfs.mkdir("/tmp", 0755);
 
   auto &devfs = fkernel::DevFs::the();
   devfs.set_name("dev");
@@ -73,6 +77,24 @@ void VirtualFileSystem::initialize() {
   if (pts_node_res) {
     pts_node_res.value()->set_name("pts");
     fkernel::DevFs::the().register_device(pts_node_res.value(), "pts");
+  }
+
+  auto sem_node_res = fk::make_ref<SemDirNode>();
+  if (sem_node_res) {
+    sem_node_res.value()->set_name("sem");
+    fkernel::DevFs::the().register_device(sem_node_res.value(), "sem");
+  }
+
+  auto mqueue_node_res = fk::make_ref<MqueueDirNode>();
+  if (mqueue_node_res) {
+    mqueue_node_res.value()->set_name("mqueue");
+    fkernel::DevFs::the().register_device(mqueue_node_res.value(), "mqueue");
+  }
+
+  auto shm_node_res = fk::make_ref<ShmDirNode>();
+  if (shm_node_res) {
+    shm_node_res.value()->set_name("shm");
+    fkernel::DevFs::the().register_device(shm_node_res.value(), "shm");
   }
 
   fkernel::terminal::TerminalManager::the().initialize();

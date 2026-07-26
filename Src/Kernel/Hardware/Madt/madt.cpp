@@ -26,14 +26,13 @@ void ACPIManager::process_madt_entries() {
 
   uint8_t *entries_start = m_madt->entries;
   uint8_t *entries_end = (uint8_t *)m_madt + m_madt->header.length;
-  [[maybe_unused]] uint32_t entry_count = 0;
+  uint32_t entry_count = 0;
 
   fk::algorithms::klog("MADT", "Processing MADT entries...");
 
   for (uint8_t *p = entries_start; p < entries_end; ) {
     MadtEntry *entry = (MadtEntry *)p;
     
-    // Rigorous validation: Ensure entry is within bounds and has reasonable length
     if (entry->length < 2) {
         fk::algorithms::kwarn("MADT", "Invalid entry length %u at offset %tu! Aborting.", entry->length, p - entries_start);
         break;
@@ -50,6 +49,10 @@ void ACPIManager::process_madt_entries() {
         bool online_capable = (lapic->flags & 2);
         
         if (enabled) {
+            if (m_cpu_count < MAX_CPU_APIC_IDS) {
+                m_cpu_apic_ids[m_cpu_count] = lapic->apic_id;
+            }
+            m_cpu_count++;
             fk::algorithms::klog("MADT", "  Entry %u: Processor Local APIC (ACPI ID: %u, APIC ID: %u) - [ENABLED]",
                                  entry_count, lapic->acpi_processor_id, lapic->apic_id);
         } else if (online_capable) {
@@ -65,14 +68,24 @@ void ACPIManager::process_madt_entries() {
         auto *ioapic = (MADT_IOAPIC *)entry;
         fk::algorithms::klog("MADT", "  Entry %u: I/O APIC (ID: %u, Address: %p, GSI Base: %u)",
                              entry_count, ioapic->ioapic_id, (void *)(uintptr_t)ioapic->address, ioapic->gsi_base);
+        if (m_ioapic_count < MAX_IOAPICS) {
+            m_ioapics[m_ioapic_count].id = ioapic->ioapic_id;
+            m_ioapics[m_ioapic_count].address = ioapic->address;
+            m_ioapics[m_ioapic_count].gsi_base = ioapic->gsi_base;
+            m_ioapic_count++;
+        }
         if (ioapic->address != 0 && ioapic->gsi_base == 0)
           set_ioapic_address(static_cast<uintptr_t>(ioapic->address));
         break;
       }
       case 2: { // Interrupt Source Override
         auto *override = (MADT_InterruptSourceOverride *)entry;
-        fk::algorithms::klog("MADT", "  Entry %u: Interrupt Source Override (Bus: %u, IRQ: %u, GSI: %u, Flags: 0x%x)",
+        fk::algorithms::klog("MADT", "  Entry %u: Interrupt Source Override (Bus: %u, IRQ: %u -> GSI: %u, Flags: 0x%x)",
                              entry_count, override->bus_source, override->irq_source, override->gsi, override->flags);
+        if (m_iso_count < MAX_ISOS) {
+            m_isos[m_iso_count] = *override;
+            m_iso_count++;
+        }
         break;
       }
       case 3: // NMI Source
@@ -100,4 +113,6 @@ void ACPIManager::process_madt_entries() {
   }
 
   fk::algorithms::klog("MADT", "Total MADT entries processed: %u", entry_count);
+  fk::algorithms::klog("MADT", "Detected %u CPUs, %u IO-APICs, %u ISOs",
+                       m_cpu_count, m_ioapic_count, m_iso_count);
 }

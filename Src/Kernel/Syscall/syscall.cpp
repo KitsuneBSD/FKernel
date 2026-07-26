@@ -1,4 +1,4 @@
-#include <Kernel/Fs/DebugFs/debug_fs.h>
+#include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Ipc/signal_delivery.h>
 #include <Kernel/Memory/memory_manager.h>
@@ -119,6 +119,8 @@ uint64_t sys_ipc_send(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t
 uint64_t sys_ipc_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_cap_revoke(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_cap_transfer(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_cap_grant(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_openpty(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -138,6 +140,18 @@ uint64_t sys_access(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, 
 uint64_t sys_chmod(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_chown(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_mknod(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_mkfifo(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_sem_open(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_sem_wait(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_sem_post(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_sem_getvalue(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_sem_unlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_mq_open(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_mq_send(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_mq_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_mq_unlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_shm_open(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_shm_unlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_symlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_readlink(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_setuid(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -197,6 +211,8 @@ uint64_t sys_setitimer(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_
 uint64_t sys_nice(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getpriority(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_setpriority(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_thread_set_qos_class(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_thread_get_qos_class(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_clock_getres(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_clock_nanosleep(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_sendfile(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -307,6 +323,8 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IPC_RECEIVE, sys_ipc_receive);
   SyscallManager::the().register_syscall(SYS_IPC_CALL, sys_ipc_call);
   SyscallManager::the().register_syscall(SYS_CAP_REVOKE, sys_cap_revoke);
+  SyscallManager::the().register_syscall(SYS_CAP_TRANSFER, sys_cap_transfer);
+  SyscallManager::the().register_syscall(SYS_CAP_GRANT, sys_cap_grant);
   SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
   SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
   SyscallManager::the().register_syscall(SYS_POLL, sys_poll);
@@ -322,6 +340,18 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_CHOWN, sys_chown);
   SyscallManager::the().register_syscall(SYS_FCHOWN, sys_fchown);
   SyscallManager::the().register_syscall(SYS_MKNOD, sys_mknod);
+  SyscallManager::the().register_syscall(SYS_MKFIFO, sys_mkfifo);
+  SyscallManager::the().register_syscall(SYS_SEM_OPEN, sys_sem_open);
+  SyscallManager::the().register_syscall(SYS_SEM_WAIT, sys_sem_wait);
+  SyscallManager::the().register_syscall(SYS_SEM_POST, sys_sem_post);
+  SyscallManager::the().register_syscall(SYS_SEM_GETVALUE, sys_sem_getvalue);
+  SyscallManager::the().register_syscall(SYS_SEM_UNLINK, sys_sem_unlink);
+  SyscallManager::the().register_syscall(SYS_MQ_OPEN, sys_mq_open);
+  SyscallManager::the().register_syscall(SYS_MQ_SEND, sys_mq_send);
+  SyscallManager::the().register_syscall(SYS_MQ_RECEIVE, sys_mq_receive);
+  SyscallManager::the().register_syscall(SYS_MQ_UNLINK, sys_mq_unlink);
+  SyscallManager::the().register_syscall(SYS_SHM_OPEN, sys_shm_open);
+  SyscallManager::the().register_syscall(SYS_SHM_UNLINK, sys_shm_unlink);
   SyscallManager::the().register_syscall(SYS_SYMLINK, sys_symlink);
   SyscallManager::the().register_syscall(SYS_READLINK, sys_readlink);
   SyscallManager::the().register_syscall(SYS_SETUID, sys_setuid);
@@ -381,6 +411,8 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_NICE, sys_nice);
   SyscallManager::the().register_syscall(SYS_GETPRIORITY, sys_getpriority);
   SyscallManager::the().register_syscall(SYS_SETPRIORITY, sys_setpriority);
+  SyscallManager::the().register_syscall(SYS_THREAD_SET_QOS_CLASS, sys_thread_set_qos_class);
+  SyscallManager::the().register_syscall(SYS_THREAD_GET_QOS_CLASS, sys_thread_get_qos_class);
   SyscallManager::the().register_syscall(SYS_CLOCK_GETRES, sys_clock_getres);
   SyscallManager::the().register_syscall(SYS_CLOCK_NANOSLEEP, sys_clock_nanosleep);
   SyscallManager::the().register_syscall(SYS_SENDFILE, sys_sendfile);

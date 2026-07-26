@@ -1,8 +1,8 @@
 #include <Kernel/Driver/Pty/pty_buffer.h>
 #include <Kernel/Driver/Pty/pty_master.h>
 #include <Kernel/Driver/Pty/pty_slave.h>
-#include <Kernel/Fs/DevFs/dev_fs.h>
-#include <Kernel/Fs/PtsFs/pts_dir_node.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
+#include <Kernel/Fs/Virtual/PtsFs/pts_dir_node.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>

@@ -37,6 +37,14 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
   child->control.lifecycle.priority = parent->control.lifecycle.priority;
   child->control.lifecycle.cpu_affinity = parent->control.lifecycle.cpu_affinity;
   child->control.lifecycle.is_a_kernel_task = parent->control.lifecycle.is_a_kernel_task;
+  child->control.lifecycle.qos = parent->control.lifecycle.qos;
+  child->control.lifecycle.policy = parent->control.lifecycle.policy;
+  child->control.lifecycle.base_priority = parent->control.lifecycle.base_priority;
+  child->control.lifecycle.mlfq_level = parent->control.lifecycle.mlfq_level;
+  child->control.lifecycle.cpu_time_consumed = 0;
+  child->control.lifecycle.allotment_ticks = parent->control.lifecycle.allotment_ticks;
+  child->control.lifecycle.boosted = false;
+  child->control.lifecycle.original_qos = parent->control.lifecycle.qos;
   child->resources.files.cwd = parent->resources.files.cwd;
   child->control.lifecycle.vfork_parent_id = parent->control.identity.id; // Mark as vfork child
 

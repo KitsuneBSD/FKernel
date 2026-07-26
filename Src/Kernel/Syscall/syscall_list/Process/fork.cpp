@@ -39,11 +39,21 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
   // 2. Clone metadata
   child->control.identity.id = SchedulerManager::the().generate_pid();
   child->control.identity.ppid = parent->control.identity.id;
+  child->control.identity.pgid = parent->control.identity.pgid;
+  child->control.identity.sid = parent->control.identity.sid;
   child->control.identity.name = parent->control.identity.name;
   child->control.lifecycle.state = TaskState::Ready;
   child->control.lifecycle.priority = parent->control.lifecycle.priority;
   child->control.lifecycle.cpu_affinity = parent->control.lifecycle.cpu_affinity;
   child->control.lifecycle.is_a_kernel_task = parent->control.lifecycle.is_a_kernel_task;
+  child->control.lifecycle.qos = parent->control.lifecycle.qos;
+  child->control.lifecycle.policy = parent->control.lifecycle.policy;
+  child->control.lifecycle.base_priority = parent->control.lifecycle.base_priority;
+  child->control.lifecycle.mlfq_level = parent->control.lifecycle.mlfq_level;
+  child->control.lifecycle.cpu_time_consumed = 0;
+  child->control.lifecycle.allotment_ticks = parent->control.lifecycle.allotment_ticks;
+  child->control.lifecycle.boosted = false;
+  child->control.lifecycle.original_qos = parent->control.lifecycle.qos;
   child->resources.files.cwd = parent->resources.files.cwd;
   child->control.lifecycle.clear_child_tid = 0;
 

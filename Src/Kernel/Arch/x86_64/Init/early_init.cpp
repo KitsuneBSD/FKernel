@@ -59,7 +59,10 @@ void early_init() {
 
   // ACPI
   fk::algorithms::klog("EARLY_INIT", "Initializing ACPI...");
-  ACPIManager::the().initialize();
+  {
+    RSDP *boot_rsdp = static_cast<RSDP *>(boot::BootInfo::the().get_acpi_info().rsdp);
+    ACPIManager::the().initialize(boot_rsdp);
+  }
   if (ACPIManager::the().get_madt()) {
     fk::algorithms::klog("EARLY_INIT", "ACPI: MADT found");
   } else {

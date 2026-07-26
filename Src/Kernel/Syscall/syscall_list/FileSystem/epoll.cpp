@@ -1,12 +1,14 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/Epoll/epoll_node.h>
+#include <Kernel/Fs/Virtual/Epoll/epoll_node.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
+
+using namespace fkernel;
 
 static constexpr int EPOLL_CTL_ADD = 1;
 static constexpr int EPOLL_CTL_DEL = 2;
@@ -103,16 +105,14 @@ uint64_t sys_epoll_wait(uint64_t epfd, uint64_t events_ptr, uint64_t maxevents,
   int   max       = (int)maxevents;
   if (max <= 0 || max > 128) max = 128;
   if (!fkernel::memory::is_user_address(events_ptr, (size_t)max * sizeof(epoll_event)))
-    return (uint64_t)-14; // EFAULT
+    return (uint64_t)-14;
 
   int64_t timeout_ms  = (int64_t)(int32_t)timeout;
-  bool  infinite  = (timeout_ms < 0);
-  bool  no_wait   = (timeout_ms == 0);
+  bool    infinite    = (timeout_ms < 0);
+  bool    no_wait     = (timeout_ms == 0);
 
   uint32_t freq     = TickManager::the().get_frequency();
-  uint64_t deadline = 0;
-  if (!infinite && !no_wait && freq > 0)
-    deadline = TickManager::the().get_ticks() + (uint64_t)timeout_ms * freq / 1000;
+  if (freq == 0) freq = 1000;
 
   epoll_event kout[128];
   while (true) {
@@ -120,12 +120,21 @@ uint64_t sys_epoll_wait(uint64_t epfd, uint64_t events_ptr, uint64_t maxevents,
     if (ready > 0 || no_wait) {
       if (ready > 0)
         fkernel::memory::copy_to_user(reinterpret_cast<void*>(events_ptr), kout,
-                                      (size_t)ready * sizeof(epoll_event));
+                                       (size_t)ready * sizeof(epoll_event));
       return (uint64_t)ready;
     }
-    if (!infinite && TickManager::the().get_ticks() >= deadline) return 0;
-    SchedulerManager::the().sleep_current(1);
-    SchedulerManager::the().schedule();
+
+    uint64_t wait_ticks;
+    if (infinite) {
+      wait_ticks = freq / 10;  // ~100ms chunks for infinite wait
+    } else {
+      uint64_t now = TickManager::the().get_ticks();
+      uint64_t deadline = now + (uint64_t)timeout_ms * freq / 1000;
+      if (deadline <= now) return 0;
+      wait_ticks = deadline - now;
+    }
+
+    epoll->notify().wait_timeout(wait_ticks);
   }
 }
 

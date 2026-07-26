@@ -44,9 +44,16 @@ public:
     return handle < m_capabilities.size() && m_capabilities[handle].is_valid();
   }
 
-  static uint32_t cspace_insert(CSpace& source, uint32_t handle, CSpace& dest,
-                                CapabilityRights mask = CapabilityRights::All) {
-    auto cap = source.get(handle);
+  uint32_t transfer(CSpace& dest, uint32_t handle, CapabilityRights mask = CapabilityRights::All) {
+    auto cap = get(handle);
+    if (!cap.is_valid())
+      return INVALID_HANDLE;
+    remove(handle);
+    return dest.install(cap.with_rights(cap.rights() & mask));
+  }
+
+  uint32_t grant(CSpace& dest, uint32_t handle, CapabilityRights mask = CapabilityRights::All) {
+    auto cap = get(handle);
     if (!cap.is_valid())
       return INVALID_HANDLE;
     return dest.install(cap.with_rights(cap.rights() & mask));
@@ -55,5 +62,5 @@ public:
   size_t size() const { return m_capabilities.size() - m_free_list.size(); }
 };
 
-} // namespace ipc
-} // namespace fkernel
+}
+}

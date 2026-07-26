@@ -18,6 +18,33 @@ int sys_chdir(const char* path);
 int sys_getcwd(char* buf, size_t size);
 int sys_ioctl(int fd, uint64_t request, void* arg);
 
+// Terminal ioctl commands
+#define TIOCSCTTY  0x540E  // Set controlling terminal
+#define TIOCGPGRP  0x540F  // Get foreground process group
+#define TIOCSPGRP  0x5410  // Set foreground process group
+
+// Keyboard layout ioctl commands (for use with sys_ioctl on /dev/tty0)
+#define KBDIO_SETLAYOUT  0x4B01  // arg: 0=US, 1=US_INTL, 2=ABNT2
+#define KBDIO_GETLAYOUT  0x4B02  // returns: KeyboardLayout enum
+#define KBDIO_SETCOMPOSE 0x4B03  // arg: 0=off, 1=on (dead key compose mode)
+
+// Signal constants
+#define SIG_DFL  ((void (*)(int))0)
+#define SIG_IGN  ((void (*)(int))1)
+#define SIGINT   2
+#define SIGQUIT  3
+#define SIGKILL  9
+#define SIGUSR1  10
+#define SIGCHLD  17
+#define SIGTSTP  20
+
+struct sigaction {
+    void (*sa_handler)(int);
+    uint64_t sa_flags;
+    void (*sa_restorer)(void);
+    uint64_t sa_mask;
+};
+
 struct linux_dirent64 {
     uint64_t d_ino;
     int64_t  d_off;

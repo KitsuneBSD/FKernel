@@ -14,6 +14,10 @@ class TcpSocket : public Socket {
   fk::synchronization::Spinlock m_lock;
   fk::containers::Vector<fk::RefPtr<TcpSocket>> m_accept_queue;
 
+  fk::containers::Vector<uint8_t> m_retransmit_buf;
+  uint32_t m_retransmit_seq{0};
+  size_t   m_retransmit_len{0};
+
 public:
   TcpSocket(TcpEndpoint local, TcpEndpoint remote);
 
@@ -53,6 +57,12 @@ public:
   void on_segment(const TcpHeader* hdr, const uint8_t* data, size_t data_len);
   TcpConnection& connection() { return m_connection; }
 
+  void on_tick(uint64_t now_ticks);
+
+  static void register_socket(TcpSocket* s);
+  static void unregister_socket(TcpSocket* s);
+  static void tick_all(uint64_t now_ticks);
+
 private:
   bool m_so_reuseaddr{false};
   bool m_tcp_nodelay{false};
@@ -63,7 +73,10 @@ private:
   void process_ack(const TcpHeader* hdr, uint8_t flags);
   void process_data(const TcpHeader* hdr, uint8_t flags, const uint8_t* data, size_t data_len, uint32_t seq);
   void process_fin(const TcpHeader* hdr, uint8_t flags);
+  void arm_retransmit();
+  void cancel_retransmit();
+  void do_retransmit();
 };
 
-} // namespace net
-} // namespace fkernel
+}
+}

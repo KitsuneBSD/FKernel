@@ -1,5 +1,5 @@
 #include <Kernel/Driver/Device/driver_manager.h>
-#include <Kernel/Fs/DevFs/dev_fs.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/log.h>
 
 namespace fkernel {

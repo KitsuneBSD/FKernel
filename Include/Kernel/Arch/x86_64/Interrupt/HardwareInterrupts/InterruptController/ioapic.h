@@ -11,18 +11,39 @@ constexpr uint32_t IOAPIC_REG_ARB = 0x02;
 constexpr uint32_t IOAPIC_REG_TABLE_BASE = 0x10;
 constexpr uintptr_t IOAPIC_ADDRESS = 0xFEC00000;
 
+static constexpr uint32_t MAX_IOAPIC_CONTROLLERS = 8;
+
+struct IoApicController {
+  uintptr_t base = 0;
+  uint32_t gsi_base = 0;
+  uint32_t max_entries = 0;
+
+  uint32_t read(uint32_t reg) const;
+  void write(uint32_t reg, uint32_t value) const;
+};
+
 /**
  * @brief I/O APIC controller implementing HardwareInterrupt interface
  */
 class IOAPIC : public HardwareInterrupt {
 private:
-  uintptr_t ioapic_base = 0;
-  // uint32_t global_interrupt_base = 0;
+  IoApicController m_controllers[MAX_IOAPIC_CONTROLLERS];
+  uint32_t m_controller_count{0};
 
   fk::text::String m_name = "IOAPIC";
 
-  uint32_t read(uint32_t reg);
-  void write(uint32_t reg, uint32_t value);
+  static constexpr uint64_t IOAPIC_REDIR_MASKED     = 1ULL << 16;
+  static constexpr uint64_t IOAPIC_REDIR_POLARITY_LOW = 1ULL << 13;
+  static constexpr uint64_t IOAPIC_REDIR_TRIGGER_LEVEL = 1ULL << 15;
+  static constexpr uint32_t MAX_IRQ = 256;
+
+  uint8_t m_irq_to_gsi[MAX_IRQ]{};
+  bool m_irq_overridden[MAX_IRQ]{};
+
+  void init_controller(IoApicController &ctrl, uintptr_t address, uint32_t gsi_base, uint8_t lapic_id);
+  void apply_iso_overrides();
+  const IoApicController *find_controller_for_gsi(uint32_t gsi) const;
+  void write_redir_entry(const IoApicController &ctrl, uint32_t gsi, uint64_t entry);
 
 public:
   IOAPIC() = default;

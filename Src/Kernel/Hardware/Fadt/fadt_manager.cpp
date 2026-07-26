@@ -8,7 +8,6 @@ FadtManager &FadtManager::the() {
   return instance;
 }
 
-// Helper function to allow acpi.cpp to call without including the manager header there
 void initialize_fadt_from_acpi(ACPIManager *acpi) {
   FadtManager::the().initialize(acpi);
 }
@@ -29,10 +28,10 @@ void FadtManager::initialize(ACPIManager *acpi) {
 
   m_length = h->length;
   m_fadt = (FADT *)h;
-  size_t base_size = offsetof(FADT, x_firmware_ctrl); // end of 32-bit FADT fields
+  size_t base_size = offsetof(FADT, x_firmware_ctrl);
   m_has_x_fields = m_length >= base_size;
 
-  fk::algorithms::klog("FADT", "FADT found at %p (len=%u), Revision: %u", 
+  fk::algorithms::klog("FADT", "FADT found at %p (len=%u), Revision: %u",
                        m_fadt, m_length, (uint32_t)m_fadt->header.revision);
 
   uint32_t port;
@@ -44,6 +43,11 @@ void FadtManager::initialize(ACPIManager *acpi) {
     fk::algorithms::klog("FADT", "  PM1a Control Block: 0x%x", port);
   if (get_pm1b_control_block(port) && port != 0)
     fk::algorithms::klog("FADT", "  PM1b Control Block: 0x%x", port);
+
+  GenericAddressStructure gas;
+  if (get_reset_register(gas))
+    fk::algorithms::klog("FADT", "  RESET_REG: addr=0x%llx space=%u width=%u offset=%u",
+                         gas.address, gas.address_space_id, gas.register_bit_width, gas.register_bit_offset);
 
   if (!m_has_x_fields) {
     fk::algorithms::klog("FADT", "  Extended 64-bit fields are absent");
@@ -60,12 +64,11 @@ bool FadtManager::validate_ports() const {
   uint32_t timer_port;
   if (get_pm_timer_block(timer_port) && timer_port != 0) {
     uint32_t val1 = inl(timer_port);
-    // Wait a bit and read again to see if it changes
     for (int i = 0; i < 10000; i++) {
         asm volatile("" ::: "memory");
     }
     uint32_t val2 = inl(timer_port);
-    
+
     if (val1 == val2) {
       fk::algorithms::klog("FADT", "  [TEST] PM Timer at port 0x%x seems STATIC (val=0x%x)", timer_port, val1);
     } else {
@@ -75,8 +78,6 @@ bool FadtManager::validate_ports() const {
 
   uint32_t smi_port;
   if (get_smi_command_port(smi_port) && smi_port != 0) {
-    // We don't want to actually trigger SMI here, just check if we can read it (if it was a read/write port)
-    // Most SMI ports are write-only for commands, but let's just log its presence.
     fk::algorithms::klog("FADT", "  [TEST] SMI Command Port 0x%x is present", smi_port);
   }
 
@@ -128,6 +129,26 @@ bool FadtManager::get_x_pm_timer(GenericAddressStructure &out) const {
   size_t off = offsetof(FADT, x_pm_timer_block);
   if (m_length >= off + sizeof(out)) {
     out = m_fadt->x_pm_timer_block;
+    return true;
+  }
+  return false;
+}
+
+bool FadtManager::get_reset_register(GenericAddressStructure &out) const {
+  if (!m_fadt) return false;
+  size_t off = offsetof(FADT, reset_reg);
+  if (m_length >= off + sizeof(out)) {
+    out = m_fadt->reset_reg;
+    return out.address_space_id != 0;
+  }
+  return false;
+}
+
+bool FadtManager::get_reset_value(uint8_t &out) const {
+  if (!m_fadt) return false;
+  size_t off = offsetof(FADT, reset_value);
+  if (m_length >= off + sizeof(m_fadt->reset_value)) {
+    out = m_fadt->reset_value;
     return true;
   }
   return false;

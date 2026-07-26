@@ -30,8 +30,13 @@ void InterruptController::initialize() {
     register_interrupt(default_handler, i);
   }
 
-  // Double fault (#8) uses IST1: dedicated stack prevents triple fault on stack corruption.
-  set_gate(8, g_isr_stubs[8], GateType::InterruptGate, 0x08, 1);
+  // IST assignments per Intel SDM Vol.3 §6.14.1 / AMD APM Vol.2 §8.6:
+  // IST1: Double Fault (#8) — prevents triple fault on stack corruption
+  // IST2: NMI (#2) — prevents triple fault if NMI fires on corrupted stack
+  // IST3: Machine Check (#18) — must not nest on a potentially-damaged stack
+  set_gate(2,  g_isr_stubs[2],  GateType::InterruptGate, 0x08, 2);
+  set_gate(8,  g_isr_stubs[8],  GateType::InterruptGate, 0x08, 1);
+  set_gate(18, g_isr_stubs[18], GateType::InterruptGate, 0x08, 3);
 
   // NOTE: Interrupt Exception
   register_interrupt(divide_by_zero_handler, 0);

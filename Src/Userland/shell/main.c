@@ -23,6 +23,17 @@ static void fk_strncpy(char* dst, const char* src, int n) {
     dst[i] = 0;
 }
 
+static void setup_signals(void* handler) {
+    struct sigaction act;
+    act.sa_handler = handler;
+    act.sa_flags = 0;
+    act.sa_restorer = 0;
+    act.sa_mask = 0;
+    sys_sigaction(SIGINT, &act, 0);
+    sys_sigaction(SIGQUIT, &act, 0);
+    sys_sigaction(SIGTSTP, &act, 0);
+}
+
 static int fk_strncmp(const char* a, const char* b, int n) {
     for (int i = 0; i < n; i++) {
         if (a[i] != b[i]) return (unsigned char)a[i] - (unsigned char)b[i];
@@ -97,6 +108,9 @@ static void exec_command(char** args, char** envp) {
 int main(int argc, char** argv, char** envp) {
     fk_puts("\nFKernel Shell v0.1\nType 'exit' to quit.\n\n");
 
+    // Ignore signals in shell process; children will restore to SIG_DFL
+    setup_signals((void*)1); // SIG_IGN
+
     char cwd[MAX_PATH];
     cwd[0] = '/'; cwd[1] = 0;
     sys_getcwd(cwd, sizeof(cwd));
@@ -143,11 +157,21 @@ int main(int argc, char** argv, char** envp) {
 
         int pid = sys_fork();
         if (pid == 0) {
+            // Restore default signal handling in child before exec
+            setup_signals((void*)0); // SIG_DFL
             exec_command(args, envp);
         }
         if (pid > 0) {
+            // Put child in its own process group
+            sys_setpgid(pid, pid);
+            // Set foreground process group to child's pgid
+            int child_pgid = pid;
+            sys_ioctl(0, 0x5410 /* TIOCSPGRP */, &child_pgid);
             int status = 0;
             sys_wait4(pid, &status, 0, 0);
+            // Restore foreground process group to shell's pgid
+            int shell_pgid = sys_getpgid(sys_getpid());
+            sys_ioctl(0, 0x5410 /* TIOCSPGRP */, &shell_pgid);
         }
         if (pid < 0) {
             fk_puts("sh: fork failed\n");

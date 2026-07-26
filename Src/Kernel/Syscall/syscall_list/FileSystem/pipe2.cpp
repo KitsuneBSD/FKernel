@@ -1,5 +1,7 @@
-#include <Kernel/Fs/PipeFs/pipe_node.h>
+#include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
+#include <Kernel/Fs/Vfs/definitions.h>
 #include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Memory/ref_ptr.h>
@@ -20,14 +22,20 @@ uint64_t sys_pipe2(uint64_t pipefd_ptr, uint64_t flags, uint64_t, uint64_t, uint
     if (dentry_res.is_error()) return (uint64_t)-1;
 
     auto dentry = dentry_res.value();
-    dentry->push_node(pipe_res.value());
+    auto pipe = pipe_res.value();
+    dentry->push_node(pipe);
 
-    bool cloexec = (flags & 02000000) != 0; // O_CLOEXEC
+    bool cloexec  = (flags & 02000000) != 0;
+    bool nonblock = (flags & O_NONBLOCK) != 0;
 
-    auto read_desc  = fk::make_ref<FileDescription>(dentry, O_RDONLY).value();
-    auto write_desc = fk::make_ref<FileDescription>(dentry, O_WRONLY).value();
+    int rflags = O_RDONLY | (nonblock ? O_NONBLOCK : 0);
+    int wflags = O_WRONLY | (nonblock ? O_NONBLOCK : 0);
+    auto read_desc  = fk::make_ref<FileDescription>(dentry, rflags).value();
+    auto write_desc = fk::make_ref<FileDescription>(dentry, wflags).value();
     if (cloexec) { read_desc->set_cloexec(true); write_desc->set_cloexec(true); }
-    pipe_res.value()->add_reader();
+    pipe->add_reader();
+    pipe->set_read_nonblock(nonblock);
+    pipe->set_write_nonblock(nonblock);
 
     int fd_r = task->add_file_descriptor(read_desc);
     if (fd_r < 0) return (uint64_t)fd_r;

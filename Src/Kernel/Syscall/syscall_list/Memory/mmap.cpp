@@ -6,6 +6,7 @@
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
+#include <Kernel/Fs/Virtual/ShmFs/shm_node.h>
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Algorithms/log.h>
@@ -14,6 +15,16 @@
 static constexpr uint64_t PROT_WRITE = 0x2;
 static constexpr uint64_t PROT_EXEC  = 0x4;
 static constexpr uint64_t MAP_ANONYMOUS = 0x20;
+static constexpr uint64_t MAP_SHARED    = 0x01;
+
+static fk::RefPtr<fkernel::ShmNode> resolve_shm(Task* task, int fd) {
+  if (fd < 0) return nullptr;
+  auto desc = task->get_file_descriptor(fd);
+  if (!desc) return nullptr;
+  auto node = desc->node();
+  if (!node || !node->is_shm()) return nullptr;
+  return fk::RefPtr<fkernel::ShmNode>(static_cast<fkernel::ShmNode*>(node.get()));
+}
 
 static uintptr_t reserve_mmap_range(Task* task, uintptr_t hint, uint64_t len) {
     if (hint != 0) return hint;
@@ -84,6 +95,16 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
             fk::memory::set(reinterpret_cast<void*>(target_addr + i * 4096), 0, 4096);
         }
         return target_addr;
+    }
+
+    if ((flags & MAP_SHARED) && fd != (uint64_t)-1) {
+        auto shm = resolve_shm(task, static_cast<int>(fd));
+        if (shm) {
+            uintptr_t target_addr = reserve_mmap_range(task, addr, len);
+            PageFlags pg_flags = prot_to_page_flags(prot);
+            shm->map_into(task, target_addr, pg_flags);
+            return target_addr;
+        }
     }
 
     return mmap_file(task, addr, len, prot, fd, offset);

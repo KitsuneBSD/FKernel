@@ -45,6 +45,14 @@ extern "C" uint64_t sys_clone(uint64_t flags, uint64_t child_stack,
     child->control.lifecycle.cpu_affinity    = parent->control.lifecycle.cpu_affinity;
     child->control.lifecycle.is_a_kernel_task = false;
     child->control.lifecycle.clear_child_tid  = 0;
+    child->control.lifecycle.qos              = parent->control.lifecycle.qos;
+    child->control.lifecycle.policy           = parent->control.lifecycle.policy;
+    child->control.lifecycle.base_priority    = parent->control.lifecycle.base_priority;
+    child->control.lifecycle.mlfq_level       = parent->control.lifecycle.mlfq_level;
+    child->control.lifecycle.cpu_time_consumed = 0;
+    child->control.lifecycle.allotment_ticks  = parent->control.lifecycle.allotment_ticks;
+    child->control.lifecycle.boosted          = false;
+    child->control.lifecycle.original_qos     = parent->control.lifecycle.qos;
     child->resources.files.cwd = parent->resources.files.cwd;
 
     child->resources.ipc.cspace = new fkernel::ipc::CSpace();

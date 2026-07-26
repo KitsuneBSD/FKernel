@@ -10,17 +10,17 @@ jobs:
   build:
     name: Build FKernel
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y clang clang-format clang-tidy nasm qemu-system-x86 qemu-utils build-essential lua5.4 ninja-build xorriso mtools grub-common grub-pc-bin
         sudo ln -sf /usr/bin/lua5.4 /usr/bin/lua
-        
+
     - name: Install xmake
       run: |
         curl -fsSL https://xmake.io/shget.text | bash
@@ -33,22 +33,51 @@ jobs:
         export PATH=$HOME/.xmake/bin:$PATH
         xmake -bv FKernel
 
-  test:
-    name: Run Tests
+  layer-check:
+    name: Layer Separation Check
     runs-on: ubuntu-latest
-    needs: build
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lua5.4
+        sudo ln -sf /usr/bin/lua5.4 /usr/bin/lua
+
     - name: Install xmake
       run: |
         curl -fsSL https://xmake.io/shget.text | bash
         export PATH=$HOME/.xmake/bin:$PATH
         source ~/.xmake/profile
-        
-    - name: Run tests
+
+    - name: Run layer check
+      run: |
+        export PATH=$HOME/.xmake/bin:$PATH
+        xmake check-layers
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang
+
+    - name: Install xmake
+      run: |
+        curl -fsSL https://xmake.io/shget.text | bash
+        export PATH=$HOME/.xmake/bin:$PATH
+        source ~/.xmake/profile
+
+    - name: Build and run tests
       run: |
         export PATH=$HOME/.xmake/bin:$PATH
         xmake -bv Test
@@ -57,46 +86,41 @@ jobs:
   code-quality:
     name: Code Quality Checks
     runs-on: ubuntu-latest
-    needs: build
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y clang clang-format clang-tidy
-        
+
     - name: Check code formatting
       run: |
-        # Check formatting of all C/C++ files
         echo "Checking clang-format compliance..."
         find . -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" | \
           xargs clang-format --dry-run --Werror
-        
+
     - name: Run clang-tidy
       run: |
         echo "Running clang-tidy..."
-        # Find source files and run clang-tidy
         find Src/ Include/ -name "*.cpp" -o -name "*.c" | \
-          head -10 | \  # Limit to avoid timeouts, increase as needed
+          head -10 | \
           xargs -I {} clang-tidy --config-file=.clang-tidy {} --quiet
 
   object-calisthenics:
     name: Object Calisthenics Validation
     runs-on: ubuntu-latest
-    needs: build
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Check class size limits
       run: |
         echo "Checking Object Calisthenics compliance..."
-        
-        # Check for classes >200 lines
+
         echo "📏 Checking for classes >200 lines..."
         large_files=$(find Src/ -name "*.cpp" -exec wc -l {} + | awk '$1 > 200 {print $2}' | wc -l)
         if [ "$large_files" -gt 0 ]; then
@@ -105,18 +129,16 @@ jobs:
           exit 1
         fi
         echo "✅ All files are ≤200 lines"
-        
-        # Check for 'else' violations
+
         echo "🚫 Checking for 'else' violations..."
         else_count=$(find Src/ -name "*.cpp" -exec grep -c "else" {} + | awk '{sum += $1} END {print sum}')
-        if [ "$else_count" -gt 50 ]; then  # Allow some reasonable threshold
+        if [ "$else_count" -gt 50 ]; then
           echo "❌ Found $else_count 'else' statements (threshold: 50)"
           echo "Use early returns instead of else blocks"
           exit 1
         fi
         echo "✅ 'else' count acceptable: $else_count"
-        
-        # Check for one-dot-per-line violations
+
         echo "⚡ Checking for one-dot-per-line violations..."
         chain_calls=$(find Src/ -name "*.cpp" -exec grep -n "\->.*\->" {} + | wc -l)
         if [ "$chain_calls" -gt 10 ]; then
@@ -129,17 +151,15 @@ jobs:
   hardware-compatibility:
     name: Hardware Compatibility Check
     runs-on: ubuntu-latest
-    needs: build
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Check for hardcoded values
       run: |
         echo "🔍 Checking for hardcoded hardware values..."
-        
-        # Check multiboot2.asm for hardcoded resolutions
+
         if grep -q "dd [1-9][0-9]*.*dd [1-9][0-9]*" Src/Kernel/Arch/x86_64/Section/multiboot2.asm; then
           if grep -q "dd 0.*dd 0" Src/Kernel/Arch/x86_64/Section/multiboot2.asm; then
             echo "✅ Using auto-detection for framebuffer resolution"
@@ -149,33 +169,29 @@ jobs:
             exit 1
           fi
         fi
-        
-        # Check for magic numbers in drivers
+
         magic_numbers=$(find Src/Kernel/Driver -name "*.cpp" -exec grep -n "0x[0-9A-Fa-f]\{4,\}" {} + | wc -l)
         echo "Found $magic_numbers potential hardware magic numbers (review needed)"
 
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: build
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Run basic security checks
       run: |
         echo "🔒 Running security analysis..."
-        
-        # Check for unsafe functions
+
         unsafe_funcs=$(find Src/ -name "*.cpp" -o -name "*.c" | xargs grep -l "strcpy\|strcat\|sprintf" | wc -l)
         if [ "$unsafe_funcs" -gt 0 ]; then
           echo "⚠️  Found potential unsafe string functions:"
           find Src/ -name "*.cpp" -o -name "*.c" | xargs grep -n "strcpy\|strcat\|sprintf" || true
           echo "Consider using safer alternatives (strncpy, strncat, snprintf)"
         fi
-        
-        # Check for unchecked returns
+
         echo "Checking for potentially unchecked return values..."
         unchecked_returns=$(find Src/ -name "*.cpp" | xargs grep -c "=.*malloc\|\.allocate\|\.create" | awk '{sum += $2} END {print sum}')
         echo "Found $unchecked_returns allocation calls that should be checked"

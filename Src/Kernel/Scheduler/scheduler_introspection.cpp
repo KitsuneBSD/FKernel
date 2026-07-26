@@ -1,14 +1,17 @@
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/qos.h>
 #include <Kernel/Ipc/signal_delivery.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Synchronization/spinlock.h>
+
+using namespace fkernel::scheduler;
 
 uint64_t SchedulerManager::process_count() {
   uint64_t count = 0;
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     fk::synchronization::ScopedLockIRQ per_cpu_lock(m_processors[i].run_queue_lock);
     if (m_processors[i].current_task) ++count;
-    count += (uint64_t)m_processors[i].run_queue.size();
+    count += (uint64_t)m_processors[i].run_queue_total_size();
   }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   count += (uint64_t)m_wait_queue.size();
@@ -21,7 +24,10 @@ void SchedulerManager::print_all_tasks() {
     fk::synchronization::ScopedLockIRQ per_cpu_lock(m_processors[i].run_queue_lock);
     if (m_processors[i].current_task) m_processors[i].current_task->print_info();
     if (m_processors[i].idle_task) m_processors[i].idle_task->print_info();
-    for (auto& task : m_processors[i].run_queue) task.print_info();
+    for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
+      for (auto& task : m_processors[i].run_queues[level].queue)
+        task.print_info();
+    }
   }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   for (auto& task : m_wait_queue) task.print_info();
@@ -36,8 +42,10 @@ fk::RefPtr<Task> SchedulerManager::find_task(fk::ProcessId id) {
       return m_processors[i].current_task;
     if (m_processors[i].idle_task && m_processors[i].idle_task->control.identity.id == id)
       return m_processors[i].idle_task;
-    for (auto& task : m_processors[i].run_queue) {
-      if (task.control.identity.id == id) return &task;
+    for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
+      for (auto& task : m_processors[i].run_queues[level].queue) {
+        if (task.control.identity.id == id) return &task;
+      }
     }
   }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
@@ -68,7 +76,9 @@ void SchedulerManager::send_signal_to_pgrp(int pgid, int signum) {
   for (uint32_t i = 0; i < m_processor_count; ++i) {
     if (m_processors[i].current_task) send(*m_processors[i].current_task);
     fk::synchronization::ScopedLockIRQ per_cpu_lock(m_processors[i].run_queue_lock);
-    for (auto& task : m_processors[i].run_queue) send(task);
+    for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
+      for (auto& task : m_processors[i].run_queues[level].queue) send(task);
+    }
   }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   for (auto& task : m_wait_queue)  send(task);
@@ -81,7 +91,10 @@ fk::RefPtr<Task> SchedulerManager::find_any_child(fk::ProcessId ppid) {
       fk::synchronization::ScopedLockIRQ per_cpu_lock(m_processors[i].run_queue_lock);
       if (m_processors[i].current_task && m_processors[i].current_task->control.identity.ppid == ppid)
         return m_processors[i].current_task;
-      for (auto& task : m_processors[i].run_queue) if (task.control.identity.ppid == ppid) return &task;
+      for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
+        for (auto& task : m_processors[i].run_queues[level].queue)
+          if (task.control.identity.ppid == ppid) return &task;
+      }
     }
   }
   fk::synchronization::ScopedLock lock(m_lock);

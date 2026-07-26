@@ -1,4 +1,4 @@
-#include <Kernel/Fs/PipeFs/pipe_node.h>
+#include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Memory/UserAccess/user_access.h>

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-FKernel is at **~75% completion** — boots successfully to userspace with **BusyBox 1.36.1** running on real hardware and QEMU. The codebase contains **~390 source files** across LibC, LibFK, and Kernel. PCI, VFS, drivers, scheduler, networking (full TCP/IP), ELF loader, and IPC (capability-based) are all functional. **~0 bugs open** (all reported bugs verified as fixed). Phases 1–25f are complete; Phase 26 is next.
+FKernel is at **~80% completion** — boots successfully to userspace with **BusyBox 1.36.1** running on real hardware and QEMU. The codebase contains **~400 source files** across LibC, LibFK, and Kernel. PCI, VFS, drivers, scheduler (XNU-inspired QoS + MLFQ + Turnstiles), networking (full TCP/IP), ELF loader, and IPC (capability-based) are all functional. **~0 bugs open** (all reported bugs verified as fixed). Phases 1–26 complete.
 
 ## Completed Milestones
 
@@ -145,16 +145,15 @@ FKernel is at **~75% completion** — boots successfully to userspace with **Bus
 **Dependencies met:** All OpenRC-required syscalls implemented.
 **Blockers:** Build scripts never executed, libmd/libbsd never compiled, /proc/sys/ missing.
 
-## Phase 26 (Next)
+## Phase 26 (Complete)
 
-Current priority is Phase 26 — see TODO.md for details.
+Phase 26 (QoS + MLFQ + Turnstiles Scheduler) is complete. See `Docs/Domains/process-scheduling.md` for full architecture.
 
 ## Strategic Recommendations
 
-1. **Fix LibFK→Kernel layer violations** — these are architectural violations that block independent compilation
-2. **Implement COW for fork()** — critical for server workloads and OpenRC service supervision
-3. **Add slab/UMA allocator** — first-fit heap fragments badly with many small allocations
-4. **Wire nice into scheduler** — currently stored but unused in scheduling decisions
-5. **Complete POSIX networking** — sendto/recvfrom/shutdown/getsockname/setsockopt are critical
-6. **Build and test OpenRC** — the long-term goal; build scripts exist but were never executed
-7. **Enable SMP** — infrastructure exists (per-CPU run queues, work stealing) but m_processor_count hardcoded to 1
+1. **Implement COW for fork()** — critical for server workloads and OpenRC service supervision
+2. **Add slab/UMA allocator** — first-fit heap fragments badly with many small allocations
+3. **Complete POSIX networking** — sendto/recvfrom/shutdown/getsockname/setsockopt are critical
+4. **Build and test OpenRC** — the long-term goal; build scripts exist but were never executed
+5. **Enable SMP** — infrastructure exists (per-CPU MLFQ queues, work stealing) but m_processor_count hardcoded to 1
+6. **Standardize Manager pattern (Phase 23)** — fix public constructors, migrate to fkernel namespace
