@@ -17,8 +17,15 @@ Fat12Node::read(uint64_t offset, size_t size, uint8_t *buffer) {
 
 fk::core::Result<size_t, fk::core::Error>
 Fat12Node::write(uint64_t offset, size_t size, const uint8_t *buffer) {
-    // TODO: Implement cluster allocation if file grows
-    return m_fs->write_to_cluster_chain(m_first_cluster, offset, size, buffer);
+    auto result = m_fs->write_to_cluster_chain(m_first_cluster, offset, size, buffer);
+    if (result.is_error()) return result.error();
+
+    size_t written = result.value();
+    size_t end_offset = offset + written;
+    if (end_offset > m_size) {
+        m_size = end_offset;
+    }
+    return written;
 }
 
 }

@@ -95,6 +95,7 @@ inline void kexception(const char *prefix, const char *fmt, ...) {
 /** Print a formatted kernel log message in yellow. No-op when FKERNEL_LOG_LEVEL < 1. */
 #if FKERNEL_LOG_LEVEL >= 1
 inline void kwarn(const char *prefix, const char *fmt, ...) {
+  if (get_log_level() > LevelWarn) return;
   char buf[512];
   va_list args;
   va_start(args, fmt);

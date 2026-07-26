@@ -75,7 +75,7 @@ The `syslog()` syscall (nr 103) provides Linux-compatible `dmesg` access:
 
 ## Current Limitations
 
-1. No runtime log-level filtering (all messages always output)
+1. ~~No runtime log-level filtering~~ **Implemented** — compile-time `FKERNEL_LOG_LEVEL` + runtime `get_log_level()` check
 2. No compile-time log stripping in release builds
 3. Panic output bypasses the logging system
 4. `kerror()` halts on every call — no non-halting error level; proposed split: `kfatal()` (halt) + `kerror()` (non-halting)

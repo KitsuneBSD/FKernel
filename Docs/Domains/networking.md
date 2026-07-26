@@ -76,7 +76,7 @@ stateDiagram-v2
 - MMIO register access via BAR0
 - RX/TX descriptor rings (128 entries each)
 - MAC address from RAL/RAH registers
-- Polling-based (interrupt handler not registered)
+- Interrupt-driven TX completion (scheduler blocks on TX ring availability)
 - PCI bus mastering enabled for DMA
 
 ### TCP Implementation
@@ -127,6 +127,5 @@ stateDiagram-v2
 1. **No IP fragmentation** — packets > MTU dropped
 2. **No TCP/UDP TX checksum** — real stacks may drop packets
 3. **ARP entries never expire** — stale entries accumulate
-4. **Polling-based E1000** — busy-wait for TX completion
-5. **No ICMP redirect handling**
-6. **Fixed-size socket arrays** — no dynamic growth
+4. **No ICMP redirect handling**
+5. **Fixed-size socket arrays** — no dynamic growth

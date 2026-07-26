@@ -18,7 +18,13 @@ This directory serves as **AI conceptual memory** -- containing architectural de
 |   +-- nvme-decomposition.md             # NVMe driver architecture
 +-- development-patterns/               # Established patterns and conventions
 |   +-- algorithm-consolidation.md      # Algorithm consolidation policy
+|   +-- allocator-backend.md            # Allocator backend injection pattern
+|   +-- error-handling.md               # Error handling conventions (Result<T,E>)
+|   +-- interrupt-handling.md           # Interrupt handler patterns
+|   +-- interrupt-hot-swap.md           # Interrupt hot-swap mechanism
+|   +-- kernel-logging.md               # Kernel logging conventions
 |   +-- one-struct-per-file.md          # SECRET RULE documentation
+|   +-- syscall-organization.md         # Syscall organization patterns
 +-- recent-modifications/               # Track recent code changes
 ```
 

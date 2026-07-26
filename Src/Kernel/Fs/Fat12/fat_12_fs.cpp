@@ -148,14 +148,76 @@ Fat12FileSystem::read_from_cluster_chain(uint32_t first_cluster, uint64_t offset
 }
 
 fk::core::Result<size_t, fk::core::Error>
-Fat12FileSystem::write_to_cluster_chain([[maybe_unused]] uint32_t first_cluster, [[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] const uint8_t* buffer) {
-    [[maybe_unused]] uint32_t current_cluster = first_cluster;
-    [[maybe_unused]] uint32_t cluster_size = 512;
-    
-    // Traversal and growth logic...
-    // (Simplified for brevity, following the same pattern as read)
+Fat12FileSystem::write_to_cluster_chain(uint32_t first_cluster, uint64_t offset, size_t size, const uint8_t* buffer) {
+    constexpr uint32_t CLUSTER_SIZE = 512;
+
+    if (size == 0) return uint64_t(0);
+    if (first_cluster < 2) return fk::core::Error::InvalidParameter;
+
+    uint32_t current_cluster = first_cluster;
     uint64_t bytes_written = 0;
-    // ... logic to find cluster at offset and write ...
+
+    // Skip clusters to reach the starting offset
+    uint64_t clusters_to_skip = offset / CLUSTER_SIZE;
+    uint32_t prev_cluster = current_cluster;
+    for (uint64_t i = 0; i < clusters_to_skip && current_cluster < 0x0FF8; ++i) {
+        prev_cluster = current_cluster;
+        current_cluster = get_next_cluster(current_cluster);
+    }
+
+    uint64_t cluster_offset = offset % CLUSTER_SIZE;
+
+    while (bytes_written < size) {
+        // Allocate clusters if we've reached end-of-chain
+        if (current_cluster >= 0x0FF8) {
+            auto alloc_result = allocate_cluster();
+            if (alloc_result.is_error()) {
+                fk::algorithms::kwarn("FAT12", "write_to_cluster_chain: no free clusters");
+                if (bytes_written > 0) return bytes_written;
+                return alloc_result.error();
+            }
+            uint32_t new_cluster = alloc_result.value();
+            if (current_cluster >= 0x0FF8) {
+                // Extending from end-of-chain: link prev -> new
+                write_fat_entry(prev_cluster, new_cluster);
+            } else {
+                // Shouldn't happen if chain is well-formed, but handle gracefully
+                write_fat_entry(prev_cluster, new_cluster);
+            }
+            current_cluster = new_cluster;
+        }
+
+        // Write data to this cluster
+        uint8_t temp[512];
+        uint32_t sector = cluster_to_sector(current_cluster);
+
+        // Read existing data for partial writes
+        if (cluster_offset > 0 || (size - bytes_written) < CLUSTER_SIZE) {
+            auto read_res = m_device->read(sector * 512, 512, temp);
+            if (read_res.is_error()) {
+                fk::algorithms::kwarn("FAT12", "write_to_cluster_chain: read-modify-write failed at cluster %u", current_cluster);
+                return bytes_written;
+            }
+        }
+
+        size_t to_write = size - bytes_written;
+        if (to_write > CLUSTER_SIZE - cluster_offset)
+            to_write = CLUSTER_SIZE - cluster_offset;
+
+        fk::memory::copy(temp + cluster_offset, buffer + bytes_written, to_write);
+
+        auto write_res = m_device->write(sector * 512, 512, temp);
+        if (write_res.is_error()) {
+            fk::algorithms::kwarn("FAT12", "write_to_cluster_chain: write failed at cluster %u", current_cluster);
+            return bytes_written;
+        }
+
+        bytes_written += to_write;
+        cluster_offset = 0;
+        prev_cluster = current_cluster;
+        current_cluster = get_next_cluster(current_cluster);
+    }
+
     return bytes_written;
 }
 

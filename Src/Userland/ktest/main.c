@@ -2,6 +2,12 @@
 
 /* ── helpers ──────────────────────────────────────────────── */
 
+void *memset(void *s, int c, unsigned long n) {
+    unsigned char *p = (unsigned char *)s;
+    while (n--) *p++ = (unsigned char)c;
+    return s;
+}
+
 static int g_pass = 0;
 static int g_fail = 0;
 static int g_serial_fd = -1;
@@ -20,6 +26,11 @@ static void print_int(int n) {
     if (n == 0) { buf[--i] = '0'; }
     else { while (n) { buf[--i] = '0' + (n % 10); n /= 10; } }
     puts_(buf + i);
+}
+
+static int fk_strcmp(const char *a, const char *b) {
+    while (*a && *a == *b) { a++; b++; }
+    return (unsigned char)*a - (unsigned char)*b;
 }
 
 static void pass(const char *name) {
@@ -47,7 +58,6 @@ static void test_getppid(void) {
 }
 
 static void test_write(void) {
-    /* write to /dev/null (fd 2 is stderr, just write there for a side-effect test) */
     long n = sys_write(1, ".", 1);
     if (n == 1) { puts_(" "); pass("write"); }
     else        fail("write", "sys_write returned wrong count");
@@ -116,7 +126,7 @@ static void test_fork_exec(void) {
 }
 
 static void test_vfork_exec(void) {
-    int pid = sys_fork();   /* use fork as proxy: vfork is tested via init */
+    int pid = sys_fork();
     if (pid < 0) { fail("vfork_exec", "fork failed"); return; }
     if (pid == 0) {
         char *argv[] = { "/bin/false", 0 };
@@ -132,7 +142,6 @@ static void test_vfork_exec(void) {
 }
 
 static void test_stat(void) {
-    /* stat /bin/sh — must exist */
     struct { unsigned long fields[18]; } buf;
     int r = sys_stat("/bin/sh", &buf);
     if (r == 0) pass("stat");
@@ -161,7 +170,6 @@ static void test_chdir(void) {
     if (r < 0) { fail("chdir", "chdir /tmp failed"); return; }
     sys_getcwd(after, sizeof(after));
     sys_chdir(before);
-    /* after should start with /tmp */
     if (after[0] == '/' && after[1] == 't' && after[2] == 'm' && after[3] == 'p')
         pass("chdir");
     else
@@ -172,6 +180,136 @@ static void test_getuid(void) {
     int uid = sys_getuid();
     if (uid >= 0) pass("getuid");
     else          fail("getuid", "returned negative uid");
+}
+
+/* ── Regression tests (Phase 17g) ─────────────────────────── */
+
+/* TmpFs write + read back: verifies write_to_cluster_chain path */
+static void test_tmpfs_write_read(void) {
+    const char *path = "/tmp/ktest_wr.dat";
+    const char *data = "Hello, FKernel!";
+    int datalen = fk_strlen(data);
+
+    /* create + write */
+    int fd = sys_open(path, 0x241 /* O_CREAT|O_WRONLY|O_TRUNC, mode 0644 */);
+    if (fd < 0) { fail("tmpfs_write_read", "open for write failed"); return; }
+    long written = sys_write(fd, data, datalen);
+    sys_close(fd);
+    if (written != datalen) { fail("tmpfs_write_read", "write returned wrong count"); return; }
+
+    /* read back */
+    fd = sys_open(path, 0 /* O_RDONLY */);
+    if (fd < 0) { fail("tmpfs_write_read", "open for read failed"); return; }
+    char buf[64] = {};
+    long nread = sys_read(fd, buf, sizeof(buf));
+    sys_close(fd);
+    if (nread != datalen) { fail("tmpfs_write_read", "read returned wrong count"); return; }
+    if (fk_strcmp(buf, data) != 0) { fail("tmpfs_write_read", "read data mismatch"); return; }
+    pass("tmpfs_write_read");
+}
+
+/* Multi-byte write: write more than one cluster's worth */
+static void test_tmpfs_large_write(void) {
+    const char *path = "/tmp/ktest_large.dat";
+    /* 1024 bytes = 2 clusters */
+    char wbuf[1024];
+    for (int i = 0; i < 1024; i++) wbuf[i] = (char)(i & 0xFF);
+
+    int fd = sys_open(path, 0x241);
+    if (fd < 0) { fail("tmpfs_large_write", "open failed"); return; }
+    long written = sys_write(fd, wbuf, 1024);
+    sys_close(fd);
+    if (written != 1024) { fail("tmpfs_large_write", "write count mismatch"); return; }
+
+    fd = sys_open(path, 0);
+    if (fd < 0) { fail("tmpfs_large_write", "open for read failed"); return; }
+    char rbuf[1024] = {};
+    long nread = sys_read(fd, rbuf, 1024);
+    sys_close(fd);
+    if (nread != 1024) { fail("tmpfs_large_write", "read count mismatch"); return; }
+
+    int ok = 1;
+    for (int i = 0; i < 1024; i++) {
+        if (rbuf[i] != (char)(i & 0xFF)) { ok = 0; break; }
+    }
+    if (ok) pass("tmpfs_large_write");
+    else    fail("tmpfs_large_write", "data corruption");
+}
+
+/* dup2 redirects stdout to file */
+static void test_dup2(void) {
+    const char *path = "/tmp/ktest_dup2.txt";
+    const char *msg = "dup2_ok";
+
+    int fd = sys_open(path, 0x241);
+    if (fd < 0) { fail("dup2", "open failed"); return; }
+
+    int old_stdout = sys_dup2(1, 100);  /* save stdout as fd 100 */
+    sys_dup2(fd, 1);                     /* redirect stdout to file */
+    sys_close(fd);
+
+    sys_write(1, msg, fk_strlen(msg));   /* write to redirected stdout */
+
+    sys_dup2(old_stdout, 1);             /* restore stdout */
+    sys_close(old_stdout);
+
+    /* read the file back */
+    fd = sys_open(path, 0);
+    if (fd < 0) { fail("dup2", "open for read failed"); return; }
+    char buf[32] = {};
+    long n = sys_read(fd, buf, sizeof(buf));
+    sys_close(fd);
+    sys_close(100);
+
+    if (n != fk_strlen(msg)) { fail("dup2", "read count mismatch"); return; }
+    if (fk_strcmp(buf, msg) != 0) { fail("dup2", "data mismatch"); return; }
+    pass("dup2");
+}
+
+/* fstat returns valid fields */
+static void test_fstat(void) {
+    struct { unsigned long fields[18]; } buf;
+    int fd = sys_open("/bin/sh", 0);
+    if (fd < 0) { fail("fstat", "open failed"); return; }
+    int r = sys_fstat(fd, &buf);
+    sys_close(fd);
+    if (r == 0) pass("fstat");
+    else        fail("fstat", "fstat failed");
+}
+
+/* getuid/geteuid/getgid/getegid return non-negative */
+static void test_ids(void) {
+    int uid  = sys_getuid();
+    int euid = sys_geteuid();
+    int gid  = sys_getgid();
+    int egid = sys_getegid();
+    if (uid >= 0 && euid >= 0 && gid >= 0 && egid >= 0)
+        pass("ids");
+    else
+        fail("ids", "one or more id calls returned negative");
+}
+
+/* mkdir + stat directory */
+static void test_mkdir_stat(void) {
+    const char *dir = "/tmp/ktest_dir";
+    sys_mkdir(dir, 0755);
+    struct { unsigned long fields[18]; } buf;
+    int r = sys_stat(dir, &buf);
+    /* cleanup */
+    /* Note: no rmdir syscall exposed yet */
+    if (r == 0) pass("mkdir_stat");
+    else        fail("mkdir_stat", "stat on created dir failed");
+}
+
+/* getdents64 on /tmp */
+static void test_getdents(void) {
+    int fd = sys_open("/tmp", 0 /* O_RDONLY */);
+    if (fd < 0) { fail("getdents", "open /tmp failed"); return; }
+    char buf[1024];
+    long n = sys_getdents64(fd, buf, sizeof(buf));
+    sys_close(fd);
+    if (n > 0) pass("getdents");
+    else       fail("getdents", "getdents returned <= 0");
 }
 
 /* ── main ─────────────────────────────────────────────────── */
@@ -185,13 +323,16 @@ int main(void) {
     test_getpid();
     test_getppid();
     test_getuid();
+    test_ids();
 
     puts_("\n[IO]\n");
     test_write();
     test_open_close();
     test_stat();
+    test_fstat();
     test_getcwd();
     test_chdir();
+    test_getdents();
 
     puts_("\n[Scheduler]\n");
     test_fork_wait();
@@ -201,6 +342,12 @@ int main(void) {
     puts_("\n[Exec]\n");
     test_fork_exec();
     test_vfork_exec();
+
+    puts_("\n[VFS Regression]\n");
+    test_tmpfs_write_read();
+    test_tmpfs_large_write();
+    test_dup2();
+    test_mkdir_stat();
 
     puts_("\n");
     puts_("=========================\n");

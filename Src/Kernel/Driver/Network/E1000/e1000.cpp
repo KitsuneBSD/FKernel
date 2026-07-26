@@ -1,4 +1,7 @@
 #include <Kernel/Driver/Network/E1000/e1000.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Memory/Dma/dma_buffer.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Hardware/Pci/pci.h>
@@ -7,8 +10,18 @@
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
+#include <LibFK/Synchronization/interrupt_disabler.h>
 
 namespace fkernel {
+
+E1000Controller* E1000Controller::s_instances[32] = {};
+
+static void e1000_isr(uint8_t vector, InterruptFrame*) {
+    uint8_t idx = vector - 32;
+    if (idx < 32 && E1000Controller::s_instances[idx]) {
+        E1000Controller::s_instances[idx]->handle_interrupt();
+    }
+}
 
 fk::RefPtr<E1000Controller> E1000Controller::create(const PciDevice& device) {
     auto controller_result = fk::make_ref<E1000Controller>(device);
@@ -29,7 +42,11 @@ E1000Controller::E1000Controller(const PciDevice& device)
     set_name("eth0");
 }
 
-E1000Controller::~E1000Controller() {}
+E1000Controller::~E1000Controller() {
+    if (m_irq_line > 0 && m_irq_line < 32) {
+        s_instances[m_irq_line] = nullptr;
+    }
+}
 
 fk::core::Result<void, fk::core::Error> E1000Controller::initialize_hardware() {
     // Map BAR0
@@ -52,12 +69,48 @@ fk::core::Result<void, fk::core::Error> E1000Controller::initialize_hardware() {
     initialize_rx();
     initialize_tx();
 
-    // Enable interrupts (combined mask: 0x1F6DC with bit 2 cleared)
-    write_command(REG_IMASK, 0x1F6DC & ~static_cast<uint32_t>(4));
-    read_command(0xc0);
+    // Read IRQ line from PCI config (offset 0x3C, low byte = Interrupt Line)
+    m_irq_line = PciManager::the().read_config_byte(m_pci_device.address(), 0x3C);
+
+    // Enable interrupts: TX Descriptor Written Back + RX Timer + Link Status + others
+    // Bit 0: TXDW, Bit 7: RXT0, Bit 2: LSC, others as needed
+    uint32_t imask = ICR_TXDW | ICR_RXT0 | ICR_LSC | ICR_TXQE;
+    write_command(REG_IMASK, imask);
+
+    // Clear any pending interrupts
+    read_command(REG_ICR);
+
+    // Register ISR if IRQ is valid (legacy PCI IRQ = 1-15)
+    if (m_irq_line > 0 && m_irq_line < 32) {
+        uint8_t vector = static_cast<uint8_t>(m_irq_line + 32);
+        s_instances[m_irq_line] = this;
+        InterruptController::the().register_interrupt(e1000_isr, vector);
+        fk::algorithms::klog("E1000", "Registered ISR for IRQ %u (vector %u)", m_irq_line, vector);
+    } else {
+        fk::algorithms::kwarn("E1000", "No valid IRQ line (%u), falling back to polling", m_irq_line);
+    }
 
     fk::algorithms::klog("E1000", "Initialized successfully");
     return {};
+}
+
+void E1000Controller::handle_interrupt() {
+    uint32_t icr = read_command(REG_ICR);
+
+    if (icr & ICR_TXDW) {
+        m_tx_done = true;
+        Task* waiter = m_tx_wait_task;
+        if (waiter) {
+            m_tx_wait_task = nullptr;
+            SchedulerManager::the().wake_task(waiter);
+        }
+    }
+
+    if (icr & ICR_LSC) {
+        uint32_t status = read_command(REG_STATUS);
+        fk::algorithms::klog("E1000", "Link status changed: %s",
+                             (status & (1 << 1)) ? "Up" : "Down");
+    }
 }
 
 void E1000Controller::write_command(uint16_t addr, uint32_t val) {
@@ -159,21 +212,44 @@ fk::core::Result<void, fk::core::Error> E1000Controller::send_packet(const uint8
 
     uint16_t old_tx = m_tx_current;
     m_tx_current = (m_tx_current + 1) % 128;
+
+    // Clear completion flag before ringing the bell
+    m_tx_done = false;
+
+    // Ring the doorbell — hardware starts DMA
     write_command(REG_TXTAIL, m_tx_current);
 
-    fk::algorithms::kdebug("E1000", "Packet sent: %zu bytes (TX Tail: %u)", size, m_tx_current);
+    fk::algorithms::kdebug("E1000", "Packet submitted: %zu bytes (TX Tail: %u)", size, m_tx_current);
 
-    // Polling for completion
-    int timeout = 1000000;
-    while (!(m_tx_descs[old_tx].status & 0xF) && timeout > 0) {
-        timeout--;
-        if (timeout % 1000 == 0) {
+    // Wait for TX completion interrupt (or poll as fallback)
+    constexpr int MAX_TICKS = 50; // 50 ticks (~500ms at 100Hz)
+    uint64_t deadline = TickManager::the().get_ticks() + MAX_TICKS;
+
+    if (m_irq_line > 0 && m_irq_line < 32) {
+        // Interrupt-driven path: sleep until ISR wakes us
+        while (!m_tx_done) {
+            fk::synchronization::ScopedInterruptDisabler intr;
+            if (m_tx_done) break;
+            m_tx_wait_task = SchedulerManager::the().current();
+            SchedulerManager::the().block_current();
+            SchedulerManager::the().schedule();
+        }
+        m_tx_wait_task = nullptr;
+    } else {
+        // Fallback: polling with yield (no IRQ registered)
+        while (!(m_tx_descs[old_tx].status & 0xF)) {
+            if (TickManager::the().get_ticks() >= deadline) {
+                fk::algorithms::kwarn("E1000", "Packet transmission timeout (polling)");
+                return fk::core::Error::DeviceError;
+            }
             SchedulerManager::the().yield();
         }
+        m_tx_done = true;
     }
-    
-    if (timeout == 0) {
-        fk::algorithms::kwarn("E1000", "Packet transmission timeout");
+
+    // Verify hardware actually completed the descriptor
+    if (!(m_tx_descs[old_tx].status & 0xF)) {
+        fk::algorithms::kwarn("E1000", "TX descriptor not completed after wake");
         return fk::core::Error::DeviceError;
     }
 

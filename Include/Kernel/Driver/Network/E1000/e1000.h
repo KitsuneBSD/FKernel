@@ -6,9 +6,11 @@
 #include <Kernel/Memory/Dma/dma_buffer.h>
 #include <LibFK/Types/types.h>
 
+struct Task;
+
 namespace fkernel {
 
-class E1000Controller final : public Driver, public NetworkDevice {
+class E1000Controller : public Driver, public NetworkDevice {
 public:
     static fk::RefPtr<E1000Controller> create(const PciDevice& device);
     
@@ -27,6 +29,8 @@ public:
     virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size, uint8_t* buffer) override;
     virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t offset, size_t size, const uint8_t* buffer) override;
     virtual size_t size() const override { return 0; }
+
+    void handle_interrupt();
 
 public:
     E1000Controller(const PciDevice& device);
@@ -79,7 +83,9 @@ private:
     static constexpr uint16_t REG_CTRL = 0x0000;
     static constexpr uint16_t REG_STATUS = 0x0008;
     static constexpr uint16_t REG_EEPROM = 0x0014;
-    static constexpr uint16_t REG_IMASK = 0x00D0;
+    static constexpr uint16_t REG_ICR = 0x00C0;   // Interrupt Cause Read
+    static constexpr uint16_t REG_ICS = 0x00C8;   // Interrupt Cause Set
+    static constexpr uint16_t REG_IMASK = 0x00D0;  // Interrupt Mask Set/Read
     static constexpr uint16_t REG_RCTRL = 0x0100;
     static constexpr uint16_t REG_TCTRL = 0x0400;
     static constexpr uint16_t REG_RXADDRL = 0x2800;
@@ -95,6 +101,22 @@ private:
     static constexpr uint16_t REG_RDTR = 0x2820; // RX Delay Timer
     static constexpr uint16_t REG_RADV = 0x282C; // RX ADV
     static constexpr uint16_t REG_RSRPD = 0x2C00; // RX Small Packet Detect
+
+    // Interrupt cause bits
+    static constexpr uint32_t ICR_TXDW = (1u << 0);  // Transmit Descriptor Written Back
+    static constexpr uint32_t ICR_TXQE = (1u << 1);  // Transmit Queue Empty
+    static constexpr uint32_t ICR_LSC  = (1u << 2);  // Link Status Change
+    static constexpr uint32_t ICR_RXT0 = (1u << 7);  // Receive Timer Interrupt
+    static constexpr uint32_t ICR_MGDE = (1u << 12); // Magic Packet Detected
+
+    // Interrupt state
+    uint32_t m_irq_line{0};
+    volatile bool m_tx_done{true};
+    Task* m_tx_wait_task{nullptr};
+
+public:
+    // ISR dispatcher needs access to instance table
+    static E1000Controller* s_instances[32];
 };
 
 } // namespace fkernel
