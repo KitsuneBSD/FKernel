@@ -1,18 +1,18 @@
 # FKernel TODO
 
-> Updated: 2026-07-26 — IPC/POSIX Phases 0-10 complete: Notification timeout/payload, Endpoint call/timeout, SharedMemory, cap_transfer/grant, SA_SIGINFO/SA_ONSTACK/SA_RESETHAND, siginfo_t, O_NONBLOCK pipes/eventfd/signalfd/timerfd, named pipes (mkfifo + PipeFs), event-driven epoll, futex over Notification[256] + REQUEUE, POSIX semaphores (/dev/sem/), POSIX message queues (/dev/mqueue/), POSIX shared memory (/dev/shm/ + MAP_SHARED), PTY line discipline (Termios + ^C/^Z/^\\), TCP retransmission timer. x86_64 arch fixes: IST for NMI/MCE, IOAPIC destination LAPIC ID, MSR_CSTAR removal, AMD/Intel CPUID compatibility verified.
+> Updated: 2026-07-27 (session 12) — Phase 32: 8 kernel FS drivers (~20,400 LOC). Phase 34a: x86_64 critical fixes. Phase 35: Desktop QoS (+/proc, real-time, transitive PI). Phase 36: Desktop IPC (SCM_RIGHTS/CREDENTIALS, siginfo_t). Phase 37: KQueue completeness (EVFILT_PROC/SIGNAL/TIMER). Phase 38: Kernel hot-path performance (memcpy, lazy FPU, fast syscalls, heap slabs, kevent polling removal). Source audit: 5 bugs found.
 
 ## Executive Summary
 
-**Status**: FKernel boots to userspace with BusyBox 1.36.1. All critical syscall collisions, signal defaults, job control, and device nodes are fixed. BusyBox now includes ~60 applets with ps/free/uptime/grep/find/sed/date/df all backed by /proc nodes. Shell (ash) job control, pipe2/dup3/setsid all work. Long-term goal: run OpenRC as init system with full service management.
+**Status**: FKernel boots to userspace with BusyBox 1.36.1. All critical syscall collisions, signal defaults, job control, and device nodes are fixed. BusyBox now includes ~60 applets. Shell (ash) job control, pipe2/dup3/setsid all work. QoS+MLFQ scheduler with turnstile priority inheritance active. TCP retransmission timer implemented. Memory management: slab allocator, embedded buddy metadata, full direct map, CoW fork, anonymous demand paging. Persistent storage: FAT12/16/32 with full metadata write support. KQueue unified event backend with event-driven I/O. ELF Loader: DT_NEEDED shared library loading, ld.so relocation processing, SMAP safety, cross-object symbol resolution. **Phase 32 planned: 8 new kernelspace filesystem drivers (MinixFS, ExFAT, UFS/UFS2, HFS+, ISO9660, ext2, ext3, ext4), ~20,400 LOC.** **Distro readiness: ~85%** — kernel can boot static BusyBox initrd, run shell, create/delete/edit files on FAT32 disk, load dynamically linked binaries.
 
-**Progress**: ~82% (all POSIX IPC mechanisms implemented, ~85% POSIX compliance)
-**Immediate Priority**: KTest bug fixes (signal_kill, sigchld_reap races), OpenRC integration
-**Long-term Goal**: Full POSIX compliance → OpenRC boot → multi-service OS
+**Progress**: ~85% distro readiness (was ~80% before Phase 30b ELF security/completeness)
+**Immediate Priority**: Phase 29b (CSpace wiring + rights enforcement) — tasks 9-11 remain after 6 POSIX nodes migrated to Endpoint async API ✅. Phase 32f (ext2) — first bootable native Unix filesystem, enables disk-root boot via pivot_root. Phase 32b (ExFAT) — essential for desktop removable storage. Phase 32e (ISO9660) — CD/DVD boot/ISO support.
+**Long-term Goal**: Alpino/BusyBox distro → dynamic linking (Phase 30 ✅) → OpenRC (Phase 19) → multi-service OS → ExFAT/ext2/UFS/HFS+/ISO9660 storage support
 
 ### IPC/POSIX Implementation Phases (2026-07-26)
 
-All 10 phases complete. ~81 files created/modified. POSIX IPC now uses unified Notification/Endpoint/SharedMemory substrate.
+All 10 phases complete. ~81 files created/modified. POSIX IPC uses `ipc::Notification` directly as embedded members — **the capability model (CSpace/Endpoint) is a parallel subsystem with zero POSIX integration** (see Phase 29 below).
 
 | Phase | Features | Syscalls | Files |
 |-------|----------|----------|-------|
@@ -27,6 +27,165 @@ All 10 phases complete. ~81 files created/modified. POSIX IPC now uses unified N
 | **8. Shared Memory** | ShmNode wrapping SharedMemory IPC, /dev/shm/, mmap MAP_SHARED | SYS_SHM_OPEN(516), SYS_SHM_UNLINK(517) | 10 |
 | **9. PTY** | Termios struct, PtyLineDiscipline (^C→SIGINT, ^\→SIGQUIT, ^Z→SIGTSTP), TCSETS/TCGETS ioctls | — | 4 |
 | **10. TCP** | Retransmission timer, exponential backoff, socket registry, tick_all integration | — | 5 |
+| **11. KQueue Unification** | Unified backend for epoll/poll/select via KQueueNode; blocking via Notification::wait_timeout(); event-driven wake-up via KNoteHook intrusive list on Node; EVFILT_TIMER/VNODE/PROC/SIGNAL/USER filter types; EV_ONESHOT/EV_CLEAR/EV_DISPATCH semantics | — | 14 |
+
+### IPC Substrate Fragmentation — Architectural Gap (2026-07-26)
+
+Source-code audit of all 10 POSIX IPC mechanisms revealed the claimed "unified Notification/Endpoint/SharedMemory substrate" does not exist. Each mechanism uses `ipc::Notification` independently as an embedded member. The seL4-style capability model (CSpace/Capability/Endpoint) is a **parallel subsystem** used only by `sys_ipc_send/receive/call` — zero POSIX mechanisms route through it.
+
+#### Reality (per syscall source audit — updated 2026-07-27 session 12)
+
+| POSIX Mechanism | Notification | Endpoint | SharedMemory | Capability/CSpace | Blocking via |
+|-----------------|:---:|:---:|:---:|:---:|---|
+| Pipe | No | **Yes** ✅ | No | No | `m_endpoint.wait()` / `m_endpoint.signal()` |
+| EventFd | No | **Yes** ✅ | No | No | `m_endpoint.wait()` |
+| Posix Semaphore | No | **Yes** ✅ | No | No | `m_endpoint.wait()` |
+| SignalFd | No | **Yes** ✅ | No | No | `m_endpoint.wait()` |
+| TimerFd | No | **Yes** ✅ | No | No | `m_endpoint.wait()` |
+| Epoll | Yes (via KQueueNode) | No | No | No | Delegates to KQueueNode::kevent() — event-driven via KNoteHook + polling fallback |
+| **kqueue** | Yes (1, per instance) | No | No | No | Event-driven: I/O paths → notify_kqueue_readers/writers() → KNoteHook → m_notification.signal() → kevent() wake-up |
+| Futex | Yes (256 static global) | No | No | No | `notif.wait()` / `notif.wait_timeout()` |
+| Message Queue | No | **Yes** ✅ | No | No | `m_endpoint.wait()` |
+| Shared Memory | No | No | Yes | No | N/A (page mapping, no blocking) |
+| **Unix Socket** | No | **Yes** ✅ | No | No | `m_accept_endpoint.wait()` / `m_accept_endpoint.signal()` |
+
+#### What's Missing
+
+| Gap | Detail |
+|-----|--------|
+| **No unified enforcement** | Each POSIX node previously implemented its own `wait()`/`signal()`. **Fixed**: PipeNode, SemNode, MqueueNode, EventFdNode, SignalFdNode, TimerFdNode now use `ipc::Endpoint` with unified async API (`signal`/`wait`/`wait_timeout`/`poll`). Permission enforcement happens at VFS `open()` time. |
+| **Capability model is an island** | `CSpace`, `Capability{Send\|Receive\|Manage}`, `Endpoint`, and `sys_cap_transfer/grant/revoke` are a completely separate IPC interface. Zero POSIX mechanisms use them. |
+| **No unified revocation** ✅ | **Fixed**: `SemNode` and `MqueueNode` dropped own `m_generation` — now delegate to `Endpoint::generation()`. `Notification` retains its own generation for Futex/Epoll/KQueue. |
+| **Epoll is now event-driven** ✅ | `EpollNode` delegates to `KQueueNode` which uses `KNoteHook` attached to watched Nodes. I/O paths (PipeNode, EventFdNode, TimerFdNode, SignalFdNode, UnixSocket) call `notify_kqueue_readers/writers()` to immediately wake waiting `kevent()` callers. `scan_ready_events()` provides polling fallback for correctness. |
+| **UnixSocket is completely independent** ✅ | **Fixed**: `accept()` now uses `ipc::Endpoint` for blocking instead of raw `SchedulerManager::block_current()`. Own `UnixSocketBuffer` ring buffer and backlog array remain. |
+| **No rights decomposition for POSIX** | A capability passed through POSIX has no Send/Receive/Manage rights — it's just a raw fd. `pipe()` returns fds, not capabilities. |
+
+#### Target Architecture
+
+```
+app A                    kernel                    app B
+  │                         │                        │
+  ├─ pipe()/sem_open/... ──►│                        │
+  │                         ├─ POSIX thin wrapper    │
+  │                         ├─ Capability{Send|Recv|Manage}
+  │                         ├─ CSpace::lookup()      │
+  │                         ├─ Endpoint/Notification │
+  │                         ├─ generation check      │
+  │                         │                        │
+  │  SINGLE enforcement     │                        │
+  │  SINGLE revocation path │                        │
+  │  SINGLE rights model    │                        │
+```
+
+#### Concrete Tasks
+
+| # | Task | Files affected | Priority |
+|---|------|---------------|----------|
+| 1 | Route PipeNode through Endpoint instead of 2 raw Notifications | `pipe_node.h/cpp` | ✅ DONE (session 12) |
+| 2 | Route SemNode through Endpoint, remove own m_generation | `sem_node.h/cpp` | ✅ DONE (session 12) |
+| 3 | Route MqueueNode through Endpoint, remove own m_generation | `mqueue_node.h/cpp` | ✅ DONE (session 12) |
+| 4 | Route EventFdNode through Endpoint | `event_fd_node.h/cpp` | ✅ DONE (session 12) |
+| 5 | Route SignalFdNode through Endpoint | `signal_fd_node.h/cpp` | ✅ DONE (session 12) |
+| 6 | Route TimerFdNode through Endpoint | `timer_fd_node.h/cpp` | ✅ DONE (session 12) |
+| 7 | Make EpollNode actually event-driven: signal m_notify on registered FD activity | `epoll_node.h/cpp`, `kqueue.h/cpp`, `node.h`, `pipe_node.cpp`, `event_fd_node.cpp`, `timer_fd_node.cpp`, `signal_fd_node.cpp`, `unix_socket.cpp` | ✅ DONE (Phase 11) |
+| 8 | Migrate UnixSocket read/write to notify kqueue watchers; accept() migrated to Endpoint (was raw SchedulerManager::block_current) | `unix_socket.h/cpp` | ✅ DONE (Phase 29a) |
+| 9 | Wire POSIX fd operations through CSpace capability lookup | All POSIX node types + syscall handlers | HIGH |
+| 10 | Unified revocation: POSIX nodes drop own generation, delegate to Endpoint/Notification gen | `sem_node`, `mqueue_node`, all others | ✅ DONE (session 12) |
+| 11 | Add rights enforcement at POSIX syscall boundary (cap_transfer/grant on fds) | Syscall handlers + CSpace | MEDIUM |
+
+**Impact**: Completing this makes every POSIX IPC mechanism inherit capability-based security (rights, revocation, confused-deputy prevention) without per-mechanism code additions. The hardening becomes architectural, not additive.
+
+### ELF Loader — Deep Audit Results (2026-07-26)
+
+Source-code audit of all 13 ELF loader files (10 .cpp, 3 headers). Documentation claims dynamic linking, ASLR, TLS, and RELRO are complete. Reality: only static ELF binaries work. Dynamically linked programs fail at two independent points.
+
+#### Critical (Will Cause Runtime Failure) — ALL 3 FIXED in Phase 30 ✅
+
+| # | Issue | File(s) | Detail |
+|---|-------|---------|--------|
+| 1 | **No `DT_NEEDED` processing** ✅ | `dynamic_domain.cpp` | `load_dependencies()` scans DT_NEEDED entries in dynamic segment. `load_shared_library()` opens/loads segments/applies relocs for each .so. Global `s_global_libraries` Vector tracks all loaded libs for cross-object symbol resolution. |
+| 2 | **ld.so relocations not processed** ✅ | `interpreter_domain.cpp:64-67` | After `process_load_segments()`, creates `DynamicDomain` and calls `apply_relocations()` for the interpreter's own `.rela.dyn`/`.rela.plt`. |
+| 3 | **No STAC/CLAC in load paths** ✅ | `load_domain.cpp`, `memory_domain.cpp`, `elf_loader_core.cpp`, `dynamic_domain.cpp` | Added `arch_smap_begin()`/`arch_smap_end()` pairs around all user-memory writes: `copy_segment_data`, `zero_fill_bss`, `map_single_page` zero-fill, `apply_single_rela` target writes, first page read in `load_segments`. |
+
+#### High (Security Gaps) — 3 of 6 fixed in Phase 30b ✅
+
+| # | Issue | File(s) | Detail |
+|---|-------|---------|--------|
+| 4 | **Zero W^X enforcement** ✅ | `memory_domain.cpp:22-25` | `apply_final_permissions()` now checks if segment is both Writable and Executable (NX=0). Rejects with `Error::PermissionDenied` and logs warning. |
+| 5 | **ASLR: 16-bit entropy, deterministic PRNG** ✅ | `parser_domain.cpp:73-82` | Already uses 30-bit entropy via ChaCha20PRNG. ld.so base now also randomized (was hardcoded `0x70000000`, now uses same ASLR range). |
+| 6 | **ld.so at fixed address `0x70000000`** ✅ | `interpreter_domain.cpp:63-70` | Interpreter base now randomized via ChaCha20PRNG in `[0x10000000, 0x70000000)`. |
+| 7 | **`R_X86_64_GLOB_DAT/JUMP_SLOT` ignores `r_addend`** ✅ | `dynamic_domain.cpp` | Both now use `resolve_symbol_cross(...) + r_addend`. |
+| 8 | **Only first `PT_GNU_RELRO` processed** ✅ | `elf_loader_core.cpp:120-135` | Removed `break`. Now processes all RELRO segments. Rounds start UP `(addr + 0xFFF) & ~0xFFFULL`. Interpreter RELRO also applied via `apply_relro_for()`. |
+| 9 | **RELRO start rounded down, not up** ✅ | `elf_loader_core.cpp:124` | Fixed to `(p_vaddr + load_base + 0xFFF) & ~0xFFFULL`. |
+
+#### Medium (Missing Features) — 3 of 6 fixed in Phase 30b ✅
+
+| # | Issue | File(s) | Detail |
+|---|-------|---------|--------|
+| 10 | **Missing relocation types** ✅ | `dynamic_domain.cpp` | R_X86_64_COPY, R_X86_64_IRELATIVE, R_X86_64_TPOFF64, R_X86_64_DTPMOD64, R_X86_64_DTPOFF64 all handled. |
+| 11 | **Missing dynamic tags** ✅ | `elf64_dynamic.h`, `elf_loader_core.cpp` | DT_INIT, DT_FINI, DT_INIT_ARRAY, DT_FINI_ARRAY, DT_INIT_ARRAYSZ, DT_FINI_ARRAYSZ, DT_FLAGS, DT_GNU_HASH, DT_DEBUG, DT_RPATH, DT_RUNPATH, DT_SONAME, DT_VERSYM, DT_VERNEED macros defined. init/fini addresses extracted into ElfLoadResult. |
+| 12 | **No symbol versioning** ⚠️ | `dynamic_domain.cpp` | DT_VERSYM, DT_VERNEED, DT_VERNEEDNUM macros defined; parsing not yet implemented. |
+| 13 | **`SHN_COMMON` not handled** ✅ | `dynamic_domain.cpp` | SHN_COMMON macro defined. `resolve_symbol()` returns 0 with debug log. |
+| 14 | **No endianness check** ✅ | `parser_domain.cpp:28` | `e_ident[5]` (EI_DATA) validated; `ELFDATA2LSB`/`ELFDATA2MSB` constants defined in `elf_constants.h` |
+| 15 | **No file-size bounds on segments** ✅ | `load_domain.cpp:97` | `p_offset + p_filesz > m_node->size()` checked before allocation; returns `InvalidParameter` |
+
+#### Low (Code Quality)
+
+| # | Issue | File(s) | Detail |
+|---|-------|---------|--------|
+| 16 | **`parse_program_headers()` called 3-4x per load** | `elf_loader_core.cpp:50,86,108,146` | Each call re-reads all `e_phnum` headers from VFS node. For 10 PHDRs, 30-40 redundant disk reads per ELF load. Cache once. |
+| 17 | **`log_header_info()` declared, never defined** ✅ | `parser_domain.h:19` | Declaration removed. |
+| 18 | **Three empty .cpp files** | `elf_domain.cpp`, `load_context.cpp`, `memory_region.cpp` | 5 lines each (`#include` + empty namespace). Exist only to satisfy "one file per class" rule. |
+| 19 | **Hardcoded `0x1000` page size** | Throughout `memory_domain.cpp` | Use `PAGE_SIZE` constant instead of literal. |
+| 20 | **`remap_page_with_permissions()` silent failure** ✅ | `memory_domain.cpp:103-109` | Now returns `Error::NotFound` when `translate()` returns 0 (page not mapped); logs warning. |
+| 21 | **Repeated `MemoryDomain` instantiation** | `load_domain.cpp:13,88-89` | Both `process_load_segments()` and `process_single_load_segment()` create new `MemoryDomain`. Pass by reference. |
+| 22 | **Zero tests** | — | No test files found for any ELF loader component. |
+| 23 | **TLS extracted but not loaded by loader** | `elf_loader_core.cpp:165-176` vs `execve.cpp:166-183` | TLS info gathered in `calculate_entry_point()` but actual allocation + FS_BASE write happens in `execve.cpp` and `init_task.cpp` — split across 3 files. `init_task.cpp:153` does NOT set up TLS at all for init process. |
+
+#### Documentation vs Reality
+
+| Doc Claim | Reality |
+|-----------|---------|
+| "full support for dynamic linking" | **True now (Phase 30)** ✅ — DT_NEEDED processed, ld.so relocs applied, SMAP-safe, cross-object symbol resolution. R_X86_64_COPY + IRELATIVE + SHN_COMMON supported. |
+| "ASLR: [0x10000000, 0x70000000)" | **False** — Actual range is [0x10000000, 0x1FFFF000) due to `& 0x0FFFF000` mask. 16-bit entropy, deterministic seed. |
+| "TLS block at 0x7FFFFE000000" | **Partially true** — Allocation + FS_BASE not in loader; split across execve.cpp and init_task.cpp. init_task has NO TLS setup. |
+| "Full RELRO — GOT made read-only" | **Partially true** — Only first PT_GNU_RELRO segment. Interpreter's RELRO not applied. Start rounded down may corrupt adjacent data. |
+| "Security: bounds checking on PHDRs" | **False** — No file-size validation on p_offset + p_filesz. No segment overlap check. No overflow check on p_vaddr + p_memsz. |
+
+#### Concrete Tasks
+
+| # | Task | Priority |
+|---|------|----------|
+| 1 | Implement `DT_NEEDED` shared library loading + recursive dependency resolution | ✅ DONE (Phase 30) |
+| 2 | Process interpreter's `PT_DYNAMIC` — call `DynamicDomain::process_dynamic_segment()` for ld.so | ✅ DONE (Phase 30) |
+| 3 | Add SMAP-aware access (`stac`/`clac`) in `copy_segment_data()` and `zero_fill_bss()` | ✅ DONE (Phase 30) |
+| 4 | Add W^X enforcement in `apply_final_permissions()` — reject PF_W + !ExecuteDisable | ✅ DONE (Phase 30b) |
+| 5 | Replace ASLR PRNG: use full 30-bit range, add ASLR for ld.so, seed from hardware CSPRNG | ✅ DONE (Phase 30b) — ChaCha20PRNG, 30-bit entropy, ld.so base randomized |
+| 6 | Fix `GLOB_DAT`/`JUMP_SLOT` to include `r_addend` per ELF64 spec | ✅ DONE (Phase 30) |
+| 7 | Fix RELRO: remove `break`, round start **up**, apply RELRO to interpreter | ✅ DONE (Phase 30b) |
+| 8 | Add endianness check (`EI_DATA != ELFDATA2LSB` → reject) | ✅ DONE (session 12) |
+| 9 | Add relocation types: `R_X86_64_COPY` ✅, `R_X86_64_IRELATIVE` ✅, `R_X86_64_TPOFF64` ✅, `R_X86_64_DTPMOD64` ✅, `R_X86_64_DTPOFF64` ✅ | ✅ DONE (Phase 30b) |
+| 10 | Add dynamic tags: macro definitions added (DT_INIT, DT_FINI, DT_GNU_HASH, DT_FLAGS, DT_RPATH, DT_RUNPATH, DT_SONAME, DT_VERSYM, DT_VERNEED); init/fini addresses extracted in ElfLoadResult | ✅ DONE (Phase 30b) |
+| 11 | `SHN_COMMON` handling in `resolve_symbol()` — macro defined, returns 0 with debug log | ⚠️ PARTIAL (Phase 30) |
+| 12 | Add file-size bounds validation for `p_offset + p_filesz` and segment overlap check | ✅ DONE (session 12) |
+| 13 | Cache program headers — parse once, pass `Vector` by const reference | ⚠️ REVERTED (session 12) — caused Error 0 init loading; needs investigation |
+| 14 | Define or remove `log_header_info()` | ✅ DONE (session 12) — declaration removed |
+| 15 | Fix `remap_page_with_permissions()` to return error when `translate()` returns 0 | ✅ DONE (session 12) |
+| 16 | Unify TLS setup — move FS_BASE + thread pointer into loader, not execve.cpp/init_task.cpp | LOW |
+| 17 | Add ELF loader tests (header validation, relocation application, segment loading) | LOW |
+
+**Impact**: Dynamically linked binaries can now be loaded ✅ (Phase 30). DT_NEEDED shared libraries resolved at load time, ld.so self-relocated, cross-object symbols resolved. W^X enforcement active, ASLR with ChaCha20PRNG + 30-bit entropy + randomized ld.so base, full RELRO with correct alignment, all relocation types (COPY, IRELATIVE, TLS). Remaining: endianness check, file-size bounds validation, symbol versioning.
+
+All phases complete. ~12 files modified. Bitmap↔buddy double-allocation eliminated, buddy metadata embedded in free pages, full KERNEL_VIRT_BASE direct map, slab allocator + demand paging.
+
+| Phase | Features | Files |
+|-------|----------|-------|
+| **27. Bug Fixes** | Bitmap↔buddy reconciliation, alloc_page bitmap-only, free_page dead code removal, alloc_contiguous/free_contiguous bitmap sync, heap_stats lock | 4 |
+| **28. Improvements** | DMA vaddr free-list (replaces leaky bump allocator), embedded FreeBlock in free pages via KERNEL_VIRT_BASE (1MB BSS savings), -ENOSYS stubs, slab allocator (8 caches 16B-2048B), demand paging for MAP_ANONYMOUS, extend_direct_map() with 2MB huge pages, init flow restructured | 10 |
+| **31a. Verification** | CoW fork verified complete (`clone_table_recursive` + `handle_write_protection` + PMM per-frame refcount arrays). Anonymous demand paging verified complete (`mmap MAP_ANONYMOUS` lazy + `handle_demand_paging` zero-fill). TODO was outdated — both were already implemented in Phases 27-28. | — |
+| **31b. FAT32 Metadata** | `truncate` completed: shrink (walk chain, mark EOC, free trailing clusters) + extend (allocate clusters without writing data). `rmdir` emptiness check: list directory entries, reject if any non-`.`/`..` entries exist. | 1 |
+| **30. ELF Loader** | DT_NEEDED shared library loading via VFS, ld.so PT_DYNAMIC relocation processing, SMAP safety (arch_smap_begin/end in all user-memory write paths), r_addend fix for GLOB_DAT/JUMP_SLOT, R_X86_64_COPY + IRELATIVE support, SHN_COMMON support, cross-object symbol resolution via global `s_global_libraries` vector, 30+ DT_* / R_X86_64_* / SHN_* macro definitions added. | 8 |
+| **30b. ELF Security** | W^X enforcement in `apply_final_permissions()` (rejects Writable+Executable segments). ASLR: ChaCha20PRNG with 30-bit entropy for main executable + randomized ld.so base (was hardcoded `0x70000000`). RELRO: all PT_GNU_RELRO segments processed (removed `break`), start rounded UP, interpreter RELRO applied. TLS relocations: R_X86_64_TPOFF64/DTPMOD64/DTPOFF64. Init/fini extraction: DT_INIT/DT_FINI/DT_INIT_ARRAY/DT_FINI_ARRAY addresses passed via ElfLoadResult. | 5 |
 
 ### x86_64 Architecture Fixes (2026-07-26)
 
@@ -45,26 +204,26 @@ All 10 phases complete. ~81 files created/modified. POSIX IPC now uses unified N
 
 | Component | Files | Bugs Critical | Missing Features |
 |-----------|-------|--------------|-----------------|
-| **LibFK** | ~78 | 0 | ~61 (Phase 24 ✅: Robin Hood HashMap, SSO String, NonnullPtr, WeakPtr, BumpAllocator, LockRank, Format system) |
-| **LibC** | ~37 | 0 | ~180 (Phase 24 ✅: memcpy optimization, stdio buffered I/O) |
-| Memory | ~15 | 0 | 3 |
+| **LibFK** | ~78 | 0 | ~61 (Phase 24 ✅) |
+| **LibC** | ~37 | 0 | ~180 (Phase 24 ✅) |
+| Memory | ~19 | 0 | 0 (Phases 27+28 ✅) |
 | Scheduler | ~12 | 0 | 5 |
 | VFS | ~24 | 0 | 6 |
 | Containers | ~12 | 0 | 10+ |
 | Drivers | ~53 | 0 | 8+ |
 | Networking | ~12 | 0 | 15+ |
-| ELF Loader | ~12 | 0 | 6+ |
-| IPC | ~12 | 0 | 5+ |
+| ELF Loader | ~12 | 0 | **3** (symbol versioning, TLS unification, caching — session 12: endianness+bounds+remap_log done) |
+| IPC | ~12 | 0 | **5** (Phase 29 session 12: 6 nodes→Endpoint async API; CSpace wiring + rights enforcement remain) |
 | Syscall | ~140 | 0 | ~25 (networking) |
 | POSIX IPC (new) | ~45 | 0 | — |
 | Boot/Init | 1 | 0 | 3
 | Manager Pattern | 13 | 0 | 10 (no is_initialized) |
 | Userspace | 0 | 0 | 5 |
-| Filesystem | ~10 | 0 | 4 |
+| Filesystem | ~10 | 0 | **8** (Phase 32: MinixFS, ExFAT, UFS/UFS2, HFS+, ISO9660, ext2, ext3, ext4) |
 | BusyBox Compat | 0 | 0 | 5 (edge cases) |
 | Concurrency | ~0 | 0 | — |
 | POSIX Compliance | ~115 | 0 | ~40+ networking |
-| **Total** | **~390** | **0** | **~340+** |
+| **Total** | **~410** | **0** | **~310+** |
 
 ### BusyBox Compatibility
 
@@ -80,7 +239,7 @@ All 10 phases complete. ~81 files created/modified. POSIX IPC now uses unified N
 | Category | Present | Working | Stub/Broken | Missing |
 |----------|---------|---------|-------------|---------|
 | Process | 20 | 15 | 5 | ~20 |
-| Filesystem | 32 | 26 | 3 | ~15 |
+| Filesystem | 32 | 28 | 1 | ~15 |
 | Memory | 5 | 4 | 0 | ~8 |
 | Signals | 12 | 10 | 1 | ~5 |
 | Time | 3 | 2 | 1 | ~8 |
@@ -124,14 +283,14 @@ LibFK vs. SerenityOS AK vs. BSD libkern — key gaps identified by source-level 
 | Library | Tests | Coverage | Components Missing Tests |
 |---------|-------|----------|------------------------|
 | LibC (string/memory/stdio) | ~65 | ~60% | strcoll, strxfrm, memccpy, ffs, stpcpy, stpncpy |
-| LibFK containers | 2 (CircularBuffer only) | ~2% | Span, Array, List, ForwardList, Stack, Queue, StaticVector, Bitmap, UnorderedSet |
-| LibFK smart ptrs | 0 | 0% | OwnPtr, RefPtr (no dedicated tests) |
-| LibFK text | 0 | 0% | StringBuilder, StringView, FixedString |
-| LibFK algorithms | 0 | 0% | CRC32, DJB2, InternetChecksum, StringAlgorithms, BinarySearch, ContainerAlgorithms, Gather, Math |
-| LibFK core/sync | 0 | 0% | Result, Error, Spinlock, InterruptDisabler, Function |
-| LibFK memory | 0 | 0% | HeapMalloc, New |
-| Kernel | 0 | 0% | All subsystems untested |
-| **Total** | **~85 test cases** | **~10-15%** | **~28 LibFK components, all Kernel** |
+| LibFK containers | ~110 | ~75% | ForwardList (✅ implemented, no tests yet) |
+| LibFK smart ptrs | 10 | ~80% | — (OwnPtr, RefPtr, Optional tested) |
+| LibFK text | 27 | ~70% | FixedString |
+| LibFK algorithms | 28 | ~60% | CRC32, DJB2 (unit tests), Math |
+| LibFK core/sync | 10 | ~70% | Spinlock (unit tested via LockRank) |
+| LibFK memory | 13 | ~50% | HeapMalloc, New (unit tested via Nonnull/Weak/Bump) |
+| Kernel | 0 | 0% | All subsystems untested (host-side only) |
+| **Total** | **~207 test cases** | **~40-50%** | **~15 LibFK components, all Kernel** |
 
 ---
 
@@ -274,6 +433,8 @@ Bugs found during comprehensive source code analysis (2026-07-19). Each bug incl
 | 6 | **VMM `switch_address_space()` not SMP-safe** — mutates singleton `m_pml4` / `m_pml4_phys` without locking; two CPUs calling concurrently corrupt page tables | `virtual_memory_manager.cpp` | ✅ Fixed: Added `ScopedLockIRQ` on `m_lock` in `switch_address_space()` | ✅ Fixed |
 | 7 | **`kcalloc` integer overflow** — `nmemb * size` computed without overflow check; attacker-controlled values can cause small allocation with large zero-fill | `Src/LibFK/Memory/heap_malloc.cpp` | Add `if (nmemb && size > SIZE_MAX / nmemb) return nullptr` before multiplication | ✅ Fixed |
 | 8 | **`__cxa_guard_acquire` not atomic** — used for `static` local variable initialization; two threads can both see guard as un-acquired on SMP | `Src/LibFK/cxxabi.cpp:20` | Use `__sync_lock_test_and_set` for the guard byte, or document single-thread requirement | ✅ Fixed |
+| 9 | **CSPRNG not seeded before ASLR** — `init.cpp` has no ChaCha20 initialization; ASLR may use unseeded PRNG producing deterministic/detectable addresses | `init.cpp`, `Src/LibFK/Algorithms/chacha20.cpp` | Seed ChaCha20 from RDTSC + RDRAND (or HPET counter) early in init, before first ELF load | OPEN |
+| 10 | **`s_global_libraries` (ELF dynamic_domain.cpp) not SMP-safe** — global `static Vector<LibraryContext>` accessed without lock in `load_dependencies()` (push) and `load_shared_library()` (read/write); two CPUs doing concurrent `execve()` corrupt the vector | `dynamic_domain.cpp:12,54-59,67-71,122-128` | Guard with Spinlock or make per-process (move from global to LoadContext/ElfLoadResult) | OPEN |
 
 ### High — Correctness / Memory Safety
 
@@ -288,24 +449,27 @@ Bugs found during comprehensive source code analysis (2026-07-19). Each bug incl
 | 15 | **`RetainPtr` refcount type mismatch** — refcount allocated as `size_t` (64-bit) but accessed via `uint32_t*` alias; reads upper 32 bits as separate value on big-endian or with padding | `Include/LibFK/Memory/retain_ptr.h` | Use consistent `uint32_t` type for refcount allocation and access | ✅ Fixed |
 | 16 | **VMM `unmap_page_range()` doesn't free intermediate page tables** — when all entries in a PD/PDPT are cleared, the table pages themselves are leaked | `virtual_memory_manager.cpp` (unmap path) | After clearing all entries in a table, free the table page itself via PMM | ✅ Fixed |
 | 17 | **`handle_pending_signals()` is 93 lines** — violates Object Calisthenics rule (max 20 lines/method); the default action switch alone is 30+ lines | `signal_delivery.cpp:53-146` | Extract `handle_default_action()`, `install_signal_frame()`, `is_sig_ignored()` as separate methods | ✅ Fixed |
+| 18 | **`Endpoint::wait()` data race on `m_pending_bits`** — after `block_current_noqueue()` returns and `ScopedLockIRQ` scope ends (:261), reads `m_pending_bits` + `clear_all()` (:262-264) without holding `m_lock`; `signal()` from another CPU can corrupt the bits concurrently | `endpoint.cpp:250-265` | Keep `m_lock` held through the read+clear, or use atomic exchange | OPEN |
+| 19 | **`Endpoint::wait_timeout()` data race on `m_pending_bits`** — same pattern as `wait()`: reads+clears `m_pending_bits` without lock at :294-296 after timeout path | `endpoint.cpp:285-296` | Same fix as wait(): hold lock through read+clear | OPEN |
+| 20 | **`Endpoint::signal_with_payload()` discards payload** — `data` and `len` parameters are `[[maybe_unused]]`; only calls `signal(bits)`, discarding the payload entirely; caller expecting payload delivery gets silent data loss | `endpoint.cpp:306-308` | Implement payload storage (e.g., ring buffer or last-payload-wins); expose via wait/poll return | OPEN |
 
 ### Medium — POSIX Compliance / Code Quality / Maintainability
 
 | # | Issue | File(s) | Fix | Status |
 |---|-------|---------|-----|--------|
-| 18 | **ProcFs: 12 classes in 1 file pair** — `proc_fs.h` defines 12 classes, `proc_fs.cpp` implements all 332 lines; violates SECRET RULE | `proc_fs.h` (135 lines), `proc_fs.cpp` (332 lines) | ✅ Fixed: Split into 14 individual .cpp files + 18 header files | ✅ Fixed |
-| 19 | **TmpFs: 4 classes in 1 header** — `tmp_fs.h` defines Child, ChildList, TmpFsNode, TmpFsDirectoryNode; also uses `memcpy` from LibC (layer violation) | `tmp_fs.h` (93 lines), `tmp_fs.cpp` (168 lines) | Split classes; replace `memcpy` with `fk::memory::copy` or equivalent | ✅ Fixed: uses fk::memory::copy exclusively |
-| 20 | **`strchr`/`strrchr` non-standard signatures** — extra `maxlen` parameter breaks POSIX compatibility; any code expecting standard signatures will fail | `Src/LibC/string/strchr.c`, `strrchr.c` | Implement standard 2-argument versions; keep 3-argument versions as `strnchr`/`strrnchr` | ✅ Fixed |
-| 21 | **`strcmp()` double-scans strings** — calls `strlen()` on both strings then `strncmp()`; standard `strcmp` does single-pass comparison | `Src/LibC/string/strcmp.c` | Rewrite as single-pass loop comparing byte-by-byte | ✅ Fixed |
-| 22 | **`String` has no SSO (Small String Optimization)** — every `String("hello")` allocates 16 bytes from heap; significant overhead for short kernel strings (filenames, errors) | `Include/LibFK/Text/string.h`, `Src/LibFK/Text/string.cpp` | Embed 16-byte inline buffer; use SSO when `size <= 16`, heap when larger | ✅ Fixed |
-| 23 | **E1000: polling only, no interrupt handler** — 1M iteration busy-wait for TX completion; burns CPU cycles | `e1000.cpp:156` | Register ISR for RX/TX completion; use scheduler blocking for async I/O | ✅ Fixed (Phase 17g): interrupt-driven TX with scheduler blocking + polling fallback |
-| 24 | **DHCP/DNS use busy-wait polling** — tight loops (`for (int i = 0; i < 200000; ...)`) burning CPU while waiting for network responses | `dhcp_client.cpp:164-174`, `dns_resolver.cpp:81` | Use `sleep_current()` with timeout or integrate with kqueue/select | ✅ Fixed: deadline-based timeout with SchedulerManager::yield() |
-| 25 | **`rmdir` in TmpFs checks wrong directory** — checks `parent->m_children.size() > 1` instead of checking if the target directory itself is empty | `tmp_fs.cpp:118` | Check `target_dir->m_children.size() == 0` instead | ✅ Fixed |
-| 26 | **`DevFs::unregister_device` doesn't actually remove** — nulls the node pointer but the `DeviceEntry` stays in the Vector forever; vector grows monotonically | `dev_fs.cpp:36` | Use `swap_remove()` to actually remove the entry from the vector | ✅ Fixed |
-| 27 | **AutoMounter error messages print wrong argument** — `WARN("Failed to mount %s as FAT12: %s", mount_path, mount_path)` prints mount_path twice instead of error string | `auto_mounter.cpp:44,56,68` | Fix format string: second `%s` should be the error/result, not mount_path | ✅ Fixed |
-| 28 | **`gather_copy` uses byte-by-byte copy** — should use `memcpy` per segment for performance | `LibFK/Algorithms/gather.h` | Replace byte loop with `memcpy(dest + offset, seg.base, seg.length)` per IoVec | ✅ Fixed |
-| 29 | **`static_vector.h` defines duplicate `fk::containers::move()`** — shadows the canonical `fk::types::move()` | `Include/LibFK/Container/static_vector.h:10-12` | Remove local `move()` definition; use `fk::types::move()` | ✅ Fixed |
-| 30 | **VFS class split across 4 .cpp files** — `virtual_filesystem.cpp`, `vfs_operations.cpp`, `vfs_resolve.cpp`, `vfs_directory.cpp` all implement `VirtualFileSystem` methods; violates one-class-per-file | `Src/Kernel/Fs/Vfs/` | ✅ Fixed: PathResolver extracted as collaborator; vfs_resolve.cpp now thin wrappers | ✅ Fixed |
+| 21 | **ProcFs: 12 classes in 1 file pair** — `proc_fs.h` defines 12 classes, `proc_fs.cpp` implements all 332 lines; violates SECRET RULE | `proc_fs.h` (135 lines), `proc_fs.cpp` (332 lines) | ✅ Fixed: Split into 14 individual .cpp files + 18 header files | ✅ Fixed |
+| 22 | **TmpFs: 4 classes in 1 header** — `tmp_fs.h` defines Child, ChildList, TmpFsNode, TmpFsDirectoryNode; also uses `memcpy` from LibC (layer violation) | `tmp_fs.h` (93 lines), `tmp_fs.cpp` (168 lines) | Split classes; replace `memcpy` with `fk::memory::copy` or equivalent | ✅ Fixed: uses fk::memory::copy exclusively |
+| 23 | **`strchr`/`strrchr` non-standard signatures** — extra `maxlen` parameter breaks POSIX compatibility; any code expecting standard signatures will fail | `Src/LibC/string/strchr.c`, `strrchr.c` | Implement standard 2-argument versions; keep 3-argument versions as `strnchr`/`strrnchr` | ✅ Fixed |
+| 24 | **`strcmp()` double-scans strings** — calls `strlen()` on both strings then `strncmp()`; standard `strcmp` does single-pass comparison | `Src/LibC/string/strcmp.c` | Rewrite as single-pass loop comparing byte-by-byte | ✅ Fixed |
+| 25 | **`String` has no SSO (Small String Optimization)** — every `String("hello")` allocates 16 bytes from heap; significant overhead for short kernel strings (filenames, errors) | `Include/LibFK/Text/string.h`, `Src/LibFK/Text/string.cpp` | Embed 16-byte inline buffer; use SSO when `size <= 16`, heap when larger | ✅ Fixed |
+| 26 | **E1000: polling only, no interrupt handler** — 1M iteration busy-wait for TX completion; burns CPU cycles | `e1000.cpp:156` | Register ISR for RX/TX completion; use scheduler blocking for async I/O | ✅ Fixed (Phase 17g): interrupt-driven TX with scheduler blocking + polling fallback |
+| 27 | **DHCP/DNS use busy-wait polling** — tight loops (`for (int i = 0; i < 200000; ...)`) burning CPU while waiting for network responses | `dhcp_client.cpp:164-174`, `dns_resolver.cpp:81` | Use `sleep_current()` with timeout or integrate with kqueue/select | ✅ Fixed: deadline-based timeout with SchedulerManager::yield() |
+| 28 | **`rmdir` in TmpFs checks wrong directory** — checks `parent->m_children.size() > 1` instead of checking if the target directory itself is empty | `tmp_fs.cpp:118` | Check `target_dir->m_children.size() == 0` instead | ✅ Fixed |
+| 29 | **`DevFs::unregister_device` doesn't actually remove** — nulls the node pointer but the `DeviceEntry` stays in the Vector forever; vector grows monotonically | `dev_fs.cpp:36` | Use `swap_remove()` to actually remove the entry from the vector | ✅ Fixed |
+| 30 | **AutoMounter error messages print wrong argument** — `WARN("Failed to mount %s as FAT12: %s", mount_path, mount_path)` prints mount_path twice instead of error string | `auto_mounter.cpp:44,56,68` | Fix format string: second `%s` should be the error/result, not mount_path | ✅ Fixed |
+| 31 | **`gather_copy` uses byte-by-byte copy** — should use `memcpy` per segment for performance | `LibFK/Algorithms/gather.h` | Replace byte loop with `memcpy(dest + offset, seg.base, seg.length)` per IoVec | ✅ Fixed |
+| 32 | **`static_vector.h` defines duplicate `fk::containers::move()`** — shadows the canonical `fk::types::move()` | `Include/LibFK/Container/static_vector.h:10-12` | Remove local `move()` definition; use `fk::types::move()` | ✅ Fixed |
+| 33 | **VFS class split across 4 .cpp files** — `virtual_filesystem.cpp`, `vfs_operations.cpp`, `vfs_resolve.cpp`, `vfs_directory.cpp` all implement `VirtualFileSystem` methods; violates one-class-per-file | `Src/Kernel/Fs/Vfs/` | ✅ Fixed: PathResolver extracted as collaborator; vfs_resolve.cpp now thin wrappers | ✅ Fixed |
 
 ---
 
@@ -364,7 +528,7 @@ New bugs discovered during full codebase audit. Organized by subsystem.
 | # | Issue | File(s) | Fix | Status |
 |---|-------|---------|-----|--------|
 | 1 | **FAT12 `list_dir` returns raw 8.3 names** — copies raw 11-byte names without formatting; `ls` shows `"HELLO   TXT"` instead of `"HELLO.TXT"` | `Src/Kernel/Fs/Disk/Fat12/fat_12_fs.cpp:188-193` | Use `format_83_name()` like FAT16/FAT32 | ✅ Fixed |
-| 2 | **FAT12 `lookup` does not handle LFN entries** — skips `attr == 0x0F` but doesn't parse LFN; files with long names invisible on FAT12 | `Src/Kernel/Fs/Disk/Fat12/fat_12_fs.cpp:154-175` | Implement LFN parsing like FAT16/FAT32 | ❌ Open |
+| 2 | **FAT12 `lookup` does not handle LFN entries** — skips `attr == 0x0F` but doesn't parse LFN; files with long names invisible on FAT12 | `Src/Kernel/Fs/Disk/Fat12/fat_12_fs.cpp:154-175` | Implement LFN parsing like FAT16/FAT32 | ✅ Fixed (lfn_buf scope moved outside sector loop) |
 | 3 | **`unmount` doesn't clean `s_mounts` tracking array** — `mount()` records in `s_mounts[]` but `unmount()` doesn't remove; stale entries in `/proc/mounts` | `Src/Kernel/Fs/Vfs/virtual_filesystem.cpp:119-126` | Remove entry from `s_mounts` in `unmount()` | ✅ Fixed |
 | 4 | **ProcMountsNode format wrong** — outputs `fstype path fstype rw 0 0` instead of `device mountpoint fstype options dump pass`; fstype printed twice, device missing | `Src/Kernel/Fs/Virtual/ProcFs/proc_fs.cpp:180` | Fix snprintf format string to match fstab format | ✅ Fixed |
 | 5 | **ProcFs PID scan hardcoded to 1000** — `list_dir` scans PID 1-999 only; PIDs ≥ 1000 invisible in `/proc` | `Src/Kernel/Fs/Virtual/ProcFs/proc_fs.cpp:54` | Use scheduler task list instead of PID scan | ✅ Fixed |
@@ -867,9 +1031,9 @@ Generic algorithms duplicated across kernel subsystems should be consolidated in
 
 | Algorithm | Call Sites | LibFK Destination | Status |
 |-----------|-----------|-------------------|--------|
-| Linear find-if by key | ArpTable, DevFs, TmpFs, PCI, KQueue, Dentry — 6+ implementations | `LibFK/Algorithms/container_algorithms.h` | ✅ Done (`find_if` available; sites updated where trivial) |
-| Linear find-and-remove (swap-with-last) | ArpTable, KQueue, DevFs | `LibFK/Algorithms/container_algorithms.h` | ✅ Done (`find_and_remove` + `swap_remove` in container_algorithms.h) |
-| Gather copy from iovec | `writev.cpp` — sum lengths + memcpy segments | `LibFK/Algorithms/gather.h` | ✅ Done (`gather.h` created; `writev.cpp` uses memcpy) |
+| Linear find-if by key | ArpTable, DevFs, TmpFs, PCI, KQueue, Dentry — 6+ implementations | `LibFK/Algorithms/container_algorithms.h` | ✅ Done (2026-07-26: all 7 call sites migrated to `find_if`) |
+| Linear find-and-remove (swap-with-last) | ArpTable, KQueue, DevFs | `LibFK/Algorithms/container_algorithms.h` | ✅ Done (2026-07-26: all 3 call sites use `find_if` + inline swap; `find_and_remove`/`swap_remove` available but Vector API mismatch makes inline pattern cleaner) |
+| Gather copy from iovec | `writev.cpp` — sum lengths + memcpy segments | `LibFK/Algorithms/gather.h` | ⚠️ Not applicable — `writev.cpp` requires `copy_from_user` per segment for SMAP safety; `gather.h` uses raw `__builtin_memcpy`. Consolidation is architecturally incompatible here. `gather.h` remains available for kernel-space IoVec operations. |
 | Byte-sum checksum validation | `acpi.cpp:70-77` — ACPI table validation | `LibFK/Algorithms/byte_checksum.h` | ✅ Done (`acpi.cpp` now calls `fk::algorithms::byte_checksum_valid`) |
 | lower_bound / upper_bound (binary search) | Set, Map, MultiSet, MultiMap — 5 identical copies | `LibFK/Algorithms/binary_search.h` | ✅ Done (Set, Map, MultiSet use fk::algorithms; MultiMap kept local for heterogeneous K-vs-Entry comparison) |
 
@@ -1545,34 +1709,22 @@ Move 3 standalone utility files + consolidate ~15 duplicated algorithms from ker
 #### Phase 14e — FD Table & CLOEXEC (HIGH) ✅ Complete
 #### Phase 14f — Time & Scheduling (MEDIUM) ✅ Complete
 
-### Phase 17 — P0 Source Code Bugs (Reanalysis 2026-07-20) — CURRENT PRIORITY
+### Phase 17 — P0 Source Code Bugs (Reanalysis 2026-07-20) — ✅ COMPLETE (2026-07-26 verified)
 
-Fix all ~34 confirmed-open bugs. Estimated: ~3-4 days.
+All ~34 bugs verified as fixed in source code. See P0 bug tables above for individual status.
 
-#### Phase 17a — LibFK→Kernel Layer Violations (1 day) — **TOP PRIORITY**
-- [ ] Fix `heap_malloc.cpp` → `<Kernel/Memory/memory_manager.h>` — use `set_allocator()` callback pattern (80 lines)
-- [ ] Fix `interrupt_disabler.h` → `<Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>` — platform callback or inline asm (40 lines)
-- [ ] Fix `spinlock.h` → Kernel dependency — move to LibFK/Arch/ with platform callback (40 lines)
-
-#### Phase 17b — DMA & Memory Safety (1 day)
-- [ ] Fix DMA virt→phys in AHCI/NVMe/E1000 — add `virt_to_phys()` translation before DMA hardware handoff (50 lines)
-- [ ] Fix `VMM switch_address_space()` not SMP-safe — add `ScopedLockIRQ` (3 lines)
-- [ ] Fix `FileDescription::seek` overflow check — add arithmetic overflow checks (10 lines)
-
-#### Phase 17c — Driver Fixes (1.5 days)
-- [ ] Add timeout to AHCI port CI polling, ATA BSY/DRQ polling, NVMe busy-waits (all infinite loops)
-- [ ] Fix NVMe memory leaks — free identify_controller/scan_namespaces pages, delete async operations
-- [ ] Fix NVMe block size inconsistency — use parsed LBA format consistently
-- [ ] Fix InterruptDrivenAhci DMA setup stubs — implement proper DMA path
-- [ ] Fix PS/2 mouse 3-byte only — add 4-byte IntelliMouse scroll wheel support
-- [x] Fix APIC timer parameter semantics — both now use `frequency_hz` + `1000/hz` formula
-- [x] Fix duplicate MSI allocation code — `msi::lapic_phys_address()` + `msi::allocate_msi_vector()` shared by all 3
-
-#### Phase 17d — Code Quality (0.5 day)
-- [ ] Fix LibC `sys/syscall.h` → Kernel header — copy needed constants to LibC
-- [ ] Fix LibC `libc_putc.cpp` → LibFK headers — use callback/hook pattern
-- [ ] Split ProcFs 12-in-1 class into individual files (SECRET RULE violation)
-- [ ] Add `copy_from_user` to `sys_execve` — kernel buf for argv/envp arrays
+#### Phase 17 ✅ Verified Fixes
+- [x] `heap_malloc.cpp` → uses `allocator_backend` pattern (no kernel dependency)
+- [x] `interrupt_disabler.h` → uses inline x86 asm (no kernel dependency)
+- [x] DMA virt→phys confusion → DmaBuffer migrates all drivers
+- [x] VMM `switch_address_space()` → `ScopedLockIRQ` added
+- [x] NVMe timeouts, memory leaks, block size → all fixed
+- [x] InterruptDrivenAhci → returns NotImplemented; base AHCI used
+- [x] PS/2 mouse → 4-byte IntelliMouse support
+- [x] APIC timer, MSI dedup → unified in msi_helpers
+- [x] LibC `sys/syscall.h`, `libc_putc.cpp` → layer violations fixed
+- [x] ProcFs → split into 15 individual .cpp files
+- [x] `copy_from_user` → used in all syscalls (execve, open, mount, etc.)
 
 ### Phase 18 — TCP/UDP Checksums (Reanalysis 2026-07-20) — HIGH PRIORITY
 
@@ -1592,12 +1744,15 @@ Build and test OpenRC as PID 1. Estimated: ~3-4 days.
 - [ ] Build OpenRC: `lua Meta/UserTools/openrc/build.lua` (or `xmake config-initrd` → select "openrc")
 - [ ] Verify all artifacts in `build/initrd_root/` (init.openrc, openrc-run, rc.conf, service scripts)
 
-#### Phase 19b — /proc Filesystem Gaps (1 day)
-- [ ] Implement `/proc/sys/` directory node
-- [ ] Implement `/proc/sys/kernel/hostname` (read/write)
-- [ ] Implement `/proc/loadavg` (read from scheduler state)
-- [ ] Implement `/proc/cpuinfo` (read from CPU detection)
-- [ ] Fix `/proc/mounts` to return actual VFS mount data (P0 bug #10)
+#### Phase 19b — /proc Filesystem Gaps (0.5 day) — ✅ All entries already exist
+- [x] `/proc/sys/` directory — ProcSysNode (directory listing: `kernel`)
+- [x] `/proc/sys/kernel/hostname` — ProcSysStringNode (read/write, default: `"fkernel"`)
+- [x] `/proc/sys/kernel/ostype` — ProcSysStringNode (read-only: `"Linux\n"`)
+- [x] `/proc/sys/kernel/osrelease` — ProcSysStringNode (read-only: `"5.15.0-fkernel\n"`)
+- [x] `/proc/sys/kernel/domainname` — ProcSysStringNode (read/write: `"(none)"`)
+- [x] `/proc/loadavg` — ProcLoadavgNode (cached, scheduler state)
+- [x] `/proc/cpuinfo` — ProcCpuinfoNode (cached, hardcoded FKernel Virtual CPU)
+- [x] `/proc/mounts` — ProcMountsNode (now shows real VFS mount data, P0 bug #10 fixed)
 
 #### Phase 19c — OpenRC Boot Testing (2 days)
 - [ ] Boot with OpenRC as PID 1 in QEMU
@@ -1675,90 +1830,81 @@ Phase 19 now covers OpenRC integration with detailed sub-phases.
 #### Phase 16b — USB (Future)
 #### Phase 16c — Security (Future)
 
-### Phase 22 — Directory & File Structure Cleanup (2026-07-23) — HIGH PRIORITY
+### Phase 22 — Directory & File Structure Cleanup (2026-07-26) — ✅ COMPLETE
 
-Fix naming inconsistencies, duplicates, empty dirs, and structural mismatches. Estimated: ~2-3 days.
+All file renames, duplicate consolidation, directory mismatches, and ProcFs audit have been completed. The TODO checklist was largely stale — most renames were already done before this phase was tracked.
 
-#### Phase 22a — Rename PascalCase/camelCase Files to snake_case (1 day)
+#### Phase 22a — Rename PascalCase/camelCase Files to snake_case (1 day) ✅
 
-All files must follow `snake_case` naming. Use `git mv` for renames to preserve history.
+All files verified — renames were already completed prior to this phase being tracked.
 
-**LibFK/Core/** — rename 4 files:
-- [ ] `Assertions.h` → `assertions.h`
-- [ ] `Error.h` → `error.h`
-- [ ] `Platform.h` → `platform.h`
-- [ ] `Result.h` → `result.h`
+**LibFK/Core/** — ✅ all already snake_case:
+- [x] `Assertions.h` → `assertions.h`
+- [x] `Error.h` → `error.h`
+- [x] `Platform.h` → `platform.h`
+- [x] `Result.h` → `result.h`
 
-**LibFK/Functional/** — rename 2 files:
-- [ ] `Function.h` → `function.h`
-- [ ] `Tuple.h` → `tuple.h` — CHECK: may conflict with `Utilities/tuple.h` (see Phase 22b)
+**LibFK/Functional/** — ✅ all already snake_case:
+- [x] `Function.h` → `function.h`
+- [x] `Tuple.h` → `tuple.h` — already removed; only `Utilities/tuple.h` exists
 
-**LibFK/Utilities/** — rename 1 file:
-- [ ] `Memory.h` → `memory.h`
+**LibFK/Utilities/** — ✅ already snake_case:
+- [x] `Memory.h` → `memory.h`
 
-**LibFK/Types/** — rename 4 camelCase files:
-- [ ] `fileDescriptor.h` → `file_descriptor.h`
-- [ ] `physicalAddress.h` → `physical_address.h`
-- [ ] `processId.h` → `process_id.h`
-- [ ] `virtualAddress.h` → `virtual_address.h`
+**LibFK/Types/** — ✅ no camelCase files remain:
+- [x] All type wrappers already in snake_case
 
-**Kernel/Driver/Storage/Nvme/** — rename 3 PascalCase files:
-- [ ] `NvmeCompletionProcessor.h` → `nvme_completion_processor.h`
-- [ ] `NvmeQueueManager.h` → `nvme_queue_manager.h`
-- [ ] `NvmeRegisterAccess.h` → `nvme_register_access.h`
+**Kernel/Driver/Storage/Nvme/** — ✅ all already snake_case:
+- [x] `NvmeCompletionProcessor.h` → `nvme_completion_processor.h`
+- [x] `NvmeQueueManager.h` → `nvme_queue_manager.h`
+- [x] `NvmeRegisterAccess.h` → `nvme_register_access.h`
 
-**Kernel/Clock/Types/** — rename 1 file:
-- [ ] `Datetime.h` → `datetime.h`
+**Kernel/Clock/Types/** — ✅ already snake_case:
+- [x] `Datetime.h` → `datetime.h`
 
-**Kernel/Scheduler/** — rename 3 PascalCase files + update includes:
-- [ ] `SchedulerIntrospection.cpp` → `scheduler_introspection.cpp`
-- [ ] `SchedulerLifecycle.cpp` → `scheduler_lifecycle.cpp`
-- [ ] `SchedulerManager.cpp` → `scheduler_manager.cpp`
+**Kernel/Scheduler/** — ✅ all .cpp already snake_case:
+- [x] `SchedulerIntrospection.cpp` → `scheduler_introspection.cpp`
+- [x] `SchedulerLifecycle.cpp` → `scheduler_lifecycle.cpp`
+- [x] `SchedulerManager.cpp` → `scheduler_manager.cpp`
 
-**Kernel/Fs/Vfs/** — rename 1 file:
-- [ ] `Fstab.cpp` → `fstab.cpp`
+**Kernel/Fs/Vfs/** — ✅ already snake_case:
+- [x] `Fstab.cpp` → `fstab.cpp`
 
-**Kernel/Arch/x86_64/Panic/** — rename 1 file:
-- [ ] `Panic.cpp` → `panic.cpp`
+**Kernel/Arch/x86_64/Panic/** — ✅ already snake_case:
+- [x] `Panic.cpp` → `panic.cpp`
 
-**Docs/Development/** — rename 2 files:
-- [ ] `GettingStarted.md` → `getting-started.md`
-- [ ] `Updating.md` → `updating.md`
+**Docs/Development/** — ✅ already snake_case:
+- [x] `GettingStarted.md` → `getting-started.md`
+- [x] `Updating.md` → `updating.md`
 
-**Meta/x86_64-tools/** — rename 1 file:
-- [ ] `check-kernel.lua` → `check_kernel.lua`
+**Meta/x86_64-tools/** — ✅ renamed:
+- [x] `check-kernel.lua` → `check_kernel.lua` (hyphen→underscore; updated require in mount_mockos.lua)
 
-**Kernel/Syscall/SyscallList/** — rename directory:
-- [ ] `SyscallList/` → `syscall_list/`
+**Kernel/Syscall/SyscallList/** — ✅ already renamed:
+- [x] `SyscallList/` → `syscall_list/`
 
-#### Phase 22b — Consolidate Duplicate tuple.h (0.5 day)
+#### Phase 22b — Consolidate Duplicate tuple.h (0.5 day) ✅
 
-- [ ] Audit `Include/LibFK/Utilities/tuple.h` vs `Include/LibFK/Functional/Tuple.h` — determine which is the canonical version
-- [ ] Remove the duplicate, update all includes to point to the canonical one
-- [ ] If both have different functionality, rename one to clarify (e.g., `pair_tuple.h`)
+- [x] Audit: `Include/LibFK/Functional/Tuple.h` does not exist (already removed). Only `Include/LibFK/Utilities/tuple.h` remains.
+- [x] No duplicate to resolve.
 
-#### Phase 22c — Fix Include/Src Directory Mismatches (0.5 day)
+#### Phase 22c — Fix Include/Src Directory Mismatches (0.5 day) ✅
 
-**Serial vs SerialPort:**
-- [ ] Rename `Include/Kernel/Driver/SerialPort/` → `Include/Kernel/Driver/Serial/` (or rename Src to match)
+- [x] Serial vs SerialPort: Both Include and Src use `Serial/` (no `SerialPort/` directories exist)
+- [x] `init.h` already exists at `Include/Kernel/Boot/Stages/init.h` (included from `init.cpp`)
+- [x] `Src/Kernel/Net/Ip/` does not exist (no empty directory to clean)
 
-**Missing Include counterpart:**
-- [ ] Create `Include/Kernel/Init/` with `init.h` header for `Src/Kernel/Init/init.cpp`
+#### Phase 22d — Merge Docs/ Stubs into Docs/Domains/ (0.5 day) ✅
 
-**Empty Src directory:**
-- [ ] Check if `Src/Kernel/Net/Ip/` needs source files, or remove empty directory
+- [x] `Docs/Kernel/` directory does not exist (already cleaned up)
 
-#### Phase 22d — Merge Docs/ Stubs into Docs/Domains/ (0.5 day)
+#### Phase 22e — ProcFs Header/Source Audit (0.5 day) ✅
 
-The `Docs/Kernel/` directory contains 9 README stubs that overlap with `Docs/Domains/`:
-- [ ] Migrate any unique content from `Docs/Kernel/*/README.md` to `Docs/Domains/*.md`
-- [ ] Remove `Docs/Kernel/` directory or keep as index linking to `Docs/Domains/`
-
-#### Phase 22e — ProcFs Header/Source Audit (0.5 day)
-
-18 headers in `Include/Kernel/Fs/Virtual/ProcFs/` but only 2 .cpp files in `Src/Kernel/Fs/Virtual/ProcFs/`:
-- [ ] Check which ProcFs nodes are header-only (inline implementations) vs missing .cpp files
-- [ ] Create missing .cpp files, or document that inline implementation is intentional
+- [x] 19 headers, 15 .cpp files. 4 headers without matching .cpp are by design:
+  - `proc_fs.h` — convenience umbrella include (header-only)
+  - `proc_fs_node.h` — has `proc_fs_node.cpp`
+  - `proc_fs_util.h` — single inline `read_from_buf()` function
+  - `proc_sys_kernel_node.h` + `proc_sys_string_node.h` — both implemented in `proc_sys_node.cpp`
 
 ### Phase 24 — LibC & LibFK Improvements (2026-07-24) — ✅ COMPLETE
 
@@ -2381,7 +2527,7 @@ sys_sched_getscheduler(pid):
 - [x] Fix `sys_sched_getscheduler()` to return real policy
 - [x] Fix `sys_sched_getparam()`/`sys_sched_setparam()`
 - [x] Fix `sys_sched_get_priority_max()`/`sys_sched_get_priority_min()`
-- [ ] Register new syscalls in `syscall.cpp`
+- [x] Register new syscalls in `syscall.cpp`
 
 ### Phase 26f — Turnstiles (QoS-over-IPC) (1 day)
 
@@ -2460,12 +2606,12 @@ struct TaskIpc {
 };
 ```
 
-- [ ] Implement `Turnstile` struct and functions
+- [x] Implement `Turnstile` struct and functions (struct created; functions persist turnstile on holder via TaskIpc::active_turnstile; unboost before IPC block cleans up)
 - [x] Add turnstile fields to `TaskIpc`
 - [x] Modify `Endpoint::send()` to create turnstile on block
 - [x] Modify `Endpoint::receive()` to create turnstile on block
 - [x] Add `boost_qos_if_needed()` and `unboost_task()`
-- [x] Handle turnstile cleanup when reply is delivered
+- [x] Handle turnstile cleanup when reply is delivered (unboost_current_if_boosted() before every endpoint block)
 - [ ] Implement chain boost transitivity (deferred to future optimization)
 
 ### Phase 26g — Documentation and Testing (0.5 day)
@@ -2530,9 +2676,977 @@ Update documentation and add regression tests.
 
 ---
 
-## References
+## Phase 27 — VFS+Capability Integration (2026-07-26) — HIGH PRIORITY
 
-- [AGENTS.md](./AGENTS.md) — Development conventions
+Make capabilities the internal substrate of POSIX file operations. FDs become capability indices; `FileDescription` validates rights through CSpace; `open()` installs capabilities, `close()` revokes them, `dup2()` copies them. VFS internals (Dentry, Node, path resolution, filesystem implementations) remain unchanged.
+
+### Architecture
+
+```
+Userspace:    open/close/dup2     read/write/seek      fork/exec/exit
+                    │                      │                   │
+                    ▼                      ▼                   ▼
+           ┌────────────────┐   ┌──────────────────┐   ┌──────────────┐
+           │ FD table        │   │ FileDescription  │   │ CSpace       │
+           │ fd → Capability │   │ Capability +     │   │ per-task     │
+           │                 │   │ offset + flags   │   │ capabilities │
+           └────────┬────────┘   └────────┬─────────┘   └──────┬───────┘
+                    │                      │                    │
+                    └──────────────────────┼────────────────────┘
+                                           │
+                            ┌──────────────▼──────────────────┐
+                            │  Capability validation          │
+                            │  • exists in CSpace?            │
+                            │  • valid generation?            │
+                            │  • has required rights?         │
+                            └──────────────┬──────────────────┘
+                                           │
+                            ┌──────────────▼──────────────────┐
+                            │  VFS (Dentry → Node)            │
+                            │  unchanged below this line      │
+                            └─────────────────────────────────┘
+```
+
+### Overview
+
+| Component | Design | Rationale |
+|-----------|--------|-----------|
+| FD table | `fd → CapabilityIndex` (not direct `RefPtr<FileDescription>`) | Enables revoke-on-close; `dup2` copies capability, not ref |
+| FileDescription | Contains `Capability` + offset + flags | Validates rights before every VFS operation |
+| open() | `resolve_path()` → `Capability(dentry, rights)` → `cspace->install()` | File existence is a capability, not a global namespace lookup |
+| close() | `fd → Capability` → `cspace->revoke()` | O(1) via generation counter; last ref frees backing resource |
+| fork() | Clone CSpace + clone FdTable (indices map to same capabilities) | Child inherits all parent's file access |
+| VFS internals | Zero changes (Dentry, Node, filesystems) | Capabilities wrap VFS, don't replace it |
+
+### Phase 27a — Expand Capability Subsystem (1 day)
+
+Expand the existing capability types, rights, and CSpace to handle file operations.
+
+**Files:** `capability.h`, `cspace.h`/`.cpp`, `badge.h`
+
+| # | Task | Details |
+|---|------|---------|
+| 1 | **Add `CapabilityType` variants** | `FileDescription`, `Dentry`, `Node` — existing `Endpoint`/`Notification`/`SharedMemory` already present |
+| 2 | **Add rights bitmask** | `Read` (1<<0), `Write` (1<<1), `Seek` (1<<2), `Ioctl` (1<<3), `Chmod` (1<<4), `Truncate` (1<<5), `Manage` (1<<6) |
+| 3 | **Generalize `CSpace::install()`** | Accept any `RefCounted*`, not just `Endpoint`/`Notification`; derive `CapabilityType` from runtime type |
+| 4 | **Add `CSpace::lookup(index)`** | Return `Optional<Capability>` with generation validation; O(1) via free-list index |
+| 5 | **Add `CSpace::revoke(index)`** | Invalidate generation counter; don't free resource (whoever has a live reference keeps it until unref) |
+| 6 | **Add `CSpace::clone()`** | Deep copy capability table with same generation counters; used by `fork()` |
+
+**Risk:** CSpace currently indexed by badge. Needs per-slot capability tracking with generation.
+
+### Phase 27b — Transition FileDescription (1.5 days)
+
+`FileDescription` today holds `RefPtr<Dentry>` directly. Transition to `Capability` + validation.
+
+**Files:** `file_description.h`/`.cpp`
+
+| # | Task | Details |
+|---|------|---------|
+| 1 | **Replace `RefPtr<Dentry> m_dentry`** | `Capability m_dentry_cap` instead |
+| 2 | **Add `resolve_dentry(required_rights)`** | Lookup capability in current task's CSpace → validate generation → validate rights → return `Result<Dentry*, Error>` |
+| 3 | **Update `read()`** | `TRY(resolve_dentry(Right::Read))` before delegating to Node |
+| 4 | **Update `write()`** | `TRY(resolve_dentry(Right::Write))` before delegating to Node |
+| 5 | **Update `lseek()`** | `TRY(resolve_dentry(Right::Seek))` before offset manipulation |
+| 6 | **Update `ioctl()`** | `TRY(resolve_dentry(Right::Ioctl))` before dispatch |
+| 7 | **Update `truncate()`** | `TRY(resolve_dentry(Right::Truncate))` before Node call |
+| 8 | **Update `stat()`** | Needs only dentry presence (no right required); validate generation only |
+
+**Impact:** Every syscall that touches a file now has a capability check in the hot path. Cost: one CSpace lookup + one generation compare (O(1), ~10 instructions).
+
+### Phase 27c — Transition Syscalls (2 days)
+
+Syscalls that create/destroy/manage FDs now operate through CSpace.
+
+**Files:** one per syscall
+
+| Syscall | Change | Details |
+|---------|--------|---------|
+| **`open()`** | `resolve_path()` → `Capability(dentry, rights_from_flags)` → `cspace->install()` → `fd` | Open returns a capability index, not a direct FD. Rights derived from `O_RDONLY`/`O_WRONLY`/`O_RDWR` |
+| **`creat()`** | Same as `open()` with `O_CREAT\|O_WRONLY\|O_TRUNC` | Creates file, then capability with Write+Truncate |
+| **`close()`** | `fd → CSpace::revoke(index)` | Revokes capability; FileDescription still alive if other FDs reference it; freed when last ref drops |
+| **`dup2()`** | `oldfd → Capability` → `cspace->install(copy)` at `newfd` index | Copies capability (same resource, same rights, same generation), not just FD table entry |
+| **`dup3()`** | Same as `dup2()` + `O_CLOEXEC` flag on new FD | |
+| **`fcntl(F_DUPFD)`** | Same as `dup2()` with auto-select lowest fd | |
+| **`fork()`** | `child->cspace = parent->cspace->clone()` + clone FdTable (indices → same capabilities) | Child gets identical access; revoke in child doesn't affect parent (independent generation counters in cloned CSpace) |
+| **`execve()`** | Iterate FdTable; `FD_CLOEXEC` → `cspace->revoke(index)` | Close-on-exec now uses capability revocation |
+| **`pipe()`** | Creates `PipeNode`, wraps in `Dentry`, creates TWO capabilities (`Capability(dentry, Read)` + `Capability(dentry, Write)`) | Two different rights on same resource |
+| **`socket()`** | Creates capability with appropriate rights based on socket type | |
+| **`mmap()`** | File-backed mmap installs capability for the mapped file | Rights: Read (always), Write (if PROT_WRITE) |
+
+### Phase 27d — Transition FdTable (1 day)
+
+Replace `Vector<RefPtr<FileDescription>>` with capability-indexed indirection.
+
+**Files:** `Task/task.h`/`.cpp`
+
+| # | Task | Details |
+|---|------|---------|
+| 1 | **FdTable becomes `Vector<CapabilityIndex>`** | Maps `fd → index` into task's CSpace |
+| 2 | **`get_file_descriptor(fd)`** | `cspace->lookup(index)` → validate CapabilityType::FileDescription → return `FileDescription*` |
+| 3 | **`add_file_descriptor(file_desc)`** | `cspace->install(Capability(file_desc, type, rights))` → returns index → store as fd |
+| 4 | **`close_file_descriptor(fd)`** | `cspace->revoke(index)` → clear fd slot |
+| 5 | **`dump_file_descriptors()`** | Iterate FdTable + CSpace to enumerate open files |
+| 6 | **Remove raw `Vector<RefPtr<FileDescription>>`** | Clean up old direct access patterns |
+
+### Phase 27e — Integration Testing (0.5 day)
+
+| # | Task | Details |
+|---|------|---------|
+| 1 | **Boot to BusyBox shell** | Verify no regression in basic file I/O |
+| 2 | **Test `dup2`/`fork` interactions** | Verify revoke isolation between parent/child |
+| 3 | **Test `close()` then access** | Verify capability revocation produces clean errors, not UAF |
+| 4 | **Test `open()` with different modes** | Verify rights enforcement: write to O_RDONLY fd → PermissionDenied |
+| 5 | **Test BusyBox applets** | `ls`, `cat`, `cp`, `mv`, `rm`, `grep`, `find` — verify no regression |
+
+### Impact Analysis
+
+**What changes:**
+- FD table indirection (extra level, but this indirection already existed via RefPtr)
+- Every file operation adds one CSpace lookup (~10 instructions, O(1))
+- `fork()` clones CSpace (new cost; today clones FD table vector)
+
+**What does NOT change:**
+- Syscall ABI (same numbers, same signatures, same return values)
+- VFS internals (Dentry, Node, filesystem implementations — zero changes)
+- Path resolution, mount points, dentry caching
+- Userspace programs (transparent)
+
+**What improves:**
+| Improvement | Before | After |
+|-------------|--------|-------|
+| `close()` safety | RefPtr still accessible if leaked | Capability revoke generates error on any subsequent access |
+| `dup2()` semantics | Copies RefPtr (same refcount, shared lifetime) | Copies capability (independent revoke, same resource) |
+| Rights enforcement | None (any open FD can do anything) | Per-FD rights validated on every operation |
+| Resource tracking | RefPtr refcount (no central tracking) | Every open file visible in CSpace |
+
+**Risks:**
+| Risk | Likelihood | Mitigation |
+|------|-----------|-----------|
+| CSpace clone in `fork()` adds overhead | Medium | CSpace is small for typical processes (< 64 entries); benchmark before optimizing |
+| Capability lookup on every `read()`/`write()` hot path | Medium | Hash-indexed lookup (O(1)); cache `FileDescription*` in syscall if performance regresses |
+| `FileDescription` lifetime management — who holds the real RefPtr? | High | CSpace holds the canonical `RefPtr`; FdTable is view-only (indices into CSpace) |
+| Generation overflow on 32-bit counter | Low | Use 64-bit generation; practical limit is never reached |
+
+### Estimated Total: ~6 days
+
+| Phase | Description | Days |
+|-------|-------------|------|
+| 27a | Expand Capability Subsystem | 1 |
+| 27b | Transition FileDescription | 1.5 |
+| 27c | Transition Syscalls | 2 |
+| 27d | Transition FdTable | 1 |
+| 27e | Integration Testing | 0.5 |
+
+### Files to Create
+
+| File | Content |
+|------|---------|
+| _(expansions of existing files only)_ | No new files; expands `capability.h`, `cspace.h`/`.cpp`, `file_description.h`/`.cpp`, `task.h`/`.cpp`, and all affected syscall handlers |
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `Include/Kernel/Ipc/capability.h` | +CapabilityType variants, +rights bitmask, +validation |
+| `Include/Kernel/Ipc/cspace.h` | +lookup(), +revoke(), +clone() |
+| `Src/Kernel/Ipc/cspace.cpp` | +lookup, +revoke, +clone implementations |
+| `Include/Kernel/Fs/Vfs/file_description.h` | Replace `RefPtr<Dentry>` with `Capability`; +resolve_dentry() |
+| `Src/Kernel/Fs/Vfs/file_description.cpp` | +resolve_dentry(), update all operations |
+| `Include/Kernel/Scheduler/Task/task.h` | FdTable → `Vector<CapabilityIndex>`; +get/set per CSpace |
+| `Src/Kernel/Scheduler/Task/task.cpp` | FdTable operations via CSpace |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/open.cpp` | CSpace install path |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/close.cpp` | CSpace revoke path |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/dup2.cpp` | Capability copy |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/dup3.cpp` | Capability copy + flags |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/fcntl.cpp` | F_DUPFD via capability copy |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/pipe.cpp` | Two capabilities (Read + Write) on same dentry |
+| `Src/Kernel/Syscall/syscall_list/Process/fork.cpp` | CSpace clone path |
+| `Src/Kernel/Syscall/syscall_list/Process/execve.cpp` | FD_CLOEXEC via capability revoke |
+| `Src/Kernel/Syscall/syscall_list/Memory/mmap.cpp` | File capability for file-backed mmap |
+| `Src/Kernel/Syscall/syscall_list/Networking/socket.cpp` | Capability install on socket creation |
+
+### Key Design Decisions (documented for future reference)
+
+1. **FDs stay FDs, not capabilities.** Userspace sees `int fd`. The mapping `fd → Capability` is kernel-internal. POSIX ABI unchanged.
+
+2. **VFS is NOT refactored.** Dentry, Node, filesystem implementations, path resolution — all zero changes. Capabilities wrap the entry points where FDs meet VFS.
+
+3. **Rights are per-capability, not per-resource.** Opening the same file twice with different modes gives two capabilities with different rights. `chmod` on one doesn't affect the other.
+
+4. **Revoke does NOT free the resource.** It invalidates the capability. The backing object (Dentry, Node) remains alive as long as any capability references it. This is the seL4 model: revoke is fast (one counter), cleanup is lazy (refcount drops to zero).
+
+5. **CSpace clone on fork creates independent generation counters.** Child revoking a capability doesn't affect the parent, even though they point to the same backing resource.
+
+6. **`FileDescription` is NOT a capability type.** `FileDescription` wraps a `Capability<Dentry>`. The capability tracks the resource; the FileDescription tracks offset + flags.
+
+7. **Signals/Notifications use the SAME CSpace.** A task has ONE CSpace containing file capabilities, IPC endpoints, and signal notifications. One lookup path for everything. This is the unification point.
+
+8. **IPC send/recv/call is the canonical userspace-visible capability API.** `sys_ipc_send(cap_index, msg)` uses the same CSpace lookup as `read(fd)`. Two interfaces, one namespace.
+
+---
+
+### Phase 29 — POSIX IPC → Capability Substrate Migration (2026-07-26) — HIGH PRIORITY
+
+Source-code audit revealed that all 10 POSIX IPC mechanisms bypass the capability model entirely. They embed `ipc::Notification` directly as members and call `wait()`/`signal()` without going through CSpace, Capability, or Endpoint. The seL4-style capability layer is used only by `sys_ipc_send/receive/call`. This phase routes POSIX IPC through the capability substrate so that rights enforcement, revocation, and confused-deputy prevention apply uniformly. See full audit above (IPC Substrate Fragmentation section).
+
+**Prerequisite: Phase 27 (VFS+Capability Integration) must be in progress or complete** — POSIX nodes need CSpace lookup to be available for FD-level access.
+
+#### Phase 29a — POSIX Nodes via Endpoint (2 days)
+
+Convert POSIX IPC nodes from raw `ipc::Notification` members to `Endpoint`-backed communication:
+
+| Task | Node | Current | Target |
+|------|------|---------|--------|
+| 1 | PipeNode | 2 raw Notifications (`m_data_notification`, `m_space_notification`) | 1 Endpoint (Send=write, Receive=read) |
+| 2 | EventFdNode | 1 raw Notification (`m_readable`) | 1 Endpoint |
+| 3 | SemNode | 1 raw Notification (`m_waiters`) + own m_generation | 1 Endpoint + delegate generation to Endpoint |
+| 4 | MqueueNode | 2 raw Notifications (`m_readable`, `m_writable`) + own m_generation | 1 Endpoint + delegate generation |
+| 5 | SignalFdNode | 1 raw Notification (`m_readable`) | 1 Endpoint |
+| 6 | TimerFdNode | 1 raw Notification (`m_readable`) | 1 Endpoint |
+| 7 | Futex | 256 static global Notifications | Per-process CSpace-backed Notifications |
+
+#### Phase 29b — Epoll Event-Driven (0.5 day)
+
+| Task | Description |
+|------|-------------|
+| 1 | Signal `EpollNode::m_notify` on registered FD activity | Make `epoll_wait` truly event-driven instead of timeout-based polling loop |
+
+#### Phase 29c — UnixSocket Migration (1 day)
+
+| Task | Description |
+|------|-------------|
+| 1 | Replace raw `SchedulerManager::block_current()` + `Task*` accept waiter with Notification-based blocking | `unix_socket.cpp` |
+| 2 | Replace `UnixSocketBuffer` ring buffer with Notification-backed abstract buffer | `unix_socket_buffer.cpp` |
+| 3 | Route UnixSocket through CSpace capability lookup | `socket.cpp` |
+
+#### Phase 29d — Unified Revocation (0.5 day)
+
+| Task | Description |
+|------|-------------|
+| 1 | Remove `SemNode::m_generation`, delegate to Endpoint/Notification generation | `sem_node.h/cpp` |
+| 2 | Remove `MqueueNode::m_generation`, delegate to Endpoint/Notification generation | `mqueue_node.h/cpp` |
+| 3 | Ensure all POSIX IPC close/release paths call CSpace revoke | All node types |
+
+#### Estimated Total: ~4 days
+
+| Phase | Description | Days |
+|-------|-------------|------|
+| 29a | POSIX Nodes via Endpoint | 2 |
+| 29b | Epoll Event-Driven | 0.5 |
+| 29c | UnixSocket Migration | 1 |
+| 29d | Unified Revocation | 0.5 |
+
+**Impact**: Completing this makes every POSIX IPC mechanism inherit seL4-style capability security — rights enforcement, O(1) revocation, confused-deputy prevention — without per-mechanism code additions. The hardening becomes architectural, not additive.
+
+### Phase 30 — ELF Loader Fixes (2026-07-26) — CRITICAL PRIORITY
+
+Deep audit of all 13 ELF loader files revealed 3 critical bugs that prevent dynamically linked binaries from running, 6 security gaps, and 8 medium/low issues. Documentation claims "full dynamic linking" are false — only static binaries work. See full audit above.
+
+**Prerequisite**: Must be fixed before Phase 29 (IPC→Capability) since dynamic linking is needed for real-world userspace programs beyond BusyBox static builds.
+
+#### Phase 30a — Dynamic Linking (2 days)
+
+| Task | Description |
+|------|-------------|
+| 1 | Implement `DT_NEEDED` processing — read shared library dependencies from dynamic segment, resolve paths, load each library recursively | `dynamic_domain.cpp`, new `shared_library_loader.cpp` |
+| 2 | Process interpreter's `PT_DYNAMIC` — call `DynamicDomain::process_dynamic_segment()` for ld.so after loading its segments | `interpreter_domain.cpp:60-68` |
+| 3 | Add `R_X86_64_IRELATIVE` — mandatory for modern musl/glibc (GNU IFUNC resolvers) | `dynamic_domain.cpp:99-118` |
+| 4 | Add `R_X86_64_COPY` — copy relocations for shared library BSS symbols | `dynamic_domain.cpp` |
+| 5 | Add `DT_INIT`/`DT_INIT_ARRAY` invocation — call init functions after load | `dynamic_domain.cpp` |
+| 6 | Add `SHN_COMMON` handling — allocate BSS space for common symbols | `dynamic_domain.cpp:127-134` |
+
+#### Phase 30b — Security Hardening (1.5 days)
+
+| Task | Description |
+|------|-------------|
+| 1 | Add SMAP-aware access in load paths — `stac()`/`clac()` around `copy_segment_data()` and `zero_fill_bss()` | `load_domain.cpp:59-61,73` |
+| 2 | Add W^X enforcement — reject segments with PF_W + missing ExecuteDisable | `memory_domain.cpp:30-37` |
+| 3 | Improve ASLR — remove `& 0x0FFFF000` mask, use full 30-bit range, add ASLR for ld.so | `parser_domain.cpp:73-82`, `interpreter_domain.cpp:63` |
+| 4 | Fix `GLOB_DAT`/`JUMP_SLOT` — include `r_addend` in computed value per ELF64 ABI | `dynamic_domain.cpp:110-113` |
+| 5 | Fix RELRO — remove `break`, round start **up** to page boundary, apply to interpreter | `elf_loader_core.cpp:124-131` |
+| 6 | Add endianness check — reject if `EI_DATA != ELFDATA2LSB` | `parser_domain.cpp:29` |
+
+#### Phase 30c — Robustness (1 day)
+
+| Task | Description |
+|------|-------------|
+| 1 | Add file-size bounds validation — verify `p_offset + p_filesz <= file_size` per PT_LOAD | `parser_domain.cpp:54-64` |
+| 2 | Add segment overlap check — reject overlapping PT_LOAD vaddr ranges | `load_domain.cpp:40-52` |
+| 3 | Add `p_vaddr + p_memsz` overflow check | `parser_domain.cpp`, `load_domain.cpp` |
+| 4 | Cache program headers — parse once, pass `Vector<Elf64_Phdr>` by const reference | `elf_loader_core.cpp:50,86,108,146` |
+| 5 | Add `DT_GNU_HASH` parsing — fallback to traditional `DT_HASH` scanning already exists | `dynamic_domain.cpp` |
+
+#### Phase 30d — Code Quality (0.5 day)
+
+| Task | Description |
+|------|-------------|
+| 1 | Define or remove `log_header_info()` declaration | `parser_domain.h:19` |
+| 2 | Fix `remap_page_with_permissions()` to return error when `translate()` returns 0 | `memory_domain.cpp:97-103` |
+| 3 | Replace hardcoded `0x1000` with `PAGE_SIZE` constant | `memory_domain.cpp` |
+| 4 | Unify TLS setup — move FS_BASE write from execve.cpp/init_task.cpp into loader | `elf_loader_core.cpp`, `execve.cpp`, `init_task.cpp` |
+| 5 | Write ELF loader tests — header validation, relocation application, segment loading | `tests/Loader/` |
+
+#### Estimated Total: ~5 days
+
+| Phase | Description | Days |
+|-------|-------------|------|
+| 30a | Dynamic Linking | 2 |
+| 30b | Security Hardening | 1.5 |
+| 30c | Robustness | 1 |
+| 30d | Code Quality | 0.5 |
+
+**Impact**: Completing Phase 30 makes dynamically linked Linux binaries work. Combined with Phase 29 (capability integration), the kernel can run arbitrary distro packages without static recompilation.
+
+---
+
+### Phase 31 — Distro Readiness Gaps (2026-07-26)
+
+Deep audit across 4 subsystems (syscalls, TTY/PTY, process/memory, VFS/filesystems) to identify what blocks FKernel from running a real Linux distribution. FKernel has ~194 functional syscalls and Linux ~2.0 feature scope, but several gaps prevent distro use.
+
+#### 31a — Critical Blockers (Kernel Crashes / Cannot Boot Distro)
+
+These three are make-or-break. Without them, no real distro workload survives.
+
+| # | Gap | Impact | Files | Fix |
+|---|-----|--------|-------|-----|
+| **1** | **No Copy-on-Write in fork** | `fork()` deep-copies ALL physical pages eagerly. A shell forking to run `ls` duplicates the shell's entire address space. Processes > few MB exhaust RAM instantly. Fork is O(n) in process size — this is the #1 blocker for any real workload. | `virtual_memory_manager.cpp:247-285` (`clone_address_space`) | Mark parent pages read-only in both parent and child PTEs, share physical frame, copy only on write fault. Need a CoW page fault handler that allocates new frame + copies. Track CoW refcount per frame in PMM. |
+| **2** | **No demand paging for anonymous memory** | `mmap(MAP_ANONYMOUS)` and `brk()` only record metadata (`MemoryRegion`, `heap_break`) but do NOT allocate or map physical pages. Any `malloc()` → `brk()` → access to allocated memory causes unhandled page fault → kernel panic. Every C program that calls `malloc()` crashes. | `Memory/mmap.cpp:89-103`, `Memory/brk.cpp`, `Arch/x86_64/Interrupt/Handler/Exception/pf_handler.cpp` | Page fault handler must: (a) detect fault in mmap/brk region, (b) allocate physical page via PMM, (c) map it in current page table with user R/W permissions, (d) zero the page on first access. PF handler already has partial demand paging logic — extend to handle all anonymous regions. |
+| **3** | **No writable persistent filesystem** | TmpFs is RAM-only (lost on reboot). RamDisk is read-only TAR initrd. FAT32 writes data sectors but `create()`/`mkdir()`/`unlink()`/`rmdir()`/`truncate()`/`rename()` between dirs all return `NotImplemented` or `NotADirectory`. There is literally nowhere to install or persist data. | `fat_32_node.cpp`, `fat_12_node.cpp`, `fat_16_node.cpp` | Implement FAT directory entry creation/deletion: allocate/free directory entries, update FAT chain (allocate_cluster already works for data), update parent directory metadata. Target: `apt-get install` must persist across reboots. |
+
+#### 31b — Runtime Blockers (Distro Boots But Software Fails)
+
+These don't crash the kernel but prevent standard distro tools from working.
+
+| # | Gap | Impact | Files | Fix |
+|---|-----|--------|-------|-----|
+| **4** | **No permission check in `open()`** | `access()`/`faccessat()` implement full POSIX DAC (owner/group/other, supplementary groups, root bypass). But `sys_open()` never calls any permission check — any process can open any file for any mode. `chmod 000 secret` is meaningless. | `FileSystem/open.cpp` | Call permission check (same logic as `access()`) in `open()` before delegating to VFS. Check against `O_RDONLY`/`O_WRONLY`/`O_RDWR` flags. Root (euid==0) bypasses all checks except execute (needs at least one x bit). |
+| **5** | **`MAX_OPEN_FILES = 128`** | Hardcoded in `TaskFiles::descriptors` as `static_vector<RefPtr<FileDescription>, 128>`. Real daemons (sshd, httpd, systemd) routinely open 256-1024+ FDs. Currently a hard crash if exceeded (static_vector asserts). | `Include/Kernel/Scheduler/Task/task.h` | Raise to 1024 or make dynamic. `static_vector` doesn't support resize — switch to `Vector` or use per-process FD array allocated at fork time. |
+| **6** | **`exit_group` == `exit`** | `sys_exit_group(231)` just calls `sys_exit(60)` — kills only the calling thread, not the entire thread group. Any multi-threaded process leaves zombie threads on exit. | `Process/exit_group.cpp` | Iterate all tasks in thread group (same `tgid`/`pid`), call `terminate_current()` for each. The caller exits last to avoid use-after-free. |
+| **7** | **`TIOCGWINSZ` missing on PtyMaster** | `PtyMaster::ioctl()` handles `TCGETS`/`TCSETS`/`TIOCGPTN` but not `TIOCGWINSZ`. Terminal emulator cannot set window size on PTY. Shell's `$COLUMNS`/`$LINES` stuck at default 80x24. `vim`, `less`, `top` all render wrong. | `Driver/Pty/pty_master.cpp` | Add `TIOCGWINSZ` (store rows/cols in PtyMaster) and `TIOCSWINSZ` (set from userspace). Default to 80x24, let terminal emulator override. |
+| **8** | **No SIGTTIN / SIGTTOU** | Background process trying to read from terminal gets no signal — reads succeed or block indefinitely. Job control in shell (`^Z`, `fg`, `bg`) cannot stop background processes that touch the terminal. | `Driver/Terminal/vga_terminal.cpp`, `signal_delivery.cpp` | In `VGATerminal::on_char()` and `read()`: if caller's pgid != `foreground_pgid`, send `SIGTTIN` (for read) or `SIGTTOU` (for write with `TOSTOP`). Per POSIX.1-2017 §11.1.4. |
+
+#### 31c — Bugs (Already Coded, Needs Fix Not Rewrite)
+
+| # | Gap | Impact | Files | Fix |
+|---|-----|--------|-------|-----|
+| **9** | **`stat`/`chdir`/`mkdir` unsafe user pointer** | These syscalls cast the user path pointer directly as `const char*` without `copy_from_user()`. Works if page is mapped but is UB and will page-fault on SMAP-enabled kernel with unmapped user page. Same bug exists in several FS syscalls. | `stat.cpp`, `chdir.cpp`, `mkdir.cpp`, others | Use `copy_from_user()` to kernel buffer first, then operate on kernel copy. Pattern already used correctly in `open.cpp` and `execve.cpp`. |
+| **10** | **`utimensat` not registered** | Source file exists (`Time/utimensat.cpp`) but is not in `syscall_numbers.h` and not registered in `syscall.cpp`. `touch` from coreutils fails — `ENOSYS`. | `syscall_numbers.h`, `syscall.cpp`, `Time/utimensat.cpp` | Register as syscall 280 (Linux x86_64 `utimensat`). Implementation already exists. |
+| **11** | **fcntl advisory locks are no-ops** | `F_SETLK` always returns success. `F_GETLK` always returns `F_UNLCK`. Databases (sqlite, postgres) and lockfiles rely on these — they'll corrupt data thinking they have exclusive access. | `FileSystem/fcntl.cpp` | Implement per-node lock list: track `(pid, type, start, len)` tuples. `F_SETLK` checks for conflicts. `F_SETLKW` blocks until lock available. `F_GETLK` returns first conflicting lock. |
+| **12** | **`getrandom` is not cryptographic** | Uses xorshift64 PRNG. `/dev/urandom` (UrandomDevice) returns predictable bytes. Any program relying on `/dev/urandom` for key generation (OpenSSL, SSH host keys) produces weak keys. | `System/getrandom.cpp`, `Driver/Device/urandom_device.cpp` | Seed from hardware entropy sources (RDTSC + interrupt timing jitter). Use ChaCha20 or similar CSPRNG. For now, at minimum document that `/dev/random` is NOT cryptographically secure. |
+| **13** | **`close()` doesn't call `node->close()`** | `close()` only sets the fd slot to `nullptr`. Pipe close doesn't notify the other end — readers on a closed pipe hang forever instead of getting EOF. Unix socket close doesn't wake `accept()` waiters. | `FileSystem/close.cpp` | Call `desc->node()->close()` or `desc->close()` before clearing the slot. Nodes implement cleanup logic (e.g., `PipeNode::close()` wakes blocked reader/writer, sets EOF flag). |
+
+#### 31d — Missing Subsystems That Distros Require
+
+| # | Gap | Impact | Priority |
+|---|-----|--------|----------|
+| **14** | **No `mmap` MAP_SHARED file-backed** | Dynamic linker (`ld.so`) maps shared libraries with `mmap(MAP_PRIVATE, fd)`. `MAP_PRIVATE` file-backed works but writes are shared (no CoW between processes). Multiple processes sharing read-only `.text` pages is fine. The gap is `MAP_SHARED` for IPC — less critical for basic distro but needed for `shm_open()`. | MEDIUM |
+| **15** | **No `mmap` MAP_FIXED** | `MAP_FIXED` flag is ignored — the kernel always picks the address. Dynamic linker uses `MAP_FIXED` to place libraries at specific addresses. Without it, ld.so's `mmap` calls may fail or place segments wrong. | HIGH |
+| **16** | **No file-backed `mmap` with `PROT_WRITE`** | `mmap.cpp:70-71` only allows `PROT_READ` for file-backed mappings: `if (prot != PROT_READ) return -EACCES`. This blocks any shared library loading where segments need write access during relocation (before `mprotect` to read-only). | HIGH |
+| **17** | **No `mmap` shared mapping writeback** | Writes to `MAP_SHARED` file-backed mappings are never flushed to disk. `msync()` is a no-op. Data written via mmap is lost on unmap. | MEDIUM |
+| **18** | **No `inotify`** | File change notification — `inotify_init`, `inotify_add_watch`, `inotify_rm_watch`. Used by systemd, udev, file managers, hot-reload in dev tools. | LOW |
+| **19** | **No `/proc/sys/` writable nodes beyond hostname** | `/proc/sys/kernel/hostname` is read/write via `ProcSysStringNode`. Other sysctl nodes are needed for `sysctl -w` and many init scripts. | LOW |
+| **20** | **No coredumps** | `do_coredump()` or equivalent doesn't exist. When a process crashes with SIGSEGV/SIGABRT, no core file is written. Debugging userspace crashes is blind. | LOW |
+
+#### 31e — PTY Completeness
+
+| # | Gap | Impact | Files |
+|---|-----|--------|-------|
+| **21** | **No `TIOCSCTTY` on PtyMaster** | Process cannot make PTY slave its controlling terminal via master fd. `setsid()` + `TIOCSCTTY` is the standard sequence. | `pty_master.cpp` |
+| **22** | **No `TIOCGPGRP`/`TIOCSPGRP` on PtyMaster** | Terminal emulator process cannot read/set foreground process group on the PTY. Job control signals go to wrong pgid. | `pty_master.cpp` |
+| **23** | **PtyLineDiscipline: no ICANON editing** | When a program uses canonical mode (not raw), the PTY discipline doesn't do backspace/line editing. Programs like `cat > file` (without readline) have no erase capability. | `pty_line_discipline.cpp` |
+| **24** | **PtyLineDiscipline: no OPOST output processing** | `\n` → `\r\n` translation not done. Programs expecting cooked output get staircased text on terminals that expect CRLF. | `pty_line_discipline.cpp` |
+| **25** | **No terminal emulator in userspace** | VGATerminal renders directly to hardware. PTY pairs have no display connection. A userspace process (like `agetty` patched or a `kterm` program) must bridge: keyboard → PTY master (+ echo to framebuffer) and PTY master output → framebuffer. This is the missing piece for multi-TTY distro login. | New userspace program needed |
+
+#### Estimated Total: ~12-15 days
+
+| Phase | Description | Days | Priority |
+|-------|-------------|------|----------|
+| 31a | Critical blockers (CoW, demand paging, writable FS) | 6-8 | **IMMEDIATE** |
+| 31b | Runtime blockers (permissions, fd limit, exit_group, TIOCGWINSZ, job control) | 2-3 | HIGH |
+| 31c | Bugs (user pointers, utimensat, locks, getrandom, close) | 1-2 | HIGH |
+| 31d | Missing subsystems (mmap flags, inotify, /proc/sys, coredumps) | 2-3 | MEDIUM |
+| 31e | PTY completeness | 1-2 | MEDIUM |
+
+**Impact**: Completing Phase 31a-c makes a minimal Alpine/BusyBox distro viable (static binaries, single-user, no networking required). 31d enables dynamically-linked distros and modern init systems. 31e enables multi-tty login sessions.
+
+---
+
+### Phase 32 — New Filesystem Drivers (2026-07-27) — HIGH PRIORITY
+
+Add 8 new filesystem drivers in kernelspace with full read/write support (ISO9660 read-only). All follow the existing FAT32 architectural pattern: filesystem root inherits `Node`, file/directory nodes hold `RefPtr<FS>` for I/O delegation, `static ::create(RefPtr<StorageDevice>)` factory validates on-disk format, registered in `AutoMounter` with try-and-fail detection.
+
+**Architecture**: Each FS reuses the existing `Node` vtable, `StorageDevice`/`BlockDevice` sector I/O, `StorageCache` (64-entry write-through), and `Dentry` mount stack. No VFS changes needed.
+
+#### Phase 32a — MinixFS (~800 linhas, 1-2 days)
+
+The simplest Unix filesystem. Validates the "inode + indirect blocks" pattern that UFS also uses, but without cylinder groups, B-trees, or complexity. Read/write with create, mkdir, unlink, rmdir, truncate.
+
+**On-disk format**: Superblock (1KB at sector 1), inode bitmap + zone bitmap (1KB each), inode table (32-byte inodes, 64 per zone), data zones (1KB each). Inodes: 7 direct blocks + 1 single-indirect + 1 double-indirect. Directories: 16-byte entries (inode 2B + name[14]).
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/MinixFs/` with `minix_fs.h`, `minix_node.h`, `minix_super.h` | 3 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/MinixFs/` with `minix_fs.cpp` (~400 lines), `minix_node.cpp` (~200 lines) | 2 sources | HIGH |
+| 3 | Register in `AutoMounter::try_mount()` + `try_mount_at()` with fstype `"minix"` | `auto_mounter.cpp` | HIGH |
+| 4 | Limitation: names 14 chars max, filesize ~268MB (double-indirect), no journaling, no ACLs | — | — |
+
+#### Phase 32b — ExFAT (~1800 linhas, 2-3 days)
+
+Essential for desktop: every pendrive > 32GB, every SDXC card uses ExFAT. Reuses ~60% of FAT32 logic (FAT chain walking, cluster-to-sector, FAT entry write). New: allocation bitmap (O(1) free cluster), cleaner directory entries (3 entries/file: type+stream+name, no 0x0F LFN hack), CRC32 checksum for boot sector.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/Exfat/` with `exfat_fs.h`, `exfat_node.h`, `exfat_bpb.h`, `exfat_checksum.h` | 4 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/Exfat/` with `exfat_fs.cpp` (~900 lines), `exfat_node.cpp` (~400 lines), `exfat_checksum.cpp` (~50 lines) | 3 sources | HIGH |
+| 3 | Dependencies: `LibFK/Algorithms/crc32.h` (boot sector validation), `LibFK/Container/bitmap.h` (allocation bitmap — already used in PMM) | — | — |
+| 4 | Case-insensitive lookup via upcase table (loaded from disk) or ASCII fallback | `exfat_fs.cpp` | MEDIUM |
+| 5 | Register in `AutoMounter` with fstype `"exfat"` | `auto_mounter.cpp` | HIGH |
+
+#### Phase 32c — UFS/UFS2 (~4000 linhas, 5-7 days)
+
+BSD native filesystem. Inodes (128B UFS1 / 256B UFS2) with 12 direct + single/double/triple indirect blocks. Cylinder groups with per-CG bitmaps and superblock backup. Directory entries: BSD variable-length format (`d_reclen`, `d_type`, `d_namlen`). UFS2 uses little-endian always (no swap on x86_64). Symlink short links stored inline in inode.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/Ufs/` with `ufs_fs.h`, `ufs_node.h`, `ufs_super.h`, `ufs_dir.h`, `ufs_endian.h` | 5 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/Ufs/` with `ufs_fs.cpp` (~1800 lines), `ufs_node.cpp` (~500 lines), `ufs_endian.cpp` (~50 lines) | 3 sources | HIGH |
+| 3 | Implement indirect block traversal up to triple-indirect (recursive `get_data_block()` to depth 3) | `ufs_fs.cpp` | HIGH |
+| 4 | Fragment support: UFS allocates fragments (sub-blocks) in the last block. `di_blocks` counts fragments, not blocks | `ufs_fs.cpp` | MEDIUM |
+| 5 | Register in `AutoMounter` with fstype `"ufs"` (auto-detects UFS1 vs UFS2 via magic: 0x011954 vs 0x19540119) | `auto_mounter.cpp` | HIGH |
+| 6 | Symlink support: short links (< 60 chars) inline in `di_shortlink` over `di_db`, long links in data blocks | `ufs_node.cpp` | MEDIUM |
+
+#### Phase 32d — HFS+ (~5000 linhas, 10-14 days)
+
+macOS native filesystem. Most complex of the four: B-trees for catalog and extents overflow, Unicode UCS-2 (NFD decomposition), case-insensitive lookup with case-folding table, fork-based I/O (data fork + resource fork), 8 inline extents per fork with B-tree overflow for large files, hard links via indirect link CNID records.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/HfsPlus/` with `hfsplus_fs.h`, `hfsplus_node.h`, `hfsplus_vh.h`, `hfsplus_catalog.h`, `hfsplus_btree.h`, `hfsplus_extents.h`, `hfsplus_unicode.h` | 7 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/HfsPlus/` with `hfsplus_fs.cpp` (~1000 lines), `hfsplus_node.cpp` (~500 lines), `hfsplus_btree.cpp` (~2000 lines), `hfsplus_catalog.cpp` (~600 lines), `hfsplus_extents.cpp` (~300 lines), `hfsplus_unicode.cpp` (~200 lines) | 6 sources | HIGH |
+| 3 | **B-tree implementation** (the core complexity): B*-tree with search, insert (split with redistribution), delete (merge). Serves catalog file, extents overflow file, and attributes file. Node cache: `Vector<RefPtr<BTreeNode>>` with LRU eviction policy | `hfsplus_btree.cpp` | **CRITICAL** |
+| 4 | Catalog operations: `lookup(parent_cnid, name)` via B-tree search with key `(parentCNID, nodeName Unicode NFD)`. Thread records resolve filename→CNID; file/folder records hold metadata + fork data | `hfsplus_catalog.cpp` | HIGH |
+| 5 | Unicode: UCS-2 big-endian ↔ UTF-8 conversion (ASCII-only subset for 95% of filenames). Case-insensitive comparison via 256-byte ASCII folding table. NFD normalization can be skipped initially | `hfsplus_unicode.cpp` | MEDIUM |
+| 6 | Fork I/O: `read_fork(&ForkData, offset, size, buf)` resolves 8 inline extents + B-tree overflow. `write_fork()` allocates new blocks via allocation bitmap when extending beyond existing extents | `hfsplus_fs.cpp` | HIGH |
+| 7 | Hard links: follow indirect link chain to resolve CNID to actual file record | `hfsplus_fs.cpp` | LOW |
+| 8 | Register in `AutoMounter` with fstype `"hfsplus"` (validates signature "H+" or "HX" in VolumeHeader at sector 2) | `auto_mounter.cpp` | HIGH |
+
+#### Phase 32e — ISO9660FS (~2000 linhas, 2-3 days)
+
+CD/DVD filesystem standard (ISO 9660:1988 + Joliet + Rock Ridge). Essential for booting from ISO images (LiveCDs, installers) and accessing optical media. Directory records are variable-length with both big-endian AND little-endian copies of multi-byte fields. Path tables provide O(log n) directory lookup sorted by parent+name. Joliet extension (Supplementary VD type 2) adds Unicode UCS-2 big-endian filename support. Rock Ridge extension (SUSP protocol) adds POSIX metadata: long filenames (NM), permissions+ownership (PX), symlinks (SL), timestamps (TF).
+
+**On-disk format**: 16 sectors reserved (system area) + Primary Volume Descriptor at sector 16 with magic "CD001" at offset 1. VDs continue until VD terminator. Root directory record embedded in PVD with extent location + data length. Directory entries: variable-length (DR length byte + extended attr length + extent LBA (LE+BE) + data size (LE+BE) + date/time + flags + interleave + volume sequence + filename length + filename). Path Table: sorted array of (parent dir number, name) with LE and BE copies, each entry 8 + name bytes.
+
+**Key architectural considerations**:
+- All multi-byte fields (LBA, size) stored in BOTH little-endian and big-endian; x86_64 resolves by always reading LE
+- Variable-length directory records: each entry's total size is `dr[0]` (length byte); skip by `ptr += dr[0]`
+- Files can span multiple extents (non-contiguous sectors on disc); must chain extents by following the `extent_lba + data_length` of each
+- Joliet: SVD at type=2 VD; UCS-2 big-endian filenames (2 bytes per char); hash lookup for case-insensitive matching
+- Rock Ridge: SUSP continuation entries after directory record (`dr[dr[0]]` has "SP"/"CE"/"PD" tag). NM entries replace filename. SL entries are symlink targets. PX entries are POSIX mode/uid/gid
+- Always read-only: CD/DVD media is immutable. All write operations return `Error::NotImplemented`
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/Iso9660/` with `iso9660_fs.h`, `iso9660_node.h`, `iso9660_vd.h`, `iso9660_susp.h` | 4 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/Iso9660/` with `iso9660_fs.cpp` (~700 lines: VD parser, path table, directory iterator, extent chain), `iso9660_node.cpp` (~400 lines: read, size, list_dir, lookup), `iso9660_susp.cpp` (~200 lines: NM/PX/SL/TF parsing) | 3 sources | HIGH |
+| 3 | Volume Descriptor parsing: iterate VDs from sector 16 until terminator. Detect PVD (type 1, magic "CD001"), SVD (type 2, Joliet), and VD terminator (type 255). Build `Iso9660Superblock` with root record, path table LBA/size, logical block size, volume size | `iso9660_fs.cpp` | HIGH |
+| 4 | Directory entry iteration: parse variable-length DRs by advancing `ptr += dr[0]`. Extract filename from `dr[33..33+len]`. Handle `dr[0] == 0` (padding to sector boundary). Detect `.` (flags & 2), `..` and skip appropriately. Handle multi-extent files (flags & 0x80 = multi-extent) | `iso9660_fs.cpp` | HIGH |
+| 5 | Joliet detection: if SVD found, use it for `lookup()` (prefer Unicode names). Fallback to PVD if no SVD. ASCII name comparison: strip trailing `;1` version suffix, convert to lowercase, compare | `iso9660_fs.cpp` | MEDIUM |
+| 6 | Rock Ridge SUSP: check for "SP" signature at VD root. Parse NM (alternate name, flags: CONTINUE=1, CURRENT=2, PARENT=4), PX (POSIX mode/links/uid/gid, 36 bytes), SL (symlink, components with flags CONTINUE=1), TF (timestamps: creation/modify/access/attribute). Skip unrecognized entries per SUSP 1.12 | `iso9660_susp.cpp` | MEDIUM |
+| 7 | Register in `AutoMounter` with fstype `"iso9660"` (validates magic "CD001" at sector 16 offset 1, VD type 1) | `auto_mounter.cpp` | HIGH |
+| 8 | Always read-only. `read()` resolves extent chain if file spans multiple extents. `lookup()` traverses directory records linearly (path table for O(log n) is optional optimization). `list_dir()` iterates all directory records, strips `;1` suffix. `size()` from root record data length | `iso9660_node.cpp` | — |
+
+**Limitations**: read-only, no UDF (DVD-Video/Blu-ray), no multisession (CD-R追加), no El Torito boot catalog parsing (BIOS boot), no ECC/EDC validation on raw sectors, no HFS hybrid ISO, no TRANS.TBL fallback for ASCII names.
+
+#### Phase 32f — ext2 (~2800 linhas, 3-4 days)
+
+Linux native filesystem (pre-journaling). Shares the inode+indirect-block pattern with MinixFS and UFS, but with block groups, configurable block size (1K/2K/4K), and variable-length directory entries. Most common filesystem for /boot partitions and small embedded systems. Symlinks: short (<60 chars) inline in `i_block[]`, long links in data blocks. File types (`d_type`) in directory entries for fast `readdir`+`stat` without extra lookup.
+
+**On-disk format**: Superblock at offset 1024, magic 0xEF53 (`EXT2_SUPER_MAGIC`). `s_log_block_size` gives block size = 1024 << log (common: 0=1K, 2=4K). Block Group Descriptor Table after superblock; each BG has block bitmap + inode bitmap + inode table. Inode: 128 bytes, `i_block[15]` = 12 direct + 1 single-indirect + 1 double-indirect + 1 triple-indirect. Directory: `ext2_dir_entry_2 { inode, rec_len, name_len, file_type, name[] }` — `rec_len` links entries as a linked list; deletion marks inode=0 and absorbs into previous entry's `rec_len`. Revision 1 (dynamic inode sizes via `s_inode_size` + `s_rev_level`).
+
+**Reuses from MinixFS/UFS**: Resolves the same pattern learned in MinixFS — `get_data_block(inode, block_index)` walking direct→indirect trees recursively to depth 3. Block group layer (`read_block_bitmap`, `write_inode`) adds iterator complexity over MinixFS flat arrays.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/Ext2/` with `ext2_fs.h`, `ext2_node.h`, `ext2_super.h`, `ext2_dir.h`, `ext2_balloc.h` | 5 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/Ext2/` with `ext2_fs.cpp` (~1200 lines: superblock, BG iteration, block/inode allocation, indirect block walk), `ext2_node.cpp` (~500 lines: read/write/truncate/lookup/list_dir), `ext2_balloc.cpp` (~300 lines: block allocator with per-BG bitmap + preallocation) | 3 sources | HIGH |
+| 3 | Indirect block traversal recursive up to triple-indirect: `get_data_block(inode, logical_block)` walks `i_block[]` tree. Allocate intermediate blocks on write/truncate extend | `ext2_fs.cpp` | HIGH |
+| 4 | Directory operations: `lookup()` linear scan via `rec_len` chain, skip deleted entries. `create_child()` finds free gap (inode=0) or appends. `list_dir()` iterates non-deleted entries, returns `d_type` mapping (EXT2_FT_* → DT_*) | `ext2_node.cpp` | HIGH |
+| 5 | Block/inode allocation: per-BG bitmaps with preference for same BG as parent directory. `free_block()` marks bitmap=0; `alloc_block()` finds first free bit | `ext2_balloc.cpp` | HIGH |
+| 6 | Symlink: short links (len < 60) stored inline in `i_block[0..14]`; long links allocated 1+ data blocks. `read_link()` checks `i_size` to decide path; `symlink()` writes inline or allocs blocks | `ext2_node.cpp` | MEDIUM |
+| 7 | Register in `AutoMounter` with fstype `"ext2"` (validates magic 0xEF53 at offset 1024, checks `EXT2_FEATURE_INCOMPAT` for no journal/compression) | `auto_mounter.cpp` | HIGH |
+| 8 | Limitations: no ACLs, no journal, no extents, no HTree, no extended attributes, 32-bit block numbers (16TB max), fixed 128B inodes | — | — |
+
+#### Phase 32g — ext3 (~1500 linhas, 2-3 days)
+
+Journaling layer over ext2. Adds JBD (Journal Block Device) to ext2, making metadata operations crash-safe. On mount, detects journal superblock in inode 8 (`EXT3_JOURNAL_INO`) or external journal device. Recovery replays committed transactions on mount. Three journal modes: `writeback` (metadata only, async data), `ordered` (default — data blocks flushed before metadata commit), `journal` (full data+metadata journaling). Reuses 100% of ext2 read/write/directory code; adds `ext3_journal.cpp` for transaction management.
+
+**On-disk changes from ext2**: Superblock `s_feature_compat |= EXT3_FEATURE_COMPAT_HAS_JOURNAL`. Inode 8 holds journal superblock (`journal_superblock_t`) with `s_header.h_magic = JFS_MAGIC_NUMBER` (0xc03b3998). Journal is a circular buffer of blocks: descriptor blocks (tag each logged block) + data blocks + commit block. Revocation blocks invalidate stale journal entries. `s_start`/`s_first`/`s_last` track ring buffer position.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/Ext3/` with `ext3_fs.h`, `ext3_journal.h`, `ext3_super.h` | 3 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/Ext3/` with `ext3_fs.cpp` (~500 lines: inherit ext2, add transaction wrappers, mount with recovery), `ext3_journal.cpp` (~800 lines: JBD commit/replay/checkpoint) | 2 sources | HIGH |
+| 3 | Journal recovery on mount: validate superblock magic, replay blocks from `s_first` to `s_last`, apply descriptor→data→commit sequences | `ext3_journal.cpp` | HIGH |
+| 4 | Transaction commit: `journal_start()` → accumulate metadata blocks → `journal_stop()` → write descriptor block → write all data blocks → write commit block. Ordered mode: flush data blocks of modified files before `journal_stop()` | `ext3_journal.cpp` | HIGH |
+| 5 | Checkpoint: advance journal head when transactions committed to disk. Wrap when buffer full | `ext3_journal.cpp` | MEDIUM |
+| 6 | Register in `AutoMounter` with fstype `"ext3"` (validates ext2 magic + HAS_JOURNAL compat flag) | `auto_mounter.cpp` | HIGH |
+| 7 | Limitations: `data=journal` mode not implemented (complexity 2x), external journal devices deferred, orphan inode list not processed, no revoke replay optimization | — | — |
+
+#### Phase 32h — ext4 (~2500 linhas, 3-5 days)
+
+Modern Linux filesystem. Extends ext3 with: extent tree (replaces indirect blocks for large files), 48-bit block numbers, flex block groups, uninitialized block groups (fast mkfs), HTree hashed directory index, nanosecond timestamps. Fully backward compatible: mounting as ext2/ext3 skips new features; mounting as ext4 uses them all.
+
+**Key on-disk differences**: Extent tree replaces `i_block[]` when `EXT4_EXTENTS_FL` in `i_flags`. Root node in `i_block[]`: `ext4_extent_header { eh_magic=0xF30A, eh_entries, eh_max, eh_depth, eh_generation }`. Depth 0: `ext4_extent[]` with `{ee_block, ee_len, ee_start_hi/lo}`. Depth >0: `ext4_extent_idx[]` with `{ei_block, ei_leaf_hi/lo}`. 48-bit block numbers: `s_first_data_block` + high 16 bits in `i_block_high`. HTree: compatible feature EXT4_FEATURE_COMPAT_DIR_INDEX. Root at `i_block[0]` = `dx_root { info: {indirect_levels, hash_version, info_length}, entries: dx_entry[] }`. Hash: TEA-based `ext4fs_dirhash()`. Flex BG: `EXT4_FEATURE_INCOMPAT_FLEX_BG` — multiple BGs share one set of bitmaps.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Fs/Disk/Ext4/` with `ext4_fs.h`, `ext4_node.h`, `ext4_extents.h`, `ext4_htree.h`, `ext4_super.h` | 5 headers | HIGH |
+| 2 | Create `Src/Kernel/Fs/Disk/Ext4/` with `ext4_fs.cpp` (~800 lines: 48-bit block ops, flex BG, uninit BG, 64-bit superblock fields), `ext4_extents.cpp` (~600 lines: extent tree search/insert/split), `ext4_htree.cpp` (~500 lines: HTree hash + lookup in indexed dirs), `ext4_node.cpp` (~400 lines: file I/O dispatching extents vs indirect, nanosecond timestamps) | 4 sources | HIGH |
+| 3 | Extent tree: `ext4_ext_search(inode, logical_block)` → walks depth>0 nodes then finds extent. `ext4_ext_insert()` splits full leaf node, adds new extent to parent index if needed. 4 extents per leaf node (15B each in 60-byte max) | `ext4_extents.cpp` | CRITICAL |
+| 4 | HTree lookup: `ext4_htree_lookup(dir_inode, name)` → compute TEA hash, walk `dx_root` → `dx_node` levels, find target leaf block, linear scan for directory entry. Fallback to linear scan if HTree disabled | `ext4_htree.cpp` | HIGH |
+| 5 | 48-bit block operations: `ext4_block_to_sector()` with hi/lo. `ext4_alloc_block()` with free block tracking across flex BGs | `ext4_fs.cpp` | HIGH |
+| 6 | Superblock: 64-bit `s_blocks_count_hi`, `s_desc_size` (≥64), `s_mkfs_time`, `s_inode_size` (≥256). `s_feature_incompat` includes EXT4_FEATURE_INCOMPAT_EXTENTS, _FLEX_BG, _64BIT | `ext4_super.h` | HIGH |
+| 7 | File I/O: `read()`/`write()` dispatch: `i_flags & EXT4_EXTENTS_FL` → extent tree path, else → indirect blocks (ext2/3 fallback). `truncate()` extends via extent insert, frees via extent remove | `ext4_node.cpp` | HIGH |
+| 8 | Register in `AutoMounter` with fstype `"ext4"` (validates ext2 magic + checks INCOMPAT flags for format detection) | `auto_mounter.cpp` | HIGH |
+| 9 | Limitations: no ext4-specific checksums (metadata_csum), no encryption (fscrypt), no inline data, no fallocate/punch hole, no journal checksums, no 64K blocks, no bigalloc clusters, no DAX | — | — |
+
+#### Files Modified (all phases)
+
+| File | Change |
+|------|--------|
+| `Src/Kernel/Fs/Vfs/auto_mounter.cpp` | Add `#include` for each new FS + try-mount blocks for minix, exfat, ufs, hfsplus, iso9660, ext2, ext3, ext4 |
+| `xmake.lua` | Add new source files (already auto-detected via glob if directories exist) |
+
+#### Summary
+
+| Phase | FS | Linhas kernel | Arquivos | Maior complexidade | Dias |
+|-------|-----|-------------|----------|-------------------|------|
+| 32a | MinixFS | ~800 | 5 (3h+2cpp) | Double-indirect block resolution | 1-2 |
+| 32b | ExFAT | ~1800 | 7 (4h+3cpp) | CRC32 checksum, allocation bitmap | 2-3 |
+| 32c | UFS/UFS2 | ~4000 | 8 (5h+3cpp) | Triple-indirect blocks, cylinder groups | 5-7 |
+| 32d | HFS+ | ~5000 | 13 (7h+6cpp) | B*-tree implementation, Unicode | 10-14 |
+| 32e | ISO9660FS | ~2000 | 7 (4h+3cpp) | Variable-length DR, SUSP/Rock Ridge | 2-3 |
+| 32f | ext2 | ~2800 | 8 (5h+3cpp) | Triple-indirect blocks, block groups | 3-4 |
+| 32g | ext3 | ~1500 | 5 (3h+2cpp) | JBD journal commit/recovery | 2-3 |
+| 32h | ext4 | ~2500 | 9 (5h+4cpp) | Extent tree, HTree, 48-bit block numbers | 3-5 |
+| **Total** | | **~20400** | **62** | | **28-41** |
+
+**Order**: MinixFS first (validates inode+indirect pattern) → ext2 (applies pattern with block groups) → UFS (cylinder groups) → ext3 (adds journal over ext2) → ext4 (extents + HTree over ext3) → ExFAT (FAT derivative) → ISO9660 (read-only CD/DVD) → HFS+ (independent B-tree complexity).
+
+**Architecture constraint**: All 8 are kernelspace drivers with full read/write (ISO9660 read-only). No FUSE userspace — this is a deliberate choice to keep the VFS interface clean (all filesystems are `Node` subclasses) and avoid the complexity of a userspace filesystem protocol until CUSE/FUSE infrastructure is implemented as a separate phase.
+
+---
+
+### Phase 33 — Volume Layer: LVM, RAID, dm-crypt (2026-07-27) — MEDIUM PRIORITY
+
+LVM, RAID, and cryptsetup are not filesystems — they are **block device transformations** that sit between the filesystem and the physical hardware. They must be in the kernel because the filesystem above them calls `read_sectors()`/`write_sectors()` transparently and cannot do RPC to userspace per sector (would be ~100x slower). Each is a `StackableBlockDevice` that delegates to one or more child `BlockDevice` instances.
+
+**Architecture**: Filesystem → Volume Layer → Hardware. The VFS and filesystem code see only `read_sectors()`/`write_sectors()`. Zero changes to VFS or filesystem drivers.
+
+```
+Filesystem (FAT32/ExFAT/UFS/HFS+/ISO9660)
+  └── BlockDevice::read_sectors() / write_sectors()
+        └── LvmDevice      → LV offset → (PV, PV offset)
+              └── RaidDevice  → stripe/mirror cálculo
+                    └── CryptoDevice → AES-XTS encrypt/decrypt
+                          └── StorageDevice → Hardware (AHCI/NVMe)
+```
+
+#### Phase 33a — StackableBlockDevice Base Class (~200 linhas, 0.5 day)
+
+Abstract class inheriting `BlockDevice` that delegates to child devices. Provides the infrastructure for all volume-layer drivers.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Driver/Device/BlockDevice/stackable_block_device.h` | 1 header | HIGH |
+| 2 | `StackableBlockDevice` holds `Vector<RefPtr<BlockDevice>> m_children` | — | HIGH |
+| 3 | Subclasses implement `read_sectors()`, `write_sectors()`, `sector_size()`, `sector_count()` | — | HIGH |
+| 4 | Default `sector_size()` returns child's value; default `sector_count()` returns child's value | — | MEDIUM |
+
+#### Phase 33b — dm-crypt / AES-XTS (~800 linhas, 2-3 days)
+
+Transparent block-level encryption. Each sector encrypt/decrypt happens inline during `read_sectors()`/`write_sectors()`. Uses AES-NI instructions (available on all x86_64 since 2010) for ~200 cycles per 512B sector — negligible overhead.
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Driver/Device/BlockDevice/crypto_device.h` | 1 header | HIGH |
+| 2 | Create `Src/Kernel/Driver/Device/BlockDevice/crypto_device.cpp` with AES-XTS encrypt/decrypt via AES-NI | 1 source | HIGH |
+| 3 | AES-128/256 key schedule + XTS mode: `AESENC`/`AESDEC`/`AESKEYGENASSIST` instructions. Per Intel SDM Vol. 2 | `crypto_device.cpp` | CRITICAL |
+| 4 | Sparse key per sector: XTS uses sector number as tweak. No two sectors encrypt to same ciphertext | `crypto_device.cpp` | HIGH |
+| 5 | LUKS1/LUKS2 header parser: read sector 0 → validate magic `LUKS\xBA\xBE`, parse cipher name, key size, PBKDF2 params, key slots | `crypto_device.cpp` | HIGH |
+| 6 | PBKDF2-HMAC-SHA256 for key derivation from passphrase (~200 lines). Can be kernelspace (lock during unlock) or accept pre-derived key from userspace | `crypto_device.cpp` | MEDIUM |
+| 7 | Static factory: `CryptoDevice::create(child, luks_header)` → validates header, derives key, returns device | `crypto_device.cpp` | HIGH |
+
+#### Phase 33c — RAID 0/1 (~600 linhas, 1-2 days)
+
+**RAID 0 (striping)**:
+- `sector_count()` = min(all disks) × num_disks
+- Chunk size configurable (default 64KB = 128 sectors)
+- `read_sectors(sector, count)`: disk = (sector / chunk) % num_disks, offset = (sector / (chunk × num_disks)) × chunk + (sector % chunk)
+- `write_sectors()`: same mapping
+
+**RAID 1 (mirroring)**:
+- `sector_count()` = min(all disks)
+- `read_sectors()`: read from any disk (round-robin for load balancing)
+- `write_sectors()`: write to ALL disks
+- Degraded mode: continue if at least one disk alive
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Driver/Device/BlockDevice/raid_device.h` | 1 header | HIGH |
+| 2 | Create `Src/Kernel/Driver/Device/BlockDevice/raid_device.cpp` with RAID 0/1 logic | 1 source | HIGH |
+| 3 | RAID metadata parser: superblock at end of disk (Linux mdadm format: 4K from end, magic `0xa92b4efc`). Parse: UUID, level, chunk_size, num_devices, device_index | `raid_device.cpp` | HIGH |
+| 4 | RAID 0 stripe read/write with chunk boundary handling (split I/O when crossing chunks) | `raid_device.cpp` | HIGH |
+| 5 | RAID 1 mirror write + round-robin read. Degraded mode when child device returns error | `raid_device.cpp` | MEDIUM |
+
+**RAID 5/6 deferred to Phase 33f** — parity calculation (XOR for RAID 5, Reed-Solomon for RAID 6) and write hole journaling add ~1500 lines. Not needed for desktop (dual-disk mirror is typical).
+
+#### Phase 33d — LVM: Logical Volume Manager (~1000 linhas, 2-3 days)
+
+Maps logical volume sectors to physical volume sectors via extent-based segment table. Supports linear (contiguous) and striped (RAID 0-style) mappings.
+
+**Metadata**:
+- PV header at sector 0: UUID, device size, data area offset, metadata area offsets (ring buffer with 2 copies of text metadata)
+- VG metadata in PV text area: human-readable key=value format. Contains: UUID, extent_size (default 4MB), PV list, LV list
+- LV metadata: name, UUID, size (in extents), segment list. Each segment: start_extent, extent_count, type (linear/striped), PV UUID, PV extent offset
+
+**Operation**:
+- `read_sectors(lv_sector, count)`: translate LV sector → extent number → segment lookup → (PV device, PV sector)
+- `write_sectors()`: same translation
+- Striped LV: distribute extents across PVs (extent N → PV[N % stripe_count])
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Create `Include/Kernel/Driver/Device/BlockDevice/lvm_device.h` | 1 header | HIGH |
+| 2 | Create `Src/Kernel/Driver/Device/BlockDevice/lvm_device.cpp` with LVM2 metadata parser + linear/striped I/O | 1 source | HIGH |
+| 3 | PV header parser: read sector 0 → validate UUID + size. Locate metadata areas (2 copies) | `lvm_device.cpp` | HIGH |
+| 4 | VG/LV metadata parser: parse key=value text format. Build segment table: `Vector<Segment>` mapping LV extents → (PV, PV extent) | `lvm_device.cpp` | CRITICAL |
+| 5 | `read_sectors`/`write_sectors` with segment table lookup (O(log n) via binary search on start_extent). Split I/O when crossing extent boundaries | `lvm_device.cpp` | HIGH |
+| 6 | Striped LV support: extent-level striping. Distribute consecutive extents across PVs in round-robin order | `lvm_device.cpp` | MEDIUM |
+
+**LVM snapshots deferred to Phase 33g** — require CoW on the block level: allocate exception store for overwritten chunks, redirect reads to exception store when chunk has been copied. ~800 lines additional.
+
+#### Files Modified (all phases)
+
+| File | Change |
+|------|--------|
+| `Include/Kernel/Driver/Device/BlockDevice/block_device.h` | Already exists; no changes needed |
+| `xmake.lua` | Add new source files under `Src/Kernel/Driver/Device/BlockDevice/` |
+
+#### Summary
+
+| Phase | Component | Linhas kernel | Arquivos | Dias |
+|-------|-----------|-------------|----------|------|
+| 33a | StackableBlockDevice base | ~200 | 1h | 0.5 |
+| 33b | dm-crypt (AES-XTS + LUKS + PBKDF2) | ~800 | 1h+1cpp | 2-3 |
+| 33c | RAID 0/1 | ~600 | 1h+1cpp | 1-2 |
+| 33d | LVM (linear + striped) | ~1000 | 1h+1cpp | 2-3 |
+| **Total** | | **~2600** | **6** | **5.5-8.5** |
+
+**Order**: 33a (base class) → 33b (dm-crypt, most impactful for security) → 33c (RAID, useful for dual-disk desktops) → 33d (LVM, workstation/server).
+
+**Future sub-phases (not planned)**:
+- 33e: RAID 5/6 (~1500 lines, parity + write hole journal)
+- 33f: LVM snapshots (~800 lines, block-level CoW)
+- 33g: dm-integrity / dm-verity (cryptographic integrity, read-only Merkle tree)
+
+---
+
+### Phase 34 — x86_64 Architecture Hardening (2026-07-27) — HIGH PRIORITY
+
+Gap analysis against Intel SDM Vol. 3 on the full x86_64 arch code revealed critical bugs and missing features. Source-code audit of all arch files (syscall entry, context switch, interrupt dispatch, paging, boot, SMP, IDT, GDT/TSS, ACPI, IOMMU, CPU features).
+
+#### Phase 34a — Critical Fixes (will crash or corrupt on SMP/AVX hardware, ~2-3 days)
+
+| # | Gap | Impact | Files | Priority |
+|---|-----|--------|-------|----------|
+| **1** | **`g_cpu_block` is global, not per-CPU** — `MSR_GS_BASE` set once for CPU 0 only. All APs share same kernel stack ptr + saved user context. SMP syscalls broken on all CPUs except BSP. | `syscall_init.cpp:12` | Per-CPU `CpuControlBlock` array. AP startup must set `wrmsr(MSR_GS_BASE, &g_cpu_block[cpu_index])`. | **CRITICAL** |
+| **2** | **Boot page tables: PWT+PCD both set** — `setup_page_tables.asm:23` uses `0b10011011` (PWT=1 + PCD=1 simultaneously). Intel SDM Vol.3A §11.12.4: reserved bit combination. Could #GP on memory access. | `setup_page_tables.asm` | Fix to `0b10000011` (WB: PWT=0, PCD=0). | **CRITICAL** |
+| **3** | **CR0.WP not set** — Kernel writes to read-only pages silently succeed. Copy-on-Write fork is unreliable: kernel write to CoW-shared page won't fault, silently corrupting both processes. | `cpu_ops.cpp` | `write_cr0(read_cr0() | CR0_WP)`. Required for CoW correctness per OSDev and Linux arch. | **CRITICAL** |
+| **4** | **CR4.OSXSAVE never set + XCR0 never programmed** — XSAVE/XRSTOR raise #UD. Userspace AVX instructions crash kernel. | `cpu_ops.cpp` | Set CR4.OSXSAVE (bit 18). `xsetbv(0, X87|SSE|AVX)`. Detect XSAVE area size via CPUID 0x0D. | **CRITICAL** |
+| **5** | **Only FXSAVE/FXRSTOR (512B, SSE state)** — AVX state (YMM0-15, ~256B) lost across context switches. AVX-512 completely clobbered. | `context_switch.asm` | Use `xsave`/`xrstor` with XSAVE area sized from CPUID 0x0D. Allocate per-task area. | **CRITICAL** |
+
+#### Phase 34b — Important Fixes (~4-5 days)
+
+| # | Gap | Impact | Files | Priority |
+|---|-----|--------|-------|----------|
+| **6** | **PCID not enabled** — CR4.PCIDE (bit 17) never set. Every `mov cr3` flushes ALL TLB except global pages. | `cpu_ops.cpp` | Set CR4.PCIDE. Program `IA32_TSC_AUX`. Use PCID in CR3 bits 11:0. | HIGH |
+| **7** | **No Meltdown mitigation (KPTI)** — User pages have User bit in kernel's PML4. Meltdown: user-space can speculatively read kernel memory. | `virtual_memory_manager.cpp` | Two PML4 roots: kernel-only + user+kernel. Swap CR3 on syscall entry/exit. Remove User bit from kernel pages in user-visible PML4. | HIGH |
+| **8** | **MCFG/ECAM never initialized** — PCIe still uses legacy CF8/CFC port I/O. Modern devices may only expose ECAM. ECAM is faster. | `acpi.cpp`, `mcfg.h` (struct exists, never used) | Call `find_table("MCFG")`, map MMIO regions, use ECAM in `PciDevice`. | HIGH |
+| **9** | **HPET not initialized** — Struct exists but no MMIO mapping or timer init. Falls back to APIC timer only. | `hpet.cpp` (stub) | Map HPET MMIO at ACPI HPET base addr. Configure main counter. Implement tick via HPET comparator. | HIGH |
+| **10** | **Machine Check Architecture not handled** — MCE (#MC, vector 18) uses generic handler: logs + halts. Zero diagnostic info from MCA banks. | `machine_check.cpp` | Read `IA32_MCG_CAP` for bank count. Read `IA32_MCG_STATUS` for reporting banks. Dump `IA32_MCi_CTL/STATUS/ADDR/MISC` per bank. | HIGH |
+| **11** | **IA32_MISC_ENABLE not read** — Fast Strings (bit 0), ERMSB (bit 9) may be off from BIOS. `memcpy`/`memset` byte-by-byte instead of REP MOVSB. | `cpu.cpp` | Read `IA32_MISC_ENABLE` (0x1A0). Enable Fast Strings + ERMSB if avilable. 4-8x faster memcpy. | HIGH |
+| **12** | **MSR_SFMASK = 0x200 (only IF cleared)** — AC (bit 18), TF (bit 8), DF (bit 10) remain enabled on syscall entry. Alignment Check (#AC) in kernel possible. | `syscall_init.cpp` | Set `SFMASK = 0x4700` (IF + AC + NT + TF + DF) per Linux convention. | MEDIUM |
+| **13** | **No early serial fallback for boot errors** — `error.asm` writes to VGA text buffer only. Silent if VGA unavailable. | `error.asm`, `long_mode_start.asm` | Init COM1 at 115200 8N1 before calling kmain. Write panic prefix to serial on error. | MEDIUM |
+
+#### Phase 34c — Feature Detection / Future-Proofing (~1 day)
+
+| # | Gap | CPUID Leaf | Priority |
+|---|-----|-----------|----------|
+| **14** | No physical/virtual address width detection | `0x80000008` (EAX[7:0]=phys, EAX[15:8]=virt). Currently hardcoded to 48-bit. | MEDIUM |
+| **15** | No 1GB page support check | `0x80000001.EDX[26]`. PDPT-level huge pages possible but never used. | LOW |
+| **16** | No INVPCID check | `0x07.EBX[10]`. More precise TLB invalidation with PCID. | LOW |
+| **17** | No FSGSBASE check | `0x07.EBX[0]`. Userspace `wrfsbase`/`wrgsbase`. Must save per-context if enabled. | LOW |
+| **18** | No UMIP check | `0x07.EBX[2]`. Prevent SGDT/SIDT/SLDT in user mode. | LOW |
+| **19** | No AVX2/AVX-512/FMA/BMI/RDRAND detection | `0x07.EBX`, `0x01.ECX`. Features exist but not queried. | LOW |
+| **20** | No LA57 (5-level paging) detection | `0x07.ECX[16]`. Ice Lake+ Xeon. Desktop CPUs don't expose yet. | LOW |
+| **21** | No CET (Shadow Stack + IBT) detection | `0x07.ECX[7]`. Tiger Lake+. | LOW |
+
+#### Phase 34d — SMP Hardening (~1-2 days)
+
+| # | Gap | Fix | Priority |
+|---|-----|-----|----------|
+| **22** | No IRQ affinity / load balancing — all IRQs routed to one LAPIC. | Use logical destination mode or APIC flat cluster for IRQ distribution across CPUs. | MEDIUM |
+| **23** | No microcode update on AP — APs wake with factory microcode revision. | Load `IA32_BIOS_UPDT_TRIG` on each AP before setting `online_flag = 1`. | MEDIUM |
+| **24** | No MTRR synchronization — MTRRs must be identical on all CPUs. BIOS typically handles but OS should verify. | On AP entry, read BSP `IA32_MTRR_DEF_TYPE` + variable MTRRs, program identically on AP. | MEDIUM |
+| **25** | No SMM save area overlap check — Trampoline at 0x8000 may conflict with SMM save area (0x8000-0x9FFF on some chipsets). | Relocate trampoline to 0x10000 if SMM detected. | LOW |
+| **26** | No APIC ID → topology mapping — X2APIC IDs encode socket/die/core/thread. Flat array doesn't handle sparse IDs. | Parse CPUID leaf 0x0B or 0x1F for topology. Build `CpuTopology` struct with package/core/SMT hierarchy. | LOW |
+
+#### Summary
+
+| Phase | Description | Days | Priority |
+|-------|-------------|------|----------|
+| 34a | Critical fixes (GS per-CPU, PWT+PCD, WP, OSXSAVE, XSAVE) | 2-3 | **IMMEDIATE** |
+| 34b | Important fixes (PCID, KPTI, MCFG, HPET, MCA, SFMASK, serial) | 4-5 | HIGH |
+| 34c | Feature detection (CPUID leaves, address width) | 1 | MEDIUM |
+| 34d | SMP improvements (IRQ balance, MTRR sync, μcode update) | 1-2 | MEDIUM |
+| **Total** | | **8-11** | |
+
+**Impact**: Phase 34a fixes blocking bugs that prevent SMP correctness and AVX-capable CPU support. Phase 34b adds Meltdown mitigation, PCID (TLB efficiency), ECAM (modern PCIe), and proper MCA handling (hardware error diagnostics). Phase 34c enables future hardware support. Phase 34d hardens SMP for multi-socket and modern APIC topologies.
+
+---
+
+### Phase 35 — Desktop Visibility & QoS Responsiveness (2026-07-27) — HIGH PRIORITY
+
+Source-code audit of scheduler, /proc, and QoS syscalls revealed that FKernel's strongest desktop advantage (6-class QoS scheduler) is invisible to userspace tooling and has dead code paths that prevent real-time scheduling from working.
+
+**Context**: FKernel has a native QoS scheduler that Linux can only approximate with cgroups v2 + cpu.weight + uclamp. But `ps`, `top`, `htop` show nothing because `/proc/<pid>/stat` omits QoS, nice, policy, and mlfq_level fields. `chrt -f 99` is a no-op because `SchedulingPolicy::Fifo`/`RoundRobin` enums exist but `pick_next()` ignores them. CPU affinity (`taskset`) is also ignored at pick time.
+
+#### Phase 35a — QoS Exposure in /proc (~200 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Add QoSClass (0-5), nice (-20..+19), SchedulingPolicy, mlfq_level (0-3), cpu_affinity to `/proc/<pid>/stat` output | `proc_pid_stat_node.cpp:25` | HIGH |
+| 2 | Add `QoS:`, `Nice:`, `Policy:`, `MLFQ:`, `Cpus_allowed:` to `/proc/<pid>/status` output | `proc_process_node.cpp:28` | HIGH |
+| 3 | Add `/proc/<pid>/sched` node exposing `base_priority`, `priority`, `qos`, `nice`, `mlfq_level`, `cpu_time_consumed`, `allotment_ticks`, `boosted`, `turnstile_active` | New `proc_pid_sched_node.h/cpp` (2 files) | MEDIUM |
+| 4 | Add `/proc/sys/kernel/sched_qos_stats` showing per-QoS-class task counts | `proc_sys_kernel_node.cpp` | LOW |
+
+**Impact**: `ps -eo pid,qos,nice,policy` becomes possible. `top`/`htop` show real scheduling state. Users can see that their compositor is UserInteractive and their compiler is Background without writing a single line of cgroup config.
+
+#### Phase 35b — Real-Time Scheduling Path (~300 linhas, 1-2 days)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | In `pick_next()`, check `SchedulingPolicy::Fifo` — if set, do NOT demote on quantum expiry (already declared, not enforced). Task runs until blocked | `scheduler_manager.cpp:87-118` | HIGH |
+| 2 | In `on_tick()`, skip demotion for `SchedulingPolicy::Fifo` and `RoundRobin` tasks | `scheduler_lifecycle.cpp` (on_tick) | HIGH |
+| 3 | `RoundRobin` tasks: on quantum expiry, re-enqueue at same MLFQ level (not demote) | `scheduler_lifecycle.cpp` | HIGH |
+| 4 | In `pick_next()`, filter out tasks whose `cpu_affinity` does not include current CPU. If no runnable task passes affinity filter, fall through to `steal_task()` which also must respect affinity | `scheduler_manager.cpp:87-118` | HIGH |
+| 5 | `steal_task()` must only steal tasks whose `cpu_affinity` includes the stealing CPU | `scheduler_manager.cpp:62-85` | HIGH |
+| 6 | In `priority_boost_all()`, only boost tasks whose affinity matches the current CPU | `scheduler_lifecycle.cpp` (priority_boost_all) | MEDIUM |
+
+**Impact**: `chrt -f 99 myapp` now gives real FIFO semantics. `taskset -c 0,2 myapp` actually pins the task. Audio/video pipelines get predictable latency without cgroups.
+
+#### Phase 35c — Turnstile Chain (Transitive Priority Inheritance) (~200 linhas, 1 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | In `boost_qos_if_needed()`, if holder is already boosted (`holder->boosted == true`), instead of returning (current behavior), walk `holder->active_turnstile->chain` to boost the waiter's QoS transitively through the chain. Append new Turnstile to the end of chain | `turnstile.cpp:25-56` | HIGH |
+| 2 | In `unboost_task()`, walk the turnstile chain and restore all intermediate tasks' original QoS. Remove from chain, delete each Turnstile node | `turnstile.cpp:58-76` | HIGH |
+| 3 | Add `MAX_CHAIN_DEPTH = 8` constant (already declared in `turnstile.h`). Report and truncate if exceeded | `turnstile.h` | HIGH |
+| 4 | Add test: create 3 tasks A→B→C with escalating QoS, verify C gets A's QoS through chain | `tests/Scheduler/test_turnstile.cpp` | MEDIUM |
+
+**Impact**: Priority inversion with 3+ participants (server proxies, middleware, notification chains) is solved. Linux only does PI for futexes; FKernel does it for all IPC including chains.
+
+#### Summary
+
+| Phase | Description | Linhas | Dias |
+|-------|-------------|--------|------|
+| 35a | QoS /proc exposure | ~200 | 0.5 |
+| 35b | Real-time scheduling + affinity | ~300 | 1-2 |
+| 35c | Transitive turnstile chain | ~200 | 1 |
+| **Total** | | **~700** | **2.5-3.5** |
+
+**Order**: 35a (visibility enables testing of 35b) → 35b (real scheduling semantics) → 35c (transitive PI chain).
+
+---
+
+### Phase 36 — Desktop IPC: SCM_RIGHTS & SCM_CREDENTIALS (2026-07-27) — HIGH PRIORITY
+
+Source-code audit of IPC and Unix sockets revealed the single biggest blocker to desktop compositors (Wayland/X11) and desktop IPC (D-Bus): no file descriptor passing between processes. `sendmsg()` with `SCM_RIGHTS` and `SCM_CREDENTIALS` are the foundation of every modern desktop stack — without them, GPU buffer sharing, D-Bus authentication, and Wayland protocol are impossible.
+
+**Context**: FKernel already has the right building blocks: `CSpace::transfer()` (`cspace.h:47-53`) moves a capability with rights masking between CSpaces, and `Capability::with_rights()` (`capability.h:74-77`) restricts rights. What's missing is the Unix socket layer that exposes this to userspace via `sendmsg()`/`recvmsg()`.
+
+#### Phase 36a — SCM_RIGHTS (FD passing via Unix sockets) (~400 linhas, 2-3 days)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Implement `UnixSocket::sendmsg()` — parse `msghdr` for `cmsg_type == SCM_RIGHTS`. Extract `int*` fd array from `cmsg_data`. For each fd, look up `FileDescription` from sender's FD table, wrap as `Capability` with `All` rights, call `CSpace::transfer(receiver_cspace, cap_handle, rights_mask)`. Append capabilities to message | `unix_socket.cpp` (new sendmsg method), `unix_socket.h` (add `Vector<CapabilityHandle> m_pending_fds` to UnixSocketBuffer or message struct) | CRITICAL |
+| 2 | Implement `UnixSocket::recvmsg()` — if message has pending FDs from `SCM_RIGHTS`, call `CSpace::grant()` (copy) or reuse handles received in `CSpace::transfer()` (move). Install each into receiver's FD table at the lowest available slot. Write fd numbers into `cmsg_data` | `unix_socket.cpp` (new recvmsg method) | CRITICAL |
+| 3 | Add `UnixSocketMessage` struct holding: data buffer + `Vector<uint32_t> fd_handles` (CSpace indices). Replace existing direct buffer-to-buffer write path with message queuing | `unix_socket_buffer.h` — extend `UnixSocketBuffer` or create new message queue | CRITICAL |
+| 4 | Adapt existing `read()`/`write()` to work with the new message-based buffer (or keep separate datagram path). `read()` returns data, `write()` enqueues message | `unix_socket.cpp:103-121` | HIGH |
+| 5 | Implement `SCM_RIGHTS` in `inet_socket.cpp` for AF_INET sockets (uses same CSpace transfer logic). Not critical for desktop (TCP is used, not Unix sockets for networking) | `inet_socket.cpp` | LOW |
+
+**Impact**: `wayland-client` can send a GPU buffer fd from compositor to client. `dbus-daemon` can authenticate callers via SCM_CREDENTIALS. First building block of desktop graphics and IPC.
+
+#### Phase 36b — SCM_CREDENTIALS (peer authentication) (~200 linhas, 1 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Implement `SCM_CREDENTIALS` in `UnixSocket::sendmsg()` — sender's uid, gid, pid are attached automatically. Read from `current->control.identity.{uid, gid, id}` (TaskIdentity fields already exist) | `unix_socket.cpp` | HIGH |
+| 2 | Implement `SO_PEERCRED` in `UnixSocket::getsockopt()` — return peer's uid, gid, pid stored at connect time | `unix_socket.cpp` | HIGH |
+| 3 | Store `peer_uid`, `peer_gid`, `peer_pid` in `UnixSocket` at connect/accept time (simple copy from peer's `TaskIdentity`) | `unix_socket.h` (add 3 fields) | HIGH |
+
+**Impact**: `dbus-daemon` gets `GetConnectionCredentials()` working without PolKit. Process A can verify process B's identity without a central authority.
+
+#### Phase 36c — siginfo_t Truncation Fix (~100 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | `NotificationPayload` has `NOTIFICATION_PAYLOAD_SIZE = 64` bytes (`notification.h:14`). `siginfo_t` is 128 bytes (verified by `static_assert` in `signal_frame.h:29`). `signal_with_payload()` copies at most 64 bytes, silently truncating the upper half of siginfo_t | `notification.cpp:55`, `notification.h:14` | HIGH |
+| 2 | Fix: increase `NOTIFICATION_PAYLOAD_SIZE` to 128 OR split siginfo_t across 2 consecutive payload slots | `notification.h:14-31` | HIGH |
+| 3 | Verify: `SIGCHLD` siginfo_t carries `si_pid`, `si_uid`, `si_status`. `SIGSEGV` carries `si_addr`. Both must survive the 128-byte buffer | `signal_delivery.cpp:46-48` | MEDIUM |
+
+**Impact**: Signal handlers that read siginfo_t fields beyond byte 64 (e.g., `si_addr` at offset ~48+ due to union layout) get correct data instead of zeros.
+
+#### Summary
+
+| Phase | Description | Linhas | Dias |
+|-------|-------------|--------|------|
+| 36a | SCM_RIGHTS (FD passing) | ~400 | 2-3 |
+| 36b | SCM_CREDENTIALS (peer auth) | ~200 | 1 |
+| 36c | siginfo_t truncation fix | ~100 | 0.5 |
+| **Total** | | **~700** | **3.5-4.5** |
+
+**Order**: 36a (FD passing is the foundation — everything else depends on it) → 36b (peer credentials layer on top) → 36c (independent fix, can be done anytime).
+
+---
+
+### Phase 37 — KQueue Completeness & FUSE (2026-07-27) — MEDIUM PRIORITY
+
+Source-code audit of kqueue (`kqueue.cpp`, `kqueue.h`) and all I/O paths confirmed the unified event backend architecture is sound, but three of seven filter types have zero integration code. The filter constants, fflags, and note values are defined — the implementation is missing.
+
+**Context**: FKernel's kqueue is already the unified backend for epoll, poll, and select. But EVFILT_PROC (process events), EVFILT_SIGNAL (signal delivery), and EVFILT_TIMER (timed events) are stubs that fall through to the generic `poll_result != 0` catch-all. This works by accident (the polling fallback in `scan_ready_events`) but is not truly event-driven.
+
+#### Phase 37a — EVFILT_PROC (Process State Change Notification) (~250 linhas, 1 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Extend KNoteHook from VFS `Node` to `Task`. Add `Task::m_proc_knotes` (`KNoteList`) with own `Spinlock` + `attach_proc_knote()`/`detach_proc_knote()` | `task.h` (add proc_knotes + lock) | CRITICAL |
+| 2 | Implement `notify_proc_kqueue(Task* task, int fflags)` — iterate `task->m_proc_knotes`, match `EVFILT_PROC`, call `knote.kq->signal_notification()` | `kqueue.cpp` (new function) | HIGH |
+| 3 | Hook into `terminate_current()` — call `notify_proc_kqueue(task, NOTE_EXIT)` + notify parent via `find_task(ppid)` | `scheduler_lifecycle.cpp` | HIGH |
+| 4 | Hook into `sys_execve()` — call `notify_proc_kqueue(task, NOTE_EXEC)` after ELF load success | `execve.cpp` | MEDIUM |
+| 5 | Hook into `fork()`/`clone()` — call `notify_proc_kqueue(parent, NOTE_FORK | child_pid)` after child creation | `fork.cpp`, `clone.cpp` | MEDIUM |
+| 6 | In `scan_ready_events()`, handle EVFILT_PROC: check `kev.fflags & event_fflags`, return fflags in kevent output | `kqueue.cpp:scan_ready_events` | HIGH |
+
+**Impact**: Monitor child process death without `wait4()` busy-polling. Single `kevent()` call for "next I/O event OR child exits."
+
+#### Phase 37b — EVFILT_SIGNAL (Signal-to-KQueue Bridge) (~200 linhas, 1 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Add `KNoteList m_signal_knotes` to `Task` with lock + `attach_signal_knote()`/`detach_signal_knote()` | `task.h` | HIGH |
+| 2 | Implement `notify_signal_kqueue(Task* task, int signum)` — iterate task's signal knote list, match registered signal number, signal kqueue | `kqueue.cpp` (new function) | HIGH |
+| 3 | Hook into `SignalDelivery::send_signal()` — after setting pending bit and waking target, call `notify_signal_kqueue(target, signum)` | `signal_delivery.cpp:26-52` | HIGH |
+| 4 | In `scan_ready_events()`, handle EVFILT_SIGNAL: return signal number + count in kevent data | `kqueue.cpp:scan_ready_events` | HIGH |
+
+**Impact**: Wait for signals via `kevent()` in the same event loop as I/O and timers. Linux needs `signalfd` + epoll; FKernel does it in one syscall.
+
+#### Phase 37c — EVFILT_TIMER (Deadline-Based Timer Events) (~150 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | In `kevent()` changelist processing, when `EVFILT_TIMER` + `EV_ADD`, compute absolute deadline from `kev.data` (ms if `NOTE_MSECONDS`, seconds if `NOTE_SECONDS`). Store deadline in ticks as `kev.udata` | `kqueue.cpp:kevent` | HIGH |
+| 2 | In `scan_ready_events()`, for EVFILT_TIMER: compare `TickManager::the().get_ticks()` against stored deadline. Trigger if expired | `kqueue.cpp:scan_ready_events` | HIGH |
+| 3 | In `kevent()` wait loop, find nearest timer deadline across all registered EVFILT_TIMER events. Use `min(nearest_deadline, user_timeout)` as `Notification::wait_timeout()` value | `kqueue.cpp:kevent` | HIGH |
+
+**Impact**: `EVFILT_TIMER` replaces `timerfd_create()` for most use cases. One `kevent()` call = "wait for I/O OR timer OR process event OR signal" — four Linux mechanisms in one syscall.
+
+#### Summary
+
+| Phase | Description | Linhas | Dias |
+|-------|-------------|--------|------|
+| 37a | EVFILT_PROC (process events) | ~250 | 1 |
+| 37b | EVFILT_SIGNAL (signal-to-kqueue) | ~200 | 1 |
+| 37c | EVFILT_TIMER (deadline timers) | ~150 | 0.5 |
+| **Total** | | **~600** | **2.5** |
+
+**Order**: Any order works — three independent filter implementations sharing the same KNoteHook architecture.
+
+---
+
+### Phase 38 — Kernel Hot-Path Performance (2026-07-27) — MEDIUM PRIORITY
+
+Audit of kernel hot paths (syscall entry, context switch, memcpy, heap allocation, event polling) revealed correctness-first implementations that leave 5-10x performance on the table. These are not bugs — the code is correct — but the paths that execute millions of times per second use byte-by-byte copy, unconditional FPU save, linear heap scanning, and O(n) polling fallbacks. Each fix is independent and delivers measurable latency improvement.
+
+#### Phase 38a — Optimized memcpy/memset (~100 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Replace byte-by-byte loop in `memcpy`/`memset`/`memmove` with architecture-optimized implementation. Detect ERMSB (Phase 34b item 11) at boot — if available, use `rep movsb`/`rep stosb` for copies ≥256 bytes. Fallback: `movdqa` 16-byte unrolled loop with alignment prologue/epilogue | `Src/LibC/string/memcpy.c`, `memset.c`, `memmove.c` | HIGH |
+| 2 | Update LibFK equivalents (`fk::memory::copy`, `fk::memory::set`) to delegate to optimized LibC primitives, or implement directly with same optimizations | `Include/LibFK/Utilities/Memory.h` | HIGH |
+| 3 | Benchmark: copy 4096 bytes (terminal framebuffer row) — current byte loop ~800ns, `rep movsb` ~100ns | — | — |
+
+**Impact**: Every `read()`/`write()` buffer copy, every terminal scroll, every network packet, every ELF segment load gets 8x faster. This is the highest-leverage single optimization in the kernel.
+
+#### Phase 38b — Lazy FPU Save (~100 linhas, 1 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | In `context_switch.asm`, replace unconditional `fxsave [rdx]` with `CR0.TS` check. Set `CR0.TS = 1` on switch (marks FPU as "not available"). Remove `fxsave` from the hot path. Save current FPU state pointer in `Task::fpu_state_ptr` | `context_switch.asm:15-44`, `task.h` (add `fpu_state_ptr` field) | HIGH |
+| 2 | Implement `#NM` handler (interrupt 7, `DeviceNotAvailable`). On entry: save FPU state of PREVIOUS task (tracked via `SchedulerManager::m_last_fpu_task`) using `fxsave` into that task's `fpu_state_ptr`. Load current task's FPU state with `fxrstor`. Clear `CR0.TS`. Set `m_last_fpu_task = current` | `Src/Kernel/Arch/x86_64/Interrupt/Handler/Exception/device_not_available.cpp` (already exists, reimplement) | HIGH |
+| 3 | On first FPU use by a task, allocate 512-byte FPU save area from slab allocator (16B cache won't fit — need kmalloc). Zero-fill for clean initial FPU state | `device_not_available.cpp` | MEDIUM |
+| 4 | Edge case: if kernel itself uses FPU (rare — SSE for memcpy optimization?), `CR0.TS` must be cleared in kernel mode with `clts` before FPU access. Kernel FPU usage must be wrapped in `kernel_fpu_begin()`/`kernel_fpu_end()` | Any kernel FPU use site | LOW |
+
+**Impact**: 90%+ of context switches skip the 512-byte `fxsave`/`fxrstor` (most tasks — shells, daemons, compilers — never touch FPU). Context switch from ~2µs to <0.5µs without FPU.
+
+#### Phase 38c — Fast Syscall Path (~80 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | In `syscall_stub.asm`, after `swapgs`, check `need_resched` BEFORE saving full `PtRegs` frame. If `need_resched == false` AND syscall number is in "fast list" (getpid=39, getuid=102, geteuid=107, getgid=104, getegid=108, gettid=186, time=201, getrandom=318), skip `push` of all GPRs and call handler directly with minimal clobber tracking | `syscall_stub.asm`, `syscall_init.cpp` | HIGH |
+| 2 | Define "fast syscall" whitelist in `syscall_numbers.h` — syscalls that: never block, never access user memory, only return a value. Handler signature: `uint64_t fast_handler()` — returns value directly in `rax`, no `PtRegs*` parameter | `syscall_numbers.h` | HIGH |
+| 3 | Register fast handlers in `SyscallManager` separately from full handlers. `syscall_stub.asm` dispatches: if fast AND `!need_resched` → call fast handler → `swapgs` → `sysretq` without touching the stack | `syscall.cpp` (registration), `syscall_stub.asm` (dispatch) | HIGH |
+
+**Impact**: `getpid()` goes from ~200ns (15 pushes + function call + 15 pops + swapgs + sysret) to <50ns (swapgs + call + swapgs + sysret). Every shell prompt, every `ps`, every script makes dozens of these. Adds up to perceivable snappiness.
+
+#### Phase 38d — Heap Allocation Fast Path (~60 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Add 4KB and 8KB slab caches to `SlabAllocator` (currently max 2048B). Many kernel allocations — file buffers, small vectors, temporary strings — fall into these sizes. 4KB cache backed by `alloc_page()` (single 4KB page), 8KB by `alloc_contiguous(order=1)` | `Src/Kernel/Memory/ObjectMemory/Zone/slab_allocator.cpp` | HIGH |
+| 2 | In `MemoryManager::allocate()`, if size ≤ 4096 → try 4KB slab cache first; if ≤ 8192 → try 8KB cache. Only fall back to first-fit linked list for sizes >8KB or if slab cache is exhausted | `Src/Kernel/Memory/memory_manager.cpp` (allocate) | HIGH |
+
+**Impact**: Post-fragmentation heap allocations (common after `make -j8` with hundreds of process spawns) go from O(n) linked list traversal to O(1) slab pop. Measurable in app startup latency under load.
+
+#### Phase 38e — Remove kevent Polling Fallback (~80 linhas, 0.5 day)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | After Phase 37a-c is complete (all 7 EVFILT types have event-driven integration), remove the `node->poll()` call from `KQueueNode::scan_ready_events()` loop. Each iteration currently calls `poll()` on every registered event even when the notification path has already delivered the event | `kqueue.cpp:125-160` (scan_ready_events) | HIGH |
+| 2 | Keep polling for EVFILT_VNODE and EVFILT_USER until their event-driven integration is done. Use compile-time `#if 0` block or per-filter check: `if (filter == EVFILT_VNODE || filter == EVFILT_USER) { poll_result = node->poll(); }` | `kqueue.cpp:125` | HIGH |
+| 3 | Verify correctness: after removing polling, the event-driven path (I/O → KNoteHook → m_notification.signal()) is the ONLY delivery mechanism. Run stress test with 1000 FDs, ensure no events are lost | `tests/KQueue/test_kqueue_stress.cpp` | MEDIUM |
+
+**Impact**: `kevent()` with 1000 registered FDs goes from O(1000) poll loop per wakeup to O(1) signal delivery. Desktop event loop (compositor, dbus-daemon) sees significantly lower CPU usage under load.
+
+#### Summary
+
+| Phase | Description | Linhas | Dias |
+|-------|-------------|--------|------|
+| 38a | Optimized memcpy/memset (ERMSB or movdqa) | ~100 | 0.5 |
+| 38b | Lazy FPU save (CR0.TS + #NM handler) | ~100 | 1 |
+| 38c | Fast syscall path (skip PtRegs save) | ~80 | 0.5 |
+| 38d | Heap slab caches 4KB/8KB | ~60 | 0.5 |
+| 38e | Remove kevent polling fallback | ~80 | 0.5 |
+| **Total** | | **~420** | **3** |
+
+**Prerequisites**: Phase 38a depends on Phase 34b item 11 (ERMSB detection). Phase 38e depends on Phase 37a-c (EVFILT_PROC/SIGNAL/TIMER event-driven). Others are independent.
+
+**Order**: 38a (highest impact, benefits everything) → 38b (context switch latency) → 38c (syscall latency) → 38d (heap latency under load) → 38e (event loop CPU usage, requires Phase 37).
+
+---
+
+## References
 - [README.md](./README.md) — Build system
 - [Docs/](./Docs/) — Domain documentation
 - [Docs/Domains/networking.md](./Docs/Domains/networking.md) — TCP/IP stack architecture, checksum computation

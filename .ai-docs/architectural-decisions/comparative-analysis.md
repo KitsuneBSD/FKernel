@@ -12,21 +12,21 @@ FKernel is a **hybrid kernel** combining:
 - **seL4 capability model** (CSpace, Endpoints, revocation) — security primitives
 - **SerenityOS C++ style** (smart pointers, containers, error handling) — modern practices
 
-No other OS combines exactly these four influences. This is a deliberate design choice documented in `design-philosophy.md`.
+This combination is unusual and a deliberate design choice documented in `design-philosophy.md`.
 
 ## Key Architectural Insights
 
-### 1. Dual Bitmap+Buddy Allocator (Unique to FKernel)
+### 1. Dual Bitmap+Buddy Allocator
 
-Per the analysis, FKernel uses **both** a bitmap (O(1) amortized single-page alloc) and buddy allocator (contiguous multi-page) per physical memory zone. No other known OS does this. Linux uses buddy only; FreeBSD uses buddy + UMA; seL4 uses simple buddy.
+Per the analysis, FKernel uses **both** a bitmap (O(1) amortized single-page alloc) and buddy allocator (contiguous multi-page) per physical memory zone. This is an unusual approach — most OSes use one or the other. Linux uses buddy only; FreeBSD uses buddy + UMA; seL4 uses simple buddy.
 
 **Decision:** Keep this design. It gives optimal single-page allocation (bitmap) with contiguous fallback (buddy). The tradeoff is ~32MB bitmap overhead for 1TB support, which is acceptable.
 
-### 2. seL4 Capabilities in a Monolithic Kernel (Unique to FKernel)
+### 2. seL4 Capabilities in a Monolithic Kernel
 
 seL4 uses capabilities because it's a microkernel — all services run in userspace and must communicate via IPC. FKernel runs drivers in kernel space but still uses capability-based IPC for process-to-process communication.
 
-**Decision:** Keep the hybrid model. Capabilities provide provable security properties (revocation, fine-grained rights) without the performance penalty of microkernel IPC for driver operations. The generation-counter revocation pattern is lightweight and effective.
+**Decision:** Keep the hybrid model. Capabilities provide fine-grained security properties (revocation, rights decomposition) without the performance penalty of microkernel IPC for driver operations. The generation-counter revocation pattern is lightweight and effective.
 
 ### 3. No COW for fork() — Critical Gap
 
@@ -64,7 +64,7 @@ FKernel's `DentryNodeStack` pushes/pops filesystem nodes on a dentry for mount o
 
 ### 7. Event Notification Breadth
 
-FKernel supports kqueue (BSD), epoll (Linux), select (POSIX), eventfd, timerfd, and signalfd — all as VFS nodes. This breadth is unusual even for production kernels.
+FKernel supports kqueue (BSD), epoll (Linux), select (POSIX), eventfd, timerfd, and signalfd — all as VFS nodes. This is a deliberate breadth-over-simplicity choice.
 
 **Decision:** Keep all mechanisms. They serve different userspace programs (BSD apps use kqueue, Linux apps use epoll, legacy apps use select).
 
@@ -150,7 +150,7 @@ FKernel provides OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr 
 
 4. **Layer enforcement is rare and valuable** — FKernel's automated layer checking is ahead of most projects. Keep it.
 
-5. **Capabilities in monolithic is novel** — No production kernel combines monolithic performance with seL4-style capabilities. FKernel is exploring new territory here.
+5. **Capabilities in monolithic is unusual** — seL4-style capabilities are normally only found in microkernels. FKernel is exploring whether they make sense in a hybrid context.
 
 6. **Test coverage is the biggest debt** — At ~10-15%, FKernel is far below production standards. Linux has kunit; SerenityOS has host-side tests. FKernel needs both.
 

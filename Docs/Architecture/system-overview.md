@@ -6,7 +6,7 @@ FKernel follows a **layered architecture** inspired by BSD/XNU with strict separ
 
 ```mermaid
 flowchart TD
-    U["Userspace<br/>Applications, Shell, BusyBox, musl, OpenRC"]
+    U["Userspace<br/>Applications, Shell, BusyBox, musl"]
     K["Kernel<br/>Core kernel functionality (LibFK only)"]
     LFK["LibFK<br/>STL-like library (uses LibC + self)"]
     LC["LibC<br/>Minimal freestanding C library"]
@@ -22,7 +22,6 @@ flowchart LR
     subgraph Userspace
         BB["BusyBox 1.36.1"]
         MUSL["musl 1.2.4"]
-        ORC["OpenRC 0.52.1"]
     end
     subgraph FKernel["FKernel Kernel"]
         MEM["Memory<br/>Buddy+Zones+VMM"]
@@ -39,7 +38,6 @@ flowchart LR
     end
     BB --> MUSL
     MUSL -->|"syscalls"| FKernel
-    ORC --> MUSL
     FKernel --> Hardware
 ```
 
@@ -52,9 +50,9 @@ FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.m
 
 ## Project Status
 
-**Completion**: ~75% -- boots to userspace with BusyBox 1.36.1 (~60 applets, ~40 fully functional)
-**POSIX Compliance**: ~30-35% (Phase 14 complete, ~40 networking syscalls missing)
-**Immediate Priority**: All reported bugs verified as fixed (~0 open bugs), build OpenRC
+**Completion**: ~85% -- boots to userspace with BusyBox 1.36.1 (~60 applets, ~40 fully functional)
+**POSIX Compliance**: ~50% (IPC/POSIX Phases 0-10 complete, ELF dynamic linking complete, FAT32 writable)
+**Immediate Priority**: IPC Capability Integration (Phase 29 — route POSIX mechanisms through CSpace/Endpoint)
 **Long-term Goal**: Full POSIX compliance -> OpenRC boot -> multi-service OS
 
 ## Architectural Principles
@@ -97,10 +95,10 @@ FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.m
 - **Advanced**: TCP sliding window, routing table, DHCP client, DNS resolver
 
 ### Security & Isolation
-- **Capabilities**: seL4-style fine-grained rights (send/receive/manage)
-- **IPC**: Secure inter-process communication with cspace + revocation
-- **ELF Security**: ASLR, NX, SMEP, SMAP, RELRO, TLS
-- **Memory**: NX pages, user/kernel isolation, SMAP/SMEP enabled
+- **Capabilities**: seL4-style fine-grained rights (send/receive/manage) via CSpace + generation-based revocation. Used by raw `sys_ipc_*` syscalls. POSIX mechanisms use `Notification` directly — capability integration (Phase 29) pending.
+- **IPC**: Endpoint (synchronous rendezvous), Notification (async bitmask + payload queue), SharedMemory (page-level). PipeNode, EventFd, Semaphore, Mqueue, Epoll/KQueue, SignalFd all use Notification embedded members.
+- **ELF Security**: ASLR (ChaCha20PRNG, 30-bit), NX, SMEP, SMAP, W^X enforcement, RELRO (all segments), TLS
+- **Memory**: NX pages, user/kernel isolation, SMAP/SMEP enabled, CoW fork, demand paging
 
 ## Design Patterns
 
@@ -127,7 +125,7 @@ FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.m
 - **Compiler**: Clang/LLD with freestanding flags (`-ffreestanding`, `-fno-exceptions`, `-fno-rtti`)
 - **Boot**: GRUB + Multiboot2
 - **Testing**: Custom framework (coverage targets: LibC 90%, LibFK 85%, Kernel 75%)
-- **Userland**: BusyBox 1.36.1 + musl 1.2.4 + OpenRC 0.52.1
+- **Userland**: BusyBox 1.36.1 + musl 1.2.4 (OpenRC 0.52.1 as planned init system)
 
 ## Development Philosophy
 

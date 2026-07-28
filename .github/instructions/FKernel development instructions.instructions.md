@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-FKernel is a modern kernel written in C++, inspired by SerenityOS, BSD systems, and XNU. The project aims to be a production-ready kernel (not a hobby OS) through its innovative Driver Abstraction Layer (DAL).
+FKernel is a personal kernel project written in C++, inspired by SerenityOS, BSD systems, and XNU. It is a learning exercise in kernel architecture — an exploration of combining Linux ABI compatibility with BSD internals and seL4-style capabilities under modern C++ practices.
 
 ### Core Philosophy
 
 - **Pragmatic POSIX**: Use POSIX as a "mask" for kernel internals, not slavish compliance
 - **BSD/XNU-inspired**: Follow SystemV ABI and BSD conventions
-- **Security-first**: Drivers run in userspace, isolated kernel subsystems (IPUK)
-- **DAL-powered**: Recompile Linux/Windows drivers against FKernel primitives (like DXVK/Wine approach)
+- **Architecture-first**: Prioritize clean internal design over feature count
+- **Linux ABI**: Run unmodified Linux binaries (BusyBox, musl) for userspace
 
 ---
 

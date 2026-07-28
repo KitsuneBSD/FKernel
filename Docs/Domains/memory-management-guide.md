@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Memory Management domain handles all memory operations in FKernel, from physical page allocation to virtual memory management. This domain is critical for system stability and performance.
+The Memory Management domain handles all memory operations in FKernel, from physical page allocation to virtual memory management. Features: dual bitmap+buddy per zone, CoW reference counting, slab allocator, demand paging for anonymous memory, 2MB huge pages for direct map, and NUMA-aware zone selection.
 
 ## Architecture
 
@@ -11,13 +11,24 @@ flowchart TD
     MM["MemoryManager<br/>Top-level coordinator"]
     PMM["PhysicalMemoryManager<br/>Zone-based allocation"]
     VMM["VirtualMemoryManager<br/>4-level page tables"]
-    HEAP["Kernel Heap<br/>First-fit linked list"]
+    SLAB["SlabAllocator<br/>8 caches (16B-2048B)"]
+    HEAP["Kernel Heap<br/>First-fit linked list<br/>tries Slab first"]
     IOMMU["IOMMU<br/>Intel VT-d (abstract)"]
 
     MM --> PMM
     MM --> VMM
+    MM --> SLAB
     MM --> HEAP
     MM --> IOMMU
+
+    subgraph "Per-Zone Components"
+        BUDDY["BuddyAllocator<br/>Orders 12-21 (4KB-2MB)<br/>Embedded FreeBlock in free pages"]
+        BITMAP["Bitmap<br/>Individual pages<br/>O(1) alloc"]
+        COW["CoW Refcounts<br/>per-frame uint16_t[]<br/>allocated from zone"]
+    end
+    PMM --> BUDDY
+    PMM --> BITMAP
+    PMM --> COW
 
     subgraph "Physical Zones"
         Z1["DMA Zone<br/>< 16MB"]
@@ -27,13 +38,6 @@ flowchart TD
     PMM --> Z1
     PMM --> Z2
     PMM --> Z3
-
-    subgraph "Zone Components"
-        BUDDY["BuddyAllocator<br/>Power-of-2 blocks<br/>orders 12-21 (4KB-2MB)"]
-        BITMAP["Bitmap<br/>Individual pages<br/>O(1) alloc"]
-    end
-    Z1 --> BUDDY
-    Z1 --> BITMAP
 ```
 
 ## Initialization Flow
@@ -49,14 +53,16 @@ flowchart TD
     DMA["DMA Zone (< 16MB)"]
     NORMAL["NORMAL Zone (16MB-4GB)"]
     HIGH["HIGH Zone (> 4GB)"]
-    RESERVE["Reserve kernel, heap,<br/>bitmap, multiboot regions"]
+    RESERVE["Reserve kernel, heap,<br/>bitmap, AP trampoline,<br/>multiboot, modules"]
+    COW_ALLOC["Allocate per-zone CoW<br/>uint16_t refcount arrays"]
     VMM_INIT["VirtualMemoryManager::initialize()"]
     PML4["Allocate PML4 page table"]
-    IDENTITY["Identity-map lower memory"]
-    FB["Map framebuffer"]
+    IDENTITY["Identity-map lower memory + framebuffer"]
     CR3["Write CR3 register"]
-    HEAP_INIT["MemoryManager::initialize_heap()"]
-    BLOCKS["Set up linked-list heap<br/>magic = 0xC0FFEE"]
+    DIRECT_MAP["extend_direct_map()<br/>2MB huge pages at KERNEL_VIRT_BASE"]
+    RECONCILE["reconcile_buddies()<br/>sync buddy from bitmap"]
+    SLAB_INIT["SlabAllocator::initialize()<br/>8 caches"]
+    HEAP_INIT["MemoryManager::initialize_heap()<br/>linked-list heap + LibFK backend"]
 
     INIT --> PMM_INIT
     PMM_INIT --> TOPO --> MEMMAP --> CREATE_ZONES
@@ -65,27 +71,40 @@ flowchart TD
     CLASSIFY -->|"16MB-4GB"| NORMAL
     CLASSIFY -->|"> 4GB"| HIGH
     CREATE_ZONES --> RESERVE
+    RESERVE --> COW_ALLOC
     INIT --> VMM_INIT
-    VMM_INIT --> PML4 --> IDENTITY --> FB --> CR3
-    INIT --> HEAP_INIT --> BLOCKS
+    VMM_INIT --> PML4 --> IDENTITY --> CR3
+    VMM_INIT --> DIRECT_MAP
+    INIT --> RECONCILE
+    INIT --> SLAB_INIT
+    INIT --> HEAP_INIT
 ```
 
 ## Physical Memory Manager
+
+### Dual Allocator per Zone
+
+| Allocator | Use Case | Operation |
+|-----------|----------|-----------|
+| **Bitmap** | Single 4KB pages | `bitmap.alloc()` — O(1) first clear bit |
+| **Buddy** | Contiguous blocks (orders 12-21) | `buddy.alloc(order)` — power-of-two splits |
+
+`alloc_page()` uses bitmap first, then invalidates the buddy page. `alloc_contiguous()` uses buddy first, then marks all resulting pages in bitmap. Both are reconciled via `reconcile_buddies()` after the direct map is available.
 
 ### Zone Selection (NUMA-aware)
 
 ```mermaid
 flowchart TD
     REQ["alloc_page(preferred_type, preferred_node)"]
-    F1{"preferred type +<br/>preferred node<br/>available?"}
-    F2{"any type +<br/>preferred node<br/>available?"}
-    F3{"preferred type +<br/>any node<br/>available?"}
-    F4["NORMAL zone,<br/>any node"]
+    F1{"preferred type +<br/>preferred node?"}
+    F2{"any type +<br/>preferred node?"}
+    F3{"preferred type +<br/>any node?"}
+    F4["NORMAL zone, any node"]
+    FALLBACK["zone[0] if nothing else"]
     SELECT["Select zone"]
-    TRY_BITMAP["Try Bitmap first<br/>O(1) alloc"]
-    BITMAP_OK{Bitmap has<br/>free page?}
-    BUDDY_ALLOC["Fallback: BuddyAllocator<br/>alloc(order=0)"]
-    FAIL["Allocation failed"]
+    TRY_BITMAP["Bitmap.alloc()<br/>O(1)"]
+    BITMAP_OK{Bitmap free?}
+    ALLOC_FAIL["Return 0 (failure)"]
 
     REQ --> F1
     F1 -->|Yes| SELECT
@@ -94,32 +113,33 @@ flowchart TD
     F2 -->|No| F3
     F3 -->|Yes| SELECT
     F3 -->|No| F4 --> SELECT
+    F4 -->|No zone found| FALLBACK --> SELECT
     SELECT --> TRY_BITMAP --> BITMAP_OK
-    BITMAP_OK -->|Yes| DONE["Return page"]
-    BITMAP_OK -->|No| BUDDY_ALLOC --> DONE
+    BITMAP_OK -->|Yes| DONE["Return phys addr<br/>refcount = 1"]
+    BITMAP_OK -->|No| ALLOC_FAIL
 ```
 
 ### Buddy Allocator
 
-The buddy allocator handles **contiguous** physical page allocation (orders 12-21, i.e., 4KB to 2MB blocks):
+Orders 12-21 (4KB to 2MB blocks):
 
 ```mermaid
 flowchart TD
     ALLOC["alloc(order)"]
-    FIND["Find smallest available block<br/>in free_lists[order]"]
-    FOUND{Found block<br/>of exact order?}
-    SPLIT["Split block:<br/>Remove from free_lists[i]<br/>Add buddy to free_lists[i-1]"]
-    SPLIT_LOOP["Repeat until<br/>target order reached"]
-    RETURN["Return allocated block"]
+    FIND["Find smallest available block<br/>in free_lists[order..MAX_ORDER]"]
+    FOUND{Found at<br/>exact order?}
+    SPLIT["Split: remove from free_lists[i]<br/>Add buddy to free_lists[i-1]"]
+    SPLIT_LOOP["Repeat until target order"]
+    RETURN["Return block"]
 
     ALLOC --> FIND --> FOUND
     FOUND -->|Yes| RETURN
     FOUND -->|No| SPLIT --> SPLIT_LOOP --> RETURN
 
     FREE["free(ptr, order)"]
-    CHECK{"Buddy also free<br/>and in range?"}
-    MERGE["Merge: XOR buddy address<br/>Remove buddy from free_lists<br/>Add merged to free_lists[order+1]"]
-    LOOP["Repeat merge<br/>up to max order"]
+    CHECK{"Buddy free<br/>and in range?"}
+    MERGE["Merge: XOR buddy addr<br/>Remove buddy from free_lists<br/>Add merged to free_lists[order+1]"]
+    LOOP["Repeat up to MAX_ORDER"]
     ADD["Add to free_lists[order]"]
 
     FREE --> CHECK
@@ -127,15 +147,23 @@ flowchart TD
     CHECK -->|No| ADD
 ```
 
-**Key detail**: Uses a static pool of 16384 `FreeBlock` nodes to avoid the chicken-and-egg problem of allocating metadata from the allocator you're building.
+**Embedded FreeBlock**: Buddy metadata (`FreeBlock` node) is stored IN the free pages themselves, accessed via the `KERNEL_VIRT_BASE` direct map. This saves ~1MB of BSS compared to a static pool. A 16384-entry static pool is also available for bootstrap before the direct map is ready.
 
 ### Buddy Math
 
-The buddy address is calculated via XOR:
-
-$$\text{buddy}(ptr, order) = ptr \oplus (2^{\text{order}} \times \text{PAGE\_SIZE})$$
+$$\text{buddy}(ptr, order) = ptr \oplus (2^{order})$$
 
 Merge condition: both the block and its buddy must be free and within the zone bounds.
+
+### CoW Reference Counting
+
+Each zone has a per-frame `uint16_t` reference count array, allocated from the zone's own physical pages:
+
+- `alloc_page()`: sets refcount = 1
+- `free_page()`: decrements refcount; only frees when it reaches 0
+- `increment_refcount(phys)`: ++ on CoW fork
+- `decrement_refcount(phys)`: -- on page unmap
+- `get_refcount(phys)`: read-only query
 
 ## Virtual Memory Manager
 
@@ -149,10 +177,10 @@ flowchart LR
     PT["PT"]
     PTE["Page Table Entry"]
 
-    PML4 -->|"PML4E[i]"| PDPT
-    PDPT -->|"PDPTE[i]"| PD
-    PD -->|"PDE[i]"| PT
-    PT -->|"PTE[i]"| PTE
+    PML4 -->|"PML4E[47:39]"| PDPT
+    PDPT -->|"PDPTE[38:30]"| PD
+    PD -->|"PDE[29:21]"| PT
+    PT -->|"PTE[20:12]"| PTE
 ```
 
 ### Map Page Flow
@@ -160,13 +188,17 @@ flowchart LR
 ```mermaid
 flowchart TD
     MAP["map_page(virt, phys, flags)"]
-    E_PML4["ensure_table(PML4, idx)<br/>Create if missing"]
-    E_PDPT["ensure_table(PDPT, idx)<br/>Create if missing"]
-    E_PD["ensure_table(PD, idx)<br/>Create if missing"]
+    E_PML4["ensure_table(PML4, idx)<br/>Create/copy if missing<br/>COW-safe: copy kernel tables for user bit"]
+    E_PDPT["ensure_table(PDPT, idx)"]
+    E_PD["ensure_table(PD, idx)"]
     SET_PTE["Set PTE: phys | flags | Present"]
+    TLB{"Changed<br/>parent tables?"}
+    FLUSH["flush_tlb()"]
     INVLPG["invlpg(virt)"]
 
-    MAP --> E_PML4 --> E_PDPT --> E_PD --> SET_PTE --> INVLPG
+    MAP --> E_PML4 --> E_PDPT --> E_PD --> SET_PTE --> TLB
+    TLB -->|Yes| FLUSH
+    TLB -->|No| INVLPG
 ```
 
 ### Page Flags
@@ -178,9 +210,9 @@ flowchart TD
 | User | 2 | Page accessible from ring 3 |
 | WriteThrough | 3 | Write-through caching |
 | CacheDisabled | 4 | Disable caching (MMIO) |
-| Accessed | 5 | Page has been accessed |
-| Dirty | 6 | Page has been written |
-| HugePage | 7 | 2MB/1GB huge page |
+| Accessed | 5 | Page has been accessed (set by CPU) |
+| Dirty | 6 | Page has been written (set by CPU) |
+| HugePage | 7 | 2MB huge page (used in direct map) |
 | Global | 8 | Global page (not flushed on CR3 switch) |
 | ExecuteDisable | 63 | NX bit (no-execute) |
 
@@ -189,74 +221,102 @@ flowchart TD
 ```mermaid
 flowchart TD
     FORK["fork()"]
-    CLONE_DEEP["clone_address_space(cr3)<br/>Deep copy user pages<br/>Share kernel mappings"]
+    CLONE_DEEP["clone_address_space(cr3)<br/>Deep copy user pages with CoW<br/>Writable → read-only in both<br/>Increment CoW refcount"]
     EXEC["execve()"]
-    CLONE_SHALLOW["create_address_space()<br/>Clone page table hierarchy<br/>Don't copy user pages"]
+    CLONE_SHALLOW["create_address_space()<br/>Clone page table hierarchy<br/>Share user pages (exec will swap)"]
 
     FORK --> CLONE_DEEP
     EXEC --> CLONE_SHALLOW
 ```
 
+### Demand Paging
+
+Anonymous memory (`mmap MAP_ANONYMOUS`) is mapped lazily. The page fault handler (`pf_handler.cpp`) handles two cases:
+
+1. **Not-present fault** (`error_code & 1 == 0`): Allocate + zero-fill a physical page, map into user address space
+2. **Write-protection fault**: CoW handling — allocate new page, copy data, update PTE with Writable
+
+### Direct Map
+
+`extend_direct_map()` maps ALL physical RAM at `KERNEL_VIRT_BASE` using 2MB huge pages (`PageFlags::HugePage`). This provides a linear kernel-accessible view of all physical memory, used by:
+- Buddy allocator's embedded FreeBlock metadata
+- CoW refcount arrays (accessed as `phys + KERNEL_VIRT_BASE`)
+- Any kernel code needing physical address access
+
 ### User Access Safety
 
-- `copy_from_user()` / `copy_to_user()` validate addresses are in userspace (< 0x800000000000)
+- `copy_from_user()` / `copy_to_user()` validate addresses are in userspace (`< 0x800000000000`)
 - Uses STAC/CLAC instructions when hardware SMAP is available
+- Returns `Result<void, Error>` for error propagation
+
+## Slab Allocator
+
+`SlabAllocator` provides fast, fixed-size object allocation with 8 caches:
+
+| Cache Size | Use Case |
+|------------|----------|
+| 16B | Tiny objects, pointers |
+| 32B | Small objects |
+| 64B | Medium objects |
+| 128B | |
+| 256B | |
+| 512B | |
+| 1024B | |
+| 2048B | Large kernel objects |
+
+The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤2048 bytes, falling back to the linked-list heap only when the slab cache is exhausted.
 
 ## Kernel Heap
 
 Simple first-fit linked-list allocator:
 
-```mermaid
-flowchart LR
-    H1["BlockHeader<br/>size=256<br/>is_free=false<br/>magic=0xC0FFEE"]
-    H2["BlockHeader<br/>size=512<br/>is_free=true<br/>magic=0xC0FFEE"]
-    H3["BlockHeader<br/>size=128<br/>is_free=false<br/>magic=0xC0FFEE"]
-
-    H1 -->|"next"| H2
-    H2 -->|"next"| H3
-    H2 -->|"prev"| H1
-    H3 -->|"prev"| H2
-```
-
-- `allocate(size)`: Walk block list, find free block >= size, split if large enough
-- `free(ptr)`: Coalesce with adjacent free blocks (both forward and backward)
-- All operations save/restore interrupts and use a `Spinlock`
+- 16-byte alignment for all allocations
+- Block splitting: if free block is large enough, carve out exactly needed size + split remainder
+- Free coalescing: merges both forward and backward with adjacent free blocks
 - Magic number `0xC0FFEE` checked on every operation for corruption detection
+- Interrupt-safe: saves/restores RFLAGS, acquires `m_heap_lock` spinlock
+- LibFK integration via `AllocatorBackend` callback structure
 
 ## Integration Points
 
 ```mermaid
 flowchart TD
     MM["Memory Manager"]
-    PROC["Process Management<br/>Page tables for fork/exec"]
-    DRV["Driver Framework<br/>DMA buffer allocation"]
-    FS["Filesystem<br/>Page cache"]
-    ELF["ELF Loader<br/>Address space setup"]
-    SYS["Syscalls<br/>brk, mmap, munmap"]
+    PROC["Process Management<br/>fork: clone_address_space (CoW)<br/>exec: create_address_space"]
+    DRV["Driver Framework<br/>DMA buffer allocation<br/>MMIO mapping"]
+    FS["Filesystem<br/>Block device read/write<br/>via direct map"]
+    ELF["ELF Loader<br/>W^X enforcement, ASLR<br/>segment mapping"]
+    SYS["Syscalls<br/>mmap, munmap, mprotect, brk"]
+    PF["Page Fault Handler<br/>demand paging, CoW break"]
 
     PROC --> MM
     DRV --> MM
     FS --> MM
     ELF --> MM
     SYS --> MM
+    PF --> MM
 ```
 
 ## Key Design Decisions
 
-- **Dual allocator per zone**: Bitmap for individual pages (fast), Buddy for contiguous blocks
-- **Static buddy node pool**: 16384 pre-allocated nodes avoid chicken-and-egg allocation
-- **Coalescing kernel heap**: Free merges both forward and backward with adjacent free blocks
-- **NUMA-aware zone selection**: 4-level fallback across type and node preferences
+- **Dual allocator per zone**: Bitmap for fast single-page, Buddy for contiguous — reconciled, not redundant
+- **Embedded buddy metadata**: FreeBlock stored in free pages via direct map, saving ~1MB BSS
+- **CoW refcounts**: Per-zone uint16_t arrays for accurate shared page tracking
+- **COW-safe table creation**: `ensure_table()` copies shared kernel tables when user bit needed
+- **2MB huge pages**: Direct map via `PageFlags::HugePage` for low TLB pressure
+- **Slab-first heap**: `allocate()` tries slab for ≤2048B, falls back to linked-list heap
+- **NUMA-aware**: Zone selection considers proximity domain with 4-level fallback
 - **SMAP/STAC-CLAC**: Hardware-enforced user/kernel memory access control
 
 ## Future Enhancements
 
 ### Short Term
-1. Complete NUMA-aware allocation policies
+1. Per-CPU page caches to reduce PMM lock contention
 2. Memory compaction for long-running systems
-3. Per-CPU caches to reduce contention
+3. Per-segment ELF bounds validation (p_offset + p_filesz)
 
 ### Long Term
-1. Transparent huge pages (2MB/1GB)
-2. Memory hot-plug support
-3. Advanced NUMA policies with distance metrics
+1. Transparent huge pages (2MB/1GB) for user mappings
+2. Swap support
+3. Memory hot-plug
+4. Advanced NUMA policies with distance metrics

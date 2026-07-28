@@ -39,7 +39,7 @@ FKernel is a **hybrid kernel** that deliberately cherry-picks the best ideas fro
 ### Why Modern Practices?
 
 - **Rust-style errors** (`Result`, `TRY`, `Optional`): Eliminate entire classes of bugs (unchecked returns, null dereferences)
-- **seL4 capabilities**: Capability-based IPC provides provable security properties absent in traditional Unix IPC
+- **seL4 capabilities**: Capability-based IPC provides fine-grained access control absent in traditional Unix IPC
 - **Object Calisthenics**: Enforced small entities, no `else`, one dot per line -- code that is easy to read, refactor, and verify
 - **Strict layering**: LibC -> LibFK -> Kernel prevents dependency spaghetti
 
@@ -64,7 +64,7 @@ When adding a new subsystem or feature, use this table to determine which refere
 
 - **Not a Linux kernel**: We implement only the Linux *ABI*, not the internal architecture
 - **Not a microkernel**: Despite seL4-inspired IPC, we run drivers and core services in kernel space for performance
-- **Not a research toy**: Goal is production-ready POSIX system capable of running real workloads
+- **A personal kernel**: Built for a single developer's machine and workflow; not aiming to replace Linux or run arbitrary hardware
 - **Not a BSD kernel**: We don't use BSD syscall numbers or binary compat layers -- the ABI is Linux
 
 ## Key Non-Negotiables

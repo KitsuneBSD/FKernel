@@ -29,13 +29,13 @@ Most hybrid kernels use traditional Unix IPC (pipes, shared memory, signals). FK
 - **Revocation**: Generation counter mechanism — when an IPC object is destroyed, its generation increments, invalidating all capabilities pointing to it
 - **Rights decomposition**: `with_rights()` creates a derived capability with restricted rights
 
-This provides provable security properties absent in traditional Unix IPC while running in a hybrid (not microkernel) architecture.
+This provides fine-grained access control properties uncommon in traditional Unix IPC, even though it runs in a hybrid (not microkernel) architecture.
 
 Key files: `Include/Kernel/Ipc/capability.h`, `Include/Kernel/Ipc/cspace.h`, `Include/Kernel/Ipc/endpoint.h`
 
 ## 3. Object Calisthenics Enforcement
 
-The codebase follows strict Smalltalk-inspired coding rules — extremely rare in kernel development:
+The codebase follows strict Smalltalk-inspired coding rules — unconventional in kernel development:
 
 - **No `else` keyword**: Early returns only
 - **Max 2 instance variables per class**: Compose objects instead

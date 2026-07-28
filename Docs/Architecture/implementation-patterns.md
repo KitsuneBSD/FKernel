@@ -98,9 +98,11 @@ stateDiagram-v2
     Running --> Ready: yield/timeout
     Running --> Blocked: block_current()
     Running --> Sleeping: sleep_current(ticks)
-    Running --> Zombie: exit/terminate
+    Running --> Stopped: SIGSTOP/SIGTSTP
+    Stopped --> Ready: SIGCONT
     Blocked --> Ready: wake_task()
     Sleeping --> Ready: on_tick()
+    Running --> Zombie: exit/terminate
     Zombie --> [*]: reap + free
 ```
 

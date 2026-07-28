@@ -1,159 +1,118 @@
 # Current Project State Analysis (July 2026)
 
+*Updated: 2026-07-27 -- source-code audit refreshed all subsystem states*
+
 ## Executive Summary
 
-FKernel is at **~80% completion** — boots successfully to userspace with **BusyBox 1.36.1** running on real hardware and QEMU. The codebase contains **~400 source files** across LibC, LibFK, and Kernel. PCI, VFS, drivers, scheduler (XNU-inspired QoS + MLFQ + Turnstiles), networking (full TCP/IP), ELF loader, and IPC (capability-based) are all functional. **~0 bugs open** (all reported bugs verified as fixed). Phases 1–26 complete.
+FKernel is at ~85% completion -- boots successfully to userspace with BusyBox 1.36.1 in QEMU. The codebase contains ~400 source files (362 Kernel .cpp + 324 Kernel headers + 39 LibC .c + 12 LibFK .cpp). All major subsystems functional: PCI, VFS (BSD-style), drivers (AHCI/NVMe/E1000/ATA/PS2/PTY), QoS+MLFQ scheduler with turnstile priority inheritance + SMP, networking (full TCP/IP), ELF loader (DT_NEEDED dynamic linking + ASLR + W^X + RELRO), and IPC (capability-based with POSIX wrappers). ~0 bugs open (all reported bugs verified as fixed in source). Phases 1-31b complete.
 
 ## Completed Milestones
 
 ### Phase 1-9: Foundation (Complete)
-- All compilation blockers resolved
-- Critical bugs fixed (memory, scheduler, VFS, IPC, containers)
-- Security features: SMEP, SMAP, NX, ASLR, RELRO, signal validation, atomic refcounts
-- Architecture violations cleaned up (layering, Error enum dedup)
-- POSIX foundation: errno.h, fcntl.h, ctype.h, dirent.h, stdio (printf/FILE), stdlib (exit/calloc/qsort)
-- Networking: full TCP/IP stack — IPv4, TCP, UDP, ARP, ICMP, routing, DHCP, DNS
+- All compilation blockers and critical bugs fixed
+- Security: SMEP, SMAP, NX, ASLR, RELRO, atomic refcounts, SMAP-aware user access
+- Networking: full TCP/IP stack
 
-### Phase 10: Userspace Bootstrap (Complete)
-- Minimal init process (PID 1) mounting /dev, /proc, spawning shell
-- FAT32 drivers rewritten (lookup, list_dir, subdirectory traversal, LFN)
-- sys_mount/umount2/getppid implemented
-- AHCI/NVMe partition scanning
-- Disk partitioning + FAT32 filesystem creation
-- BusyBox 1.36.1 boots to shell prompt
-
-### Phase 12: BusyBox Full Compatibility (Complete)
-- Syscall number collisions fixed (readlink=89, symlink=88)
-- Signal defaults fixed (SIGSTOP/SIGCONT/SIGPIPE)
-- setsid/setpgid implemented
-- pipe2/dup3/mprotect implemented
+### Phase 10-12: Userspace + BusyBox (Complete)
+- Minimal init + shell, FAT32 rewritten (lookup, list_dir, subdirectory, LFN, metadata write)
 - /dev/null, /dev/zero, /dev/urandom, /dev/ptmx registered
-- PTY blocking reads fixed
-- select/poll blocking with timeout
-- TCP connect/accept implemented (three-way handshake)
-- *at() syscall family implemented (12 syscalls)
-- Controlling terminal + foreground process group tracking
+- PTY blocking reads, select/poll blocking, TCP connect/accept
+- *at() syscall family (12 syscalls)
 
-### Phase 14a-14f: POSIX Compliance (Complete)
-- Process groups and sessions (pgid, sid, session leader)
-- Signal delivery (SIGSTOP/SIGTSTP/SIGTTIN/SIGTOU/SIGCONT)
-- Environment variables (getenv/setenv/putenv/unsetenv)
-- FD_CLOEXEC tracking
-- chroot syscall
-- File locking (flock, fcntl F_SETLK/F_SETLKW/F_GETLK — advisory stubs)
-- Time subsystem (gettimeofday, clock_gettime, clock_getres, clock_nanosleep)
-- Scheduling syscalls (nice, getpriority/setpriority)
+### Phase 13: Kernel -> LibFK Migration (Complete)
+- byte_order.h, io.h, syscall_numbers.h moved to LibFK
+- ~15 duplicated algorithms consolidated (DJB2, internet checksum, FAT name formatting, binary search)
 
-### Phase 13: Kernel→LibFK Migration (Complete)
-- 3 standalone utility files moved to LibFK
-- ~15 duplicated algorithms consolidated into `LibFK/Algorithms/`
+### Phases 24-26: QoS + MLFQ + Turnstiles (Complete)
+- XNU-inspired 6-class QoS scheduler with 4-level MLFQ, periodic priority boost, work stealing
+- Turnstile-based priority inheritance for IPC (Endpoint boost/unboost)
+
+### Phases 27-28: Memory Improvements (Complete)
+- Bitmap+buddy reconciliation, CoW fork with per-frame refcount arrays
+- Direct map at KERNEL_VIRT_BASE with 2MB huge pages
+- Embedded FreeBlock buddy metadata in free pages (saves ~1MB BSS)
+- SlabAllocator: 8 caches (16B-2048B)
+- Anonymous demand paging: lazy zero-fill on first access
+
+### Phases 30-30b: ELF Loader (Complete)
+- DT_NEEDED shared library loading via VFS, ld.so self-relocation
+- 10 relocation types (NONE, RELATIVE, 64, GLOB_DAT, JUMP_SLOT, COPY, IRELATIVE, TPOFF64, DTPMOD64, DTPOFF64)
+- Cross-object symbol resolution via global library registry
+- ASLR: ChaCha20PRNG with 30-bit entropy, randomized ld.so base
+- W^X enforcement, full RELRO (all segments, correct alignment, interpreter RELRO)
+- SMAP STAC/CLAC in all user-memory write paths
+
+### Phase 31a-31b: Verification + FAT32 Metadata (Complete)
+- CoW fork + demand paging verified complete
+- FAT32 truncate (shrink + extend), rmdir emptiness check
+
+### IPC/POSIX Phases 0-10 (Complete)
+- Enhanced Notification (wait_timeout, signal_with_payload), Endpoint (call, send_timeout, receive_timeout)
+- SharedMemory page-level sharing, cap_transfer/grant syscalls
+- Signals with full siginfo_t, altstack, SA_RESETHAND, SA_NODEFER, SA_RESTART
+- Pipes, FIFOs, eventfd, signalfd, timerfd, epoll, futex, semaphores, message queues, shared memory
+- PTY discipline, TCP retransmission timer, KQueue unified event backend
 
 ## Current State by Subsystem
 
-### Kernel Core
-
 | Subsystem | Status | Files | Notes |
 |-----------|--------|-------|-------|
-| **LibFK** | ~70% | ~78 | Containers complete; text, core, algorithms solid |
-| **LibC** | ~60% | ~37 | Strings/stdio/ctype complete; stdio stubs abort |
-| **Memory** | ~80% | ~15 | Buddy+zones; VMM 4-level paging; no slab allocator yet |
-| **Scheduler** | ~75% | ~12 | Priority queues, work stealing; SMP single-core (hardcoded) |
-| **VFS** | ~80% | ~24 | BSD-style dentry/vnode/mount; FAT12/16/32, DevFs, ProcFs, TmpFs, DebugFs |
-| **Drivers** | ~65% | ~53 | ATA/AHCI/NVMe/E1000 + PS/2 + PTY + Serial; USB headers only |
-| **Networking** | ~80% | ~12 | TCP/IP stack — ARP, ICMP, IP, TCP, UDP, DHCP, DNS, E1000 |
-| **ELF Loader** | ~85% | ~12 | Parser/Dynamic/Memory/Load domains; ASLR/TLS/RELRO; interpreter pending |
-| **IPC** | ~75% | ~8 | seL4-style capabilities; CSpace; endpoints; notifications; revocation |
-| **Syscalls** | ~70% | ~120 | ~139 registered handlers across 10 domain directories |
-| **Arch/x86_64** | ~80% | ~77 | GDT/IDT/TSS, page tables, context switch, syscall entry |
+| LibFK | ~75% | ~78 | Containers, text, core, algorithms solid |
+| LibC | ~65% | ~37 | Strings/stdio/ctype complete |
+| Memory | ~90% | ~19 | Buddy+zones+CoW; VMM with demand paging; SlabAllocator (8 caches); 2MB huge page direct map |
+| Scheduler | ~90% | ~12 | QoS (6 classes) + MLFQ (4 levels) + Turnstiles; SMP with work stealing |
+| VFS | ~85% | ~24 | BSD-style dentry/vnode/mount; FAT12/16/32 LFN+write; mount namespaces; pivot_root; KQueue |
+| Drivers | ~70% | ~53 | ATA/AHCI/NVMe/E1000 + PS/2 + PTY + Serial; USB headers only |
+| Networking | ~85% | ~12 | Full TCP/IP: ARP, ICMP, IP, TCP (handshake+window+retransmit), UDP, DHCP, DNS, routing |
+| ELF Loader | ~85% | ~12 | DT_NEEDED + 10 reloc types + cross-object symbols + ASLR + W^X + RELRO + SMAP |
+| IPC | ~75% | ~8 | seL4-style CSpace/Endpoint/Notification; POSIX wrappers use Notification directly |
+| Syscalls | ~75% | ~144 | ~139 registered handlers across 10 domain directories |
+| Arch/x86_64 | ~85% | ~77 | GDT/IDT/TSS, page tables, context switch with FPU, syscall entry, SMP AP startup |
 
-### Open Bug Inventory (All Verified Fixed)
+## Key Architecture Insights (from Source Audit)
 
-| Category | Total | Open | Fixed |
-|----------|-------|------|-------|
-| P0 Critical | 13 | 0 | 13 |
-| P0 High | 14 | 0 | 14 |
-| Concurrency | 8 | 0 | 8 |
-| Driver | 22 | 0 | 22 |
-| IPC/Signal | 6 | 0 | 6 |
-| Syscall Buffers | 8+ | 0 | 8+ |
-| LibC | 9 | 0 | 9 |
-| LibFK | 4 | 0 | 4 |
-| **Total** | **~84** | **~0** | **~84** |
+### What Actually Works (verified in source code)
 
-### BusyBox Compatibility
+- CoW fork: clone_table_recursive() with per-zone uint16_t refcount arrays
+- Anonymous demand paging: pf_handler allocates + zero-fills on first access
+- SlabAllocator: 8 caches, tried first in kernel heap allocate()
+- 2MB huge pages: extend_direct_map() maps all RAM at KERNEL_VIRT_BASE
+- Embedded buddy FreeBlock: metadata in free pages via direct map, no BSS allocation
+- Full POSIX signal delivery: SA_SIGINFO, SA_RESTART (rip -= 2), SA_ONSTACK, SA_RESETHAND, SA_NODEFER, builtin restorer trampoline
+- TCP checksums: RFC 793 pseudo-header computation in tcp_socket.cpp
+- TCP retransmission: exponential backoff (RTO * (1 << attempt)), max 4 retries
+- Mount namespaces: per-process isolation via MountNamespace + dentry stack overrides
+- pivot_root: full implementation with mount record updates
+- MLFQ demotion: cpu_time_consumed >= allotment_ticks triggers level demotion
+- Stopped state: wired through signal_delivery.cpp -> TaskState::Stopped
 
-| Metric | Value |
-|--------|-------|
-| Applets enabled | ~60 (ash, init, cat, rm, ls, cp, mv, mkdir, chmod, chown, ln, sleep, uname, id, whoami, env, touch, tail, head, wc, basename, dirname, echo, clear, sync, kill, ps, free, uptime, top, df, du, find, stat, grep, sed, cut, sort, uniq, tr, printf, date, hostname, which, mount, umount, dmesg, reboot, halt, poweroff, less, more, xargs, tee, stty, yes, expr, test, mktemp, realpath, split) |
-| Applets fully functional | ~40 |
-| Applets partial/broken | ~10 (ash edge cases, df statfs, date no RTC) |
-| Overall compatibility | ~70-75% |
+### What Still Has Gaps
 
-### Test Coverage
+| Gap | Detail |
+|-----|--------|
+| IPC fragmentation | POSIX mechanisms use Notification directly; CSpace/Endpoint is parallel subsystem (Phase 29) |
+| ELF bounds | No endianness check (EI_DATA), no file-size bounds on p_offset + p_filesz |
+| TCP out-of-order | process_data() only accepts in-order segments (seq must match recv_next exactly) |
+| Kernel tests | 0% coverage -- all 207 tests are LibC/LibFK only |
+| Thread groups | No CLONE_THREAD support |
+| OpenRC | Build never executed; /proc/sys/ missing |
+| CSPRNG | init.cpp lines 105-107 commented out; ASLR may use unseeded PRNG |
+
+## Test Coverage
 
 | Library | Tests | Coverage |
 |---------|-------|----------|
 | LibC (string/memory/stdio) | ~65 | ~60% |
-| LibFK containers | 2 (CircularBuffer only) | ~2% |
-| LibFK smart ptrs | 0 | 0% |
-| LibFK text/algorithms/core | 0 | 0% |
+| LibFK containers | ~110 | ~75% |
+| LibFK text/algos/core/memory | ~55 | ~60-80% |
 | Kernel | 0 | 0% |
-| **Total** | **~85 test cases** | **~10-15%** |
-
-## Key Architecture Insights (from Comparative Analysis)
-
-### Strengths vs Other OSes
-
-| Feature | FKernel | Linux | FreeBSD | SerenityOS | seL4 |
-|---------|---------|-------|---------|------------|------|
-| Dual bitmap+buddy | **Unique** | No | No | No | No |
-| seL4 caps in monolithic | **Unique** | No | No | No | N/A (pure micro) |
-| COW-safe page table cloning | Yes | Yes | Yes | Yes | N/A |
-| kqueue+epoll+eventfd+timerfd+signalfd | **All 5** | epoll+signalfd | kqueue | kqueue | N/A |
-| Three-tier smart pointers | OwnPtr/RefPtr/RetainPtr | None | None | RefPtr/OwnPtr | N/A |
-| Layer enforcement (build-time) | Yes (Lua script) | No | No | No | N/A |
-| Heap corruption detection | 0xC0FFEE magic | CONFIG_DEBUG_HEAP | No | No | N/A |
-| PCI hotplug | Yes (+/dev/pci) | Yes | Yes | No | N/A |
-
-### Weaknesses vs Other OSes
-
-| Gap | FKernel | Linux | FreeBSD | SerenityOS |
-|-----|---------|-------|---------|------------|
-| No COW (fork copies all) | Critical | Since 0.01 | Since 0.01 | Implemented |
-| Fixed 32MB heap | Fragments | vmalloc exists | UMA zones | Heap grows |
-| Scheduler: nice not wired | Statically prioritized | CFS/EEVDF dynamic | Dynamic decay | Dynamic |
-| No slab/UMA allocator | First-fit heap | SLUB (complex) | UMA (mature) | Slab-like |
-| No swap/OOM killer | halt on OOM | Full OOM | Full OOM | OOM resistance |
-| SMP hardcoded to 1 CPU | Infra exists | Full SMP | Full SMP | Full SMP |
-| No AML interpreter | ACPI DSDT/SSDT skipped | Full AML | Full AML | Partial |
-
-## Critical Blocker Analysis
-
-### Phase 17 — Bug Fixes (Complete)
-
-**All high-impact bugs resolved:**
-- LibFK→Kernel dependencies fixed
-- DMA virt→physical address confusion in AHCI/NVMe/E1000 resolved
-- VMM switch_address_space() SMP-safe
-- NVMe busy-waits and memory leaks fixed
-- E1000/DHCP/DNS interrupt-driven TX implemented
-- Kernel→LibC layer violations eliminated
-- Magic numbers replaced with named constants
-
-### Phase 19 — OpenRC Integration (Pending)
-
-**Dependencies met:** All OpenRC-required syscalls implemented.
-**Blockers:** Build scripts never executed, libmd/libbsd never compiled, /proc/sys/ missing.
-
-## Phase 26 (Complete)
-
-Phase 26 (QoS + MLFQ + Turnstiles Scheduler) is complete. See `Docs/Domains/process-scheduling.md` for full architecture.
+| Total | ~207 test cases | ~40-50% |
 
 ## Strategic Recommendations
 
-1. **Implement COW for fork()** — critical for server workloads and OpenRC service supervision
-2. **Add slab/UMA allocator** — first-fit heap fragments badly with many small allocations
-3. **Complete POSIX networking** — sendto/recvfrom/shutdown/getsockname/setsockopt are critical
-4. **Build and test OpenRC** — the long-term goal; build scripts exist but were never executed
-5. **Enable SMP** — infrastructure exists (per-CPU MLFQ queues, work stealing) but m_processor_count hardcoded to 1
-6. **Standardize Manager pattern (Phase 23)** — fix public constructors, migrate to fkernel namespace
+1. Phase 29 (IPC Capability Integration) -- route POSIX mechanisms through CSpace/Endpoint for unified security model
+2. OpenRC integration -- build + test the init system as PID 1
+3. Kernel integration tests -- at minimum VFS, scheduler, and memory manager test coverage
+4. Fix remaining ELF gaps -- endianness check, file-size bounds, symbol versioning
+5. Thread group support (CLONE_THREAD) -- needed for multi-threaded userspace
+6. Enable CSPRNG seeding -- uncomment init.cpp:105-107 for real ASLR entropy
