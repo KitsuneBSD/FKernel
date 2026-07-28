@@ -1,4 +1,3 @@
-
 require("Meta.Lib.os_interact")
 require("Meta.Lib.print_message")
 require("Meta.Lib.run_command")
@@ -28,11 +27,11 @@ function RunMockOS(debug_flags, output_log_path)
     "qemu-system-x86_64",
     "-cdrom " .. MockOS,
     "-m 2G",
-    "-smp 2",
+    "-smp 1",
     "-boot d",
+    "-no-reboot",
   }
 
-  -- Determine if graphical mode or debug mode
   local is_debug_mode = debug_flags and output_log_path
 
   if is_debug_mode then
@@ -42,7 +41,6 @@ function RunMockOS(debug_flags, output_log_path)
     table.insert(qemu_cmd, "-serial mon:stdio")
   else
     table.insert(qemu_cmd, "-vga qxl")
-    table.insert(qemu_cmd, "-d int,mmu")
     table.insert(qemu_cmd, "-serial file:logs/serial.log")
   end
 

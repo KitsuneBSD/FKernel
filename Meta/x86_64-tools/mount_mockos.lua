@@ -5,7 +5,7 @@ local Compiler = require("Meta.Lib.userland_compiler")
 local Initrd = require("Meta.Lib.initrd_builder")
 local Iso = require("Meta.Lib.iso_builder")
 local Components = require("Meta.Lib.component_manager")
-require("Meta.x86_64-tools.check-kernel")
+require("Meta.x86_64-tools.check_kernel")
 
 local STAGING = "build/initrd_root"
 local MOCKOS = "build/mockos"
