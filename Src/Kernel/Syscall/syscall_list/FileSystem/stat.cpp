@@ -2,6 +2,7 @@
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <LibFK/Utilities/memory.h>
 
 using namespace fkernel;
@@ -13,15 +14,27 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
   if (!path_ptr || !statbuf_ptr)
     return fkernel::return_error(fk::core::Error::InvalidParameter);
 
+  if (!fkernel::memory::is_user_address(path_ptr, 1))
+    return fkernel::return_error(fk::core::Error::InvalidParameter);
+  if (!fkernel::memory::is_user_address(statbuf_ptr, sizeof(struct stat)))
+    return fkernel::return_error(fk::core::Error::InvalidParameter);
+
   auto *current_task = SchedulerManager::the().current();
   if (!current_task)
     return fkernel::return_error(fk::core::Error::PermissionDenied);
 
-  char path[512];
-  fk::memory::copy_n(path, reinterpret_cast<const char *>(path_ptr), 511);
-  path[511] = '\0';
+  const char *upath = reinterpret_cast<const char *>(path_ptr);
+  size_t path_len = 0;
+  while (path_len < 511 && upath[path_len] != '\0')
+    path_len++;
 
-  struct stat *buf = reinterpret_cast<struct stat *>(statbuf_ptr);
+  char path[512];
+  auto path_copy = fkernel::memory::copy_from_user(path, upath, path_len + 1);
+  if (path_copy.is_error())
+    return -14;
+
+  struct stat kbuf;
+  fk::memory::set(&kbuf, 0, sizeof(kbuf));
 
   char absolute_path[512];
   const char *final_path = path;
@@ -48,10 +61,15 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
     final_path = absolute_path;
   }
 
-  auto res = VirtualFileSystem::the().stat(final_path, buf);
+  auto res = VirtualFileSystem::the().stat(final_path, &kbuf);
   if (res.is_error()) {
     return fkernel::return_error(res.error());
   }
+
+  auto copy_out = fkernel::memory::copy_to_user(
+      reinterpret_cast<void *>(statbuf_ptr), &kbuf, sizeof(struct stat));
+  if (copy_out.is_error())
+    return -14;
 
   return 0;
 }

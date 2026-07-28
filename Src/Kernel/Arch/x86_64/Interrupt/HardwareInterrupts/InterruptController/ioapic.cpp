@@ -91,7 +91,11 @@ void IOAPIC::apply_iso_overrides() {
     m_irq_to_gsi[iso->irq_source] = static_cast<uint8_t>(iso->gsi);
     m_irq_overridden[iso->irq_source] = true;
 
-    uint64_t entry = (static_cast<uint64_t>(CPU::the().lapic_id()) << 56) | vector | static_cast<uint64_t>(ioapic_flags);
+    uint32_t cpu_count = ACPIManager::the().cpu_count();
+    if (cpu_count == 0) cpu_count = 1;
+    uint8_t target_lapic = ACPIManager::the().cpu_apic_id(iso->irq_source % cpu_count);
+
+    uint64_t entry = (static_cast<uint64_t>(target_lapic) << 56) | vector | static_cast<uint64_t>(ioapic_flags);
     write_redir_entry(*ctrl, iso->gsi, entry);
   }
 }
@@ -100,13 +104,15 @@ void IOAPIC::initialize() {
   for (uint32_t i = 0; i < MAX_IRQ; ++i)
     m_irq_to_gsi[i] = static_cast<uint8_t>(i);
 
-  uint8_t bsp_lapic_id = CPU::the().lapic_id();
+  uint32_t cpu_count = ACPIManager::the().cpu_count();
+  if (cpu_count == 0) cpu_count = 1;
 
   if (ACPIManager::the().ioapic_count() > 0) {
     for (uint32_t i = 0; i < ACPIManager::the().ioapic_count() && m_controller_count < MAX_IOAPIC_CONTROLLERS; ++i) {
       auto *info = ACPIManager::the().ioapic_info(i);
       if (!info || info->address == 0) continue;
-      init_controller(m_controllers[m_controller_count], info->address, info->gsi_base, bsp_lapic_id);
+      uint8_t target_lapic = ACPIManager::the().cpu_apic_id(m_controller_count % cpu_count);
+      init_controller(m_controllers[m_controller_count], info->address, info->gsi_base, target_lapic);
       m_controller_count++;
     }
   }
@@ -114,15 +120,17 @@ void IOAPIC::initialize() {
   if (m_controller_count == 0) {
     uintptr_t acpi_addr = ACPIManager::the().ioapic_address();
     uintptr_t address = (acpi_addr != 0) ? acpi_addr : IOAPIC_ADDRESS;
+    uint8_t target_lapic = ACPIManager::the().cpu_apic_id(0);
     fk::algorithms::klog("IOAPIC", "Falling back to single IOAPIC at %p (%s)",
                          address, (acpi_addr != 0) ? "MADT" : "hardcoded");
-    init_controller(m_controllers[0], address, 0, bsp_lapic_id);
+    init_controller(m_controllers[0], address, 0, target_lapic);
     m_controller_count = 1;
   }
 
   apply_iso_overrides();
 
-  fk::algorithms::klog("IOAPIC", "Initialized %u IOAPIC controller(s)", m_controller_count);
+  fk::algorithms::klog("IOAPIC", "Initialized %u IOAPIC controller(s) across %u CPUs",
+                       m_controller_count, cpu_count);
 }
 
 void IOAPIC::mask_interrupt(uint8_t irq) {

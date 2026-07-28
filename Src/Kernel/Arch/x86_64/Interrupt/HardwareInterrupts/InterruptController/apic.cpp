@@ -155,7 +155,7 @@ APIC::allocate_msix_vector(const PciDevice& device, uint16_t entry) {
   ctrl &= ~static_cast<uint16_t>(1 << 14);
   device.write_config_word(cap_ptr + 2, ctrl);
 
-  fk::algorithms::klog("MSI-X", "Entry %u -> Vector 0x%x for %02x:%02x.%d",
+  fk::algorithms::klog("MSI_X", "Entry %u -> Vector 0x%x for %02x:%02x.%d",
                        entry, vector, device.address().bus(),
                        device.address().device(), device.address().function());
   return vector;
@@ -168,4 +168,15 @@ uint32_t APIC::get_id() const {
   if (!lapic_base)
     return 0;
   return (read(0x20) >> 24) & 0xFF;
+}
+
+void APIC::send_ipi(uint8_t lapic_id, uint8_t vector, uint32_t delivery_mode) {
+  write(APIC_REG_ICR_HIGH, static_cast<uint32_t>(lapic_id) << 24);
+  uint32_t icr_low = delivery_mode | vector;
+  write(APIC_REG_ICR_LOW, icr_low);
+}
+
+void APIC::wait_ipi_delivery() {
+  while (read(APIC_REG_ICR_LOW) & (1u << 12))
+    asm volatile("pause");
 }

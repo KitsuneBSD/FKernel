@@ -12,17 +12,17 @@ StorageCache::CacheEntry* StorageCache::find_entry(uint64_t sector) {
 
 fk::core::Result<size_t, fk::core::Error>
 StorageCache::read_sectors(uint64_t start_sector, size_t count, uint8_t* buffer) {
-    fk::algorithms::klog("STORAGE CACHE", "Reading %u sectors at %llu", count, start_sector);
+    fk::algorithms::klog("STORAGE_CACHE", "Reading %u sectors at %llu", count, start_sector);
     
     for (size_t i = 0; i < count; ++i) {
         uint64_t sector = start_sector + i;
         CacheEntry* entry = find_entry(sector);
         
         if (entry) {
-            fk::algorithms::klog("STORAGE CACHE", "Hit for sector %llu", sector);
+            fk::algorithms::klog("STORAGE_CACHE", "Hit for sector %llu", sector);
             fk::memory::copy(buffer + (i * 512), entry->data, 512);
         } else {
-            fk::algorithms::klog("STORAGE CACHE", "Miss for sector %llu, loading...", sector);
+            fk::algorithms::klog("STORAGE_CACHE", "Miss for sector %llu, loading...", sector);
             size_t index = sector % CACHE_SIZE;
             if (m_cache[index].dirty) {
                 TRY(m_device->write_sectors(m_cache[index].sector, 1, m_cache[index].data));
@@ -42,7 +42,7 @@ StorageCache::read_sectors(uint64_t start_sector, size_t count, uint8_t* buffer)
 
 fk::core::Result<size_t, fk::core::Error>
 StorageCache::write_sectors(uint64_t start_sector, size_t count, const uint8_t* buffer) {
-    fk::algorithms::klog("STORAGE CACHE", "Writing %u sectors at %llu", count, start_sector);
+    fk::algorithms::klog("STORAGE_CACHE", "Writing %u sectors at %llu", count, start_sector);
     
     for (size_t i = 0; i < count; ++i) {
         uint64_t sector = start_sector + i;

@@ -2,6 +2,9 @@
 
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Types/cpu_count.h>
+#include <LibFK/Types/tick_count.h>
+#include <LibFK/Types/process_id.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Synchronization/spinlock.h>
@@ -17,16 +20,16 @@ private:
 
     fk::synchronization::Spinlock m_lock;
     fkernel::Processor m_processors[32];
-    uint32_t m_processor_count = 1;
+    fk::CpuCount m_processor_count{1};
 
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_wait_queue;
     fk::containers::IntrusiveList<Task, &Task::sleep_node> m_sleep_queue;
     fk::containers::IntrusiveList<Task, &Task::zombie_node> m_zombie_queue;
 
     bool m_is_initialized = false;
-    uint64_t m_default_quantum = 5;
+    fk::TickCount m_default_quantum{5};
     uint64_t m_next_pid = 1;
-    uint64_t m_global_tick_counter{0};
+    fk::TickCount m_global_tick_counter{0};
     static constexpr uint64_t BOOST_PERIOD_TICKS = 500;
 
 public:
@@ -39,14 +42,14 @@ public:
       return fk::ProcessId(__sync_fetch_and_add(&m_next_pid, 1));
     }
 
-    uint64_t last_pid() const { return m_next_pid; }
+    fk::ProcessId last_pid() const { return fk::ProcessId(m_next_pid); }
 
     void initialize();
     void add_task(Task* task);
     void block_current();
     void block_current_noqueue();
     void zombify_current();
-    void sleep_current(uint64_t ticks);
+    void sleep_current(fk::TickCount ticks);
     void yield();
     void wake_task(Task* task);
     void terminate_current(int status);
@@ -65,7 +68,7 @@ public:
     void send_signal_to_pgrp(int pgid, int signum);
 
     Task* pick_next();
-    Task* steal_task(uint32_t stealing_cpu);
+    Task* steal_task(fk::CpuCount stealing_cpu);
 
     fkernel::Processor& current_processor();
     Task* current() { return current_processor().current_task; }
@@ -73,4 +76,8 @@ public:
     bool is_need_resched() { return current_processor().need_resched; }
     void set_need_resched(bool value) { current_processor().need_resched = value; }
     bool is_initialized() const { return m_is_initialized; }
+
+    void start_aps();
+    void idle_loop();
+    fk::CpuCount processor_count() const { return m_processor_count; }
 };

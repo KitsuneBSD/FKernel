@@ -1,11 +1,13 @@
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
+#include <Kernel/Memory/VirtualMemory/memory_region.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Fs/Virtual/ShmFs/shm_node.h>
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/node.h>
@@ -16,6 +18,7 @@ static constexpr uint64_t PROT_WRITE = 0x2;
 static constexpr uint64_t PROT_EXEC  = 0x4;
 static constexpr uint64_t MAP_ANONYMOUS = 0x20;
 static constexpr uint64_t MAP_SHARED    = 0x01;
+static constexpr uint64_t MAP_FIXED     = 0x10;
 
 static fk::RefPtr<fkernel::ShmNode> resolve_shm(Task* task, int fd) {
   if (fd < 0) return nullptr;
@@ -26,7 +29,25 @@ static fk::RefPtr<fkernel::ShmNode> resolve_shm(Task* task, int fd) {
   return fk::RefPtr<fkernel::ShmNode>(static_cast<fkernel::ShmNode*>(node.get()));
 }
 
-static uintptr_t reserve_mmap_range(Task* task, uintptr_t hint, uint64_t len) {
+static uintptr_t reserve_mmap_range(Task* task, uintptr_t hint, uint64_t len, bool fixed) {
+    if (fixed) {
+        if (hint == 0 || (hint & 0xFFF) != 0)
+            return 0; // EINVAL
+        uintptr_t aligned_len = (len + 0xFFF) & ~0xFFFULL;
+        uintptr_t end = hint + aligned_len;
+        // If MAP_FIXED overlaps existing regions, unmap them
+        auto& regions = task->resources.memory.regions.list;
+        for (size_t i = 0; i < regions.size(); ) {
+            auto& r = regions[i];
+            if (r.start < end && hint < r.end) {
+                VirtualMemoryManager::the().munmap(r.start, r.end - r.start);
+                regions.remove_at(i);
+            } else {
+                ++i;
+            }
+        }
+        return hint;
+    }
     if (hint != 0) return hint;
     uintptr_t addr = task->memory().regions.mmap_end;
     task->memory().regions.mmap_end += (len + 0xFFF) & ~0xFFFULL;
@@ -44,18 +65,18 @@ static uint64_t mmap_file(Task* task, uintptr_t addr, uint64_t len, uint64_t pro
                            uint64_t fd, uint64_t offset) {
     auto file = task->get_file_descriptor(static_cast<int>(fd));
     if (!file) {
-        fk::algorithms::kwarn("sys_mmap", "invalid fd=%lu", fd);
+        fk::algorithms::kwarn("MMAP", "invalid fd=%lu", fd);
         return fkernel::return_error(fk::core::Error::InvalidParameter);
     }
 
-    uintptr_t target = reserve_mmap_range(task, addr, len);
+    uintptr_t target = reserve_mmap_range(task, addr, len, false);
     PageFlags flags = prot_to_page_flags(prot);
     uint64_t pages = (len + 0xFFF) >> 12;
 
     for (uint64_t i = 0; i < pages; ++i) {
         uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
         if (!phys) return fkernel::return_error(fk::core::Error::OutOfMemory);
-        fk::memory::set(reinterpret_cast<void*>(phys + 0xFFFF800000000000ULL), 0, 4096);
+        fk::memory::set(reinterpret_cast<void*>(phys + KERNEL_VIRT_BASE), 0, 4096);
         VirtualMemoryManager::the().map_page(target + i * 4096, phys, flags);
     }
 
@@ -85,22 +106,26 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
     if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
 
     if (flags & MAP_ANONYMOUS) {
-        uintptr_t target_addr = reserve_mmap_range(task, addr, len);
+        bool is_fixed = (flags & MAP_FIXED) != 0;
+        uintptr_t target_addr = reserve_mmap_range(task, addr, len, is_fixed);
         PageFlags pg_flags = prot_to_page_flags(prot);
-        uint64_t pages = (len + 0xFFF) >> 12;
-        for (uint64_t i = 0; i < pages; ++i) {
-            uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
-            if (!phys) return fkernel::return_error(fk::core::Error::OutOfMemory);
-            VirtualMemoryManager::the().map_page(target_addr + i * 4096, phys, pg_flags);
-            fk::memory::set(reinterpret_cast<void*>(target_addr + i * 4096), 0, 4096);
-        }
+        uint64_t page_aligned_len = (len + 0xFFF) & ~0xFFFULL;
+
+        fkernel::MemoryRegion region;
+        region.start = target_addr;
+        region.end = target_addr + page_aligned_len;
+        region.flags = pg_flags;
+        region.name = "anon";
+
+        task->resources.memory.regions.list.push_back(region);
+
         return target_addr;
     }
 
     if ((flags & MAP_SHARED) && fd != (uint64_t)-1) {
         auto shm = resolve_shm(task, static_cast<int>(fd));
         if (shm) {
-            uintptr_t target_addr = reserve_mmap_range(task, addr, len);
+            uintptr_t target_addr = reserve_mmap_range(task, addr, len, false);
             PageFlags pg_flags = prot_to_page_flags(prot);
             shm->map_into(task, target_addr, pg_flags);
             return target_addr;
@@ -128,7 +153,7 @@ uint64_t sys_mremap(uint64_t old_addr, uint64_t old_size, uint64_t new_size,
     if (!task) return (uint64_t)-12;
 
     (void)flags; (void)new_addr_hint;
-    uintptr_t new_region = reserve_mmap_range(task, 0, new_size);
+    uintptr_t new_region = reserve_mmap_range(task, 0, new_size, false);
     uint64_t new_pages = (new_size + 0xFFF) >> 12;
     for (uint64_t i = 0; i < new_pages; ++i) {
         uintptr_t phys = PhysicalMemoryManager::the().alloc_page();

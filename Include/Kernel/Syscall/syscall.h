@@ -70,6 +70,8 @@ uint64_t sys_yield(uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4,
                    uint64_t arg5, uint64_t arg6, PtRegs* regs);
 uint64_t sys_fcntl(uint64_t fd, uint64_t cmd, uint64_t arg, uint64_t arg4,
                    uint64_t arg5, uint64_t arg6, PtRegs* regs);
+uint64_t sys_utimensat(uint64_t dirfd, uint64_t path, uint64_t times, uint64_t flags,
+                       uint64_t arg5, uint64_t arg6, PtRegs* regs);
 
 void initialize_syscalls();
 

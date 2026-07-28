@@ -22,8 +22,75 @@ void BuddyAllocator::add_range(uintptr_t base_address, size_t length) {
     );
     m_base_address = base_address;
     m_length = length;
+}
+
+void BuddyAllocator::initialize_from_bitmap(const fk::containers::Bitmap<uint64_t>& bitmap, uintptr_t zone_base) {
+    fk::algorithms::klog(
+        "BUDDY",
+        "Initialize from bitmap: base=%p len=%zu zone_base=%p",
+        m_base_address,
+        m_length,
+        zone_base
+    );
+
     m_state.reset();
-    initialize();
+
+    uintptr_t aligned = fk::utilities::align_up(m_base_address, BUDDY_PAGE_SIZE);
+    uintptr_t end = m_base_address + m_length;
+    m_base_address = aligned;
+    m_length = end - aligned;
+
+    uintptr_t current = m_base_address;
+    size_t remaining = m_length;
+
+    while (remaining >= order_to_size(MIN_ORDER)) {
+        size_t frame = (current - zone_base) / BUDDY_PAGE_SIZE;
+
+        if (bitmap.get(frame)) {
+            current += BUDDY_PAGE_SIZE;
+            remaining -= BUDDY_PAGE_SIZE;
+            continue;
+        }
+
+        size_t order = MAX_ORDER;
+        while (order >= MIN_ORDER) {
+            size_t size = order_to_size(order);
+            if ((current & (size - 1)) != 0 || size > remaining) {
+                order--;
+                continue;
+            }
+            size_t base_frame = (current - zone_base) / BUDDY_PAGE_SIZE;
+            size_t page_count = size / BUDDY_PAGE_SIZE;
+            bool all_free = true;
+            for (size_t p = 1; p < page_count; p++) {
+                if (bitmap.get(base_frame + p)) {
+                    all_free = false;
+                    break;
+                }
+            }
+            if (all_free) break;
+            order--;
+        }
+
+        if (order < MIN_ORDER) {
+            current += BUDDY_PAGE_SIZE;
+            remaining -= BUDDY_PAGE_SIZE;
+            continue;
+        }
+
+        push_free_block(order, current);
+
+        size_t size = order_to_size(order);
+        current += size;
+        remaining -= size;
+    }
+
+    fk::algorithms::klog(
+        "BUDDY",
+        "Initialize from bitmap done: base=%p len=%zu",
+        m_base_address,
+        m_length
+    );
 }
 
 size_t BuddyAllocator::order_to_index(size_t order) const {
@@ -39,26 +106,16 @@ bool BuddyAllocator::in_range(uintptr_t address) const {
            address < (m_base_address + m_length);
 }
 
-FreeBlock* BuddyAllocator::new_block(uintptr_t phys) {
-    return m_state.allocate_node(phys);
-}
-
 void BuddyAllocator::push_free_block(size_t order, uintptr_t address) {
     size_t idx = order_to_index(order);
-    FreeBlock* block = new_block(address);
-    if (!block) {
-        fk::algorithms::kwarn("BUDDY", "Push failed: node pool exhausted");
-        return;
-    }
-
-    m_state.push(idx, block);
+    m_state.push(idx, address);
 }
 
 uintptr_t BuddyAllocator::pop_free_block(size_t order) {
     size_t idx = order_to_index(order);
-    FreeBlock* block = m_state.pop(idx);
+    uintptr_t phys = m_state.pop(idx);
 
-    if (!block) {
+    if (!phys) {
         fk::algorithms::kwarn(
             "BUDDY",
             "Pop failed: order=%zu",
@@ -67,7 +124,7 @@ uintptr_t BuddyAllocator::pop_free_block(size_t order) {
         return 0;
     }
 
-    return block->phys_addr;
+    return phys;
 }
 
 void BuddyAllocator::initialize() {
@@ -163,7 +220,7 @@ void BuddyAllocator::free(void* ptr, size_t order) {
         uintptr_t buddy = buddy_of(addr, order);
 
         if (!in_range(buddy)) {
-            fk::algorithms::kwarn(
+            fk::algorithms::kdebug(
                 "BUDDY",
                 "Merge stop: buddy out of range phys=%p",
                 buddy
@@ -174,7 +231,7 @@ void BuddyAllocator::free(void* ptr, size_t order) {
         size_t idx = order_to_index(order);
 
         if (!m_state.remove(idx, buddy)) {
-            fk::algorithms::kwarn(
+            fk::algorithms::kdebug(
                 "BUDDY",
                 "Merge stop: buddy not free phys=%p",
                 buddy
@@ -187,4 +244,11 @@ void BuddyAllocator::free(void* ptr, size_t order) {
     }
 
     push_free_block(order, addr);
+}
+
+void BuddyAllocator::invalidate_page(uintptr_t phys) {
+    for (size_t order = MIN_ORDER; order <= MAX_ORDER; order++) {
+        size_t idx = order_to_index(order);
+        m_state.remove(idx, phys);
+    }
 }

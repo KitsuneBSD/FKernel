@@ -14,7 +14,7 @@ static size_t futex_bucket(uintptr_t uaddr) {
 }
 
 extern "C" void fkernel_futex_wake_one(uintptr_t uaddr) {
-  s_futex_notifications[futex_bucket(uaddr)].signal(1);
+  s_futex_notifications[futex_bucket(uaddr)].signal(fk::NotificationBits(1));
 }
 
 static constexpr int FUTEX_WAIT         = 0;
@@ -57,8 +57,8 @@ extern "C" uint64_t sys_futex(uint64_t uaddr, uint64_t op, uint64_t val,
       uint64_t ticks = (ns / 1000000ULL) * freq / 1000ULL;
       if (ticks == 0) ticks = 1;
 
-      uint64_t result = notif.wait_timeout(ticks);
-      if (result == 0)
+      fk::NotificationBits result = notif.wait_timeout(fk::TickCount(ticks));
+      if (result.is_empty())
         return (uint64_t)-110;
     } else {
       notif.wait();
@@ -72,7 +72,7 @@ extern "C" uint64_t sys_futex(uint64_t uaddr, uint64_t op, uint64_t val,
     if (count == 0) count = 1;
     auto& notif = s_futex_notifications[futex_bucket(addr)];
     for (uint32_t i = 0; i < count; ++i)
-      notif.signal(1);
+      notif.signal(fk::NotificationBits(1));
     return (uint64_t)count;
   }
 
@@ -92,7 +92,7 @@ extern "C" uint64_t sys_futex(uint64_t uaddr, uint64_t op, uint64_t val,
 
     auto& src_notif = s_futex_notifications[futex_bucket(addr)];
     for (uint32_t i = 0; i < nr_wake; ++i)
-      src_notif.signal(1);
+      src_notif.signal(fk::NotificationBits(1));
 
     return (uint64_t)nr_wake;
   }

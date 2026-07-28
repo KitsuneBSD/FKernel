@@ -119,6 +119,7 @@ void DisplayFramebuffer::render_char(uint32_t x, uint32_t y, char c, uint32_t fg
           uint32_t offset = py * fb_pitch + px * (fb_bpp / 8);
           if (fb_bpp == 32) *reinterpret_cast<uint32_t *>(target + offset) = color;
           else if (fb_bpp == 24) { target[offset] = color & 0xFF; target[offset + 1] = (color >> 8) & 0xFF; target[offset + 2] = (color >> 16) & 0xFF; }
+          else if (fb_bpp == 16 || fb_bpp == 15) *reinterpret_cast<uint16_t *>(target + offset) = static_cast<uint16_t>(color);
         }
       }
     }
@@ -137,6 +138,7 @@ void DisplayFramebuffer::scroll() {
     uint8_t* line = target + (y * fb_pitch);
     for (uint32_t x = 0; x < fb_width; ++x) {
       if (fb_bpp == 32) reinterpret_cast<uint32_t *>(line)[x] = bg_pixel;
+      else if (fb_bpp == 16 || fb_bpp == 15) reinterpret_cast<uint16_t *>(line)[x] = static_cast<uint16_t>(bg_pixel);
       else if (fb_bpp == 24) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
     }
   }
@@ -178,6 +180,8 @@ void DisplayFramebuffer::draw_cursor() {
     uint8_t* line = target + (y * fb_pitch);
     for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
       if (fb_bpp == 32) reinterpret_cast<uint32_t *>(line)[x] = color;
+      else if (fb_bpp == 16 || fb_bpp == 15) reinterpret_cast<uint16_t *>(line)[x] = static_cast<uint16_t>(color);
+      else if (fb_bpp == 24) { line[x*3] = color & 0xFF; line[x*3+1] = (color >> 8) & 0xFF; line[x*3+2] = (color >> 16) & 0xFF; }
     }
   }
   mark_dirty(px_start, py_start, font_w, 2);
@@ -192,6 +196,8 @@ void DisplayFramebuffer::erase_cursor() {
     uint8_t* line = target + (y * fb_pitch);
     for (uint32_t x = px_start; x < px_start + font_w && x < fb_width; ++x) {
       if (fb_bpp == 32) reinterpret_cast<uint32_t *>(line)[x] = color;
+      else if (fb_bpp == 16 || fb_bpp == 15) reinterpret_cast<uint16_t *>(line)[x] = static_cast<uint16_t>(color);
+      else if (fb_bpp == 24) { line[x*3] = color & 0xFF; line[x*3+1] = (color >> 8) & 0xFF; line[x*3+2] = (color >> 16) & 0xFF; }
     }
   }
   mark_dirty(px_start, py_start, font_w, 2);
@@ -222,6 +228,7 @@ void DisplayFramebuffer::clear() {
           for (uint32_t y = 0; y < fb_height; ++y) {
               uint8_t* line = back_buffer + (y * fb_pitch);
               if (fb_bpp == 32) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
+              else if (fb_bpp == 16 || fb_bpp == 15) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint16_t*>(line)[x] = static_cast<uint16_t>(bg_pixel);
               else for (uint32_t x = 0; x < fb_width; ++x) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
           }
       }
@@ -233,6 +240,7 @@ void DisplayFramebuffer::clear() {
           for (uint32_t y = 0; y < fb_height; ++y) {
               uint8_t* line = framebuffer + (y * fb_pitch);
               if (fb_bpp == 32) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint32_t*>(line)[x] = bg_pixel;
+              else if (fb_bpp == 16 || fb_bpp == 15) for (uint32_t x = 0; x < fb_width; ++x) reinterpret_cast<uint16_t*>(line)[x] = static_cast<uint16_t>(bg_pixel);
               else for (uint32_t x = 0; x < fb_width; ++x) { line[x*3] = bg_pixel&0xFF; line[x*3+1] = (bg_pixel>>8)&0xFF; line[x*3+2] = (bg_pixel>>16)&0xFF; }
           }
       }
@@ -254,6 +262,7 @@ void DisplayFramebuffer::clear_rect(uint32_t x, uint32_t y, uint32_t width, uint
     uint8_t* line = target + (py * fb_pitch);
     for (uint32_t px = x; px < end_x; ++px) {
       if (fb_bpp == 32) reinterpret_cast<uint32_t *>(line)[px] = bg_pixel;
+      else if (fb_bpp == 16 || fb_bpp == 15) reinterpret_cast<uint16_t *>(line)[px] = static_cast<uint16_t>(bg_pixel);
       else if (fb_bpp == 24) { line[px*3] = bg_pixel&0xFF; line[px*3+1] = (bg_pixel>>8)&0xFF; line[px*3+2] = (bg_pixel>>16)&0xFF; }
     }
   }
@@ -277,7 +286,10 @@ void DisplayFramebuffer::set_colors_rgb(uint32_t fg, uint32_t bg) { fk::synchron
 void DisplayFramebuffer::set_cursor_pos(uint32_t x, uint32_t y) { fk::synchronization::ScopedLockIRQ lock(Display::lock()); erase_cursor(); cursor_x = x; cursor_y = y; draw_cursor(); }
 void DisplayFramebuffer::show_cursor(bool visible) { if (visible) draw_cursor(); else erase_cursor(); }
 void DisplayFramebuffer::write_ansi(const char *str) { write_ansi_n(str, fk::memory::length(str)); }
-void DisplayFramebuffer::write_ansi_n([[maybe_unused]] const char *str, [[maybe_unused]] size_t size) { /* Implementação ANSI processada pelo delegate VGATerminal */ }
+void DisplayFramebuffer::write_ansi_n(const char *str, size_t size) {
+  for (size_t i = 0; i < size; ++i)
+    put_codepoint(static_cast<uint8_t>(str[i]));
+}
 
 void DisplayFramebuffer::allocate_back_buffer() {
   if (back_buffer) return;
@@ -323,7 +335,15 @@ void DisplayFramebuffer::update_dirty_rectangles() {
 }
 
 uint8_t* DisplayFramebuffer::get_render_buffer() { if (double_buffering_enabled && back_buffer) return back_buffer; return framebuffer; }
-void DisplayFramebuffer::flush() { if (!double_buffering_enabled || !back_buffer || !m_dirty_tiles) return; fk::synchronization::ScopedLockIRQ lock(Display::lock()); update_dirty_rectangles(); m_last_flush_tick = TickManager::the().get_ticks(); }
+void DisplayFramebuffer::flush() {
+  if (!double_buffering_enabled || !back_buffer) return;
+  fk::synchronization::ScopedLockIRQ lock(Display::lock());
+  if (m_dirty_tiles)
+    update_dirty_rectangles();
+  else
+    fk::memory::copy(framebuffer, back_buffer, fb_height * fb_pitch);
+  m_last_flush_tick = TickManager::the().get_ticks();
+}
 void DisplayFramebuffer::background_flush() {
   if (!double_buffering_enabled || !back_buffer || !m_dirty_tiles) return;
   uint64_t current_tick = TickManager::the().get_ticks(); uint32_t freq = TickManager::the().get_frequency(); if (freq == 0) freq = 100;

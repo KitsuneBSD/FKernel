@@ -72,10 +72,17 @@ void CPU::detect_cpu_features() {
     m_has_smep = true;
   if (ebx & (1 << 20))
     m_has_smap = true;
+
+  // Check for XSAVE + AVX (leaf 1, ECX bits 26-28)
+  // Already have ecx from leaf 1 above
+  if (ecx & (1 << 26))
+    m_has_xsave = true;
+  if (ecx & (1 << 28))
+    m_has_avx = true;
 }
 
 void CPU::initialize_features() {
-  arch_enable_cpu_features(m_has_smep, m_has_smap, m_has_nx);
+  arch_enable_cpu_features(m_has_smep, m_has_smap, m_has_nx, m_has_xsave, m_has_avx);
 }
 
 void CPU::write_msr(uint32_t msr, uint64_t value) {

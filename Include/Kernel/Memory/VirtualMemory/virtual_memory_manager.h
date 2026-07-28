@@ -32,9 +32,6 @@ protected:
   /** @brief Invalidates a single TLB entry. */
   void invlpg(uintptr_t addr);
 
-  /** @brief Flushes the entire TLB by reloading CR3. */
-  void flush_tlb();
-
   /** @brief (Internal) Calculates the virtual address of a page table. */
   uintptr_t get_table_virtual_address(uint16_t pml4_idx, uint16_t pdpt_idx = 0,
                                       uint16_t pd_idx = 0,
@@ -94,8 +91,17 @@ public:
   /** @brief Unmaps a region of virtual memory. */
   fk::core::Result<int, fk::core::Error> munmap(uintptr_t addr, size_t length);
 
+  /** @brief Extends the higher-half direct map to cover all physical memory using 2MB pages. */
+  void extend_direct_map();
+
+  /** @brief Returns the physical address of the kernel PML4. */
+  uintptr_t get_kernel_cr3() const { return m_kernel_pml4_phys; }
+
   /** @brief Gets the PTE for a virtual address. */
   uint64_t* get_pte(uintptr_t virt, bool create = false);
+
+  /** @brief Flushes the entire TLB by reloading CR3. Public so fork can flush after CoW marking. */
+  void flush_tlb();
 
 private:
   void unmap_page_range(uintptr_t start, uintptr_t end);

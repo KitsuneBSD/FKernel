@@ -1,4 +1,5 @@
 #include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -22,7 +23,7 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64
         if (m_read_nonblock) {
             return fk::core::Error::WouldBlock;
         }
-        m_data_notification.wait();
+        m_endpoint.wait();
         m_lock.lock();
     }
 
@@ -42,7 +43,8 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64
     }
     m_lock.unlock();
 
-    m_space_notification.signal(1);
+    m_endpoint.signal(fk::NotificationBits(1));
+    notify_kqueue_writers(this);
     return to_read;
 }
 
@@ -66,7 +68,7 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::write([[maybe_unused]] uint6
             if (m_write_nonblock) {
                 return total_written > 0 ? fk::core::Result<size_t, fk::core::Error>(total_written) : fk::core::Error::WouldBlock;
             }
-            m_space_notification.wait();
+            m_endpoint.wait();
             m_lock.lock();
             continue;
         }
@@ -81,7 +83,8 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::write([[maybe_unused]] uint6
 
         total_written += to_write;
         m_lock.unlock();
-        m_data_notification.signal(1);
+        m_endpoint.signal(fk::NotificationBits(1));
+        notify_kqueue_readers(this);
         m_lock.lock();
     }
     m_lock.unlock();

@@ -10,6 +10,15 @@
 namespace fkernel {
 namespace net {
 
+static bool skip_dns_name(const uint8_t*& p, const uint8_t* end) {
+    while (p < end && *p != 0) {
+        if ((*p & 0xC0) == 0xC0) { p += 2; return false; }
+        p += 1 + *p;
+    }
+    if (p < end) ++p;
+    return true;
+}
+
 DnsResolver& DnsResolver::the() {
     static DnsResolver instance(IPv4Address(8, 8, 8, 8));
     return instance;
@@ -28,22 +37,12 @@ bool dns_parse_response(const uint8_t* buf, size_t len, uint32_t& ip_out) {
     const uint8_t* end = buf + len;
 
     for (uint16_t i = 0; i < qdcount && p < end; ++i) {
-        while (p < end && *p != 0) {
-            if ((*p & 0xC0) == 0xC0) { p += 2; goto next_q; }
-            p += 1 + *p;
-        }
-        ++p;
-        next_q:
+        skip_dns_name(p, end);
         p += 4;
     }
 
     for (uint16_t i = 0; i < ancount && p < end; ++i) {
-        while (p < end && *p != 0) {
-            if ((*p & 0xC0) == 0xC0) { p += 2; goto next_a; }
-            p += 1 + *p;
-        }
-        ++p;
-        next_a:
+        skip_dns_name(p, end);
         if (p + 10 > end) return false;
         uint16_t rtype  = (uint16_t)((p[0] << 8) | p[1]);
         uint16_t rclass = (uint16_t)((p[2] << 8) | p[3]);

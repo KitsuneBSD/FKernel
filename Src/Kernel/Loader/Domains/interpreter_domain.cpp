@@ -1,9 +1,11 @@
 #include <Kernel/Loader/Domains/interpreter_domain.h>
+#include <Kernel/Loader/Domains/dynamic_domain.h>
 #include <Kernel/Loader/Domains/parser_domain.h>
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/dentry.h>
+#include <LibFK/Algorithms/chacha20.h>
 #include <LibFK/Algorithms/log.h>
 
 namespace fkernel::elf_domains {
@@ -57,13 +59,26 @@ InterpreterDomain::load_interpreter(const fk::text::String& interpreter_path) {
     if (headers_res.is_error())
         return headers_res.error();
     
-    LoadDomain loader(node_res.value());
-    MemoryDomain memory(node_res.value());
-    
     uintptr_t interpreter_base = 0x70000000;
+    {
+      uint64_t seed;
+      fk::algorithms::ChaCha20PRNG::the().fill_buffer(
+          reinterpret_cast<uint8_t*>(&seed), sizeof(seed));
+      static constexpr uintptr_t ASLR_MIN  = 0x10000000;
+      static constexpr size_t    ASLR_RANGE = 0x60000000 / 0x1000;
+      uintptr_t offset = ((seed & 0x3FFFFFFFull) % ASLR_RANGE) * 0x1000;
+      interpreter_base = ASLR_MIN + offset;
+    }
+    m_interpreter_base = interpreter_base;
+    
+    LoadDomain loader(node_res.value());
     auto load_res = loader.process_load_segments(headers_res.value(), interpreter_base);
     if (load_res.is_error())
         return load_res.error();
+    
+    DynamicDomain dyn_ldr(node_res.value());
+    (void)dyn_ldr.apply_relocations(headers_res.value(), fk::VirtualAddress(interpreter_base));
+    fk::algorithms::klog("ELF", "ld.so relocations applied at base 0x%lx", interpreter_base);
     
     return reinterpret_cast<uintptr_t>(header_res.value().e_entry + interpreter_base);
 }

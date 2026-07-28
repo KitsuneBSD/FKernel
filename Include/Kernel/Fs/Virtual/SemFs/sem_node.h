@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Types/types.h>
@@ -29,16 +29,15 @@ public:
   int try_wait();
   int get_value() const;
 
-  uint64_t generation() const { return m_generation; }
-  const uint64_t* generation_ptr() const { return &m_generation; }
-  void revoke() { ++m_generation; }
+  uint64_t generation() const { return m_endpoint.generation(); }
+  const uint64_t* generation_ptr() const { return m_endpoint.generation_ptr(); }
+  void revoke() { m_endpoint.revoke(); }
 
 private:
   mutable fk::synchronization::Spinlock m_lock;
   uint32_t m_count;
   uint32_t m_max;
-  uint64_t m_generation{0};
-  ipc::Notification m_waiters;
+  ipc::Endpoint m_endpoint;
 };
 
 }

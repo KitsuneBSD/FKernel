@@ -1,6 +1,10 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
+#include <LibFK/Types/task_priority.h>
+#include <LibFK/Types/nice_value.h>
+#include <LibFK/Types/tick_count.h>
+#include <LibFK/Types/mlfq_level.h>
 
 namespace fkernel::scheduler {
 
@@ -22,18 +26,18 @@ enum class SchedulingPolicy : uint8_t {
 };
 
 struct QoSLevel {
-    uint8_t base_priority;
-    uint8_t priority_range;
-    uint8_t quantum_ticks;
-    uint64_t allotment_ticks;
-    uint8_t default_mlfq_level;
+    fk::TaskPriority base_priority;
+    fk::TaskPriority priority_range;
+    fk::TickCount quantum_ticks;
+    fk::TickCount allotment_ticks;
+    fk::MlqfLevel default_mlfq_level;
 };
 
 const QoSLevel& qos_level(QoSClass qos);
-uint8_t priority_for_qos(QoSClass qos, int8_t nice = 0);
-uint64_t allotment_for_qos(QoSClass qos);
-uint8_t quantum_for_level(uint8_t level);
-int8_t nice_to_priority_offset(int8_t nice);
+fk::TaskPriority priority_for_qos(QoSClass qos, fk::NiceValue nice = fk::NiceValue(0));
+fk::TickCount allotment_for_qos(QoSClass qos);
+fk::TickCount quantum_for_level(fk::MlqfLevel level);
+fk::NiceValue nice_to_priority_offset(fk::NiceValue nice);
 QoSClass qos_from_linux_policy(int policy);
 int linux_policy_from_qos(SchedulingPolicy policy);
 

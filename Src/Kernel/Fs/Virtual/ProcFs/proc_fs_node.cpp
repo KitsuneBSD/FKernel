@@ -69,7 +69,7 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
   entries.push_back(cpuinfo_de);
 
   auto& scheduler = SchedulerManager::the();
-  uint64_t max_pid = scheduler.last_pid();
+  uint64_t max_pid = scheduler.last_pid().value();
   for (uint64_t pid = 1; pid < max_pid; ++pid) {
     if (scheduler.find_task(fk::ProcessId(pid))) {
       DirectoryEntry de;
@@ -119,7 +119,7 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> ProcFsNode::lookup(const cha
     ++p;
   }
 
-  auto res = fk::make_ref<ProcPidDirNode>(pid).value();
+  auto res = fk::make_ref<ProcPidDirNode>(fk::ProcessId(pid)).value();
   if (!res) return fk::core::Error::OutOfMemory;
   return fk::RefPtr<Node>(res);
 }

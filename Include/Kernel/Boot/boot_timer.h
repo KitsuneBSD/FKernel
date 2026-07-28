@@ -25,4 +25,5 @@ public:
 
   void mark(const char* name);
   void log_summary();
+  void set_tsc_frequency(uint64_t freq_hz);
 };

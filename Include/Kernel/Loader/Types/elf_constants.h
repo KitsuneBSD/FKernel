@@ -3,6 +3,11 @@
 namespace fkernel {
 #define EI_NIDENT 16
 
+// ELF identification indices
+#define EI_DATA         5
+#define ELFDATA2LSB     1
+#define ELFDATA2MSB     2
+
 // Machine types
 #define EM_X86_64       62
 

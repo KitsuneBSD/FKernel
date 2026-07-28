@@ -30,6 +30,9 @@ public:
 
   uint32_t get_id() const;
 
+  void send_ipi(uint8_t lapic_id, uint8_t vector, uint32_t delivery_mode);
+  void wait_ipi_delivery();
+
   fk::text::String get_name() override { return m_name; }
   /**
    * @brief Initialize and enable the local APIC

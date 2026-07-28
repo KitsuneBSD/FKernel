@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
+#include <Kernel/Driver/Terminal/vga_terminal.h>
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/log.h>
@@ -38,7 +39,7 @@ TerminalManager::create_terminal(TerminalType type, const char *name_hint) {
     fkernel::DriverManager::the().register_device(fk::RefPtr<Node>(term_ptr));
 
     m_vga_terminals.push_back(fk::types::move(terminal));
-    fk::algorithms::klog("TERMINAL MANAGER",
+    fk::algorithms::klog("TERMINAL_MANAGER",
                          "Created VGA terminal tty%d on-demand", tty_index);
     return id;
   }
@@ -81,7 +82,7 @@ TerminalManager::delete_terminal(TerminalId id) {
         m_vga_terminals[m_vga_terminals.size() - 1] = fk::types::move(temp);
       }
       m_vga_terminals.pop_back();
-      fk::algorithms::klog("TERMINAL MANAGER", "Deleted VGA terminal tty%d",
+      fk::algorithms::klog("TERMINAL_MANAGER", "Deleted VGA terminal tty%d",
                            id.value() - 1);
       return {};
     }
@@ -114,6 +115,8 @@ void TerminalManager::initialize() {
   }
   // Set default active terminal
   m_active_terminal_index = 0;
+  if (m_vga_terminals.size() > 0)
+    VGATerminal::set_active(m_vga_terminals[0].get());
   m_is_initialized = true;
 }
 
@@ -141,7 +144,7 @@ void TerminalManager::switch_to(int index) {
   // Update the global active TTY for legacy reasons/convenience
   VGATerminal::set_active(terminal);
   
-  fk::algorithms::klog("TERMINAL MANAGER", "Switched to tty%d", index);
+  fk::algorithms::klog("TERMINAL_MANAGER", "Switched to tty%d", index);
   
   // 1. Redraw/Sync Display: Clear screen and show terminal state
   // In a real system, we'd restore the character buffer of this terminal to the VGA adapter.
@@ -167,7 +170,7 @@ void TerminalManager::force_tty0_active() {
     m_active_terminal_index = 0;
     auto* terminal = m_vga_terminals[0].get();
     VGATerminal::set_active(terminal);
-    fk::algorithms::klog("TERMINAL MANAGER", "Forced tty0 to be active for userspace visibility");
+    fk::algorithms::klog("TERMINAL_MANAGER", "Forced tty0 to be active for userspace visibility");
   }
 }
 

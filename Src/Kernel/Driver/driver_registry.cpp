@@ -12,37 +12,37 @@
 namespace fkernel {
 
 void DriverRegistry::initialize() {
-    fk::algorithms::klog("DRIVER REGISTRY", "Initializing auto-registration system...");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Initializing auto-registration system...");
     
     register_storage_drivers();
     register_network_drivers();
     register_display_drivers();
     
-    fk::algorithms::klog("DRIVER REGISTRY", "Auto-registration complete.");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Auto-registration complete.");
 }
 
 void DriverRegistry::register_storage_drivers() {
-    fk::algorithms::klog("DRIVER REGISTRY", "Registering storage drivers...");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Registering storage drivers...");
     
     // PCI Class 0x01: Mass Storage Controllers
     register_pci_driver<ATAController>(0x01, 0x01);  // IDE Controller
     register_pci_driver<AHCIController>(0x01, 0x06);  // SATA Controller  
     register_pci_driver<NVMeController>(0x01, 0x08);  // NVMe Controller
     
-    fk::algorithms::klog("DRIVER REGISTRY", "Storage drivers registered.");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Storage drivers registered.");
 }
 
 void DriverRegistry::register_network_drivers() {
-    fk::algorithms::klog("DRIVER REGISTRY", "Registering network drivers...");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Registering network drivers...");
     
     // PCI Class 0x02: Network Controllers
     register_pci_driver<E1000Controller>(0x02, 0x00); // Ethernet Controller
     
-    fk::algorithms::klog("DRIVER REGISTRY", "Network drivers registered.");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Network drivers registered.");
 }
 
 void DriverRegistry::register_display_drivers() {
-    fk::algorithms::klog("DRIVER REGISTRY", "Display drivers not implemented yet.");
+    fk::algorithms::klog("DRIVER_REGISTRY", "Display drivers not implemented yet.");
     // Future: register_pci_driver<VGADriver>(0x03, 0x00);
 }
 

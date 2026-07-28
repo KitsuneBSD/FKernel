@@ -4,6 +4,7 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 
 #include <Kernel/Boot/Stages/early_init.h>
 #include <Kernel/Boot/Stages/init.h>
@@ -46,7 +47,8 @@ void early_init() {
 
   auto &pmm = PhysicalMemoryManager::the();
   size_t total_mib = pmm.total_memory() / (1024 * 1024);
-  size_t free_mib  = pmm.free_memory()  / (1024 * 1024);
+  size_t raw_free   = pmm.free_memory();
+  size_t free_mib   = (raw_free > total_mib * 1024ULL * 1024ULL) ? total_mib : raw_free / (1024 * 1024);
   fk::algorithms::klog("EARLY_INIT",
       "Physical memory: total=%zu MiB free=%zu MiB",
       total_mib, free_mib);
@@ -72,6 +74,7 @@ void early_init() {
   // CPU features
   fk::algorithms::klog("EARLY_INIT", "Detecting CPU features...");
   CPU::the().initialize_features();
+  detect_tsc_frequency();
   fk::algorithms::klog("EARLY_INIT", "CPU: vendor='%s' brand='%s'",
       CPU::the().get_vendor().c_str(),
       CPU::the().get_brand().c_str());

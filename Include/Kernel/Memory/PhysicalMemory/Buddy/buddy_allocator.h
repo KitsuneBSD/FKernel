@@ -7,6 +7,7 @@
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/free_blocks.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Container/bitmap.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Utilities/aligner.h>
@@ -40,9 +41,6 @@ protected:
   /** @brief Checks if an address is within the managed range. */
   bool in_range(uintptr_t address) const;
 
-  /** @brief Allocates a new node from the state's pool. */
-  FreeBlock* new_block(uintptr_t phys);
-
   /** @brief Pushes a block into the specified order's free list. */
   void push_free_block(size_t order, uintptr_t address);
 
@@ -58,9 +56,16 @@ public:
   BuddyAllocator(uintptr_t base_address, size_t length);
 
   /**
-   * @brief Adds a new range to the allocator and re-initializes.
+   * @brief Stores the managed range without populating free lists.
    */
   void add_range(uintptr_t base_address, size_t length);
+
+  /**
+   * @brief Initializes free lists from bitmap, only adding blocks of truly free pages.
+   * @param bitmap The per-page allocation bitmap for the zone.
+   * @param zone_base Physical base address of the zone (for frame index calculation).
+   */
+  void initialize_from_bitmap(const fk::containers::Bitmap<uint64_t>& bitmap, uintptr_t zone_base);
 
   /**
    * @brief Allocates a block of memory of the specified order.
@@ -73,4 +78,10 @@ public:
    * @brief Frees a previously allocated block and attempts to merge buddies.
    */
   void free(void* ptr, size_t order);
+
+  /**
+   * @brief Removes a single page from all buddy free lists so it won't be
+   *        returned by alloc() after the bitmap has already given it out.
+   */
+  void invalidate_page(uintptr_t phys);
 };

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/file_description.h>
+#include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Fs/Vfs/mount_namespace.h>
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Container/static_vector.h>
 #include <LibFK/Text/fixed_string.h>
@@ -63,14 +65,17 @@ struct TaskMemory {
     } regions{};
 };
 
-static constexpr size_t MAX_OPEN_FILES = 128;
+static constexpr size_t MAX_OPEN_FILES = 1024;
 
 /**
  * @brief Task Files and filesystem state
  */
 struct TaskFiles {
     fk::text::fixed_string<256> cwd{"/"};
+    fk::RefPtr<fkernel::Dentry> root;
+    fk::RefPtr<fkernel::MountNamespace> mount_ns;
     fk::containers::static_vector<fk::RefPtr<FileDescription>, MAX_OPEN_FILES> descriptors;
+    // CSpace cap_handles deferred — heap corruption investigation needed
 };
 
 /**
@@ -108,7 +113,15 @@ struct TaskContext {
     uint64_t fs_base{0};
     uint64_t gs_base{0};
     alignas(16) uint8_t fx_state[512]{};
+    uint8_t* xsave_area{nullptr};
+    size_t   xsave_size{0};
 };
+
+inline void* get_fpu_save_area(TaskContext& ctx) {
+    if (ctx.xsave_area)
+        return ctx.xsave_area;
+    return ctx.fx_state;
+}
 
 /**
  * @brief Task Scheduling and Lifecycle state
@@ -216,6 +229,7 @@ struct Task {
 
     void dump_file_descriptors() const;
     void print_info() const;
+    void release_all_file_locks();
 
     void destroy();
 

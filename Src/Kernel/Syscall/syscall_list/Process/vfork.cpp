@@ -46,7 +46,8 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
   child->control.lifecycle.boosted = false;
   child->control.lifecycle.original_qos = parent->control.lifecycle.qos;
   child->resources.files.cwd = parent->resources.files.cwd;
-  child->control.lifecycle.vfork_parent_id = parent->control.identity.id; // Mark as vfork child
+  child->resources.files.root = parent->resources.files.root;
+  child->resources.files.mount_ns = parent->resources.files.mount_ns;
 
   // 2.5 Initialize IPC CSpace for child
   child->resources.ipc.cspace = new fkernel::ipc::CSpace();

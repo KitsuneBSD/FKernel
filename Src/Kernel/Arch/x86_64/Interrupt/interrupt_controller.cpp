@@ -26,7 +26,7 @@ void InterruptController::initialize() {
   clear();
 
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
-    set_gate(i, g_isr_stubs[i], GateType::InterruptGate, 0x08, 0);
+    set_gate(i, g_isr_stubs[i], GateType::InterruptGate, GDT_KERNEL_CODE_SELECTOR, 0);
     register_interrupt(default_handler, i);
   }
 
@@ -34,9 +34,9 @@ void InterruptController::initialize() {
   // IST1: Double Fault (#8) — prevents triple fault on stack corruption
   // IST2: NMI (#2) — prevents triple fault if NMI fires on corrupted stack
   // IST3: Machine Check (#18) — must not nest on a potentially-damaged stack
-  set_gate(2,  g_isr_stubs[2],  GateType::InterruptGate, 0x08, 2);
-  set_gate(8,  g_isr_stubs[8],  GateType::InterruptGate, 0x08, 1);
-  set_gate(18, g_isr_stubs[18], GateType::InterruptGate, 0x08, 3);
+  set_gate(2,  g_isr_stubs[2],  GateType::InterruptGate, GDT_KERNEL_CODE_SELECTOR, 2);
+  set_gate(8,  g_isr_stubs[8],  GateType::InterruptGate, GDT_KERNEL_CODE_SELECTOR, 1);
+  set_gate(18, g_isr_stubs[18], GateType::InterruptGate, GDT_KERNEL_CODE_SELECTOR, 3);
 
   // NOTE: Interrupt Exception
   register_interrupt(divide_by_zero_handler, 0);
@@ -85,9 +85,6 @@ void InterruptController::initialize() {
 }
 
 void InterruptController::clear() {
-  /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::kdebug("INTERRUPT", "Clearing all IDT entries and handlers");
-  */
   for (size_t i = 0; i < MAX_x86_64_IDT_SIZE; ++i) {
     m_entries[i] = {};
     m_handlers[i] = nullptr;
@@ -106,21 +103,10 @@ void InterruptController::set_gate(uint8_t vector, void (*new_interrupt)(),
   d.offset_mid = static_cast<uint16_t>((handler >> 16) & 0xFFFFu);
   d.offset_high = static_cast<uint32_t>((handler >> 32) & 0xFFFFFFFFu);
   d.zero = 0;
-
-  /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::kdebug(
-      "IDT", "Gate set: vector=%u handler=%p type=%u selector=%x ist=%u",
-      vector, new_interrupt, type, selector, ist);
-  */
 }
 
 void InterruptController::register_interrupt(interrupt new_interrupt,
                                              uint8_t vector) {
-  /*TODO: Apply this log when we work with LogLevel
-                                              fk::algorithms::kdebug("INTERRUPT",
-                         "Registered handler: vector=%u, handler=%p", vector,
-                         new_interrupt);
-  */
   m_handlers[vector] = new_interrupt;
 }
 
@@ -129,9 +115,6 @@ void InterruptController::load() {
   ptr.limit = static_cast<uint16_t>(sizeof(m_entries) - 1);
   ptr.base = reinterpret_cast<uint64_t>(&m_entries);
   flush_idt(&ptr);
-  /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::kdebug("INTERRUPT", "IDT loaded to CPU", ptr.base, ptr.limit);
-  */
 }
 
 interrupt InterruptController::get_interrupt(uint8_t vector) {

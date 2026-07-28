@@ -25,11 +25,11 @@ extern "C" uint64_t sys_chroot(uint64_t path_ptr, uint64_t, uint64_t, uint64_t,
         path = resolved;
     }
 
-    auto res = fkernel::VirtualFileSystem::the().resolve_path(path);
-    if (res.is_error()) return fkernel::return_error(res.error());
-    if (!res.value()->top_node() || !res.value()->top_node()->is_directory())
-        return (uint64_t)-20; // ENOTDIR
+  auto res = fkernel::VirtualFileSystem::the().resolve_path(path);
+  if (res.is_error()) return fkernel::return_error(res.error());
+  if (!res.value()->top_node() || !res.value()->top_node()->is_directory())
+    return (uint64_t)-20; // ENOTDIR
 
-    task->resources.files.cwd = fk::text::fixed_string<256>(path);
-    return 0;
+  task->resources.files.root = res.value();
+  return 0;
 }

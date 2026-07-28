@@ -40,6 +40,13 @@ private:
   void process_range(uintptr_t base, uintptr_t end, uint64_t *&bitmap_cursor,
                      size_t bitmap_words_remaining);
 
+  /** @brief Internal single-page alloc bypassing init guard (used during boot). */
+  uintptr_t alloc_page_internal(ZoneType preferred, uint32_t preferred_node);
+
+  /** @brief Internal contiguous alloc bypassing init guard (used during boot). */
+  uintptr_t alloc_contiguous_internal(size_t order, ZoneType preferred,
+                                      uint32_t preferred_node);
+
 public:
   PhysicalMemoryManager() = default;
   PhysicalMemoryManager(const PhysicalMemoryManager &) = delete;
@@ -59,6 +66,11 @@ public:
   void initialize();
 
   /**
+   * @brief Reconciles buddy allocators with bitmap after direct map is available.
+   */
+  void reconcile_buddies();
+
+  /**
    * @brief Mark a physical memory range as reserved (not for general allocation)
    * @param base Physical base address
    * @param length Length of range in bytes
@@ -73,8 +85,23 @@ public:
    */
   uintptr_t alloc_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
 
-  /** @brief Frees a previously allocated page. */
+  /** @brief Frees a previously allocated page (refcount-aware). */
   void free_page(uintptr_t phys);
+
+  /**
+   * @brief Increments the CoW reference count for a physical frame.
+   * Called when a frame is shared between parent and child during fork.
+   */
+  void increment_refcount(uintptr_t phys);
+
+  /**
+   * @brief Decrements the CoW reference count for a physical frame.
+   * @return The new refcount after decrement. Caller should free if 0.
+   */
+  uint16_t decrement_refcount(uintptr_t phys);
+
+  /** @brief Returns the current CoW refcount for a physical frame. */
+  uint16_t get_refcount(uintptr_t phys) const;
 
   /**
    * @brief Allocates a contiguous range of blocks using the buddy system.

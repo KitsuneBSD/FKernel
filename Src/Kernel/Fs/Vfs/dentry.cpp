@@ -1,10 +1,21 @@
 #include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Fs/Vfs/mount_namespace.h>
+#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Utilities/memory.h>
 
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
+
+static DentryNodeStack& dentry_stack(Dentry* d) {
+  auto* ns = current_mount_namespace();
+  if (ns) {
+    auto* ns_stack = ns->get_stack(d);
+    if (ns_stack) return *ns_stack;
+  }
+  return d->default_stack();
+}
 
 Dentry::Dentry(fk::text::String name, fk::RefPtr<Dentry> parent)
     : m_name(fk::types::move(name)), m_parent(fk::types::move(parent)) {}
@@ -15,18 +26,44 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::create(fk::text::S
 
 void Dentry::push_node(fk::RefPtr<Node> node) {
     if (!node) return;
+    auto* ns = current_mount_namespace();
+    if (ns) {
+      ns->ensure_stack(this).push(node);
+      return;
+    }
     fk::synchronization::ScopedLock lock(m_lock);
     m_node_stack.push(node);
 }
 
 void Dentry::pop_node() {
+    auto* ns = current_mount_namespace();
+    if (ns) {
+      auto* ns_stack = ns->get_stack(this);
+      if (ns_stack) ns_stack->pop();
+      return;
+    }
     fk::synchronization::ScopedLock lock(m_lock);
     m_node_stack.pop();
 }
 
 fk::RefPtr<Node> Dentry::top_node() const {
+    auto* ns = current_mount_namespace();
+    if (ns) {
+      auto* ns_stack = ns->get_stack(const_cast<Dentry*>(this));
+      if (ns_stack) return ns_stack->top();
+      return nullptr;
+    }
     fk::synchronization::ScopedLock lock(m_lock);
     return m_node_stack.top();
+}
+
+const fk::containers::Vector<fk::RefPtr<Node>>& Dentry::nodes() const {
+    auto* ns = current_mount_namespace();
+    if (ns) {
+      auto* ns_stack = ns->get_stack(const_cast<Dentry*>(this));
+      if (ns_stack) return ns_stack->all();
+    }
+    return m_node_stack.all();
 }
 
 fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char* name) {
@@ -35,13 +72,12 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
 
     {
         fk::synchronization::ScopedLock lock(m_lock);
-        for (auto& child : m_children) {
-            if (child->name() == name) return child;
-        }
+        size_t idx = fk::algorithms::find_if(m_children.begin(), m_children.size(),
+            [&name](const auto& c) { return c->name() == name; });
+        if (idx != m_children.size()) return m_children[idx];
     }
 
-    // Not in cache, try lookups in the node stack
-    const auto& all_nodes = m_node_stack.all();
+    const auto& all_nodes = dentry_stack(this).all();
     for (int i = static_cast<int>(all_nodes.size()) - 1; i >= 0; --i) {
         auto res = all_nodes[i]->lookup(name);
         if (!res.is_ok())
@@ -57,9 +93,9 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
         }
 
         fk::synchronization::ScopedLock lock(m_lock);
-        for (auto& child : m_children) {
-            if (child->name() == name) return child;
-        }
+        size_t idx = fk::algorithms::find_if(m_children.begin(), m_children.size(),
+            [&name](const auto& c) { return c->name() == name; });
+        if (idx != m_children.size()) return m_children[idx];
         m_children.push_back(new_dentry);
         return new_dentry;
     }

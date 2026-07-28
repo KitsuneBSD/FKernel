@@ -18,8 +18,8 @@ fk::core::Result<size_t, fk::core::Error> ProcProcessNode::read(uint64_t offset,
 
 void ProcProcessNode::ensure_cached() {
   if (!m_cached.is_empty()) return;
-  uint64_t pid = m_pid;
-  auto t = SchedulerManager::the().find_task(fk::ProcessId(pid));
+  fk::ProcessId pid = m_pid;
+  auto t = SchedulerManager::the().find_task(pid);
   if (!t) {
     const char* msg = "(process not found)\n";
     m_cached.clear();

@@ -88,6 +88,17 @@ typedef struct {
 #define SI_TIMER   -2
 #define SI_TKILL   -6
 
+#define ILL_ILLOPC  1
+#define ILL_PRVOPC  2
+#define FPE_INTDIV  1
+#define FPE_INTOVF  2
+#define FPE_FLTDIV  3
+#define SEGV_MAPERR 1
+#define BUS_ADRALN  1
+#define BUS_ADRERR  2
+#define TRAP_BRKPT  1
+#define TRAP_TRACE  2
+
 typedef void (*sighandler_t)(int);
 
 #define SIG_DFL ((sighandler_t)0)

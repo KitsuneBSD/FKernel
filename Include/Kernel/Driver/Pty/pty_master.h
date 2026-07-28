@@ -36,6 +36,8 @@ private:
   fk::RefPtr<PtyBuffer> m_to_slave;
   fk::RefPtr<PtyBuffer> m_from_slave;
   PtyLineDiscipline m_ldisc;
+  uint16_t m_rows{24};
+  uint16_t m_cols{80};
 };
 
 }

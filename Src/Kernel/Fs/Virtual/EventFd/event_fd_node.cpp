@@ -1,4 +1,5 @@
 #include <Kernel/Fs/Virtual/EventFd/event_fd_node.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <LibFK/Memory/ref_ptr.h>
 
 namespace fkernel {
@@ -25,7 +26,7 @@ EventFdNode::read(uint64_t, size_t size, uint8_t* buffer) {
         m_lock.unlock();
         if (m_nonblock)
             return fk::core::Error::WouldBlock;
-        m_readable.wait();
+        m_endpoint.wait();
         m_lock.lock();
     }
 
@@ -62,7 +63,8 @@ EventFdNode::write(uint64_t, size_t size, const uint8_t* buffer) {
     m_counter += val;
     m_lock.unlock();
 
-    m_readable.signal(1);
+    m_endpoint.signal(fk::NotificationBits(1));
+    notify_kqueue_readers(this);
     return sizeof(uint64_t);
 }
 

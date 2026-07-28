@@ -14,8 +14,7 @@ extern "C" void kernel_entry() {
   serial::init();
   // Wire up the puts hook now so every klog/kwarn/kerror below actually reaches serial.
   fkernel::io::initialize_kernel_puts();
-  fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
-                                   fk::algorithms::LogTarget::Display);
+  fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial);
 
   auto &vga = vga::the();
   vga.clear();

@@ -1,8 +1,15 @@
 #include <Kernel/Driver/Pty/pty_master.h>
 #include <Kernel/Ipc/signal_delivery.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Utilities/memory.h>
+
+struct winsize {
+  uint16_t ws_row;
+  uint16_t ws_col;
+  uint16_t ws_xpixel;
+  uint16_t ws_ypixel;
+};
 
 namespace fkernel {
 
@@ -63,27 +70,59 @@ PtyMaster::write(uint64_t, size_t size, const uint8_t* buf) {
 
 fk::core::Result<int, fk::core::Error>
 PtyMaster::ioctl(uint64_t request, uint64_t arg) {
-  static constexpr uint64_t TIOCGPTN = 0x80045430;
-  static constexpr uint64_t TCSETS   = 0x5402;
-  static constexpr uint64_t TCGETS   = 0x5401;
+  static constexpr uint64_t TIOCGPTN   = 0x80045430;
+  static constexpr uint64_t TCSETS     = 0x5402;
+  static constexpr uint64_t TCGETS     = 0x5401;
+  static constexpr uint64_t TIOCGWINSZ = 0x5413;
+  static constexpr uint64_t TIOCSWINSZ = 0x5414;
+  static constexpr uint64_t TIOCSCTTY  = 0x540E;
 
   if (request == TIOCGPTN) {
     const char* p = name().c_str() + 3;
     unsigned int n = 0;
     while (*p >= '0' && *p <= '9') n = n * 10 + (unsigned int)(*p++ - '0');
-    *reinterpret_cast<unsigned int*>(arg) = n;
+    fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &n, sizeof(n));
     return 0;
   }
 
+  if (request == TIOCGWINSZ) {
+    struct winsize ws;
+    ws.ws_row = m_rows;
+    ws.ws_col = m_cols;
+    ws.ws_xpixel = m_cols * 8;
+    ws.ws_ypixel = m_rows * 16;
+    fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &ws, sizeof(ws));
+    return 0;
+  }
+
+  if (request == TIOCSWINSZ) {
+    struct winsize ws;
+    if (fkernel::memory::copy_from_user(&ws, reinterpret_cast<const void*>(arg), sizeof(ws)).is_error())
+      return fk::core::Error::InvalidParameter;
+    if (ws.ws_row > 0) m_rows = ws.ws_row;
+    if (ws.ws_col > 0) m_cols = ws.ws_col;
+    return 0;
+  }
+
+  if (request == TIOCSCTTY) {
+    auto* task = SchedulerManager::the().current();
+    if (task) {
+      task->control.identity.pgid = task->control.identity.id;
+      return 0;
+    }
+    return fk::core::Error::PermissionDenied;
+  }
+
   if (request == TCGETS) {
-    auto* t = reinterpret_cast<Termios*>(arg);
-    fk::memory::copy(t, &m_ldisc.termios(), sizeof(Termios));
+    fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &m_ldisc.termios(), sizeof(Termios));
     return 0;
   }
 
   if (request == TCSETS) {
-    auto* t = reinterpret_cast<const Termios*>(arg);
-    m_ldisc.set_termios(*t);
+    Termios t;
+    if (fkernel::memory::copy_from_user(&t, reinterpret_cast<const void*>(arg), sizeof(Termios)).is_error())
+      return fk::core::Error::InvalidParameter;
+    m_ldisc.set_termios(t);
     return 0;
   }
 

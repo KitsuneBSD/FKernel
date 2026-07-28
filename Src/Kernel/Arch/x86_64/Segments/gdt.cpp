@@ -10,96 +10,89 @@ extern "C" uint64_t stack_bottom;
 extern "C" void flush_tss(uint16_t tss_selector);
 extern "C" void flush_gdt(void *gdtr);
 
-static constexpr size_t EXPECTED_TSS_SIZE = sizeof(TSS64);
-static_assert(EXPECTED_TSS_SIZE == 112,
-              "TSS64 size unexpected; check structure packing/alignment");
+static_assert(sizeof(TSS64) == 112, "TSS64 size unexpected; check packing/alignment");
 
-void GDTController::setupNull() { gdt[0] = 0; }
+static void setup_entries_impl(uint64_t gdt[10]) {
+  gdt[0] = 0; // null
 
-void GDTController::setupKernelCode() {
   gdt[1] = createSegment(SegmentAccess::Ring0Code,
                          SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-}
-
-void GDTController::setupKernelData() {
   gdt[2] = createSegment(SegmentAccess::Ring0Data, SegmentFlags::Granularity4K);
-}
-
-void GDTController::setupUserCode() {
+  gdt[3] = createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
   gdt[4] = createSegment(SegmentAccess::Ring3Code,
                          SegmentFlags::LongMode | SegmentFlags::Granularity4K);
-}
-
-void GDTController::setupUserData() {
-  gdt[3] = createSegment(SegmentAccess::Ring3Data, SegmentFlags::Granularity4K);
-}
-
-void GDTController::setupCompatibilitySegments() {
-  // Slot 7: 32-bit Kernel Code
-  gdt[7] = createSegment(SegmentAccess::Ring0Code, SegmentFlags::DefaultSize32 | SegmentFlags::Granularity4K);
-  
-  // Slot 8: 16-bit Kernel Code
+  gdt[7] = createSegment(SegmentAccess::Ring0Code,
+                         SegmentFlags::DefaultSize32 | SegmentFlags::Granularity4K);
   gdt[8] = createSegment(SegmentAccess::Ring0Code, SegmentFlags::DefaultSize16);
-  
-  // Slot 9: 16-bit Kernel Data
   gdt[9] = createSegment(SegmentAccess::Ring0Data, SegmentFlags::DefaultSize16);
 }
 
-void GDTController::setupTSS() {
-
-  uint64_t rsp0_top =
-      reinterpret_cast<uint64_t>(&stack_bottom) + KERNEL_STACK_SIZE;
+static void fill_tss_impl(TSS64& tss, uint32_t cpu_index) {
+  uint64_t rsp0_top = reinterpret_cast<uint64_t>(&stack_bottom)
+                      + KERNEL_STACK_SIZE * (cpu_index + 1);
   tss.rsp0 = rsp0_top;
-
-  tss.rsp1 = reinterpret_cast<uint64_t>(&rsp1_stack[IST_STACK_SIZE]);
-  tss.rsp2 = reinterpret_cast<uint64_t>(&rsp2_stack[IST_STACK_SIZE]);
+  tss.rsp1 = 0;
+  tss.rsp2 = 0;
 
   uint64_t *ist_targets[7] = {&tss.ist1, &tss.ist2, &tss.ist3, &tss.ist4,
-                              &tss.ist5, &tss.ist6, &tss.ist7};
-
+                               &tss.ist5, &tss.ist6, &tss.ist7};
   for (size_t i = 0; i < 7; ++i) {
-    uint64_t top = reinterpret_cast<uint64_t>(&ist_stacks[i][IST_STACK_SIZE]);
+    uint64_t top = reinterpret_cast<uint64_t>(
+        &ist_stacks[i][IST_STACK_SIZE]) + cpu_index * IST_STACK_SIZE * 7;
     *ist_targets[i] = top;
   }
 
   tss.io_map_base = sizeof(TSS64);
+}
 
+static void fill_gdt_tss_entries(uint64_t gdt[10], TSS64& tss) {
   uint64_t base = reinterpret_cast<uint64_t>(&tss);
   uint32_t limit = static_cast<uint32_t>(sizeof(TSS64) - 1);
-
   uint16_t limit16 = limit & 0xFFFF;
-
   uint64_t base0 = base & 0xFFFF;
   uint64_t base1 = (base >> 16) & 0xFF;
   uint64_t base2 = (base >> 24) & 0xFF;
   uint64_t base3 = (base >> 32) & 0xFFFFFFFF;
 
   uint64_t low = (limit16) | (base0 << 16) |
-                 ((uint64_t)0x9 << 40) | // type = 9 (available TSS)
-                 ((uint64_t)1 << 47) |   // present
+                 (0x9ULL << 40) | (1ULL << 47) |
                  (base1 << 32) | (base2 << 56);
-
   uint64_t high = base3;
-
-  if (TSS_INDEX + 1 >= (sizeof(gdt) / sizeof(gdt[0]))) {
-    fk::algorithms::kfatal("TSS", "TSS_INDEX out of range");
-  }
 
   gdt[TSS_INDEX] = low;
   gdt[TSS_INDEX + 1] = high;
 }
 
-void GDTController::setupGDTR() {
+void GDTController::initialize() {
+  if (m_initialized) {
+    fk::algorithms::kwarn("GDT", "already initialized, skipping");
+    return;
+  }
+  init_per_cpu(0);
+  load_per_cpu(0);
+  m_initialized = true;
+}
+
+void GDTController::init_per_cpu(uint32_t cpu_index) {
+  auto& gdt = m_gdt_per_cpu[cpu_index];
+  auto& tss = m_tss_per_cpu[cpu_index];
+  auto& gdtr = m_gdtr_per_cpu[cpu_index];
+
+  setup_entries_impl(gdt);
+  fill_tss_impl(tss, cpu_index);
+  fill_gdt_tss_entries(gdt, tss);
+
   gdtr.limit = static_cast<uint16_t>(sizeof(gdt) - 1);
   gdtr.base = reinterpret_cast<uint64_t>(&gdt);
 
-  if ((gdtr.base & 0x7ULL) != 0) {
-    fk::algorithms::kwarn("GDT", "GDTR base (0x%016lx) not 8-byte aligned",
-                          gdtr.base);
-  }
+  fk::algorithms::klog("GDT", "CPU %u GDT/TSS prepared (GDTR base=0x%016lx)",
+                       cpu_index, gdtr.base);
 }
 
-void GDTController::loadSegments() {
+void GDTController::load_per_cpu(uint32_t cpu_index) {
+  auto& gdtr = m_gdtr_per_cpu[cpu_index];
+
+  flush_gdt(&gdtr);
 
   asm volatile("mov $0x10, %%ax\n"
                "mov %%ax, %%ds\n"
@@ -115,58 +108,10 @@ void GDTController::loadSegments() {
                :
                :
                : "rax");
-}
-
-void GDTController::setupGDT() {
-
-  setupNull();
-  setupKernelCode();
-  setupKernelData();
-  setupUserCode();
-  setupUserData();
-  setupCompatibilitySegments();
-  setupTSS();
-  setupGDTR();
-}
-
-void GDTController::initialize() {
-  if (m_initialized) {
-    fk::algorithms::kwarn("GDT", "GDT already initialized, skipping");
-    return;
-  }
-
-  setupGDT();
-
-  flush_gdt(&gdtr);
-
-  GDTR loaded_gdtr = {};
-  asm volatile("sgdt %0" : "=m"(loaded_gdtr));
-
-  if (loaded_gdtr.base != gdtr.base || loaded_gdtr.limit != gdtr.limit) {
-    fk::algorithms::kfatal("GDT", "GDTR mismatch after lgdt");
-  }
-
-  loadSegments();
 
   flush_tss(TSS_SELECTOR);
-
-  uint16_t tr_val = 0;
-  asm volatile("str %0" : "=r"(tr_val));
-
-  if ((tr_val & 0xFFF8) != (TSS_SELECTOR & 0xFFF8)) {
-    fk::algorithms::kwarn(
-        "TSS", "Loaded TR (0x%04x) does not match expected selector (0x%04x)",
-        tr_val, TSS_SELECTOR);
-    fk::algorithms::kfatal("TSS", "Load verification failed (STR mismatch)");
-  }
-
-  m_initialized = true;
-  fk::algorithms::klog(
-      "GDT",
-      "Initialization complete (TSS selector=0x%04x, GDTR base=0x%016lx)",
-      TSS_SELECTOR, gdtr.base);
 }
 
 void GDTController::set_kernel_stack(uint64_t stack_addr) {
-  tss.rsp0 = stack_addr;
+  m_tss_per_cpu[0].rsp0 = stack_addr;
 }

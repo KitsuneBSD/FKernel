@@ -1,8 +1,13 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
+#include <Kernel/Arch/x86_64/Smp/ap_entry.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Driver/Vga/display.h>
 #include <Kernel/Hardware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
@@ -14,12 +19,16 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
+#include <LibFK/Utilities/memory.h>
 
 using namespace fkernel::scheduler;
 
 extern CpuControlBlock g_cpu_block;
 extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr,
-                               void* prev_fx, void* next_fx);
+                                void* prev_fx, void* next_fx);
+extern "C" void trampoline_start();
+extern "C" void trampoline_end();
+extern "C" uint64_t stack_bottom;
 
 SchedulerManager::SchedulerManager() {
   for (int i = 0; i < 32; ++i) {
@@ -32,12 +41,12 @@ void SchedulerManager::initialize() {
 
   if (ACPIManager::the().is_initialized()) {
     uint32_t detected = ACPIManager::the().cpu_count();
-    m_processor_count = (detected > 0) ? detected : 1;
+    m_processor_count = fk::CpuCount((detected > 0) ? detected : 1);
   } else {
-    m_processor_count = 1;
+    m_processor_count = fk::CpuCount(1);
   }
 
-  for (uint32_t i = 0; i < m_processor_count; ++i) {
+  for (uint32_t i = 0; i < m_processor_count.value(); ++i) {
     Task* idle = new Task();
     *idle = create_a_new_task(fk::ProcessId(0), "idle", idle_task_entry, true, 0, 1ULL << i, 0, 0,
                               QoSClass::Background);
@@ -47,14 +56,14 @@ void SchedulerManager::initialize() {
 
   m_next_pid = 2;
   fk::algorithms::klog("SCHEDULER", "MLFQ Scheduler initialized (%d levels, %d CPUs)",
-                       MLFQ_LEVELS, m_processor_count);
+                       MLFQ_LEVELS, m_processor_count.value());
 }
 
-Task* SchedulerManager::steal_task(uint32_t stealing_cpu) {
-  uint32_t busiest_cpu = stealing_cpu;
+Task* SchedulerManager::steal_task(fk::CpuCount stealing_cpu) {
+  uint32_t busiest_cpu = stealing_cpu.value();
   size_t max_tasks = 1;
-  for (uint32_t i = 0; i < m_processor_count; ++i) {
-    if (i == stealing_cpu) continue;
+  for (uint32_t i = 0; i < m_processor_count.value(); ++i) {
+    if (i == stealing_cpu.value()) continue;
     fk::synchronization::ScopedLockIRQ peek_lock(m_processors[i].run_queue_lock);
     size_t count = m_processors[i].run_queue_total_size();
     if (count > max_tasks) {
@@ -62,12 +71,22 @@ Task* SchedulerManager::steal_task(uint32_t stealing_cpu) {
       busiest_cpu = i;
     }
   }
-  if (busiest_cpu == stealing_cpu) return nullptr;
+  if (busiest_cpu == stealing_cpu.value()) return nullptr;
   fk::synchronization::ScopedLockIRQ lock(m_processors[busiest_cpu].run_queue_lock);
 
   for (int level = MLFQ_LEVELS - 1; level >= 0; --level) {
-    if (!m_processors[busiest_cpu].run_queues[level].queue.empty()) {
-      return m_processors[busiest_cpu].run_queues[level].queue.pop_front();
+    auto& queue = m_processors[busiest_cpu].run_queues[level].queue;
+    if (queue.empty()) continue;
+
+    uint32_t stealer_id = stealing_cpu.value();
+    for (auto it = queue.begin(); it != queue.end(); ++it) {
+      Task* task = &*it;
+      if (task->control.lifecycle.cpu_affinity != 0 &&
+          !(task->control.lifecycle.cpu_affinity & (1ULL << stealer_id)))
+        continue;
+      queue.remove(task);
+      task->control.lifecycle.time_slice_ticks = m_processors[busiest_cpu].run_queues[level].quantum_ticks.value();
+      return task;
     }
   }
   return nullptr;
@@ -75,25 +94,30 @@ Task* SchedulerManager::steal_task(uint32_t stealing_cpu) {
 
 Task* SchedulerManager::pick_next() {
   auto& proc = current_processor();
+  uint32_t cpu_id = proc.id;
   {
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
     for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
-      if (!proc.run_queues[level].queue.empty()) {
-        Task* next = proc.run_queues[level].queue.pop_front();
-        next->control.lifecycle.state = TaskState::Running;
-        next->control.lifecycle.time_slice_ticks = proc.run_queues[level].quantum_ticks;
-        next->control.lifecycle.cpu_time_consumed = 0;
-        proc.current_task = next;
+      auto& queue = proc.run_queues[level].queue;
+      if (queue.empty()) continue;
+
+      for (auto it = queue.begin(); it != queue.end(); ++it) {
+        Task* task = &*it;
+        if (task->control.lifecycle.cpu_affinity != 0 &&
+            !(task->control.lifecycle.cpu_affinity & (1ULL << cpu_id)))
+          continue;
+        queue.remove(task);
+        task->control.lifecycle.state = TaskState::Running;
+        task->control.lifecycle.time_slice_ticks = proc.run_queues[level].quantum_ticks.value();
+        proc.current_task = task;
         proc.need_resched = false;
         return proc.current_task;
       }
     }
   }
-  Task* stolen = steal_task(proc.id);
+  Task* stolen = steal_task(fk::CpuCount(proc.id));
   if (stolen) {
     stolen->control.lifecycle.state = TaskState::Running;
-    stolen->control.lifecycle.time_slice_ticks = m_default_quantum;
-    stolen->control.lifecycle.cpu_time_consumed = 0;
     proc.current_task = stolen;
     proc.need_resched = false;
     return proc.current_task;
@@ -106,9 +130,6 @@ Task* SchedulerManager::pick_next() {
 fkernel::Processor& SchedulerManager::current_processor() {
   if (!m_is_initialized)
     return m_processors[0];
-  uint32_t id = APIC::the().get_id();
-  if (id < 32)
-    return m_processors[id];
   return m_processors[0];
 }
 
@@ -170,8 +191,77 @@ void SchedulerManager::schedule() {
                    next_task->resources.context.fx_state);
   } else {
     uint64_t dummy;
-    alignas(16) static uint8_t s_dummy_fx[512]{};
+    alignas(64) static uint8_t s_dummy_fx[4096]{};
     switch_context(&dummy, next_task->resources.context.stack_pointer,
-                   s_dummy_fx, next_task->resources.context.fx_state);
+                   s_dummy_fx,
+                   next_task->resources.context.fx_state);
+  }
+}
+
+void SchedulerManager::start_aps() {
+  if (m_processor_count.value() <= 1) {
+    fk::algorithms::klog("SCHEDULER", "Uniprocessor system, no APs to start");
+    return;
+  }
+
+  auto* tramp_start_ptr = reinterpret_cast<const char*>(&trampoline_start);
+  auto* tramp_end_ptr = reinterpret_cast<const char*>(&trampoline_end);
+  size_t trampoline_size = tramp_end_ptr - tramp_start_ptr;
+  fk::memory::copy(reinterpret_cast<void*>(fkernel::smp::TRAMPOLINE_PHYS_ADDR),
+                   tramp_start_ptr, trampoline_size);
+
+  auto* data = reinterpret_cast<fkernel::smp::TrampolineData*>(
+      fkernel::smp::TRAMPOLINE_PHYS_ADDR + 0xF80);
+
+  for (uint32_t i = 1; i < m_processor_count.value(); ++i) {
+    uint8_t apic_id = ACPIManager::the().cpu_apic_id(i);
+
+    GDTController::the().init_per_cpu(i);
+
+    data->pml4_phys = VirtualMemoryManager::the().get_kernel_cr3();
+    data->stack_ptr = reinterpret_cast<uint64_t>(&stack_bottom) + KERNEL_STACK_SIZE * (i + 1);
+    data->entry_point = 0;
+    data->cpu_index = i;
+    data->online_flag = 0;
+    __sync_synchronize();
+
+    void (*ap_entry_fn)(uint32_t) = nullptr;
+    asm volatile("lea ap_entry(%%rip), %0" : "=r"(ap_entry_fn));
+    data->entry_point = reinterpret_cast<uint64_t>(ap_entry_fn);
+
+    if (CPU::the().has_x2apic()) {
+      X2APIC::the().send_ipi(apic_id, 0, IPI_INIT);
+    } else {
+      APIC::the().send_ipi(apic_id, 0, IPI_INIT);
+    }
+    TickManager::the().sleep(10);
+
+    uint8_t sipi_vector = static_cast<uint8_t>(fkernel::smp::TRAMPOLINE_PHYS_ADDR >> 12);
+    for (int attempt = 0; attempt < 2; ++attempt) {
+      if (CPU::the().has_x2apic()) {
+        X2APIC::the().send_ipi(apic_id, sipi_vector, IPI_STARTUP);
+      } else {
+        APIC::the().send_ipi(apic_id, sipi_vector, IPI_STARTUP);
+      }
+      TickManager::the().sleep(1);
+    }
+
+    for (int timeout = 0; timeout < 500; ++timeout) {
+      __sync_synchronize();
+      if (data->online_flag == 1)
+        break;
+      TickManager::the().sleep(10);
+    }
+    if (data->online_flag)
+      fk::algorithms::klog("SCHEDULER", "CPU %u (APIC %u) online", i, apic_id);
+    else
+      fk::algorithms::kwarn("SCHEDULER", "CPU %u (APIC %u) failed to start", i, apic_id);
+  }
+}
+
+void SchedulerManager::idle_loop() {
+  for (;;) {
+    asm volatile("sti; hlt");
+    schedule();
   }
 }

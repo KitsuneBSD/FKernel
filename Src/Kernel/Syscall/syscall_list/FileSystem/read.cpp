@@ -11,7 +11,6 @@
 extern "C" {
 uint64_t sys_read(uint64_t fd_u64, uint64_t buffer_ptr, uint64_t size,
                   uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
-  int fd = (int)fd_u64;
 
   auto *current_task = SchedulerManager::the().current();
   if (!current_task)
@@ -22,10 +21,7 @@ uint64_t sys_read(uint64_t fd_u64, uint64_t buffer_ptr, uint64_t size,
   if (!fkernel::memory::is_user_address(buffer_ptr, size))
     return -14; // EFAULT
 
-  if (fd < 0 || (size_t)fd >= current_task->resources.files.descriptors.size())
-    return -static_cast<int>(fk::core::Error::InvalidHandle);
-
-  auto &desc = current_task->resources.files.descriptors[fd];
+  auto desc = current_task->get_file_descriptor(static_cast<int>(fd_u64));
   if (!desc)
     return -static_cast<int>(fk::core::Error::InvalidHandle);
 

@@ -12,7 +12,7 @@ void ProcLoadavgNode::ensure_cached() {
   auto& scheduler = SchedulerManager::the();
   uint64_t running = 0;
   uint64_t total = scheduler.process_count();
-  uint64_t max_pid = scheduler.last_pid();
+  uint64_t max_pid = scheduler.last_pid().value();
   for (uint64_t pid = 1; pid < max_pid; ++pid) {
     auto t = scheduler.find_task(fk::ProcessId(pid));
     if (t) {

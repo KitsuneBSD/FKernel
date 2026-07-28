@@ -3,7 +3,6 @@
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 
-// XOR-shift PRNG seeded from ticks — same as /dev/urandom node
 static uint64_t xorshift64(uint64_t& state) {
   state ^= state << 13;
   state ^= state >> 7;

@@ -1,16 +1,33 @@
 #pragma once
 
+#include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Memory/retain_ptr.h>
+#include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Types/process_id.h>
 
 #include <Kernel/Fs/Vfs/definitions.h>
-#include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
+
+namespace fkernel {
+    class KQueueNode;
+}
+
+namespace fkernel {
+    class FileLockList;
+}
+
+struct KNoteHook {
+    fk::containers::IntrusiveListNode<KNoteHook> hook;
+    fkernel::KQueueNode* kq{nullptr};
+    uint64_t ident{0};
+    int16_t filter{0};
+};
 
 struct DirectoryEntry {
   char name[256];
@@ -19,7 +36,9 @@ struct DirectoryEntry {
 
 class Node : public fk::memory::RefCounted<Node> {
 public:
-  virtual ~Node() override = default;
+  using KNoteList = fk::containers::IntrusiveList<KNoteHook, &KNoteHook::hook>;
+
+  virtual ~Node() override;
 
   virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size,
                                                          uint8_t* buffer) = 0;
@@ -148,12 +167,38 @@ public:
     m_gid = gid;
   }
 
+  void attach_knote(KNoteHook* knote) {
+    fk::synchronization::ScopedLockIRQ lock(m_knotes_lock);
+    m_knotes.push_back(knote);
+  }
+
+  void detach_knote(KNoteHook* knote) {
+    fk::synchronization::ScopedLockIRQ lock(m_knotes_lock);
+    m_knotes.remove(knote);
+  }
+
+  const KNoteList& knotes() const { return m_knotes; }
+  KNoteList& knotes() { return m_knotes; }
+  fk::synchronization::Spinlock& knotes_lock() const { return m_knotes_lock; }
+
+  // POSIX advisory file lock operations
+  bool try_acquire_lock(fk::ProcessId pid, short l_type, int64_t start, int64_t end,
+                        fk::ProcessId *out_conflict_pid, short *out_conflict_type);
+  void release_lock(fk::ProcessId pid, int64_t start, int64_t end);
+  void release_all_locks_for_process(fk::ProcessId pid);
+  bool test_lock_conflict(short l_type, int64_t start, int64_t end,
+                          fk::ProcessId *out_conflict_pid, short *out_conflict_type);
+
 protected:
   fk::text::String m_name;
   fk::RefPtr<Node> m_parent;
   uint32_t m_mode{0};
   uint32_t m_uid{0};
   uint32_t m_gid{0};
+
+  mutable fk::synchronization::Spinlock m_knotes_lock;
+  KNoteList m_knotes;
+  fkernel::FileLockList* m_lock_list{nullptr};
 
 private:
   uint64_t m_inode;

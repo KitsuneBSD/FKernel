@@ -1,12 +1,16 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Disk/Fat32/directory_entry.h>
 #include <Kernel/Driver/Storage/storage_device.h>
 #include <LibFK/Memory/retain_ptr.h>
 
 namespace fkernel {
 
+class Fat32Node;
+
 class Fat32FileSystem : public Node {
+    friend class Fat32Node;
     fk::RefPtr<StorageDevice> m_device;
     uint32_t m_first_data_sector;
     uint32_t m_fat_sector;
@@ -49,12 +53,24 @@ public:
     fk::core::Result<void, fk::core::Error>
     update_dir_entry_size(uint32_t dir_sector_lba, uint8_t entry_idx, uint32_t new_size);
 
+    // Metadata operations for writable FAT32
+    fk::core::Result<void, fk::core::Error>
+    find_free_dir_entry(uint32_t dir_cluster, uint32_t& out_sector, uint8_t& out_idx,
+                        bool allow_cluster_expand = true);
+
+    fk::core::Result<void, fk::core::Error>
+    write_dir_entry_raw(uint32_t sector_lba, uint8_t entry_idx, const Fat32DirectoryEntry& entry);
+
+    void free_cluster_chain(uint32_t first_cluster);
+
+    fk::core::Result<uint32_t, fk::core::Error>
+    allocate_cluster(uint32_t prev_cluster);
+
 private:
     Fat32FileSystem(fk::RefPtr<StorageDevice> device) : m_device(device) {}
     uint32_t cluster_to_sector(uint32_t cluster) const;
     uint32_t get_next_cluster(uint32_t cluster);
     fk::core::Result<void, fk::core::Error> write_fat_entry(uint32_t cluster, uint32_t value);
-    fk::core::Result<uint32_t, fk::core::Error> allocate_cluster(uint32_t prev_cluster);
 };
 
 }

@@ -12,7 +12,7 @@
 namespace fkernel {
 
 InterruptDrivenNvmeController* InterruptDrivenNvmeController::create(const PciDevice& device) {
-  fk::algorithms::klog("NVMe-INT", "Creating controller for %02x:%02x.%d", device.address().bus(),
+  fk::algorithms::klog("NVME_INT", "Creating controller for %02x:%02x.%d", device.address().bus(),
                        device.address().device(), device.address().function());
   auto controller_result = fk::make_ref<InterruptDrivenNvmeController>(device);
   if (controller_result.is_error())
@@ -21,7 +21,7 @@ InterruptDrivenNvmeController* InterruptDrivenNvmeController::create(const PciDe
   auto init_result = controller->initialize_interrupt_driven();
   if (init_result.is_error())
     return nullptr;
-  fk::algorithms::klog("NVMe-INT", "Controller ready");
+  fk::algorithms::klog("NVME_INT", "Controller ready");
   return controller.leak_ptr();
 }
 
@@ -108,7 +108,7 @@ InterruptDrivenNvmeController::submit_read_async(uint64_t start_lba, uint32_t bl
     return submit_result.error();
   }
 
-  fk::algorithms::klog("NVMe-INT", "Read: cmd=%d, lba=%ld", command_id, start_lba);
+  fk::algorithms::klog("NVME_INT", "Read: cmd=%d, lba=%ld", command_id, start_lba);
   return operation;
 }
 
@@ -126,7 +126,7 @@ InterruptDrivenNvmeController::submit_read_command(NvmeAsyncOperation* operation
   uint64_t prp1 = MemoryManager::the().translate(reinterpret_cast<uintptr_t>(operation->buffer()));
   uint32_t transfer_size = operation->block_count() * m_state.configuration().block_size();
   if (transfer_size > 4096) {
-    fk::algorithms::kerror("NVMe-INT", "Large xfer not supported");
+    fk::algorithms::kerror("NVME_INT", "Large xfer not supported");
     return fk::core::Error::NotImplemented;
   }
 

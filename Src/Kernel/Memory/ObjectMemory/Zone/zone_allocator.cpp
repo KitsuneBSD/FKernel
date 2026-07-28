@@ -19,21 +19,33 @@ void Zone::populate_zone(uintptr_t base, size_t length, ZoneType type) {
 }
 
 uintptr_t Zone::base() const {
-  assert(m_initialized);
+  if (!m_initialized) {
+    fk::algorithms::kwarn("ZONE", "base() called on uninitialized zone");
+    return 0;
+  }
   return m_base;
 }
 
 size_t Zone::length() const {
-  assert(m_initialized);
+  if (!m_initialized) {
+    fk::algorithms::kwarn("ZONE", "length() called on uninitialized zone");
+    return 0;
+  }
   return m_length;
 }
 
 size_t Zone::frame_count() const {
-  assert(m_initialized);
+  if (!m_initialized) {
+    fk::algorithms::kwarn("ZONE", "frame_count() called on uninitialized zone");
+    return 0;
+  }
   return m_frame_count;
 }
 
 ZoneType Zone::type() const {
-  assert(m_initialized);
+  if (!m_initialized) {
+    fk::algorithms::kwarn("ZONE", "type() called on uninitialized zone");
+    return ZoneType::NORMAL;
+  }
   return m_type;
 }

@@ -10,6 +10,7 @@ enum class CapabilityType : uint8_t {
     Endpoint,
     Notification,
     SharedMemory,
+    FileDescription,
 };
 
 enum class CapabilityRights : uint32_t {
@@ -17,7 +18,11 @@ enum class CapabilityRights : uint32_t {
     Send    = 1 << 0,
     Receive = 1 << 1,
     Manage  = 1 << 2,
-    All     = Send | Receive | Manage,
+    Read    = 1 << 3,
+    Write   = 1 << 4,
+    Seek    = 1 << 5,
+    Ioctl   = 1 << 6,
+    All     = Send | Receive | Manage | Read | Write | Seek | Ioctl,
 };
 
 inline CapabilityRights operator|(CapabilityRights a, CapabilityRights b) {
@@ -70,6 +75,10 @@ public:
     bool can_send()   const { return (m_meta.rights & CapabilityRights::Send)    != CapabilityRights::None; }
     bool can_recv()   const { return (m_meta.rights & CapabilityRights::Receive) != CapabilityRights::None; }
     bool can_manage() const { return (m_meta.rights & CapabilityRights::Manage)  != CapabilityRights::None; }
+    bool can_read()   const { return (m_meta.rights & CapabilityRights::Read)    != CapabilityRights::None; }
+    bool can_write()  const { return (m_meta.rights & CapabilityRights::Write)   != CapabilityRights::None; }
+    bool can_seek()   const { return (m_meta.rights & CapabilityRights::Seek)    != CapabilityRights::None; }
+    bool can_ioctl()  const { return (m_meta.rights & CapabilityRights::Ioctl)   != CapabilityRights::None; }
 
     Capability with_rights(CapabilityRights r) const {
         return Capability(m_object, m_meta.type, r,

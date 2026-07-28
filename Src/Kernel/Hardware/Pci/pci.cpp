@@ -5,6 +5,7 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Memory/memory_manager.h>
+#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Algorithms/log.h>
 
 void PciManager::initialize() {
@@ -322,15 +323,10 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
     bool exists = (vendor != 0xFFFF);
     
     // Check if we already know about this device
-    int known_index = -1;
-    for (size_t i = 0; i < m_devices.size(); ++i) {
-        if (m_devices[i].address() == address) {
-            known_index = (int)i;
-            break;
-        }
-    }
+    size_t known_index = fk::algorithms::find_if(m_devices.begin(), m_devices.size(),
+        [&address](const auto& d) { return d.address() == address; });
 
-    if (exists && known_index == -1) {
+    if (exists && known_index == m_devices.size()) {
         // New device discovered
         uint32_t class_reg = read_config_dword(address, 0x08);
         uint16_t dev_id = vendor_device >> 16;
@@ -363,7 +359,7 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
                 }
             }
         }
-    } else if (!exists && known_index != -1) {
+    } else if (!exists && known_index != m_devices.size()) {
         // Device removed
         PciDevice removed_device = m_devices[known_index];
         

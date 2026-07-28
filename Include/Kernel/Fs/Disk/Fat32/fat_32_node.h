@@ -30,6 +30,13 @@ public:
 
     virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> lookup(const char* name) override;
     virtual fk::core::Result<void, fk::core::Error> list_dir(fk::containers::Vector<DirectoryEntry>& entries) override;
+
+    // Metadata operations (Phase 31 — writable FAT32)
+    virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> create_child(const char* name, int mode) override;
+    virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> mkdir(const char* name, int mode) override;
+    virtual fk::core::Result<void, fk::core::Error> unlink(const char* name) override;
+    virtual fk::core::Result<void, fk::core::Error> rmdir(const char* name) override;
+    virtual fk::core::Result<void, fk::core::Error> truncate(uint64_t new_size) override;
 };
 
 }

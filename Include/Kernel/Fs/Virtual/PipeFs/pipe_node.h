@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 
@@ -33,9 +33,9 @@ public:
     }
     static PipeNode* from_node(Node* n) { return n && n->is_pipe() ? static_cast<PipeNode*>(n) : nullptr; }
 
-    void set_eof() { m_eof = true; m_data_notification.signal(1); }
+    void set_eof() { m_eof = true; m_endpoint.signal(fk::NotificationBits(1)); }
     void add_reader() { m_reader_count++; }
-    void remove_reader() { if (m_reader_count > 0) m_reader_count--; m_space_notification.signal(1); }
+    void remove_reader() { if (m_reader_count > 0) m_reader_count--; m_endpoint.signal(fk::NotificationBits(1)); }
 
     void set_read_nonblock(bool v)  { m_read_nonblock = v; }
     void set_write_nonblock(bool v) { m_write_nonblock = v; }
@@ -51,8 +51,7 @@ private:
     bool m_read_nonblock{false};
     bool m_write_nonblock{false};
 
-    ipc::Notification m_data_notification;
-    ipc::Notification m_space_notification;
+    ipc::Endpoint m_endpoint;
     mutable fk::synchronization::Spinlock m_lock;
 };
 

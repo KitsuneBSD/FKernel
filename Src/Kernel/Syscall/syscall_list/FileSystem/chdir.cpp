@@ -3,6 +3,7 @@
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <LibFK/Utilities/memory.h>
 
 extern "C" {
@@ -13,11 +14,23 @@ uint64_t sys_chdir(uint64_t path_ptr, uint64_t, uint64_t, uint64_t, uint64_t,
   if (!current_task)
     return -1;
 
-  const char *path = (const char *)path_ptr;
-  if (!path)
+  if (!path_ptr || !fkernel::memory::is_user_address(path_ptr, 1))
     return fkernel::return_error(fk::core::Error::InvalidParameter);
 
-  auto res = fkernel::VirtualFileSystem::the().resolve_path(path);
+  const char *upath = reinterpret_cast<const char *>(path_ptr);
+  size_t len = 0;
+  while (len < 512 && upath[len] != '\0')
+    len++;
+  if (len >= 512)
+    return fkernel::return_error(fk::core::Error::InvalidParameter);
+
+  char kpath[512];
+  kpath[0] = '\0';
+  auto copy_res = fkernel::memory::copy_from_user(kpath, upath, len + 1);
+  if (copy_res.is_error())
+    return -14;
+
+  auto res = fkernel::VirtualFileSystem::the().resolve_path(kpath);
   if (res.is_error())
     return fkernel::return_error(res.error());
 

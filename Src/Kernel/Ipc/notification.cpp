@@ -26,7 +26,7 @@ void Notification::payload_push(const NotificationPayload& p) {
   ++m_payload_count;
 }
 
-void Notification::signal(uint64_t bits) {
+void Notification::signal(fk::NotificationBits bits) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   m_pending_bits |= bits;
 
@@ -35,18 +35,18 @@ void Notification::signal(uint64_t bits) {
     m_waiting_tasks.remove(task);
     uint32_t task_id = task.control.identity.id.value();
 
-    task.registers().rax = m_pending_bits;
-    uint64_t delivered_bits = m_pending_bits;
-    m_pending_bits = 0;
+    task.registers().rax = m_pending_bits.value();
+    uint64_t delivered_bits = m_pending_bits.value();
+    m_pending_bits.clear_all();
 
     IpcLogNode::the()->log_notification_operation("signal_wake", task_id, delivered_bits);
     SchedulerManager::the().wake_task(&task);
   } else {
-    IpcLogNode::the()->log_notification_operation("signal_queue", 0, bits);
+    IpcLogNode::the()->log_notification_operation("signal_queue", 0, bits.value());
   }
 }
 
-void Notification::signal_with_payload(uint64_t bits, const void* data, size_t len) {
+void Notification::signal_with_payload(fk::NotificationBits bits, const void* data, size_t len) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   m_pending_bits |= bits;
 
@@ -64,33 +64,33 @@ void Notification::signal_with_payload(uint64_t bits, const void* data, size_t l
     m_waiting_tasks.remove(task);
     uint32_t task_id = task.control.identity.id.value();
 
-    task.registers().rax = m_pending_bits;
-    uint64_t delivered_bits = m_pending_bits;
-    m_pending_bits = 0;
+    task.registers().rax = m_pending_bits.value();
+    uint64_t delivered_bits = m_pending_bits.value();
+    m_pending_bits.clear_all();
 
     IpcLogNode::the()->log_notification_operation("signal_wake_payload", task_id, delivered_bits);
     SchedulerManager::the().wake_task(&task);
   } else {
-    IpcLogNode::the()->log_notification_operation("signal_queue_payload", 0, bits);
+    IpcLogNode::the()->log_notification_operation("signal_queue_payload", 0, bits.value());
   }
 }
 
-uint64_t Notification::wait() {
+fk::NotificationBits Notification::wait() {
   auto& scheduler = SchedulerManager::the();
   Task* current = scheduler.current();
   uint32_t task_id = current->control.identity.id.value();
 
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
-    if (m_pending_bits != 0) {
-      uint64_t bits = m_pending_bits;
-      m_pending_bits = 0;
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
 
-      IpcLogNode::the()->log_notification_operation("wait_immediate", task_id, bits);
+      IpcLogNode::the()->log_notification_operation("wait_immediate", task_id, bits.value());
       return bits;
     }
 
-    IpcLogNode::the()->log_notification_operation("wait_blocked", task_id, m_pending_bits);
+    IpcLogNode::the()->log_notification_operation("wait_blocked", task_id, m_pending_bits.value());
     m_waiting_tasks.append(*current);
     scheduler.block_current_noqueue();
   }
@@ -98,25 +98,25 @@ uint64_t Notification::wait() {
   uint64_t result = current->registers().rax;
 
   IpcLogNode::the()->log_notification_operation("wait_woken", task_id, result);
-  return result;
+  return fk::NotificationBits(result);
 }
 
-uint64_t Notification::wait_timeout(uint64_t timeout_ticks) {
+fk::NotificationBits Notification::wait_timeout(fk::TickCount timeout_ticks) {
   auto& scheduler = SchedulerManager::the();
   Task* current = scheduler.current();
   uint32_t task_id = current->control.identity.id.value();
 
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
-    if (m_pending_bits != 0) {
-      uint64_t bits = m_pending_bits;
-      m_pending_bits = 0;
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
 
-      IpcLogNode::the()->log_notification_operation("wait_timeout_immediate", task_id, bits);
+      IpcLogNode::the()->log_notification_operation("wait_timeout_immediate", task_id, bits.value());
       return bits;
     }
 
-    IpcLogNode::the()->log_notification_operation("wait_timeout_blocked", task_id, timeout_ticks);
+    IpcLogNode::the()->log_notification_operation("wait_timeout_blocked", task_id, timeout_ticks.value());
     m_waiting_tasks.append(*current);
   }
 
@@ -130,23 +130,21 @@ uint64_t Notification::wait_timeout(uint64_t timeout_ticks) {
     if (still_waiting) {
       m_waiting_tasks.remove(*current);
       IpcLogNode::the()->log_notification_operation("wait_timeout_expired", task_id, 0);
-      return 0;
+      return fk::NotificationBits(0);
     }
   }
 
   uint64_t result = current->registers().rax;
   IpcLogNode::the()->log_notification_operation("wait_timeout_woken", task_id, result);
-  return result;
+  return fk::NotificationBits(result);
 }
 
-uint64_t Notification::poll() {
+fk::NotificationBits Notification::poll() {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
-  uint64_t bits = m_pending_bits;
-  m_pending_bits = 0;
+  fk::NotificationBits bits = m_pending_bits;
+  m_pending_bits.clear_all();
 
-  if (bits != 0) {
-  }
-  IpcLogNode::the()->log_notification_operation("poll", 0, bits);
+  IpcLogNode::the()->log_notification_operation("poll", 0, bits.value());
   return bits;
 }
 

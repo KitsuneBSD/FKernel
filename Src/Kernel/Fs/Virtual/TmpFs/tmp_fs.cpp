@@ -1,17 +1,16 @@
 #include <Kernel/Fs/Virtual/TmpFs/tmp_fs.h>
+#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Memory/new.h>
 
 fk::RefPtr<Node> ChildList::find_by_name(const char* name) {
-  for (auto& entry : m_entries) {
-    if (entry.has_name(name)) {
-      fk::algorithms::kdebug("TMPFS", "Found child %s", name);
-      return entry.node();
-    }
-  }
-  return {};
+  size_t idx = fk::algorithms::find_if(m_entries.begin(), m_entries.size(),
+      [&name](const auto& e) { return e.has_name(name); });
+  if (idx == m_entries.size()) return {};
+  fk::algorithms::kdebug("TMPFS", "Found child %s", name);
+  return m_entries[idx].node();
 }
 
 fk::core::Result<size_t, fk::core::Error> TmpFsNode::read(uint64_t offset, size_t size,

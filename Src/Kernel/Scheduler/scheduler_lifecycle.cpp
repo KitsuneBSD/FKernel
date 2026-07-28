@@ -67,15 +67,15 @@ void SchedulerManager::zombify_current() {
   proc.need_resched = true;
 }
 
-void SchedulerManager::sleep_current(uint64_t sleep_ticks) {
+void SchedulerManager::sleep_current(fk::TickCount ticks) {
   ScopedInterruptDisabler intr_disabler;
   auto& proc = current_processor();
   if (!proc.current_task) return;
 
   Task* task = proc.current_task;
   task->control.lifecycle.state = TaskState::Sleeping;
-  task->control.lifecycle.wake_up_time_ticks = TickManager::the().get_ticks() + sleep_ticks;
-  fk::algorithms::kdebug("SCHEDULER", "Task %lu sleeping for %lu ticks", task->control.identity.id.value(), sleep_ticks);
+  task->control.lifecycle.wake_up_time_ticks = TickManager::the().get_ticks() + ticks.value();
+  fk::algorithms::kdebug("SCHEDULER", "Task %lu sleeping for %lu ticks", task->control.identity.id.value(), ticks.value());
   {
     ScopedLock lock(m_lock);
     m_sleep_queue.push_back(task);
@@ -113,7 +113,7 @@ void SchedulerManager::wake_task(Task* task) {
   }
 
   task->control.lifecycle.state = TaskState::Ready;
-  task->control.lifecycle.time_slice_ticks = quantum_for_level(task->control.lifecycle.mlfq_level);
+  task->control.lifecycle.time_slice_ticks = quantum_for_level(fk::MlqfLevel(task->control.lifecycle.mlfq_level)).value();
   fk::algorithms::kdebug("SCHEDULER", "Task %lu woken (level=%d)", task->control.identity.id.value(), task->control.lifecycle.mlfq_level);
 
   uint32_t target_cpu = 0;
@@ -123,7 +123,7 @@ void SchedulerManager::wake_task(Task* task) {
       break;
     }
   }
-  if (target_cpu >= m_processor_count)
+  if (target_cpu >= m_processor_count.value())
     target_cpu = 0;
 
   {
@@ -135,6 +135,8 @@ void SchedulerManager::wake_task(Task* task) {
 void SchedulerManager::terminate_current(int status) {
   Task* curr = this->current();
   if (!curr) return;
+
+  curr->release_all_file_locks();
 
   fk::algorithms::klog("SCHEDULER", "Task %lu exiting with status %d", curr->control.identity.id.value(), status);
   curr->control.lifecycle.terminated = true;
@@ -194,10 +196,10 @@ void SchedulerManager::add_task(Task* task) {
   ScopedInterruptDisabler intr_disabler;
 
   task->control.lifecycle.state = TaskState::Ready;
-  task->control.lifecycle.time_slice_ticks = quantum_for_level(task->control.lifecycle.mlfq_level);
+  task->control.lifecycle.time_slice_ticks = quantum_for_level(fk::MlqfLevel(task->control.lifecycle.mlfq_level)).value();
   fk::algorithms::klog("SCHEDULER", "Task %lu added at MLFQ level %d", task->control.identity.id.value(), task->control.lifecycle.mlfq_level);
 
-  uint32_t target_cpu = find_least_loaded_cpu(m_processors, m_processor_count);
+  uint32_t target_cpu = find_least_loaded_cpu(&m_processors[0], m_processor_count.value());
   if (task->control.lifecycle.cpu_affinity != 0) {
     for (uint32_t i = 0; i < 32; ++i) {
       if (task->control.lifecycle.cpu_affinity & (1ULL << i)) {
@@ -205,7 +207,7 @@ void SchedulerManager::add_task(Task* task) {
         break;
       }
     }
-    if (target_cpu >= m_processor_count) target_cpu = 0;
+    if (target_cpu >= m_processor_count.value()) target_cpu = 0;
   }
 
   {
@@ -234,14 +236,14 @@ void SchedulerManager::yield() {
 }
 
 void SchedulerManager::priority_boost_all() {
-  for (uint32_t cpu = 0; cpu < m_processor_count; ++cpu) {
+  for (uint32_t cpu = 0; cpu < m_processor_count.value(); ++cpu) {
     fk::synchronization::ScopedLockIRQ lock(m_processors[cpu].run_queue_lock);
     for (uint32_t level = 1; level < MLFQ_LEVELS; ++level) {
       while (!m_processors[cpu].run_queues[level].queue.empty()) {
         Task* task = m_processors[cpu].run_queues[level].queue.pop_front();
         task->control.lifecycle.mlfq_level = 0;
         task->control.lifecycle.cpu_time_consumed = 0;
-        task->control.lifecycle.time_slice_ticks = quantum_for_level(0);
+        task->control.lifecycle.time_slice_ticks = quantum_for_level(fk::MlqfLevel(0)).value();
         m_processors[cpu].run_queues[0].queue.push_back(task);
       }
     }
@@ -296,8 +298,8 @@ void SchedulerManager::on_tick() {
 
   fkernel::net::TcpSocket::tick_all(now);
 
-  ++m_global_tick_counter;
-  if (m_global_tick_counter % BOOST_PERIOD_TICKS == 0) {
+  m_global_tick_counter = fk::TickCount(m_global_tick_counter.value() + 1);
+  if (m_global_tick_counter.value() % BOOST_PERIOD_TICKS == 0) {
     priority_boost_all();
   }
 
@@ -324,13 +326,15 @@ void SchedulerManager::on_tick() {
         return;
       }
 
-      if (task->control.lifecycle.mlfq_level < MLFQ_LEVELS - 1)
+      if (task->control.lifecycle.mlfq_level < MLFQ_LEVELS - 1 &&
+          task->control.lifecycle.cpu_time_consumed >= task->control.lifecycle.allotment_ticks) {
         ++task->control.lifecycle.mlfq_level;
+        task->control.lifecycle.cpu_time_consumed = 0;
+      }
 
       task->control.lifecycle.state = TaskState::Ready;
       uint8_t new_level = task->control.lifecycle.mlfq_level;
-      task->control.lifecycle.time_slice_ticks = quantum_for_level(new_level);
-      task->control.lifecycle.cpu_time_consumed = 0;
+      task->control.lifecycle.time_slice_ticks = quantum_for_level(fk::MlqfLevel(new_level)).value();
       {
         ScopedLock lock(proc.run_queue_lock);
         proc.run_queues[new_level].queue.push_back(task);

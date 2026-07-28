@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Ipc/endpoint.h>
 #include <Kernel/Net/socket.h>
 #include <Kernel/Net/unix_socket_buffer.h>
 #include <Kernel/Scheduler/Task/task.h>
@@ -51,7 +52,7 @@ private:
     size_t m_backlog_count{0};
     bool m_listening{false};
     bool m_connected{false};
-    Task* m_accept_waiter{nullptr};
+    ipc::Endpoint m_accept_endpoint;
 
     UnixSocketBuffer m_rx_buffer;
 };

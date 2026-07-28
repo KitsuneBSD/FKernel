@@ -15,7 +15,7 @@ public:
 
   fk::ProcessId generate_pid() {
     if (m_next_pid >= m_max_pid) {
-      return fk::ProcessId(0); // Invalid PID indicates exhaustion
+      return fk::ProcessId(0);
     }
     return fk::ProcessId(m_next_pid++);
   }

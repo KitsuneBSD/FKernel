@@ -1,4 +1,5 @@
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
+#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Utilities/memory.h>
@@ -18,9 +19,9 @@ fk::core::Result<void, fk::core::Error> DevFs::register_device(fk::RefPtr<Node> 
     if (!node || !name) return fk::core::Error::InvalidParameter;
 
     fk::synchronization::ScopedLockIRQ lock(m_lock);
-    for (auto& entry : m_devices) {
-        if (entry.name == name) return fk::core::Error::PermissionDenied;
-    }
+    size_t idx = fk::algorithms::find_if(m_devices.begin(), m_devices.size(),
+        [&name](const auto& e) { return e.name == name; });
+    if (idx != m_devices.size()) return fk::core::Error::PermissionDenied;
 
     m_devices.push_back({name, node});
     fk::algorithms::klog("DEVFS", "Registered device: /dev/%s", name);
@@ -29,25 +30,21 @@ fk::core::Result<void, fk::core::Error> DevFs::register_device(fk::RefPtr<Node> 
 
 fk::core::Result<void, fk::core::Error> DevFs::unregister_device(const char* name) {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
-    for (size_t i = 0; i < m_devices.size(); ++i) {
-        if (m_devices[i].name == name) {
-            m_devices[i] = fk::types::move(m_devices[m_devices.size() - 1]);
-            m_devices.pop_back();
-            return {};
-        }
-    }
-    return fk::core::Error::NotFound;
+    size_t idx = fk::algorithms::find_if(m_devices.begin(), m_devices.size(),
+        [&name](const auto& e) { return e.name == name; });
+    if (idx == m_devices.size()) return fk::core::Error::NotFound;
+    m_devices[idx] = fk::types::move(m_devices[m_devices.size() - 1]);
+    m_devices.pop_back();
+    return {};
 }
 
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error> DevFs::lookup(const char* name) {
     if (!name) return fk::core::Error::InvalidParameter;
 
     fk::synchronization::ScopedLockIRQ lock(m_lock);
-    for (auto& entry : m_devices) {
-        if (entry.node && fk::memory::compare(entry.name.c_str(), name) == 0) {
-            return entry.node;
-        }
-    }
+    size_t idx = fk::algorithms::find_if(m_devices.begin(), m_devices.size(),
+        [&name](const auto& e) { return e.node && fk::memory::compare(e.name.c_str(), name) == 0; });
+    if (idx != m_devices.size()) return m_devices[idx].node;
     return fk::core::Error::NotFound;
 }
 

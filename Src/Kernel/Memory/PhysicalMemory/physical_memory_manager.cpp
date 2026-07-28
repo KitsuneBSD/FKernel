@@ -7,6 +7,7 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/new.h>
+#include <LibFK/Utilities/memory.h>
 
 PhysicalZone* PhysicalMemoryManager::create_zone(uintptr_t base, size_t length, ZoneType type,
                                                  uint64_t* bitmap_storage, size_t bitmap_bits) {
@@ -81,7 +82,7 @@ void PhysicalMemoryManager::initialize() {
   assert(boot::BootInfo::the().is_initialized() &&
          "BootInfo must be initialized before PhysicalMemoryManager!");
 
-  fk::algorithms::klog("PHYSICAL MEMORY MANAGER", "Initializing Physical Memory Manager");
+  fk::algorithms::klog("PHYS_MEM", "Initializing Physical Memory Manager");
 
   // Initialize TopologyManager to discover NUMA layout
   fkernel::acpi::TopologyManager::the().initialize();
@@ -135,6 +136,9 @@ void PhysicalMemoryManager::initialize() {
                 reinterpret_cast<uintptr_t>(__pmm_bitmap_end) -
                     reinterpret_cast<uintptr_t>(__pmm_bitmap_start));
 
+  // Reserve AP trampoline page (0x8000-0x9000)
+  reserve_range(0x8000, 0x1000);
+
   // Reserve Multiboot data
   void* mb_ptr = boot::BootInfo::the().get_raw_multiboot_ptr();
   if (mb_ptr) {
@@ -150,9 +154,47 @@ void PhysicalMemoryManager::initialize() {
 
   m_is_initialized = true;
 
-  fk::algorithms::klog("PHYSICAL MEMORY MANAGER",
+  fk::algorithms::klog("PHYS_MEM",
                        "Initialized: zones=%lu total=%lu MB, free=%lu MB", m_zone_count,
                        m_total_memory / (1024 * 1024), m_free_memory / (1024 * 1024));
+}
+
+void PhysicalMemoryManager::reconcile_buddies() {
+  fk::algorithms::klog("PHYS_MEM", "Reconciling buddy allocators with bitmap");
+
+  for (size_t i = 0; i < m_zone_count; ++i) {
+    m_zones[i].buddy.initialize_from_bitmap(m_zones[i].bitmap, m_zones[i].zone.base());
+  }
+
+  fk::algorithms::klog("PHYS_MEM", "Buddy reconciliation complete");
+
+  // Allocate CoW refcount arrays for each zone (direct map now available)
+  for (size_t i = 0; i < m_zone_count; ++i) {
+    auto& pz = m_zones[i];
+    size_t frames = pz.zone.length() / FRAME_SIZE;
+    size_t bytes = frames * sizeof(uint16_t);
+    size_t pages = (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+    uintptr_t arr_phys = 0;
+
+    if (pages == 1) {
+      arr_phys = alloc_page(ZoneType::NORMAL, pz.proximity_domain);
+    } else {
+      size_t order = size_to_order(bytes);
+      arr_phys = alloc_contiguous(order, ZoneType::NORMAL, pz.proximity_domain);
+    }
+
+    if (!arr_phys) {
+      fk::algorithms::kwarn("PHYS_MEM",
+                            "Failed to allocate CoW refcount array for zone %zu (frames=%zu)",
+                            i, frames);
+      continue;
+    }
+
+    auto* refs = reinterpret_cast<uint16_t*>(arr_phys + KERNEL_VIRT_BASE);
+    fk::memory::set(refs, 0, bytes);
+    pz.cow_refcounts = refs;
+    pz.cow_frame_count = frames;
+  }
 }
 
 PhysicalZone* PhysicalMemoryManager::find_zone_for_paddr(uintptr_t phys) {
@@ -163,7 +205,7 @@ PhysicalZone* PhysicalMemoryManager::find_zone_for_paddr(uintptr_t phys) {
     }
   }
 
-  fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER", "No zone found for phys=%p", phys);
+  fk::algorithms::kwarn("PHYS_MEM", "No zone found for phys=%p", phys);
 
   return nullptr;
 }
@@ -201,78 +243,89 @@ PhysicalZone* PhysicalMemoryManager::select_zone(ZoneType preferred, uint32_t pr
     return &m_zones[0];
   }
 
-  fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER", "No zones available");
+  fk::algorithms::kwarn("PHYS_MEM", "No zones available");
   return nullptr;
 }
 
-uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred, uint32_t preferred_node) {
-  assert(m_is_initialized);
+uintptr_t PhysicalMemoryManager::alloc_page_internal(ZoneType preferred,
+                                                     uint32_t preferred_node) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone* pz = select_zone(preferred, preferred_node);
   if (!pz) {
-    fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER", "Alloc_page: No zone available");
+    fk::algorithms::kwarn("PHYS_MEM", "Alloc_page: No zone available");
     return 0;
   }
 
   ssize_t frame = pz->bitmap.alloc();
   if (frame >= 0) {
     uintptr_t phys = pz->zone.base() + (frame * FRAME_SIZE);
-
+    pz->buddy.invalidate_page(phys);
     m_free_memory -= FRAME_SIZE;
+    if (pz->cow_refcounts) {
+      pz->cow_refcounts[frame] = 1;
+    }
     return phys;
   }
 
-  fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER", "Bitmap exhausted, falling back to buddy");
+  fk::algorithms::kwarn("PHYS_MEM", "Alloc_page: No free pages in zone type %d",
+                        (int)pz->zone.type());
+  return 0;
+}
 
-  void* ptr = pz->buddy.alloc(0);
-  if (!ptr)
+uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred, uint32_t preferred_node) {
+  if (!m_is_initialized) {
+    fk::algorithms::kwarn("PHYS_MEM", "Alloc_page called before init");
     return 0;
-
-  m_free_memory -= FRAME_SIZE;
-
-  return reinterpret_cast<uintptr_t>(ptr);
+  }
+  return alloc_page_internal(preferred, preferred_node);
 }
 
 void PhysicalMemoryManager::free_page(uintptr_t phys) {
-  assert(m_is_initialized);
-  assert((phys % FRAME_SIZE) == 0);
+  if (!m_is_initialized) {
+    fk::algorithms::kwarn("PHYS_MEM", "Free_page called before init");
+    return;
+  }
+  if ((phys % FRAME_SIZE) != 0) {
+    fk::algorithms::kwarn("PHYS_MEM", "free_page: unaligned phys=%p", (void*)phys);
+    return;
+  }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone* pz = find_zone_for_paddr(phys);
   if (!pz) {
-    fk::algorithms::kerror("PHYSICAL MEMORY MANAGER", "free_page: no zone found for address %p",
+    fk::algorithms::kerror("PHYS_MEM", "free_page: no zone found for address %p",
                            phys);
     return;
   }
 
-  uintptr_t base = pz->zone.base();
-  uintptr_t end = base + pz->zone.length();
+  size_t frame = (phys - pz->zone.base()) / FRAME_SIZE;
 
-  if (phys >= base && phys < end) {
-    size_t frame = (phys - base) / FRAME_SIZE;
-    pz->bitmap.clear(frame);
-  } else {
-    pz->buddy.free(reinterpret_cast<void*>(phys), 0);
+  if (pz->cow_refcounts && pz->cow_refcounts[frame] > 0) {
+    pz->cow_refcounts[frame]--;
+    if (pz->cow_refcounts[frame] > 0) {
+      return;
+    }
   }
 
+  pz->bitmap.clear(frame);
+  pz->buddy.free(reinterpret_cast<void*>(phys), MIN_ORDER);
   m_free_memory += FRAME_SIZE;
 }
 
-uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order, ZoneType preferred,
-                                                  uint32_t preferred_node) {
-  assert(m_is_initialized);
+uintptr_t PhysicalMemoryManager::alloc_contiguous_internal(size_t order, ZoneType preferred,
+                                                          uint32_t preferred_node) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone* pz = select_zone(preferred, preferred_node);
   if (!pz) {
-    fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER", "alloc_contiguous: No zone available");
+    fk::algorithms::kwarn("PHYS_MEM", "alloc_contiguous: No zone available");
     return 0;
   }
 
   void* block = pz->buddy.alloc(order);
   if (!block) {
-    fk::algorithms::kwarn("PHYSICAL MEMORY MANAGER",
+    fk::algorithms::kwarn("PHYS_MEM",
                           "alloc_contiguous: Buddy allocation failed for order "
                           "%lu in zone type %d",
                           order, (int)pz->zone.type());
@@ -280,22 +333,96 @@ uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order, ZoneType preferr
   }
 
   uintptr_t phys = reinterpret_cast<uintptr_t>(block);
+  size_t effective_order = order < MIN_ORDER ? MIN_ORDER : order;
+  size_t page_count = order_to_size(effective_order) / FRAME_SIZE;
+  uintptr_t zone_base = pz->zone.base();
+  for (size_t i = 0; i < page_count; i++) {
+    size_t frame = (phys - zone_base + i * FRAME_SIZE) / FRAME_SIZE;
+    pz->bitmap.set(frame, true);
+  }
+
+  if (pz->cow_refcounts) {
+    size_t first_frame = (phys - zone_base) / FRAME_SIZE;
+    for (size_t i = 0; i < page_count; i++) {
+      pz->cow_refcounts[first_frame + i] = 1;
+    }
+  }
+
   m_free_memory -= (FRAME_SIZE << order);
   return phys;
 }
 
+uintptr_t PhysicalMemoryManager::alloc_contiguous(size_t order, ZoneType preferred,
+                                                  uint32_t preferred_node) {
+  if (!m_is_initialized) {
+    fk::algorithms::kwarn("PHYS_MEM", "alloc_contiguous called before init");
+    return 0;
+  }
+  return alloc_contiguous_internal(order, preferred, preferred_node);
+}
+
 void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
-  assert(m_is_initialized);
-  assert((phys % FRAME_SIZE) == 0);
+  if (!m_is_initialized) {
+    fk::algorithms::kwarn("PHYS_MEM", "free_contiguous called before init");
+    return;
+  }
+  if ((phys % FRAME_SIZE) != 0) {
+    fk::algorithms::kwarn("PHYS_MEM", "free_contiguous: unaligned phys=%p", (void*)phys);
+    return;
+  }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   PhysicalZone* pz = find_zone_for_paddr(phys);
   if (!pz) {
-    fk::algorithms::kerror("PHYSICAL MEMORY MANAGER",
+    fk::algorithms::kerror("PHYS_MEM",
                            "free_contiguous: no zone found for address %p", phys);
     return;
   }
 
+  size_t effective_order = order < MIN_ORDER ? MIN_ORDER : order;
+  size_t page_count = order_to_size(effective_order) / FRAME_SIZE;
+  uintptr_t zone_base = pz->zone.base();
+  for (size_t i = 0; i < page_count; i++) {
+    size_t frame = (phys - zone_base + i * FRAME_SIZE) / FRAME_SIZE;
+    if (pz->cow_refcounts && pz->cow_refcounts[frame] > 0) {
+      if (--pz->cow_refcounts[frame] > 0) continue;
+    }
+    pz->bitmap.clear(frame);
+  }
+
   pz->buddy.free(reinterpret_cast<void*>(phys), order);
   m_free_memory += (FRAME_SIZE << order);
+}
+
+void PhysicalMemoryManager::increment_refcount(uintptr_t phys) {
+  PhysicalZone* pz = find_zone_for_paddr(phys);
+  if (!pz || !pz->cow_refcounts) return;
+  size_t frame = (phys - pz->zone.base()) / FRAME_SIZE;
+  if (frame >= pz->cow_frame_count) return;
+  pz->cow_refcounts[frame]++;
+}
+
+uint16_t PhysicalMemoryManager::decrement_refcount(uintptr_t phys) {
+  PhysicalZone* pz = find_zone_for_paddr(phys);
+  if (!pz || !pz->cow_refcounts) return 0;
+  size_t frame = (phys - pz->zone.base()) / FRAME_SIZE;
+  if (frame >= pz->cow_frame_count) return 0;
+  if (pz->cow_refcounts[frame] > 0)
+    pz->cow_refcounts[frame]--;
+  return pz->cow_refcounts[frame];
+}
+
+uint16_t PhysicalMemoryManager::get_refcount(uintptr_t phys) const {
+  for (size_t i = 0; i < m_zone_count; ++i) {
+    auto& z = m_zones[i].zone;
+    if (phys >= z.base() && phys < z.base() + z.length()) {
+      if (!m_zones[i].cow_refcounts) return 1;
+      size_t frame = (phys - z.base()) / FRAME_SIZE;
+      if (frame >= m_zones[i].cow_frame_count) return 1;
+      uint16_t rc = m_zones[i].cow_refcounts[frame];
+      if (rc == 0) return 1;
+      return rc;
+    }
+  }
+  return 1;
 }

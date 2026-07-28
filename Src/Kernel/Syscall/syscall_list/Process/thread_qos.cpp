@@ -17,7 +17,7 @@ extern "C" uint64_t sys_thread_set_qos_class(uint64_t pid, uint64_t qos_class,
   QoSClass qos = static_cast<QoSClass>(qos_class);
   target->control.lifecycle.qos = qos;
   target->control.lifecycle.base_priority =
-      priority_for_qos(qos, target->control.lifecycle.nice);
+      priority_for_qos(qos, fk::NiceValue(target->control.lifecycle.nice)).value();
   target->control.lifecycle.priority = target->control.lifecycle.base_priority;
   return 0;
 }

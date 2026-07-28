@@ -37,14 +37,10 @@ struct Processor {
 
 private:
     void init_quanta() {
-        run_queues[0].quantum_ticks = 2;
-        run_queues[0].allotment_ticks = 8;
-        run_queues[1].quantum_ticks = 4;
-        run_queues[1].allotment_ticks = 32;
-        run_queues[2].quantum_ticks = 16;
-        run_queues[2].allotment_ticks = 64;
-        run_queues[3].quantum_ticks = 64;
-        run_queues[3].allotment_ticks = 256;
+        run_queues[0].quantum_ticks = fk::TickCount(2);
+        run_queues[1].quantum_ticks = fk::TickCount(4);
+        run_queues[2].quantum_ticks = fk::TickCount(8);
+        run_queues[3].quantum_ticks = fk::TickCount(16);
     }
 };
 

@@ -49,24 +49,24 @@ bool PartitionManager::has_partitions_for_device(fk::RefPtr<StorageDevice> devic
 }
 
 void PartitionManager::scan(fk::RefPtr<StorageDevice> device) {
-  fk::algorithms::klog("PARTITION MANAGER", "[%s] Scanning for partitions...",
+  fk::algorithms::klog("PARTITION_MANAGER", "[%s] Scanning for partitions...",
                        device->name().c_str());
 
   // Try GPT first
   if (GPTParser::parse(device).is_ok()) {
-    fk::algorithms::klog("PARTITION MANAGER", "[%s] GPT partitioning detected",
+    fk::algorithms::klog("PARTITION_MANAGER", "[%s] GPT partitioning detected",
                          device->name().c_str());
     return;
   }
 
   // Fallback to MBR
   if (MBRParser::parse(device).is_ok()) {
-    fk::algorithms::klog("PARTITION MANAGER", "[%s] MBR partitioning detected",
+    fk::algorithms::klog("PARTITION_MANAGER", "[%s] MBR partitioning detected",
                          device->name().c_str());
     return;
   }
 
-  fk::algorithms::kwarn("PARTITION MANAGER",
+  fk::algorithms::kwarn("PARTITION_MANAGER",
                         "[%s] No valid partition table found",
                         device->name().c_str());
 }

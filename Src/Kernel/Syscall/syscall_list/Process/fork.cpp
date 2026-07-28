@@ -55,6 +55,8 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
   child->control.lifecycle.boosted = false;
   child->control.lifecycle.original_qos = parent->control.lifecycle.qos;
   child->resources.files.cwd = parent->resources.files.cwd;
+  child->resources.files.root = parent->resources.files.root;
+  child->resources.files.mount_ns = parent->resources.files.mount_ns;
   child->control.lifecycle.clear_child_tid = 0;
 
   child->resources.ipc.cspace = new fkernel::ipc::CSpace();
@@ -95,10 +97,13 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
   child->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
   child->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
 
-  // 3. Clone File Descriptors
+  // 3. Clone File Descriptors + grant capabilities to child's CSpace
   for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
     child->resources.files.descriptors.push_back(parent->resources.files.descriptors[i]);
   }
+  if (parent->resources.ipc.cspace)
+    parent->resources.ipc.cspace->grant_all_to(*child->resources.ipc.cspace,
+                                                fkernel::ipc::CapabilityType::FileDescription);
   child->dump_file_descriptors();
 
   // 4. Setup Kernel Stack
@@ -117,9 +122,10 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
       reinterpret_cast<void*>(parent->resources.context.kernel_stack_top - STACK_SIZE);
   fk::memory::copy(child_stack_mem, parent_stack_bottom, STACK_SIZE);
 
-  // 5. Setup Address Space
+  // 5. Setup Address Space (CoW: shares pages, marks read-only in both)
   child->resources.memory.cr3 =
       VirtualMemoryManager::the().clone_address_space(parent->resources.memory.cr3);
+  VirtualMemoryManager::the().flush_tlb();
 
   // 6. Setup child's context for switch_context
   uintptr_t parent_stack_ptr = reinterpret_cast<uintptr_t>(regs);

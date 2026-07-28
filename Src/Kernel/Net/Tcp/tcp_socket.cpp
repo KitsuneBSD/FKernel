@@ -12,6 +12,8 @@
 namespace fkernel {
 namespace net {
 
+static constexpr uint16_t TCP_MAX_WINDOW = 65535;
+
 // RFC 793 pseudo-header checksum over TCP segment (header + payload)
 static uint16_t tcp_checksum(IPv4Address dst, const uint8_t* seg, size_t seg_len) {
     struct __attribute__((packed)) {
@@ -61,7 +63,8 @@ fk::core::Result<void, fk::core::Error> TcpSocket::connect(const char* path) {
 
     {
         fk::synchronization::ScopedLock lock(m_lock);
-        static uint16_t s_ephemeral{49152};
+        static constexpr uint16_t TCP_EPHEMERAL_START = 49152;
+        static uint16_t s_ephemeral{TCP_EPHEMERAL_START};
         uint16_t local_port = __sync_fetch_and_add(&s_ephemeral, 1);
         m_connection.set_local_port(local_port);
         m_connection.set_remote({IPv4Address(ntohl(remote_ip_be)), remote_port});
@@ -74,7 +77,7 @@ fk::core::Result<void, fk::core::Error> TcpSocket::connect(const char* path) {
         uint8_t syn[TCP_HEADER_SIZE];
         auto* syn_hdr = reinterpret_cast<TcpHeader*>(syn);
         syn_hdr->fill(local_port, remote_port, m_connection.send_next, 0,
-                      TCP_FLAG_SYN, 65535);
+                      TCP_FLAG_SYN, TCP_MAX_WINDOW);
         syn_hdr->checksum = tcp_checksum(IPv4Address(ntohl(remote_ip_be)), syn, TCP_HEADER_SIZE);
         ++m_connection.send_next;
         NetworkStack::the().send_ipv4(IPv4Address(ntohl(remote_ip_be)),
@@ -189,7 +192,7 @@ void TcpSocket::process_handshake(const TcpHeader* hdr, uint8_t flags, uint32_t 
         reply->checksum = tcp_checksum(m_connection.remote().ip, ack, TCP_HEADER_SIZE);
         NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
                                       ack, TCP_HEADER_SIZE);
-        m_connection.state_changed.signal(1);
+        m_connection.state_changed.signal(fk::NotificationBits(1));
         return;
     }
     if (m_connection.state != TcpState::Listen) return;
@@ -235,7 +238,7 @@ void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
             child->m_connection.state = TcpState::Established;
             child->m_connection.send_unacked = ack;
             child->m_connection.peer_window = ntohs(hdr->window);
-            m_connection.state_changed.signal(1);
+            m_connection.state_changed.signal(fk::NotificationBits(1));
             return;
         }
         return;
@@ -243,7 +246,7 @@ void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
 
     if (m_connection.state == TcpState::SynReceived) {
         m_connection.state = TcpState::Established;
-        m_connection.state_changed.signal(1);
+        m_connection.state_changed.signal(fk::NotificationBits(1));
     }
     if (ack > m_connection.send_unacked && ack <= m_connection.send_next) {
         m_connection.send_unacked = ack;
@@ -432,7 +435,7 @@ void TcpSocket::on_tick(uint64_t now_ticks) {
   if (m_connection.retransmit_count >= TcpConnection::MAX_RETRANSMITS) {
     m_connection.state = TcpState::Closed;
     m_connection.retransmit_ticks = 0;
-    m_connection.state_changed.signal(1);
+    m_connection.state_changed.signal(fk::NotificationBits(1));
     return;
   }
   do_retransmit();

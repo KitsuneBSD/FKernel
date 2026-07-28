@@ -36,13 +36,13 @@ static uint64_t mount_tmpfs(const char* target) {
 static uint64_t mount_device(const char* source, const char* target) {
   auto dentry_res = fkernel::VirtualFileSystem::the().resolve_path(source);
   if (dentry_res.is_error()) {
-    fk::algorithms::kwarn("sys_mount", "Cannot resolve source %s", source);
+    fk::algorithms::kwarn("MOUNT", "Cannot resolve source %s", source);
     return fkernel::return_error(fk::core::Error::NotFound);
   }
 
   auto node = dentry_res.value()->top_node();
   if (!node || !node->is_block_device()) {
-    fk::algorithms::kwarn("sys_mount", "Source %s is not a block device", source);
+    fk::algorithms::kwarn("MOUNT", "Source %s is not a block device", source);
     return fkernel::return_error(fk::core::Error::NotADirectory);
   }
 
@@ -57,6 +57,7 @@ uint64_t sys_mount(uint64_t source_ptr, uint64_t target_ptr, uint64_t filesystem
                    uint64_t /*mountflags*/, uint64_t /*data*/, [[maybe_unused]] PtRegs* regs) {
   auto* current_task = SchedulerManager::the().current();
   if (!current_task) return fkernel::return_error(fk::core::Error::PermissionDenied);
+  if (current_task->control.identity.euid != 0) return -1; // EPERM
 
   if (!target_ptr) return fkernel::return_error(fk::core::Error::InvalidParameter);
 

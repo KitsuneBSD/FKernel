@@ -2,6 +2,7 @@
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall_utils.h>
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <LibFK/Utilities/memory.h>
 
 using namespace fkernel;
@@ -13,9 +14,23 @@ uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t, uint64_
   if (!current_task)
     return -1;
 
-  const char* path = reinterpret_cast<const char*>(path_ptr);
-  if (!path)
+  if (!path_ptr || !fkernel::memory::is_user_address(path_ptr, 1))
     return -static_cast<int>(fk::core::Error::InvalidParameter);
+
+  const char* upath = reinterpret_cast<const char*>(path_ptr);
+  size_t len = 0;
+  while (len < 512 && upath[len] != '\0')
+    len++;
+  if (len >= 512)
+    return -static_cast<int>(fk::core::Error::InvalidParameter);
+
+  char kpath[512];
+  kpath[0] = '\0';
+  auto copy_res = fkernel::memory::copy_from_user(kpath, upath, len + 1);
+  if (copy_res.is_error())
+    return -14;
+
+  const char* path = kpath;
 
   char absolute_path[512];
   if (path[0] != '/') {

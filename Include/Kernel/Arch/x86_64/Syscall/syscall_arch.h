@@ -33,4 +33,4 @@ struct PtRegs {
   uint64_t rsp;
 };
 
-void init_syscalls();
+void init_syscalls(size_t cpu_count = 0);

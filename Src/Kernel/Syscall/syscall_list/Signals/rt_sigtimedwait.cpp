@@ -82,7 +82,7 @@ extern "C" uint64_t sys_rt_sigtimedwait(uint64_t set_ptr, uint64_t info_ptr,
 
     // Sleep for the timeout period; signal delivery will wake us early
     if (wait_ticks == (uint64_t)-1) SchedulerManager::the().block_current();
-    if (wait_ticks != (uint64_t)-1) SchedulerManager::the().sleep_current(wait_ticks);
+    if (wait_ticks != (uint64_t)-1) SchedulerManager::the().sleep_current(fk::TickCount(wait_ticks));
 
     // After waking, check again for the signal
     sig = dequeue_signal(task, mask);

@@ -28,6 +28,12 @@ struct ElfLoadResult {
     bool      stack_executable{false};
     TlsInfo   tls;
     uintptr_t highest_load_end{0};
+    uintptr_t init{0};
+    uintptr_t fini{0};
+    uintptr_t init_array{0};
+    uintptr_t fini_array{0};
+    size_t    init_arraysz{0};
+    size_t    fini_arraysz{0};
 };
 
 using ElfLoadOperationResult = fk::core::Result<ElfLoadResult, fk::core::Error>;

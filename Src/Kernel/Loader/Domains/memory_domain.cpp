@@ -1,4 +1,5 @@
 #include <Kernel/Loader/Domains/memory_domain.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <LibFK/Algorithms/log.h>
@@ -17,6 +18,14 @@ MemoryDomain::allocate_memory_region(const MemoryRegion& region, bool for_writin
 
 fk::core::Result<void, fk::core::Error>
 MemoryDomain::apply_final_permissions(const MemoryRegion& region) {
+  uint32_t has_w = (static_cast<uint64_t>(region.permissions) & static_cast<uint64_t>(PageFlags::Writable)) != 0;
+  uint32_t has_x = (static_cast<uint64_t>(region.permissions) & static_cast<uint64_t>(PageFlags::ExecuteDisable)) == 0;
+
+  if (has_w && has_x) {
+    fk::algorithms::kwarn("ELF", "W^X violation: segment at 0x%lx is both Writable and Executable", region.actual_vaddr);
+    return fk::core::Error::PermissionDenied;
+  }
+
   for (uintptr_t vaddr = region.start_vaddr; vaddr < region.end_vaddr; vaddr += 0x1000) {
     auto existing_flags_res = VirtualMemoryManager::the().get_page_flags(vaddr);
     if (existing_flags_res.is_ok()) {
@@ -29,8 +38,9 @@ MemoryDomain::apply_final_permissions(const MemoryRegion& region) {
 
       uint64_t combined = static_cast<uint64_t>(current) | static_cast<uint64_t>(requested);
 
-      // Special handling for NX (bit 63): it should only be set if BOTH current and requested have
-      // it set. (i.e. if either wants execution, clear NX)
+      if (!(static_cast<uint64_t>(requested) & static_cast<uint64_t>(PageFlags::Writable)))
+        combined &= ~static_cast<uint64_t>(PageFlags::Writable);
+
       if (!(static_cast<uint64_t>(current) & static_cast<uint64_t>(PageFlags::ExecuteDisable)) ||
           !(static_cast<uint64_t>(requested) & static_cast<uint64_t>(PageFlags::ExecuteDisable))) {
         combined &= ~static_cast<uint64_t>(PageFlags::ExecuteDisable);
@@ -73,7 +83,6 @@ bool MemoryDomain::is_already_mapped(uintptr_t vaddr) {
   auto flags_res = VirtualMemoryManager::the().get_page_flags(aligned_vaddr);
   if (flags_res.is_error())
     return false;
-  // Kernel-only pages (no User bit) must not be reused for user segments.
   return static_cast<uint64_t>(flags_res.value()) & static_cast<uint64_t>(PageFlags::User);
 }
 
@@ -84,22 +93,21 @@ fk::core::Result<void, fk::core::Error> MemoryDomain::map_single_page(uintptr_t 
     fk::algorithms::kwarn("DOMAIN", "map_single_page: alloc_page failed at %p", (void*)vaddr);
     return fk::core::Error::OutOfMemory;
   }
-  // Zero out the physical page using its identity mapping (since we are in kernel)
-  // or map it temporarily. Assuming phys is identity mapped for simplicity if it's < 1GB
-  // or using memset on vaddr AFTER mapping ONLY if it was not mapped.
-  // However, if we map it first and THEN memset, we are fine as long as we only do it for NEW
-  // mappings.
   VirtualMemoryManager::the().map_page(vaddr, phys, flags);
+  arch_smap_begin();
   fk::memory::set(reinterpret_cast<void*>(vaddr), 0, 0x1000);
+  arch_smap_end();
   return {};
 }
 
 fk::core::Result<void, fk::core::Error> MemoryDomain::remap_page_with_permissions(uintptr_t vaddr,
-                                                                                  PageFlags flags) {
+                                                                                   PageFlags flags) {
   uintptr_t phys = VirtualMemoryManager::the().translate(vaddr);
-  if (phys != 0) {
-    VirtualMemoryManager::the().map_page(vaddr, phys, flags);
+  if (phys == 0) {
+    fk::algorithms::kwarn("ELF", "remap_page_with_permissions: page not mapped at %p", (void*)vaddr);
+    return fk::core::Error::NotFound;
   }
+  VirtualMemoryManager::the().map_page(vaddr, phys, flags);
   return {};
 }
 

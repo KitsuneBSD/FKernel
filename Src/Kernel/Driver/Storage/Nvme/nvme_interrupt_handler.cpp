@@ -11,7 +11,7 @@ InterruptDrivenNvmeController* NvmeInterruptHandler::s_nvme_controllers[MAX_IDT_
 void NvmeInterruptHandler::register_handler(fk::RefPtr<InterruptDrivenNvmeController> controller) {
   uint32_t irq = controller->interrupt_line();
   if (irq == 0 || irq >= 32) {
-    fk::algorithms::kerror("NVMe-INT", "Invalid IRQ line: %d", irq);
+    fk::algorithms::kerror("NVME_INT", "Invalid IRQ line: %d", irq);
     return;
   }
 
@@ -26,7 +26,7 @@ void NvmeInterruptHandler::register_handler(fk::RefPtr<InterruptDrivenNvmeContro
 
   InterruptController::the().register_interrupt(dispatch, vector);
 
-  fk::algorithms::klog("NVMe-INT", "Registered interrupt handler for IRQ %d (vector %d)", irq,
+  fk::algorithms::klog("NVME_INT", "Registered interrupt handler for IRQ %d (vector %d)", irq,
                        vector);
 }
 

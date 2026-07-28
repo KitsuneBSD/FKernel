@@ -1,5 +1,6 @@
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
+#include <Kernel/Ipc/cspace.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
@@ -288,7 +289,11 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   // Close all FDs marked O_CLOEXEC across execve
   for (size_t i = 0; i < task->resources.files.descriptors.size(); ++i) {
     auto& desc = task->resources.files.descriptors[i];
-    if (desc && desc->is_cloexec()) desc = nullptr;
+    if (desc && desc->is_cloexec()) {
+      if (task->resources.ipc.cspace)
+        task->resources.ipc.cspace->remove_by_object(desc.get());
+      desc = nullptr;
+    }
   }
 
   task->dump_file_descriptors();

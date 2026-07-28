@@ -9,32 +9,28 @@
 void general_protection_handler(uint8_t vector, InterruptFrame* frame) {
     if (!frame) halt_forever();
 
-    // User-mode #GP: check for privileged instructions (hlt, invd, wbinvd, etc.)
-    // that musl/busybox use in user space. Linux converts these to SIGILL.
     if ((frame->cs & 3) == 3) {
+        auto* task = SchedulerManager::the().current();
+        if (!task || task->is_a_kernel_task()) { halt_forever(); return; }
+
         uint8_t insn = 0;
         if (fkernel::memory::copy_from_user(&insn,
                 reinterpret_cast<const void*>(frame->rip), 1).is_ok()) {
-            // hlt (0xF4), invd (0x08), wbinvd (0x09) — privileged instructions
-            // that user-space code (musl __lock) may execute as hints.
             if (insn == 0xF4 || insn == 0x08 || insn == 0x09) {
-                auto* task = SchedulerManager::the().current();
-                if (task && !task->is_a_kernel_task()) {
-                    fk::algorithms::klog("GPF",
-                        "User-mode privileged insn 0x%02x at RIP=%p, sending SIGILL",
-                        (unsigned)insn, (void*)frame->rip);
-                    siginfo_t si{};
-                    si.si_signo = SIGILL;
-                    si.si_code  = 2;
-                    si.si_addr  = frame->rip;
-                    fkernel::ipc::SignalDelivery::send_signal(task, SIGILL, &si);
-                    return;
-                }
+                fk::algorithms::klog("GPF",
+                    "User-mode privileged insn 0x%02x at RIP=%p, sending SIGILL",
+                    (unsigned)insn, (void*)frame->rip);
             }
         }
+
+        siginfo_t si{};
+        si.si_signo = SIGILL;
+        si.si_code  = ILL_PRVOPC;
+        si.si_addr  = frame->rip;
+        fkernel::ipc::SignalDelivery::send_signal(task, SIGILL, &si);
+        return;
     }
 
-    // Kernel-mode #GP or unrecognized user-mode #GP — fatal
     fk::algorithms::kexception(
         "General Protection",
         "vector=%u error=%p RIP=%p RSP=%p RFLAGS=%p",

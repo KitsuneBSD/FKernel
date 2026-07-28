@@ -5,8 +5,6 @@
 
 namespace fkernel {
 
-// A minimal LCG-based PRNG. Not cryptographically secure — satisfies
-// programs that just need non-zero bytes (musl's arc4random_buf, etc.).
 class UrandomDevice final : public CharacterDevice {
     mutable uint64_t m_state{0x123456789ABCDEF0ULL};
 
@@ -38,7 +36,7 @@ public:
     }
 
     virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t, size_t size, const uint8_t*) override {
-        return size; // Discard
+        return size;
     }
 
     virtual size_t size() const override { return 0; }

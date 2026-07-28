@@ -19,8 +19,13 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
 PathResolver::resolve_unlocked(const char* path, fk::RefPtr<Dentry> base, int depth) {
   if (depth > 8) return fk::core::Error::IOError;
 
-  auto root = m_vfs.root();
-  if (!path || !root) return fk::core::Error::InvalidParameter;
+  if (!path) return fk::core::Error::InvalidParameter;
+
+  auto* task = SchedulerManager::the().current();
+  fk::RefPtr<Dentry> root = m_vfs.root();
+  if (task && task->resources.files.root)
+    root = task->resources.files.root;
+  if (!root) return fk::core::Error::InvalidParameter;
 
   fk::RefPtr<Dentry> current = root;
   const char* ptr = path;
@@ -30,7 +35,6 @@ PathResolver::resolve_unlocked(const char* path, fk::RefPtr<Dentry> base, int de
   } else if (base) {
     current = base;
   } else {
-    auto* task = SchedulerManager::the().current();
     if (task && !task->resources.files.cwd.empty()) {
       auto cwd_res = resolve_unlocked(task->resources.files.cwd.c_str(), nullptr, depth + 1);
       if (cwd_res.is_ok()) current = cwd_res.value();
@@ -50,7 +54,7 @@ PathResolver::resolve_unlocked(const char* path, fk::RefPtr<Dentry> base, int de
       continue;
 
     if (fk::memory::compare(name, "..") == 0) {
-      if (current->parent()) current = current->parent();
+      if (current.get() != root.get() && current->parent()) current = current->parent();
       continue;
     }
 

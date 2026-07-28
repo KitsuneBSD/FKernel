@@ -2,6 +2,7 @@
 
 #include <Kernel/Driver/Terminal/terminal.h>
 #include <Kernel/Driver/Terminal/terminal_renderer.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Container/circular_buffer.h>
 #include <LibFK/Terminal/ansi_parser.h>
@@ -90,6 +91,7 @@ private:
   int m_index;
   static constexpr size_t INPUT_QUEUE_SIZE = 1024;
   fk::containers::CircularBuffer<char, INPUT_QUEUE_SIZE> m_input_queue;
+  fkernel::ipc::Endpoint m_read_endpoint;
   fk::terminal::AnsiParser m_ansi_parser;
   fk::synchronization::Spinlock m_lock;
   

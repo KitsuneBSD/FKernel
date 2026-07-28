@@ -35,7 +35,7 @@ private:
 
   BlockHeader *m_heap_head = nullptr;
   bool m_heap_initialized = false;
-  fk::synchronization::Spinlock m_heap_lock;
+  mutable fk::synchronization::Spinlock m_heap_lock;
 
 public:
   /** @return The singleton instance. */

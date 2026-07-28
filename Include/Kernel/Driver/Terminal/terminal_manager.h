@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Kernel/Driver/Terminal/vga_terminal.h"
+#include "Kernel/Driver/Terminal/terminal_id.h"
 #include <LibFK/Memory/own_ptr.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/optional.h>
@@ -12,19 +13,6 @@ enum class TerminalType {
     VGA,
     Serial,
     PTY
-};
-
-class TerminalId {
-    uint32_t m_value;
-    
-public:
-    explicit TerminalId(uint32_t id) : m_value(id) {}
-    
-    bool is_valid() const { return m_value > 0; }
-    uint32_t value() const { return m_value; }
-    
-    bool operator==(const TerminalId& other) const { return m_value == other.m_value; }
-    bool operator!=(const TerminalId& other) const { return !(*this == other); }
 };
 
 class TerminalManager {

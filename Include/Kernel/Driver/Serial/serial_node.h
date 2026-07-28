@@ -2,6 +2,7 @@
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Serial/serial_port.h>
+#include <Kernel/Scheduler/scheduler.h>
 
 namespace fkernel {
 
@@ -14,7 +15,10 @@ public:
 
     virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t size, uint8_t* buffer) override {
         if (!buffer || size == 0) return fk::core::Error::InvalidParameter;
-        return serial::read(buffer, size);
+        size_t n;
+        while ((n = serial::read(buffer, size)) == 0)
+            SchedulerManager::the().yield();
+        return n;
     }
 
     virtual fk::core::Result<size_t, fk::core::Error> write(uint64_t, size_t size, const uint8_t* buffer) override {

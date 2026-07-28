@@ -19,24 +19,24 @@ static void ahci_interrupt_dispatcher(uint8_t vector, InterruptFrame* frame) {
 fk::RefPtr<InterruptDrivenAhciController>
 InterruptDrivenAhciController::create(const PciDevice& device) {
   fk::algorithms::klog(
-      "AHCI-INT", "Creating interrupt-driven AHCI controller for device %02x:%02x.%d",
+      "AHCI_INT", "Creating interrupt-driven AHCI controller for device %02x:%02x.%d",
       device.address().bus(), device.address().device(), device.address().function());
 
   auto controller_result = fk::make_ref<InterruptDrivenAhciController>(device);
   if (controller_result.is_error()) {
-    fk::algorithms::kerror("AHCI-INT", "Failed to create controller instance");
+    fk::algorithms::kerror("AHCI_INT", "Failed to create controller instance");
     return nullptr;
   }
 
   auto controller = controller_result.value();
   auto init_result = controller->initialize_interrupt_driven();
   if (init_result.is_error()) {
-    fk::algorithms::kerror("AHCI-INT", "Failed to initialize controller: %d",
+    fk::algorithms::kerror("AHCI_INT", "Failed to initialize controller: %d",
                            (int)init_result.error());
     return nullptr;
   }
 
-  fk::algorithms::klog("AHCI-INT", "Interrupt-driven controller created successfully");
+  fk::algorithms::klog("AHCI_INT", "Interrupt-driven controller created successfully");
   return controller;
 }
 
@@ -88,7 +88,7 @@ fk::core::Result<void, fk::core::Error> InterruptDrivenAhciController::enable_in
       continue;
 
     port.regs->ie = 0x7FFFF;
-    fk::algorithms::klog("AHCI-INT", "Enabled interrupts for port %d", i);
+    fk::algorithms::klog("AHCI_INT", "Enabled interrupts for port %d", i);
   }
 
   uint32_t ghc = *reinterpret_cast<volatile uint32_t*>(m_hba_base + 0x04);
@@ -96,7 +96,7 @@ fk::core::Result<void, fk::core::Error> InterruptDrivenAhciController::enable_in
   *reinterpret_cast<volatile uint32_t*>(m_hba_base + 0x04) = ghc;
 
   m_interrupts_enabled = true;
-  fk::algorithms::klog("AHCI-INT", "Interrupts enabled on IRQ %d", m_interrupt_line);
+  fk::algorithms::klog("AHCI_INT", "Interrupts enabled on IRQ %d", m_interrupt_line);
 
   return {};
 }
@@ -297,7 +297,7 @@ void InterruptDrivenAhciController::complete_operation(uint32_t port_index, uint
 void AhciInterruptHandler::register_handler(fk::RefPtr<InterruptDrivenAhciController> controller) {
   uint32_t irq = controller->get_interrupt_line();
   if (irq == 0 || irq >= 32) {
-    fk::algorithms::kerror("AHCI-INT", "Invalid IRQ line: %d", irq);
+    fk::algorithms::kerror("AHCI_INT", "Invalid IRQ line: %d", irq);
     return;
   }
 
@@ -306,17 +306,26 @@ void AhciInterruptHandler::register_handler(fk::RefPtr<InterruptDrivenAhciContro
 
   InterruptController::the().register_interrupt(ahci_interrupt_dispatcher, vector);
 
-  fk::algorithms::klog("AHCI-INT", "Registered interrupt handler for IRQ %d (vector %d)", irq, vector);
+  fk::algorithms::klog("AHCI_INT", "Registered interrupt handler for IRQ %d (vector %d)", irq, vector);
 }
 
 // Async DMA operations not yet implemented — callers get DeviceError
 fk::core::Result<void, fk::core::Error> InterruptDrivenAhciController::setup_dma_buffers() {
-    fk::algorithms::kwarn("AHCI-INT", "setup_dma_buffers: async DMA not implemented");
+    fk::algorithms::kwarn("AHCI_INT", "setup_dma_buffers: async DMA not implemented");
     return fk::core::Error::NotImplemented;
 }
-void InterruptDrivenAhciController::setup_command_header(uint32_t, uint32_t, uint32_t, bool) {}
-void InterruptDrivenAhciController::setup_fis(uint32_t, uint32_t, uint64_t, uint32_t, bool) {}
-void InterruptDrivenAhciController::start_command(uint32_t, uint32_t) {}
-DmaBuffer& InterruptDrivenAhciController::get_dma_buffer(uint32_t) { static DmaBuffer dummy; return dummy; }
+void InterruptDrivenAhciController::setup_command_header(uint32_t, uint32_t, uint32_t, bool) {
+    fk::algorithms::kwarn("AHCI_INT", "setup_command_header: not implemented");
+}
+void InterruptDrivenAhciController::setup_fis(uint32_t, uint32_t, uint64_t, uint32_t, bool) {
+    fk::algorithms::kwarn("AHCI_INT", "setup_fis: not implemented");
+}
+void InterruptDrivenAhciController::start_command(uint32_t, uint32_t) {
+    fk::algorithms::kwarn("AHCI_INT", "start_command: not implemented");
+}
+DmaBuffer& InterruptDrivenAhciController::get_dma_buffer(uint32_t) {
+    fk::algorithms::kwarn("AHCI_INT", "get_dma_buffer: returning static dummy");
+    static DmaBuffer dummy; return dummy;
+}
 
 } // namespace fkernel

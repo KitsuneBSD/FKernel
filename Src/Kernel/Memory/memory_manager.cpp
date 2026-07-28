@@ -2,6 +2,7 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
+#include <Kernel/Memory/ObjectMemory/slab_allocator.h>
 #include <Kernel/Memory/iommu.h>
 #include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
 #include <Kernel/Boot/boot_info.h>
@@ -28,7 +29,12 @@ void MemoryManager::initialize() {
   PhysicalMemoryManager::the().initialize();
   VirtualMemoryManager::the().initialize();
 
-  // Initialize Intel IOMMU (VT-d)
+  VirtualMemoryManager::the().extend_direct_map();
+  PhysicalMemoryManager::the().reconcile_buddies();
+
+  SlabAllocator::the().initialize();
+  fk::algorithms::klog("MEMORY", "Slab allocator ready");
+
   fkernel::vtd::IntelIOMMU::the().initialize();
 
   initialize_heap();
@@ -71,9 +77,9 @@ void MemoryManager::initialize_heap() {
     m_heap_head->prev = nullptr;
     m_heap_head->magic = BlockHeader::MAGIC;
 
-    m_heap_initialized = true;
-    libc_set_heap_ready();
-    fk::algorithms::klog("MEMORY", "Kernel Heap initialized. Size: %zu bytes", total_size);
+  m_heap_initialized = true;
+  libc_set_heap_ready();
+  fk::algorithms::klog("MEMORY", "Kernel Heap initialized. Size: %zu bytes", total_size);
 }
 
 static inline uint64_t save_and_disable_interrupts() {
@@ -86,6 +92,11 @@ static inline void restore_interrupts(uint64_t flags) {
 
 void* MemoryManager::allocate(size_t size) {
     if (!m_heap_initialized) return nullptr;
+
+    if (SlabAllocator::the().is_initialized() && size > 0 && size <= 2048) {
+        void* ptr = SlabAllocator::the().allocate(size);
+        if (ptr) return ptr;
+    }
 
     uint64_t flags = save_and_disable_interrupts();
     m_heap_lock.lock();
@@ -172,6 +183,10 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
 void MemoryManager::free(void* ptr) {
     if (!ptr) return;
 
+    if (SlabAllocator::the().is_initialized()) {
+        if (SlabAllocator::the().deallocate(ptr)) return;
+    }
+
     uint64_t flags = save_and_disable_interrupts();
     m_heap_lock.lock();
 
@@ -241,15 +256,21 @@ uintptr_t MemoryManager::allocate_contiguous(size_t order, ZoneType preferred, u
 void MemoryManager::free_contiguous(uintptr_t phys, size_t order) {
     PhysicalMemoryManager::the().free_contiguous(phys, order);
 }
-
 void MemoryManager::heap_stats(size_t& total_out, size_t& free_out) const {
     total_out = 0;
     free_out = 0;
     if (!m_heap_head) return;
+
+    uint64_t flags = save_and_disable_interrupts();
+    m_heap_lock.lock();
+
     BlockHeader* curr = m_heap_head;
     while (curr) {
         total_out += curr->size;
         if (curr->is_free) free_out += curr->size;
         curr = curr->next;
     }
+
+    m_heap_lock.unlock();
+    restore_interrupts(flags);
 }

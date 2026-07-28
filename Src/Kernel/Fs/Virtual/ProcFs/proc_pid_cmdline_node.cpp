@@ -5,7 +5,7 @@
 using namespace fk::core;
 
 fk::core::Result<size_t, fk::core::Error> ProcPidCmdlineNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
-  auto t = SchedulerManager::the().find_task(fk::ProcessId(m_pid));
+  auto t = SchedulerManager::the().find_task(m_pid);
   if (!t) return fk::core::Error::NotFound;
   fk::synchronization::ScopedLock task_lock(t->lock);
   const char* name = t->control.identity.name.c_str();

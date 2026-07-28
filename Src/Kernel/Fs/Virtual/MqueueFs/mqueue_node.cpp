@@ -21,7 +21,7 @@ int MqueueNode::send(const void* buf, size_t len, uint32_t prio) {
   m_lock.lock();
   while (m_count >= m_max_msgs) {
     m_lock.unlock();
-    m_writable.wait();
+    m_endpoint.wait();
     m_lock.lock();
   }
 
@@ -38,7 +38,7 @@ int MqueueNode::send(const void* buf, size_t len, uint32_t prio) {
   ++m_count;
   m_lock.unlock();
 
-  m_readable.signal(1);
+  m_endpoint.signal(fk::NotificationBits(1));
   return 0;
 }
 
@@ -47,7 +47,7 @@ ssize_t MqueueNode::receive(void* buf, size_t len, uint32_t* prio, bool nonblock
   while (m_count == 0) {
     m_lock.unlock();
     if (nonblock) return -1;
-    m_readable.wait();
+    m_endpoint.wait();
     m_lock.lock();
   }
 
@@ -68,7 +68,7 @@ ssize_t MqueueNode::receive(void* buf, size_t len, uint32_t* prio, bool nonblock
   fk::memory::copy(buf, &entry->data[0], copy_len);
 
   kfree(entry);
-  m_writable.signal(1);
+  m_endpoint.signal(fk::NotificationBits(1));
   return static_cast<ssize_t>(copy_len);
 }
 

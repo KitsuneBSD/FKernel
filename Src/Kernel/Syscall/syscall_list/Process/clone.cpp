@@ -1,4 +1,6 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
+#include <Kernel/Fs/Vfs/mount_namespace.h>
+#include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Ipc/cspace.h>
@@ -22,6 +24,7 @@ static constexpr uint64_t CLONE_SETTLS   = 0x00080000;
 static constexpr uint64_t CLONE_PARENT_SETTID  = 0x00100000;
 static constexpr uint64_t CLONE_CHILD_CLEARTID = 0x00200000;
 static constexpr uint64_t CLONE_CHILD_SETTID   = 0x01000000;
+static constexpr uint64_t CLONE_NEWNS          = 0x00020000;
 
 extern "C" {
 void fork_child_trampoline();
@@ -54,6 +57,12 @@ extern "C" uint64_t sys_clone(uint64_t flags, uint64_t child_stack,
     child->control.lifecycle.boosted          = false;
     child->control.lifecycle.original_qos     = parent->control.lifecycle.qos;
     child->resources.files.cwd = parent->resources.files.cwd;
+    child->resources.files.root = parent->resources.files.root;
+    child->resources.files.mount_ns = parent->resources.files.mount_ns;
+
+    if (flags & CLONE_NEWNS) {
+      child->resources.files.mount_ns = fkernel::VirtualFileSystem::the().clone_mount_namespace();
+    }
 
     child->resources.ipc.cspace = new fkernel::ipc::CSpace();
     if (!child->resources.ipc.cspace) { delete child; return (uint64_t)-12; }

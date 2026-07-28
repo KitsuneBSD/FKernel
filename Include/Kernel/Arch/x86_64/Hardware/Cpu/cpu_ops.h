@@ -10,7 +10,8 @@ void arch_cpuid(uint32_t leaf, uint32_t subleaf,
 void arch_write_msr(uint32_t msr, uint64_t value);
 uint64_t arch_read_msr(uint32_t msr);
 
-void arch_enable_cpu_features(bool has_smep, bool has_smap, bool has_nx);
+void arch_enable_cpu_features(bool has_smep, bool has_smap, bool has_nx,
+                              bool has_xsave, bool has_avx);
 
 [[noreturn]] void arch_halt_loop();
 
@@ -26,5 +27,7 @@ void arch_restore_flags(uint64_t flags);
 
 void arch_smap_begin();
 void arch_smap_end();
+
+void detect_tsc_frequency();
 
 } // extern "C"

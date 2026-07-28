@@ -3,12 +3,13 @@
 #include <Kernel/Memory/VirtualMemory/RegionSplitter/region_splitter.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/log.h>
 
 VirtualMemoryManager::VirtualMemoryManager() : m_pml4(nullptr), m_pml4_phys(0) {
   /*TODO: Apply this log when we work with LogLevel
-  fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Ctor (empty)");
+  fk::algorithms::klog("VIRT_MEM", "Ctor (empty)");
   */
 }
 
@@ -27,19 +28,19 @@ void VirtualMemoryManager::flush_tlb() {
 
 void VirtualMemoryManager::perform_initial_identity_mapping() {
   size_t pages = INITIAL_IDENTITY_MAPPING_SIZE / PAGE_SIZE;
-  fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Identity mapping start: pages=%zu", pages);
+  fk::algorithms::klog("VIRT_MEM", "Identity mapping start: pages=%zu", pages);
 
   for (size_t i = 0; i < pages; i++) {
     uintptr_t phys = i * PAGE_SIZE;
     map_page(phys, phys, PageFlags::Present | PageFlags::Writable);
   }
 
-  fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Identity mapping done");
+  fk::algorithms::klog("VIRT_MEM", "Identity mapping done");
 }
 
 void VirtualMemoryManager::initialize() {
   if (m_pml4) {
-    fk::algorithms::kwarn("VIRTUAL MEMORY MANAGER", "Initialize skipped: already initialized");
+    fk::algorithms::kwarn("VIRT_MEM", "Initialize skipped: already initialized");
     return;
   }
 
@@ -53,7 +54,7 @@ void VirtualMemoryManager::initialize() {
 
   /*TODO: Apply this log when we work with LogLevel
   fk::algorithms::kdebug(
-      "VIRTUAL MEMORY MANAGER",
+      "VIRT_MEM",
       "PML4 allocated: phys=%p",
       m_pml4_phys
   );
@@ -65,18 +66,18 @@ void VirtualMemoryManager::initialize() {
   perform_initial_identity_mapping();
   if (boot::BootInfo::the().has_framebuffer()) {
     auto fb = boot::BootInfo::the().get_framebuffer_info();
-    uintptr_t start = fb.addr & ~0xFFFULL;
-    uintptr_t end = (fb.addr + fb.pitch * fb.height + 0xFFF) & ~0xFFFULL;
-    for (uintptr_t v = start; v < end; v += 0x1000) {
+    uintptr_t start = fb.addr & ~PAGE_FLAGS_MASK;
+    uintptr_t end = (fb.addr + fb.pitch * fb.height + 0xFFF) & ~PAGE_FLAGS_MASK;
+    for (uintptr_t v = start; v < end; v += PAGE_SIZE) {
       map_page(v, v, PageFlags::Present | PageFlags::Writable);
     }
-    fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Mapped framebuffer: %p - %p", (void*)start,
+    fk::algorithms::klog("VIRT_MEM", "Mapped framebuffer: %p - %p", (void*)start,
                          (void*)end);
   }
 
   write_on_cr3(static_cast<void*>(m_pml4));
 
-  fk::algorithms::klog("VIRTUAL MEMORY MANAGER", "Initialize done: cr3=%p", m_pml4);
+  fk::algorithms::klog("VIRT_MEM", "Initialize done: cr3=%p", m_pml4);
   m_is_initialized = true;
 }
 
@@ -103,12 +104,12 @@ PageTable* VirtualMemoryManager::ensure_table(PageTable* parent, size_t index, P
   // copy the pointed-to table into a fresh page so we never modify shared kernel
   // page tables (PDPT_K / PD_K / their leaf PTs).
   if (user_bit && !(existing & static_cast<uint64_t>(PageFlags::User))) {
-    uintptr_t old_addr = existing & 0x000FFFFFFFFFF000ULL;
+    uintptr_t old_addr = existing & PHYSICAL_ADDRESS_MASK;
     uintptr_t new_table = PhysicalMemoryManager::the().alloc_page();
     if (new_table == 0) return nullptr;
     fk::memory::copy(reinterpret_cast<void*>(new_table),
            reinterpret_cast<void*>(old_addr), PAGE_SIZE);
-    parent->entries[index] = new_table | (existing & 0xFFFULL) | user_bit | write_bit;
+    parent->entries[index] = new_table | (existing & PAGE_FLAGS_MASK) | user_bit | write_bit;
     changed = true;
     return reinterpret_cast<PageTable*>(new_table);
   }
@@ -119,18 +120,20 @@ PageTable* VirtualMemoryManager::ensure_table(PageTable* parent, size_t index, P
     changed = true;
   }
 
-  return reinterpret_cast<PageTable*>(parent->entries[index] & 0x000FFFFFFFFFF000ULL);
+  return reinterpret_cast<PageTable*>(parent->entries[index] & PHYSICAL_ADDRESS_MASK);
 }
 
 void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags flags) {
-  assert((virt % PAGE_SIZE) == 0);
-  assert((phys % PAGE_SIZE) == 0);
+  if ((virt % PAGE_SIZE) != 0 || (phys % PAGE_SIZE) != 0) {
+    fk::algorithms::kwarn("VMM", "map_page: unaligned addr virt=%p phys=%p", (void*)virt, (void*)phys);
+    return;
+  }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
-  size_t pml4_idx = (virt >> 39) & 0x1FF;
-  size_t pdpt_idx = (virt >> 30) & 0x1FF;
-  size_t pd_idx = (virt >> 21) & 0x1FF;
-  size_t pt_idx = (virt >> 12) & 0x1FF;
+  size_t pml4_idx = (virt >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pdpt_idx = (virt >> PDPT_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pd_idx = (virt >> PD_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pt_idx = (virt >> PT_INDEX_SHIFT) & TABLE_INDEX_MASK;
 
   bool changed_parents = false;
 
@@ -165,7 +168,10 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags fl
 
 void VirtualMemoryManager::unmap_page(uintptr_t virt) {
   fk::algorithms::kdebug("VMM", "unmap_page(%p)", (void*)virt);
-  assert((virt % PAGE_SIZE) == 0);
+  if ((virt % PAGE_SIZE) != 0) {
+    fk::algorithms::kwarn("VMM", "unmap_page: unaligned addr %p", (void*)virt);
+    return;
+  }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   uint64_t* pte_ptr = get_pte(virt);
@@ -178,69 +184,79 @@ void VirtualMemoryManager::unmap_page(uintptr_t virt) {
 void VirtualMemoryManager::protect_page(uintptr_t virt, PageFlags flags) {
   fk::algorithms::kdebug("VMM", "protect_page(%p, flags=0x%lx)", (void*)virt, (uint64_t)flags);
   fk::synchronization::ScopedLockIRQ lock(m_lock);
-  uint64_t* pte = get_pte(virt, false);
-  if (!pte || !(*pte & static_cast<uint64_t>(PageFlags::Present)))
-    return;
-  uintptr_t phys = *pte & 0x000FFFFFFFFFF000ULL;
-  *pte = phys | static_cast<uint64_t>(flags);
+  bool changed = false;
+  PageTable* pt = ensure_table(
+      ensure_table(
+          ensure_table(m_pml4, (virt >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK, flags, changed),
+          (virt >> PDPT_INDEX_SHIFT) & TABLE_INDEX_MASK, flags, changed),
+      (virt >> PD_INDEX_SHIFT) & TABLE_INDEX_MASK, flags, changed);
+  if (!pt) return;
+  size_t pt_idx = (virt >> PT_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  if (!(pt->entries[pt_idx] & static_cast<uint64_t>(PageFlags::Present))) return;
+  uintptr_t phys = pt->entries[pt_idx] & PHYSICAL_ADDRESS_MASK;
+  pt->entries[pt_idx] = phys | static_cast<uint64_t>(flags) | static_cast<uint64_t>(PageFlags::Present);
+  if (changed) { flush_tlb(); return; }
   invlpg(virt);
 }
 
 uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
-  assert((virt % PAGE_SIZE) == 0);
+  if ((virt % PAGE_SIZE) != 0) {
+    fk::algorithms::kwarn("VMM", "translate: unaligned addr %p", (void*)virt);
+    return 0;
+  }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
-  size_t pml4_idx = (virt >> 39) & 0x1FF;
-  size_t pdpt_idx = (virt >> 30) & 0x1FF;
-  size_t pd_idx = (virt >> 21) & 0x1FF;
-  size_t pt_idx = (virt >> 12) & 0x1FF;
+  size_t pml4_idx = (virt >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pdpt_idx = (virt >> PDPT_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pd_idx = (virt >> PD_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pt_idx = (virt >> PT_INDEX_SHIFT) & TABLE_INDEX_MASK;
 
   if (!(m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
+  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & PHYSICAL_ADDRESS_MASK);
 
   if (!(pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
+  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & PHYSICAL_ADDRESS_MASK);
 
   if (!(pd->entries[pd_idx] & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
+  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & PHYSICAL_ADDRESS_MASK);
 
   if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  uintptr_t phys = (pt->entries[pt_idx] & 0x000FFFFFFFFFF000) + (virt & 0xFFF);
+  uintptr_t phys = (pt->entries[pt_idx] & PHYSICAL_ADDRESS_MASK) + (virt & 0xFFF);
   return phys;
 }
 
 fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flags(uintptr_t virt) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
-  size_t pml4_idx = (virt >> 39) & 0x1FF;
-  size_t pdpt_idx = (virt >> 30) & 0x1FF;
-  size_t pd_idx = (virt >> 21) & 0x1FF;
-  size_t pt_idx = (virt >> 12) & 0x1FF;
+  size_t pml4_idx = (virt >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pdpt_idx = (virt >> PDPT_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pd_idx = (virt >> PD_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pt_idx = (virt >> PT_INDEX_SHIFT) & TABLE_INDEX_MASK;
 
   if (!(m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::Present))
     return fk::core::Error::NotFound;
-  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000);
+  PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & PHYSICAL_ADDRESS_MASK);
   if (!(pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present))
     return fk::core::Error::NotFound;
-  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000);
+  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & PHYSICAL_ADDRESS_MASK);
   if (!(pd->entries[pd_idx] & (uint64_t)PageFlags::Present))
     return fk::core::Error::NotFound;
-  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000);
+  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & PHYSICAL_ADDRESS_MASK);
   if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present))
     return fk::core::Error::NotFound;
 
-  return static_cast<PageFlags>(pt->entries[pt_idx] & ~0x000FFFFFFFFFF000ULL);
+  return static_cast<PageFlags>(pt->entries[pt_idx] & ~PHYSICAL_ADDRESS_MASK);
 }
 
 uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
@@ -249,9 +265,9 @@ uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
 
   PageTable* old_table = reinterpret_cast<PageTable*>(old_phys);
   PageTable* new_table = reinterpret_cast<PageTable*>(new_phys);
-  fk::memory::set(new_table, 0, 0x1000);
+  fk::memory::set(new_table, 0, PAGE_SIZE);
 
-  for (int i = 0; i < 512; ++i) {
+  for (size_t i = 0; i < PT_ENTRIES; ++i) {
     if (!(old_table->entries[i] & 1))
       continue; // Not present
 
@@ -263,18 +279,22 @@ uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
 
     // User mappings:
     if (level > 1) {
-      uintptr_t old_sub = old_table->entries[i] & 0x000FFFFFFFFFF000;
+      uintptr_t old_sub = old_table->entries[i] & PHYSICAL_ADDRESS_MASK;
       uintptr_t new_sub = clone_table_recursive(old_sub, level - 1, deep_copy);
       if (!new_sub) continue;
       new_table->entries[i] = new_sub | (old_table->entries[i] & 0xFFF);
     } else {
       // It's a PT, pointing to a page
       if (deep_copy) {
-        uintptr_t old_page = old_table->entries[i] & 0x000FFFFFFFFFF000;
-        uintptr_t new_page = PhysicalMemoryManager::the().alloc_page();
-        if (!new_page) continue;
-        fk::memory::copy(reinterpret_cast<void*>(new_page), reinterpret_cast<void*>(old_page), 0x1000);
-        new_table->entries[i] = new_page | (old_table->entries[i] & 0xFFF);
+        uintptr_t old_page = old_table->entries[i] & PHYSICAL_ADDRESS_MASK;
+        uint64_t flags = old_table->entries[i] & 0xFFF;
+        // CoW: share the physical frame, clear Writable in both parent and child
+        if (flags & static_cast<uint64_t>(PageFlags::Writable)) {
+          flags &= ~static_cast<uint64_t>(PageFlags::Writable);
+          old_table->entries[i] = old_page | flags;
+        }
+        new_table->entries[i] = old_page | flags;
+        PhysicalMemoryManager::the().increment_refcount(old_page);
       } else {
         new_table->entries[i] = 0;
       }
@@ -286,17 +306,13 @@ uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
 uintptr_t VirtualMemoryManager::create_address_space() {
   fk::algorithms::kdebug("VMM", "create_address_space()");
   fk::synchronization::ScopedLockIRQ lock(m_lock);
-  // Always clone from the kernel's root PML4, not from m_pml4_phys which tracks
-  // the current task's (possibly user) address space and can become stale after frees.
-  uintptr_t new_cr3 = clone_table_recursive(m_kernel_pml4_phys, 4, false);
-  fk::algorithms::kdebug("VMM", "create_address_space() -> %p", (void*)new_cr3);
-  return new_cr3;
+  return clone_table_recursive(m_kernel_pml4_phys, PAGE_TABLE_LEVELS, false);
 }
 
 uintptr_t VirtualMemoryManager::clone_address_space(uintptr_t source_cr3) {
   fk::algorithms::kdebug("VMM", "clone_address_space(%p)", (void*)source_cr3);
   fk::synchronization::ScopedLockIRQ lock(m_lock);
-  return clone_table_recursive(source_cr3, 4, true);
+  return clone_table_recursive(source_cr3, PAGE_TABLE_LEVELS, true);
 }
 
 void VirtualMemoryManager::switch_address_space(uintptr_t cr3) {
@@ -317,31 +333,31 @@ void VirtualMemoryManager::free_address_space(uintptr_t cr3) {
   auto* pml4 = reinterpret_cast<PageTable*>(cr3);
 
   // Walk only the user-space half of PML4 (entries 0-255 for 48-bit canonical)
-  for (int pml4_i = 0; pml4_i < 256; ++pml4_i) {
+  for (size_t pml4_i = 0; pml4_i < PT_ENTRIES / 2; ++pml4_i) {
     uint64_t pml4e = pml4->entries[pml4_i];
     if (!(pml4e & 1) || !(pml4e & 4)) continue;
 
-    uintptr_t pdpt_phys = pml4e & 0x000FFFFFFFFFF000ULL;
+    uintptr_t pdpt_phys = pml4e & PHYSICAL_ADDRESS_MASK;
     auto* pdpt = reinterpret_cast<PageTable*>(pdpt_phys);
 
     for (int pdpt_i = 0; pdpt_i < 512; ++pdpt_i) {
       uint64_t pdpte = pdpt->entries[pdpt_i];
       if (!(pdpte & 1) || !(pdpte & 4)) continue;
 
-      uintptr_t pd_phys = pdpte & 0x000FFFFFFFFFF000ULL;
+      uintptr_t pd_phys = pdpte & PHYSICAL_ADDRESS_MASK;
       auto* pd = reinterpret_cast<PageTable*>(pd_phys);
 
       for (int pd_i = 0; pd_i < 512; ++pd_i) {
         uint64_t pde = pd->entries[pd_i];
         if (!(pde & 1) || !(pde & 4)) continue;
 
-        uintptr_t pt_phys = pde & 0x000FFFFFFFFFF000ULL;
+        uintptr_t pt_phys = pde & PHYSICAL_ADDRESS_MASK;
         auto* pt = reinterpret_cast<PageTable*>(pt_phys);
 
         for (int pt_i = 0; pt_i < 512; ++pt_i) {
           uint64_t pte = pt->entries[pt_i];
           if (!(pte & 1) || !(pte & 4)) continue;
-          PhysicalMemoryManager::the().free_page(pte & 0x000FFFFFFFFFF000ULL);
+          PhysicalMemoryManager::the().free_page(pte & PHYSICAL_ADDRESS_MASK);
         }
         PhysicalMemoryManager::the().free_page(pt_phys);
       }
@@ -354,7 +370,7 @@ void VirtualMemoryManager::free_address_space(uintptr_t cr3) {
 
 static PageTable* get_or_create_table(PageTable* parent, size_t index, bool create) {
   if (parent->entries[index] & static_cast<uint64_t>(PageFlags::Present))
-    return reinterpret_cast<PageTable*>(parent->entries[index] & 0x000FFFFFFFFFF000);
+    return reinterpret_cast<PageTable*>(parent->entries[index] & PHYSICAL_ADDRESS_MASK);
   if (!create) return nullptr;
   uintptr_t new_table = PhysicalMemoryManager::the().alloc_page();
   if (!new_table) return nullptr;
@@ -366,10 +382,10 @@ static PageTable* get_or_create_table(PageTable* parent, size_t index, bool crea
 }
 
 uint64_t* VirtualMemoryManager::get_pte(uintptr_t virt, bool create) {
-  size_t pml4_idx = (virt >> 39) & 0x1FF;
-  size_t pdpt_idx = (virt >> 30) & 0x1FF;
-  size_t pd_idx = (virt >> 21) & 0x1FF;
-  size_t pt_idx = (virt >> 12) & 0x1FF;
+  size_t pml4_idx = (virt >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pdpt_idx = (virt >> PDPT_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pd_idx = (virt >> PD_INDEX_SHIFT) & TABLE_INDEX_MASK;
+  size_t pt_idx = (virt >> PT_INDEX_SHIFT) & TABLE_INDEX_MASK;
 
   PageTable* pdpt = get_or_create_table(m_pml4, pml4_idx, create);
   if (!pdpt) return nullptr;
@@ -395,7 +411,7 @@ void VirtualMemoryManager::unmap_page_range(uintptr_t start, uintptr_t end) {
     if (!pte_ptr) continue;
     if (!(*pte_ptr & static_cast<uint64_t>(PageFlags::Present))) continue;
 
-    uint64_t frame = *pte_ptr & 0x000FFFFFFFFFF000;
+    uint64_t frame = *pte_ptr & PHYSICAL_ADDRESS_MASK;
     if (*pte_ptr & static_cast<uint64_t>(PageFlags::User))
       PhysicalMemoryManager::the().free_page(frame);
 
@@ -408,13 +424,13 @@ void VirtualMemoryManager::unmap_page_range(uintptr_t start, uintptr_t end) {
     size_t pd_idx   = (addr >> 21) & 0x1FF;
 
     if (!(m_pml4->entries[pml4_idx] & 1)) continue;
-    auto* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & 0x000FFFFFFFFFF000ULL);
+    auto* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & PHYSICAL_ADDRESS_MASK);
 
     if (!(pdpt->entries[pdpt_idx] & 1)) continue;
-    auto* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & 0x000FFFFFFFFFF000ULL);
+    auto* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & PHYSICAL_ADDRESS_MASK);
 
     if (!(pd->entries[pd_idx] & 1)) continue;
-    auto* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & 0x000FFFFFFFFFF000ULL);
+    auto* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & PHYSICAL_ADDRESS_MASK);
 
     if (!is_table_empty(pt)) continue;
     PhysicalMemoryManager::the().free_page(reinterpret_cast<uintptr_t>(pt));
@@ -454,8 +470,10 @@ fk::core::Result<int, fk::core::Error> VirtualMemoryManager::munmap(uintptr_t ad
 }
 
 void VirtualMemoryManager::map_range(uintptr_t start, uintptr_t size, PageFlags flags) {
-  assert((start % PAGE_SIZE) == 0);
-  assert((size % PAGE_SIZE) == 0);
+  if ((start % PAGE_SIZE) != 0 || (size % PAGE_SIZE) != 0) {
+    fk::algorithms::kwarn("VMM", "map_range: unaligned start=%p size=%zu", (void*)start, size);
+    return;
+  }
 
   for (uintptr_t offset = 0; offset < size; offset += PAGE_SIZE) {
     // Here we assume identity mapping for simpler use cases or that
@@ -463,4 +481,63 @@ void VirtualMemoryManager::map_range(uintptr_t start, uintptr_t size, PageFlags 
     // This is commonly used for MMIO or kernel regions.
     map_page(start + offset, start + offset, flags);
   }
+}
+
+void VirtualMemoryManager::extend_direct_map() {
+  fk::algorithms::klog("VMM", "Extending direct map at %p", (void*)KERNEL_VIRT_BASE);
+
+  size_t total_memory = PhysicalMemoryManager::the().total_memory();
+  size_t aligned_total = (total_memory + PAGE_SIZE_2M - 1) & ~(PAGE_SIZE_2M - 1);
+
+  fk::algorithms::klog("VMM", "Direct map: %zu MB physical memory", total_memory / (1024 * 1024));
+
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+
+  size_t pml4_idx = (KERNEL_VIRT_BASE >> 39) & 0x1FF;
+  uint64_t pml4e = m_pml4->entries[pml4_idx];
+
+  PageTable* pdpt;
+  if (!(pml4e & static_cast<uint64_t>(PageFlags::Present))) {
+    uintptr_t pdpt_phys = PhysicalMemoryManager::the().alloc_page();
+    if (!pdpt_phys) {
+      fk::algorithms::kerror("VMM", "extend_direct_map: failed to allocate PDPT");
+      return;
+    }
+    fk::memory::set(reinterpret_cast<void*>(pdpt_phys), 0, PAGE_SIZE);
+    m_pml4->entries[pml4_idx] = pdpt_phys | static_cast<uint64_t>(PageFlags::Present)
+                                                  | static_cast<uint64_t>(PageFlags::Writable);
+    pdpt = reinterpret_cast<PageTable*>(pdpt_phys);
+  } else {
+    pdpt = reinterpret_cast<PageTable*>(pml4e & PHYSICAL_ADDRESS_MASK);
+  }
+
+  for (uintptr_t offset = 0; offset < aligned_total; offset += PAGE_SIZE_2M) {
+    size_t pdpt_idx = (offset >> 30) & 0x1FF;
+    size_t pd_idx = (offset >> 21) & 0x1FF;
+
+    uint64_t pdpte = pdpt->entries[pdpt_idx];
+
+    PageTable* pd;
+    if (!(pdpte & static_cast<uint64_t>(PageFlags::Present))) {
+      uintptr_t pd_phys = PhysicalMemoryManager::the().alloc_page();
+      if (!pd_phys) {
+        fk::algorithms::kerror("VMM", "extend_direct_map: out of memory at offset %p", (void*)offset);
+        return;
+      }
+      fk::memory::set(reinterpret_cast<void*>(pd_phys), 0, PAGE_SIZE);
+      pdpt->entries[pdpt_idx] = pd_phys | static_cast<uint64_t>(PageFlags::Present)
+                                         | static_cast<uint64_t>(PageFlags::Writable);
+      pd = reinterpret_cast<PageTable*>(pd_phys);
+    } else {
+      pd = reinterpret_cast<PageTable*>(pdpte & PHYSICAL_ADDRESS_MASK);
+    }
+
+    pd->entries[pd_idx] = offset | static_cast<uint64_t>(PageFlags::Present)
+                                 | static_cast<uint64_t>(PageFlags::Writable)
+                                 | static_cast<uint64_t>(PageFlags::HugePage);
+  }
+
+  flush_tlb();
+
+  fk::algorithms::klog("VMM", "Direct map extended: %zu MB", aligned_total / (1024 * 1024));
 }

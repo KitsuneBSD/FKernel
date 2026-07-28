@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
@@ -35,9 +35,9 @@ public:
   ssize_t receive(void* buf, size_t len, uint32_t* prio, bool nonblock);
   short poll() const override;
 
-  uint64_t generation() const { return m_generation; }
-  const uint64_t* generation_ptr() const { return &m_generation; }
-  void revoke() { ++m_generation; }
+  uint64_t generation() const { return m_endpoint.generation(); }
+  const uint64_t* generation_ptr() const { return m_endpoint.generation_ptr(); }
+  void revoke() { m_endpoint.revoke(); }
 
 private:
   mutable fk::synchronization::Spinlock m_lock;
@@ -45,9 +45,7 @@ private:
   size_t m_max_msgs;
   size_t m_max_msg_size;
   size_t m_count{0};
-  uint64_t m_generation{0};
-  ipc::Notification m_readable;
-  ipc::Notification m_writable;
+  ipc::Endpoint m_endpoint;
 };
 
 }

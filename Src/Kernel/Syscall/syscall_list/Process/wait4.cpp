@@ -30,7 +30,11 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
     }
 
     if (task) {
-      ASSERT(task->is_valid());
+      if (!task->is_valid()) {
+        fk::algorithms::kwarn("WAIT", "Task %lu has invalid magic, skipping",
+                              pid.value());
+        return fkernel::return_error(fk::core::Error::InvalidHandle);
+      }
 
       if (status_ptr) {
         int encoded = (task->control.lifecycle.exit_status << 8);
@@ -79,7 +83,10 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
       }
 
       if (zombie) {
-        ASSERT(zombie->is_valid());
+        if (!zombie->is_valid()) {
+          fk::algorithms::kwarn("WAIT", "Zombie task has invalid magic, skipping");
+          return fkernel::return_error(fk::core::Error::InvalidHandle);
+        }
 
         if (status_ptr) {
           int encoded = (zombie->control.lifecycle.exit_status << 8);

@@ -4,6 +4,7 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
+#include <Kernel/Syscall/syscall_utils.h>
 #include <LibFK/Algorithms/log.h>
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
@@ -18,7 +19,7 @@ SyscallManager& SyscallManager::the() {
 
 void SyscallManager::initialize() {
   initialize_syscalls();
-  init_syscalls();
+  init_syscalls(0);
   fk::algorithms::klog("SYSCALL", "Syscall manager initialized");
   m_is_initialized = true;
 }
@@ -33,11 +34,14 @@ uint64_t SyscallManager::handle(uint64_t num, uint64_t arg1, uint64_t arg2, uint
                                 uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs) {
   if (num >= SYS_MAX || !m_syscall_table[num]) {
     fk::algorithms::kwarn("SYSCALL", "Unknown syscall %lu", num);
-    return -38; // -ENOSYS
+    return return_error(fk::core::Error::NotImplemented);
+  }
+  auto* task = SchedulerManager::the().current();
+  if (task && task->control.identity.id.value() == 1) {
+    fk::algorithms::kdebug("PID1", "syscall #%lu", num);
   }
   return m_syscall_table[num](arg1, arg2, arg3, arg4, arg5, arg6, regs);
 }
-
 extern "C" {
 uint64_t sys_open(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_close(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -60,6 +64,7 @@ uint64_t sys_fork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, Pt
 uint64_t sys_vfork(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_clone(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_mount(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_pivot_root(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_umount2(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_execve(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_dup(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -235,6 +240,7 @@ uint64_t sys_epoll_wait(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64
 uint64_t sys_rt_sigtimedwait(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_reboot(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_accept4(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_utimensat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 }
 
 extern "C" void initialize_syscalls() {
@@ -327,6 +333,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_CAP_GRANT, sys_cap_grant);
   SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
   SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
+  SyscallManager::the().register_syscall(SYS_PIVOT_ROOT, sys_pivot_root);
   SyscallManager::the().register_syscall(SYS_POLL, sys_poll);
   SyscallManager::the().register_syscall(SYS_SELECT, sys_select);
   SyscallManager::the().register_syscall(SYS_KQUEUE, sys_kqueue);
@@ -434,6 +441,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_EPOLL_WAIT, sys_epoll_wait);
   SyscallManager::the().register_syscall(SYS_RT_SIGTIMEDWAIT, sys_rt_sigtimedwait);
   SyscallManager::the().register_syscall(SYS_REBOOT, sys_reboot);
+  SyscallManager::the().register_syscall(SYS_UTIMENSAT, sys_utimensat);
 }
 extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
                                        uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs) {

@@ -60,6 +60,31 @@ public:
   }
 
   size_t size() const { return m_capabilities.size() - m_free_list.size(); }
+
+  Capability find_by_object(void* object) const {
+    for (size_t i = 0; i < m_capabilities.size(); ++i) {
+      if (m_capabilities[i].object() == object && m_capabilities[i].is_valid())
+        return m_capabilities[i];
+    }
+    return {};
+  }
+
+  void remove_by_object(void* object) {
+    for (size_t i = 0; i < m_capabilities.size(); ++i) {
+      if (m_capabilities[i].object() == object) {
+        remove(static_cast<uint32_t>(i));
+        return;
+      }
+    }
+  }
+
+  void grant_all_to(CSpace& dest, CapabilityType type = CapabilityType::None) {
+    for (size_t i = 0; i < m_capabilities.size(); ++i) {
+      if (!m_capabilities[i].is_valid()) continue;
+      if (type != CapabilityType::None && m_capabilities[i].type() != type) continue;
+      dest.install(m_capabilities[i]);
+    }
+  }
 };
 
 }

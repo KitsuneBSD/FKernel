@@ -14,12 +14,24 @@
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
+#include <Kernel/Arch/x86_64/rdtsc.h>
+#include <LibFK/Algorithms/chacha20.h>
 #include <LibFK/Algorithms/log.h>
 
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
+static uint64_t rdtsc_entropy_source() {
+  uint32_t lo, hi;
+  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+  return (static_cast<uint64_t>(hi) << 32) | lo;
+}
+
 void init() {
   BootTimer::the().mark("init_start");
+
+  // Seed CSPRNG early — needed by ASLR, /dev/urandom, getrandom()
+  fk::algorithms::ChaCha20PRNG::set_entropy_callback(rdtsc_entropy_source);
+  fk::algorithms::ChaCha20PRNG::the().initialize();
 
   // Force serial-only logging until display is ready.
   fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial);
@@ -51,11 +63,7 @@ void init() {
     Display::switch_to(DisplayFramebuffer::the());
 
     // Enable on-screen logging now that display is ready
-    fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial |
-                                    fk::algorithms::LogTarget::Display);
-
-    // Garantir que tty0 esteja ativo para userspace
-    fkernel::terminal::TerminalManager::the().force_tty0_active();
+    fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial);
 
     Display::the().flush();
 
@@ -79,6 +87,9 @@ void init() {
   if (!fkernel::terminal::TerminalManager::the().is_initialized())
     fk::algorithms::kfatal("INIT", "Terminal manager failed to initialize");
 
+  // Activate tty0 AFTER terminals exist
+  fkernel::terminal::TerminalManager::the().force_tty0_active();
+
   // 2. Inicializa Teclado (legacy PS/2 device, not PCI)
   fk::algorithms::klog("INIT", "Initializing PS/2 keyboard...");
   PS2Keyboard::the().initialize();
@@ -91,6 +102,10 @@ void init() {
   SchedulerManager::the().initialize();
   if (!SchedulerManager::the().is_initialized())
     fk::algorithms::kfatal("INIT", "Scheduler manager failed to initialize");
+
+  fk::algorithms::klog("INIT", "Starting application processors...");
+  SchedulerManager::the().start_aps();
+
   fk::algorithms::klog("INIT", "Initializing syscall manager...");
   SyscallManager::the().initialize();
   if (!SyscallManager::the().is_initialized())
@@ -106,8 +121,17 @@ void init() {
   HardwareInterruptManager::the().unmask_interrupt(15); // Secondary ATA
   InterruptController::the().enable_interrupt();
 
+  // Disable interrupts for the scheduler transition. Timer interrupts firing
+  // during boot log output and context initialization can race. The idle task's
+  // idle_loop() will re-enable interrupts via sti;hlt.
+  asm volatile("cli");
+
   fk::algorithms::klog("INIT", "Starting scheduler...");
   BootTimer::the().mark("init_end");
   BootTimer::the().log_summary();
+
+  // The first schedule() needs need_resched=true to pick the idle task.
+  // Interrupts are disabled (cli above), so no timer tick will set it.
+  SchedulerManager::the().set_need_resched(true);
   SchedulerManager::the().schedule();
 }

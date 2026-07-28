@@ -229,6 +229,8 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
 Fat12FileSystem::lookup(const char* name) {
     uint8_t sector[512];
     uint32_t root_start = m_first_data_sector - m_root_dir_sectors;
+    char lfn_buf[256] = {};
+    bool has_lfn = false;
 
     for (uint32_t i = 0; i < m_root_dir_sectors; ++i) {
         auto res = m_device->read((root_start + i) * 512, 512, sector);
@@ -237,8 +239,6 @@ Fat12FileSystem::lookup(const char* name) {
             return fk::core::Error::IOError;
         }
         auto* dir = reinterpret_cast<Fat12DirectoryEntry*>(sector);
-        char lfn_buf[256] = {};
-        bool has_lfn = false;
         for (int j = 0; j < 16; ++j) {
             if (dir[j].name[0] == 0) return fk::core::Error::NotFound;
             if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) { has_lfn = false; continue; }

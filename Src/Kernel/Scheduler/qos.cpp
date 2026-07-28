@@ -3,12 +3,12 @@
 namespace fkernel::scheduler {
 
 static constexpr QoSLevel s_qos_table[6] = {
-    {120, 8,  2,   8,   0},  // UserInteractive
-    {100, 20, 4,  16,   0},  // UserInitiated
-    { 80, 20, 8,  32,   1},  // Default
-    { 60, 20, 16, 64,   2},  // Utility
-    { 40, 20, 32, 128,  2},  // Background
-    { 20, 20, 64, 256,  3},  // Maintenance
+    {fk::TaskPriority(120), fk::TaskPriority(8),  fk::TickCount(2),   fk::TickCount(8),   fk::MlqfLevel(0)},
+    {fk::TaskPriority(100), fk::TaskPriority(20), fk::TickCount(4),   fk::TickCount(16),  fk::MlqfLevel(0)},
+    {fk::TaskPriority(80),  fk::TaskPriority(20), fk::TickCount(8),   fk::TickCount(32),  fk::MlqfLevel(1)},
+    {fk::TaskPriority(60),  fk::TaskPriority(20), fk::TickCount(16),  fk::TickCount(64),  fk::MlqfLevel(2)},
+    {fk::TaskPriority(40),  fk::TaskPriority(20), fk::TickCount(32),  fk::TickCount(128), fk::MlqfLevel(2)},
+    {fk::TaskPriority(20),  fk::TaskPriority(20), fk::TickCount(64),  fk::TickCount(256), fk::MlqfLevel(3)},
 };
 
 static constexpr uint8_t s_level_quanta[4] = {2, 4, 8, 16};
@@ -17,30 +17,30 @@ const QoSLevel& qos_level(QoSClass qos) {
     return s_qos_table[static_cast<uint8_t>(qos)];
 }
 
-uint8_t priority_for_qos(QoSClass qos, int8_t nice) {
+fk::TaskPriority priority_for_qos(QoSClass qos, fk::NiceValue nice) {
     const auto& level = qos_level(qos);
-    int16_t offset = nice_to_priority_offset(nice);
-    int16_t pri = static_cast<int16_t>(level.base_priority) + offset;
-    if (pri < static_cast<int16_t>(level.base_priority) - 8)
-        pri = static_cast<int16_t>(level.base_priority) - 8;
-    if (pri > static_cast<int16_t>(level.base_priority) + 7)
-        pri = static_cast<int16_t>(level.base_priority) + 7;
-    return static_cast<uint8_t>(pri);
+    int16_t offset = nice_to_priority_offset(nice).value();
+    int16_t pri = static_cast<int16_t>(level.base_priority.value()) + offset;
+    if (pri < static_cast<int16_t>(level.base_priority.value()) - 8)
+        pri = static_cast<int16_t>(level.base_priority.value()) - 8;
+    if (pri > static_cast<int16_t>(level.base_priority.value()) + 7)
+        pri = static_cast<int16_t>(level.base_priority.value()) + 7;
+    return fk::TaskPriority(static_cast<uint8_t>(pri));
 }
 
-uint64_t allotment_for_qos(QoSClass qos) {
+fk::TickCount allotment_for_qos(QoSClass qos) {
     return qos_level(qos).allotment_ticks;
 }
 
-uint8_t quantum_for_level(uint8_t level) {
-    if (level >= 4) level = 3;
-    return s_level_quanta[level];
+fk::TickCount quantum_for_level(fk::MlqfLevel level) {
+    if (level.value() >= 4) level = fk::MlqfLevel(3);
+    return fk::TickCount(s_level_quanta[level.value()]);
 }
 
-int8_t nice_to_priority_offset(int8_t nice) {
-    if (nice <= -20) return 7;
-    if (nice >= 19) return -8;
-    return static_cast<int8_t>((nice * -8) / 20);
+fk::NiceValue nice_to_priority_offset(fk::NiceValue nice) {
+    if (nice.value() <= -20) return fk::NiceValue(7);
+    if (nice.value() >= 19) return fk::NiceValue(-8);
+    return fk::NiceValue(static_cast<int8_t>((nice.value() * -8) / 20));
 }
 
 QoSClass qos_from_linux_policy(int policy) {

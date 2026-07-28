@@ -2,6 +2,7 @@
 
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Fs/Vfs/dentry_node_stack.h>
+#include <Kernel/Fs/Vfs/mount_namespace.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
@@ -22,7 +23,8 @@ public:
     void push_node(fk::RefPtr<Node> node);
     void pop_node();
     fk::RefPtr<Node> top_node() const;
-    const fk::containers::Vector<fk::RefPtr<Node>>& nodes() const { return m_node_stack.all(); }
+    const fk::containers::Vector<fk::RefPtr<Node>>& nodes() const;
+    DentryNodeStack& default_stack() { return m_node_stack; }
 
     // Child Management
     fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> lookup(const char* name);

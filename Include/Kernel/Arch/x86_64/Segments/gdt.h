@@ -2,58 +2,33 @@
 
 #include <Kernel/Arch/x86_64/Segments/Gdt/gdt_structures.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Types/types.h>
 
-/**
- * @brief Global Descriptor Table (GDT) controller
- *
- * This singleton class manages the GDT, TSS, and associated stacks.
- * It provides initialization and allows setting the kernel stack pointer.
- */
 class GDTController {
 private:
-  bool m_initialized = false; ///< Tracks whether GDT is initialized
+  bool m_initialized = false;
 
-  uint64_t gdt[10] = {0}; ///< Array of GDT entries
-  struct TSS64 tss = {}; ///< TSS structure
-  GDTR gdtr = {};        ///< GDTR structure
+  static constexpr size_t MAX_CPUS = 32;
 
-  void setupNull(); ///< Setup null descriptor
-  void setupKernelCode(); ///< Setup kernel code segment
-  void setupKernelData(); ///< Setup kernel data segment
-  void setupUserCode(); ///< Setup user code segment
-  void setupUserData(); ///< Setup user data segment
-  void setupCompatibilitySegments(); ///< Setup 16/32-bit segments
+  uint64_t m_gdt_per_cpu[MAX_CPUS][10];
+  TSS64    m_tss_per_cpu[MAX_CPUS];
+  GDTR     m_gdtr_per_cpu[MAX_CPUS];
 
-  void setupTSS();     ///< Setup TSS descriptor
-  void setupGDT();     ///< Setup all GDT entries
-  void setupGDTR();    ///< Setup GDTR structure
-  void loadGDT();      ///< Load GDT using lgdt
-  void loadSegments(); ///< Load segment registers
-  void loadTSS();      ///< Load TSS using ltr
+  void setup_entries(uint64_t gdt[10]);
+  void fill_tss(uint32_t cpu_index);
 
-  GDTController() = default; ///< Private constructor for singleton
+  GDTController() = default;
 
 public:
-  /**
-   * @brief Get the singleton instance of the GDTController
-   * @return Reference to GDTController
-   */
   static GDTController &the() {
     static GDTController inst;
     return inst;
   }
 
-  /**
-   * @brief Initialize the GDT and TSS
-   */
   void initialize();
-
-  /**
-   * @brief Set the kernel stack pointer for Ring 0
-   *
-   * @param stack_addr Physical address of the stack
-   */
+  void init_per_cpu(uint32_t cpu_index);
+  void load_per_cpu(uint32_t cpu_index);
   void set_kernel_stack(uint64_t stack_addr);
 };

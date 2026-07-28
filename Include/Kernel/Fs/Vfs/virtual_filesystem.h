@@ -38,6 +38,9 @@ public:
   // Iterate all recorded mount points (path, fstype). Callback receives c-strings.
   static void for_each_mount(void (*cb)(const char* path, const char* fstype, void* ctx), void* ctx);
 
+  // Clone the mount namespace for the current task (or global if no ns set).
+  fk::RefPtr<MountNamespace> clone_mount_namespace();
+
   // Return the device ID for the mount point whose path is the longest prefix of `path`.
   static uint32_t dev_id_for_path(const char* path);
 
@@ -71,6 +74,8 @@ public:
   fk::core::Result<void, fk::core::Error> chown(const char* path, uint32_t uid, uint32_t gid);
 
   fk::core::Result<void, fk::core::Error> unmount(const char* path);
+
+  fk::core::Result<void, fk::core::Error> pivot_root(const char* new_root, const char* put_old);
 
   fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error>
   resolve_path(const char* path, fk::RefPtr<Dentry> base = nullptr, int depth = 0);

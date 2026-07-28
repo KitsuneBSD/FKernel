@@ -11,7 +11,7 @@
 #include <LibFK/Memory/own_ptr.h>
 
 void ATAController::initialize() {
-  fk::algorithms::klog("ATA CONTROLLER", "Controller initialized");
+  fk::algorithms::klog("ATA_CONTROLLER", "Controller initialized");
 }
 
 ATAController &ATAController::the() {
@@ -26,11 +26,11 @@ void ATAController::detect_devices() {
 
   // If no devices were found via PCI, fallback to legacy only if ACPI says it's okay
   if (m_devices.is_empty()) {
-    fk::algorithms::klog("ATA CONTROLLER", "No IDE devices found via PCI, trying legacy...");
+    fk::algorithms::klog("ATA_CONTROLLER", "No IDE devices found via PCI, trying legacy...");
     detect_legacy();
   }
 
-  fk::algorithms::klog("ATA CONTROLLER",
+  fk::algorithms::klog("ATA_CONTROLLER",
                        "Detection complete. Total devices: %d",
                        m_devices.size());
 }
@@ -40,7 +40,7 @@ void ATAController::create(const PciDevice& device) {
 }
 
 void ATAController::detect_on_pci(const PciDevice &device) {
-  fk::algorithms::klog("ATA CONTROLLER",
+  fk::algorithms::klog("ATA_CONTROLLER",
                        "Found PCI IDE controller at %02x:%02x.%d (ProgIF: %02x)",
                        device.address().bus(), device.address().device(),
                        device.address().function(), device.prog_if());
@@ -69,7 +69,7 @@ void ATAController::detect_on_pci(const PciDevice &device) {
   uint32_t bar4 = PciManager::the().read_config_dword(device.address(), 0x20);
   if (bar4 & 0x01) {
       m_bm_base = bar4 & 0xFFFC;
-      fk::algorithms::klog("ATA CONTROLLER", "Bus Master IDE base address: %04x", m_bm_base);
+      fk::algorithms::klog("ATA_CONTROLLER", "Bus Master IDE base address: %04x", m_bm_base);
   }
 
   probe_channel(primary_io, primary_ctrl, 0, m_bm_base);
@@ -77,7 +77,7 @@ void ATAController::detect_on_pci(const PciDevice &device) {
 }
 
 void ATAController::detect_legacy() {
-  fk::algorithms::klog("ATA CONTROLLER", "Probing legacy IO ports (0x1F0, 0x170)...");
+  fk::algorithms::klog("ATA_CONTROLLER", "Probing legacy IO ports (0x1F0, 0x170)...");
   // Optional: check ACPI FADT 8042 flag or similar if needed
   // For now, just probe standard ports as a last resort
   probe_channel(0x1F0, 0x3F6, 0, 0);
@@ -90,7 +90,7 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index,
   for (int master = 0; master < 2; ++master) {
     bool is_master = (master == 0);
 
-    fk::algorithms::klog("ATA CONTROLLER",
+    fk::algorithms::klog("ATA_CONTROLLER",
                          "Probing %s on channel %d (IO: %04x, CTRL: %04x)...",
                          is_master ? "Master" : "Slave", channel_index, io, ctrl);
 

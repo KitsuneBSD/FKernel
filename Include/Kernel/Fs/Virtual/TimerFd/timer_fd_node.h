@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Types/types.h>
@@ -53,7 +53,7 @@ private:
     uint64_t m_next_tick{0};
     bool m_armed{false};
     bool m_nonblock{false};
-    ipc::Notification m_readable;
+    ipc::Endpoint m_endpoint;
 };
 
 } // namespace fkernel

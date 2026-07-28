@@ -11,10 +11,13 @@
 
 namespace fkernel {
 
+static constexpr size_t SECTOR_SIZE = 512;
+static constexpr uint8_t ATTR_LFN = 0x0F;
+
 fk::core::Result<void, fk::core::Error>
 Fat32FileSystem::list_directory_from(uint32_t first_cluster, fk::containers::Vector<DirectoryEntry>& entries) {
     uint32_t current_cluster = first_cluster;
-    uint8_t sector[512];
+    uint8_t sector[SECTOR_SIZE];
     uint32_t cluster_count = 0;
     char lfn_buf[256] = {};
     bool has_lfn = false;
@@ -22,13 +25,13 @@ Fat32FileSystem::list_directory_from(uint32_t first_cluster, fk::containers::Vec
     while (current_cluster < 0x0FFFFFF8 && cluster_count < 10000) {
         uint32_t root_sector = cluster_to_sector(current_cluster);
         for (uint32_t i = 0; i < m_sectors_per_cluster; ++i) {
-            if (m_device->read((root_sector + i) * 512, 512, sector).is_error())
+            if (m_device->read((root_sector + i) * SECTOR_SIZE, SECTOR_SIZE, sector).is_error())
                 return fk::core::Error::IOError;
             auto* dir = reinterpret_cast<Fat32DirectoryEntry*>(sector);
             for (int j = 0; j < 16; ++j) {
                 if (dir[j].name[0] == 0) return {};
                 if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) { has_lfn = false; continue; }
-                if (dir[j].attr == 0x0F) {
+                if (dir[j].attr == ATTR_LFN) {
                     const uint8_t* raw = reinterpret_cast<const uint8_t*>(&dir[j]);
                     int order = raw[0] & 0x1F;
                     if (raw[0] & 0x40) { fk::memory::set(lfn_buf, 0, sizeof(lfn_buf)); has_lfn = true; }
@@ -52,7 +55,7 @@ Fat32FileSystem::list_directory_from(uint32_t first_cluster, fk::containers::Vec
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
 Fat32FileSystem::find_in_directory(uint32_t first_cluster, const char* name) {
     uint32_t current_cluster = first_cluster;
-    uint8_t sector[512];
+    uint8_t sector[SECTOR_SIZE];
     uint32_t cluster_count = 0;
     char lfn_buf[256] = {};
     bool has_lfn = false;
@@ -60,13 +63,13 @@ Fat32FileSystem::find_in_directory(uint32_t first_cluster, const char* name) {
     while (current_cluster < 0x0FFFFFF8 && cluster_count < 10000) {
         uint32_t root_sector = cluster_to_sector(current_cluster);
         for (uint32_t i = 0; i < m_sectors_per_cluster; ++i) {
-            if (m_device->read((root_sector + i) * 512, 512, sector).is_error())
+            if (m_device->read((root_sector + i) * SECTOR_SIZE, SECTOR_SIZE, sector).is_error())
                 return fk::core::Error::IOError;
             auto* dir = reinterpret_cast<Fat32DirectoryEntry*>(sector);
             for (int j = 0; j < 16; ++j) {
                 if (dir[j].name[0] == 0) return fk::core::Error::NotFound;
                 if (static_cast<uint8_t>(dir[j].name[0]) == 0xE5) { has_lfn = false; continue; }
-                if (dir[j].attr == 0x0F) {
+                if (dir[j].attr == ATTR_LFN) {
                     const uint8_t* raw = reinterpret_cast<const uint8_t*>(&dir[j]);
                     int order = raw[0] & 0x1F;
                     if (raw[0] & 0x40) { fk::memory::set(lfn_buf, 0, sizeof(lfn_buf)); has_lfn = true; }
@@ -119,11 +122,9 @@ Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {
     }
     if (bpb.root_entry_count != 0) {
         fk::algorithms::kwarn("FAT32", "Invalid root entry count: %u (expected 0 for FAT32)", bpb.root_entry_count);
-        // return fk::core::Error::InvalidData; // Some formatters might be loose here
     }
     if (bpb.fat_size_16 != 0) {
         fk::algorithms::kwarn("FAT32", "Invalid FAT size 16: %u (expected 0 for FAT32)", bpb.fat_size_16);
-        // return fk::core::Error::InvalidData;
     }
     if (bpb.fat_count == 0 || bpb.fat_count > 2) {
         fk::algorithms::kwarn("FAT32", "Invalid FAT count: %u", bpb.fat_count);
@@ -140,7 +141,6 @@ Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {
         fk::memory::copy(type_str, bpb.fs_type, 8);
         type_str[8] = '\0';
         fk::algorithms::kwarn("FAT32", "Invalid fs_type signature: '%s'", type_str);
-        // return fk::core::Error::InvalidData; // Many modern tools put garbage or different strings here
     }
     
     // Validate cluster count - should be reasonable
@@ -154,7 +154,6 @@ Fat32FileSystem::create(fk::RefPtr<StorageDevice> device) {
     uint32_t total_clusters = data_sectors / bpb.sectors_per_cluster;
     if (total_clusters < 65525) {
         fk::algorithms::kwarn("FAT32", "Too few clusters for FAT32: %u (expected > 65525)", total_clusters);
-        // return fk::core::Error::InvalidData;
     }
     
     // Validate root cluster - should be 2 or higher
@@ -381,6 +380,67 @@ Fat32FileSystem::update_dir_entry_size(uint32_t dir_sector_lba, uint8_t entry_id
     if (m_device->write((uint64_t)dir_sector_lba * 512, 512, sector).is_error())
         return fk::core::Error::IOError;
     return {};
+}
+
+fk::core::Result<void, fk::core::Error>
+Fat32FileSystem::find_free_dir_entry(uint32_t dir_cluster, uint32_t& out_sector, uint8_t& out_idx,
+                                      bool allow_cluster_expand) {
+    uint32_t cluster = dir_cluster;
+    uint8_t sector[512];
+    uint32_t cluster_count = 0;
+
+    while (cluster < 0x0FFFFFF8 && cluster_count < 10000) {
+        uint32_t sec = cluster_to_sector(cluster);
+        for (uint32_t i = 0; i < m_sectors_per_cluster; ++i) {
+            if (m_device->read((uint64_t)(sec + i) * 512, 512, sector).is_error())
+                return fk::core::Error::IOError;
+            auto* dir = reinterpret_cast<Fat32DirectoryEntry*>(sector);
+            for (int j = 0; j < 16; ++j) {
+                if (dir[j].name[0] == 0 || (uint8_t)dir[j].name[0] == 0xE5) {
+                    out_sector = sec + i;
+                    out_idx = (uint8_t)j;
+                    return {};
+                }
+            }
+        }
+        uint32_t next = get_next_cluster(cluster);
+        if (next >= 0x0FFFFFF8) {
+            if (allow_cluster_expand) {
+                auto res = allocate_cluster(cluster);
+                if (res.is_error()) return res.error();
+                next = res.value();
+            } else {
+                break;
+            }
+        }
+        cluster = next;
+        cluster_count++;
+    }
+    return fk::core::Error::DeviceError;
+}
+
+fk::core::Result<void, fk::core::Error>
+Fat32FileSystem::write_dir_entry_raw(uint32_t sector_lba, uint8_t entry_idx,
+                                      const Fat32DirectoryEntry& entry) {
+    uint8_t sector[512];
+    if (m_device->read((uint64_t)sector_lba * 512, 512, sector).is_error())
+        return fk::core::Error::IOError;
+    auto* dir = reinterpret_cast<Fat32DirectoryEntry*>(sector);
+    fk::memory::copy(&dir[entry_idx], &entry, sizeof(Fat32DirectoryEntry));
+    if (m_device->write((uint64_t)sector_lba * 512, 512, sector).is_error())
+        return fk::core::Error::IOError;
+    return {};
+}
+
+void Fat32FileSystem::free_cluster_chain(uint32_t first_cluster) {
+    uint32_t cluster = first_cluster;
+    uint32_t count = 0;
+    while (cluster >= 2 && cluster < 0x0FFFFFF8 && count < 100000) {
+        uint32_t next = get_next_cluster(cluster);
+        (void)write_fat_entry(cluster, 0);
+        cluster = next;
+        count++;
+    }
 }
 
 }

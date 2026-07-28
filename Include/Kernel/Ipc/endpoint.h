@@ -1,9 +1,12 @@
 #pragma once
 
 #include <Kernel/Ipc/message_info.h>
+#include <Kernel/Ipc/notification.h>
 #include <Kernel/Scheduler/Task/task.h>
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Core/result.h>
+#include <LibFK/Types/notification_bits.h>
+#include <LibFK/Types/tick_count.h>
 
 #include <LibFK/Synchronization/spinlock.h>
 
@@ -16,31 +19,50 @@ class Endpoint {
   fk::synchronization::Spinlock m_lock;
   fk::containers::IntrusiveList<Task, &Task::wait_node> m_senders;
   fk::containers::IntrusiveList<Task, &Task::recv_wait_node> m_receivers;
+  fk::containers::IntrusiveList<Task, &Task::wait_node> m_async_waiters;
   uint64_t m_generation{0};
 
+  fk::NotificationBits m_pending_bits{0};
+
   Task* m_call_sender{nullptr};
+
+  NotificationPayload m_payloads[NOTIFICATION_MAX_PAYLOADS];
+  uint8_t m_payload_head{0};
+  uint8_t m_payload_tail{0};
+  uint8_t m_payload_count{0};
+
+  bool payload_pop(NotificationPayload& out);
+  void payload_push(const NotificationPayload& p);
 
 public:
   Endpoint() = default;
 
-  /// @brief Sends a message through the endpoint. Blocks indefinitely if no receiver is waiting.
+  // --- Synchronous rendezvous API (seL4-style) ---
+
   fk::core::Result<MessageInfo> send(MessageInfo info);
 
-  /// @brief Sends with timeout. Returns Error::Timeout on expiry.
   fk::core::Result<MessageInfo> send_timeout(MessageInfo info, uint64_t timeout_ticks);
 
-  /// @brief Receives a message from the endpoint. Blocks indefinitely if no sender is waiting.
   fk::core::Result<MessageInfo> receive();
 
-  /// @brief Receives with timeout. Returns Error::Timeout on expiry.
   fk::core::Result<MessageInfo> receive_timeout(uint64_t timeout_ticks);
 
-  /// @brief Atomic send+receive: sends and immediately waits for reply without
-  /// allowing another task to steal the reply. The reply is routed back to the
-  /// calling task even if another receiver is waiting.
   fk::core::Result<MessageInfo> call(MessageInfo info);
 
-  /// @brief Revoke all capabilities pointing to this endpoint.
+  // --- Asynchronous signal/wait API (Notification-compatible) ---
+
+  void signal(fk::NotificationBits bits);
+
+  void signal_with_payload(fk::NotificationBits bits, const void* data, size_t len);
+
+  fk::NotificationBits wait();
+
+  fk::NotificationBits wait_timeout(fk::TickCount timeout_ticks);
+
+  fk::NotificationBits poll();
+
+  // --- Revocation ---
+
   void revoke() { ++m_generation; }
   const uint64_t* generation_ptr() const { return &m_generation; }
   uint64_t generation() const { return m_generation; }

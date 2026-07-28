@@ -109,7 +109,7 @@ fk::core::Result<void, fk::core::Error> ElfLoaderCore::process_dynamic() {
   if (headers_res.is_error())
     return headers_res.error();
 
-  auto reloc_res = m_dynamic.process_dynamic_segment(headers_res.value(), m_context.load_base);
+  auto reloc_res = m_dynamic.process_dynamic_segment(headers_res.value(), fk::VirtualAddress(m_context.load_base));
   if (reloc_res.is_error())
     return reloc_res;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
+#include <LibFK/Types/physical_address.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Core/error.h>
@@ -12,25 +13,19 @@ namespace fkernel {
 
 enum class IoCompletionStatus : uint8_t { Success, Error, Timeout, Busy };
 
-// Abstract base class for interrupt-driven I/O operations
 class AsyncIoOperation {
 public:
   virtual ~AsyncIoOperation() = default;
 
-  // Called when interrupt occurs
   virtual void on_interrupt(uint32_t interrupt_status) = 0;
 
-  // Check if operation completed
   virtual bool is_completed() const = 0;
 
-  // Get completion status
   virtual IoCompletionStatus get_status() const = 0;
 
-  // Block caller until operation completes
   virtual IoCompletionStatus wait_for_completion(uint64_t timeout_ms = 5000) = 0;
 };
 
-// Interrupt-driven I/O request queue
 template <typename T, size_t MAX_PENDING = 32> class AsyncIoQueue {
 private:
   T m_pending_operations[MAX_PENDING];
@@ -78,11 +73,10 @@ public:
   uint32_t size() const { return m_count; }
 };
 
-// Interrupt-driven DMA buffer manager
 class DmaBuffer {
 private:
   void* m_virtual_addr = nullptr;
-  uintptr_t m_physical_addr = 0;
+  fk::PhysicalAddress m_physical_addr;
   size_t m_size = 0;
   bool m_mapped = false;
 
@@ -96,17 +90,14 @@ public:
     }
 
     size_t page_count = (size + 4095) / 4096;
-    // Simplificação: ordem do buddy baseada no número de páginas
-    // Em um kernel real, converteríamos page_count para a potência de 2 mais próxima (order)
-    m_physical_addr = MemoryManager::the().allocate_contiguous(page_count);
-    if (m_physical_addr == 0) {
+    m_physical_addr = fk::PhysicalAddress(MemoryManager::the().allocate_contiguous(page_count));
+    if (m_physical_addr.is_null()) {
       return fk::core::Error::OutOfMemory;
     }
 
-    // Map to virtual address
     for (size_t offset = 0; offset < size; offset += 4096) {
-      uintptr_t phys = m_physical_addr + offset;
-      uintptr_t virt = phys; // Identity map para drivers kernel-space simples
+      uintptr_t phys = m_physical_addr.as_uintptr() + offset;
+      uintptr_t virt = phys;
 
       MemoryManager::the().map_page(
           virt, phys,
@@ -114,11 +105,10 @@ public:
                                  PageFlags::CacheDisabled));
     }
 
-    m_virtual_addr = reinterpret_cast<void*>(m_physical_addr);
+    m_virtual_addr = reinterpret_cast<void*>(m_physical_addr.as_uintptr());
     m_size = size;
     m_mapped = true;
 
-    // Clear buffer
     memset(m_virtual_addr, 0, m_size);
 
     return {};
@@ -128,24 +118,22 @@ public:
     if (!m_mapped)
       return;
 
-    // Unmap pages
     for (size_t offset = 0; offset < m_size; offset += 4096) {
       uintptr_t virt = reinterpret_cast<uintptr_t>(m_virtual_addr) + offset;
       MemoryManager::the().unmap_page(virt);
     }
 
-    // Free physical memory
     size_t page_count = (m_size + 4095) / 4096;
-    MemoryManager::the().free_contiguous(m_physical_addr, page_count);
+    MemoryManager::the().free_contiguous(m_physical_addr.as_uintptr(), page_count);
 
     m_virtual_addr = nullptr;
-    m_physical_addr = 0;
+    m_physical_addr = fk::PhysicalAddress(0);
     m_size = 0;
     m_mapped = false;
   }
 
   void* virtual_address() const { return m_virtual_addr; }
-  uintptr_t physical_address() const { return m_physical_addr; }
+  fk::PhysicalAddress physical_address() const { return m_physical_addr; }
   size_t size() const { return m_size; }
   bool is_valid() const { return m_mapped; }
 };

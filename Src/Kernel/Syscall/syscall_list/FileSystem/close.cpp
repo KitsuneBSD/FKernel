@@ -23,8 +23,7 @@ uint64_t sys_close(uint64_t fd_u64, uint64_t, uint64_t, uint64_t, uint64_t, uint
     return -static_cast<int>(fk::core::Error::InvalidHandle);
   }
 
-  auto desc = current_task->resources.files.descriptors[fd];
-  current_task->resources.files.descriptors[fd] = nullptr;
+  current_task->close_file_descriptor(fd);
   return 0;
 }
 }

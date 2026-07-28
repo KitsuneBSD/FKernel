@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
@@ -63,7 +63,7 @@ private:
     [[maybe_unused]] Task* m_task;
     uint64_t m_mask;
     fk::containers::Vector<SignalfdSiginfo> m_queue;
-    ipc::Notification m_readable;
+    ipc::Endpoint m_endpoint;
     bool m_nonblock{false};
 };
 

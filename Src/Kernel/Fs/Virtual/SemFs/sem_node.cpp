@@ -21,7 +21,7 @@ int SemNode::post() {
   }
   ++m_count;
   m_lock.unlock();
-  m_waiters.signal(1);
+  m_endpoint.signal(fk::NotificationBits(1));
   return 0;
 }
 
@@ -29,7 +29,7 @@ int SemNode::wait() {
   m_lock.lock();
   while (m_count == 0) {
     m_lock.unlock();
-    m_waiters.wait();
+    m_endpoint.wait();
     m_lock.lock();
   }
   --m_count;

@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Fs/Virtual/SignalFd/signal_fd_node.h>
 #include <Kernel/Ipc/cspace.h>
 #include <Kernel/Ipc/notification.h>
@@ -10,8 +11,6 @@
 
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Utilities/memory.h>
-
-extern CpuControlBlock g_cpu_block;
 
 namespace fkernel {
 namespace ipc {
@@ -46,7 +45,7 @@ void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info
 
   if (target->resources.ipc.signal_notification)
     target->resources.ipc.signal_notification->signal_with_payload(
-        1ULL << signum, &si, sizeof(si));
+        fk::NotificationBits(1ULL << signum), &si, sizeof(si));
 
   fk::algorithms::klog("SIGNAL", "Signal %d sent to PID %lu code=%d",
                        signum, target->control.identity.id.value(), si.si_code);
@@ -84,6 +83,9 @@ void SignalDelivery::apply_default(Task* task, int sig, DefaultAction action) {
     return;
   }
   fk::algorithms::klog("SIGNAL", "Terminating Task %lu due to signal %d", pid, sig);
+  if (pid == 1) {
+    fk::algorithms::kfatal("SIGNAL", "Init process (PID 1) killed by signal %d", sig);
+  }
   SchedulerManager::the().terminate_current(128 + sig);
 }
 

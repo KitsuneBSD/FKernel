@@ -27,9 +27,23 @@ constexpr uint32_t APIC_REG_CURRENT_COUNT = 0x390;
 constexpr uint32_t APIC_REG_DIVIDE_CONFIG = 0x3E0;
 
 // x2APIC MSR addresses
-constexpr uint32_t X2APIC_EOI_MSR           = 0x80B;
-constexpr uint32_t X2APIC_SPURIOUS_MSR      = 0x80F;
-constexpr uint32_t X2APIC_LVT_TIMER_MSR     = 0x832;
+constexpr uint32_t X2APIC_ID_MSR          = 0x802;
+constexpr uint32_t X2APIC_EOI_MSR          = 0x80B;
+constexpr uint32_t X2APIC_SPURIOUS_MSR     = 0x80F;
+constexpr uint32_t X2APIC_ICR_MSR          = 0x830;
+constexpr uint32_t X2APIC_LVT_TIMER_MSR    = 0x832;
 constexpr uint32_t X2APIC_INITIAL_COUNT_MSR = 0x838;
 constexpr uint32_t X2APIC_CURRENT_COUNT_MSR = 0x839;
 constexpr uint32_t X2APIC_DIVIDE_CONFIG_MSR = 0x83E;
+
+// xAPIC MMIO ICR registers
+constexpr uint32_t APIC_REG_ICR_LOW  = 0x300;
+constexpr uint32_t APIC_REG_ICR_HIGH = 0x310;
+
+// IPI delivery modes
+constexpr uint32_t IPI_FIXED    = 0x000;
+constexpr uint32_t IPI_INIT     = 0x500;
+constexpr uint32_t IPI_STARTUP  = 0x600;
+
+// IPI destination shorthand
+constexpr uint32_t IPI_DEST_ALL_EXCL_SELF = 3u << 18;

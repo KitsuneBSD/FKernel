@@ -10,7 +10,7 @@ void TickManager::sleep(uint64_t ms) {
     uint64_t freq = m_frequency > 0 ? m_frequency : 1000;
     uint64_t ticks = (ms * freq) / 1000;
     if (ticks == 0) ticks = 1;
-    sched.sleep_current(ticks);
+    sched.sleep_current(fk::TickCount(ticks));
     sched.schedule();
     return;
   }

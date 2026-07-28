@@ -24,6 +24,8 @@ private:
   bool m_has_nx = false;
   bool m_has_smep = false;
   bool m_has_smap = false;
+  bool m_has_xsave = false;
+  bool m_has_avx = false;
   uint8_t m_lapic_id = 0;
 
   void cpuid(uint32_t eax, uint32_t ecx, uint32_t *a, uint32_t *b, uint32_t *c,
@@ -45,6 +47,8 @@ public:
   bool has_hpet() const { return m_has_hpet; }
   bool has_nx() const { return m_has_nx; }
   bool has_smap() const { return m_has_smap; }
+  bool has_xsave() const { return m_has_xsave; }
+  bool has_avx() const { return m_has_avx; }
   uint8_t lapic_id() const { return m_lapic_id; }
 
   void initialize_features();

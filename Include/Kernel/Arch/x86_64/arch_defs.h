@@ -95,18 +95,82 @@ static constexpr uintptr_t PML4_RECURSIVE_SLOT = 0x1FF;
 static constexpr size_t MAX_TABLES = 512;
 
 /**
+ * @brief Page table entries per table
+ */
+static constexpr size_t PT_ENTRIES = 512;
+
+/**
+ * @brief Page table level count (PML4 → PDPT → PD → PT)
+ */
+static constexpr size_t PAGE_TABLE_LEVELS = 4;
+
+/**
+ * @brief Index mask for page table entries (9 bits)
+ */
+static constexpr size_t TABLE_INDEX_MASK = 0x1FF;
+
+/**
+ * @brief Page table index shift amounts
+ */
+static constexpr size_t PML4_INDEX_SHIFT = 39;
+static constexpr size_t PDPT_INDEX_SHIFT = 30;
+static constexpr size_t PD_INDEX_SHIFT   = 21;
+static constexpr size_t PT_INDEX_SHIFT   = 12;
+
+/**
+ * @brief Physical address mask in page table entries (bits 12–51)
+ */
+static constexpr uintptr_t PHYSICAL_ADDRESS_MASK = 0x000FFFFFFFFFF000ULL;
+
+/**
+ * @brief Page flags mask (lower 12 bits of a PTE)
+ */
+static constexpr uintptr_t PAGE_FLAGS_MASK = 0xFFFULL;
+
+/**
  * @brief Maximum number of physical zones
  */
 static constexpr size_t MAX_PHYSICAL_ZONES = 32;
 
 /**
+ * @brief Maximum number of CPUs supported
+ */
+static constexpr size_t MAX_CPUS = 32;
+
+/**
+ * @brief IDT entry count (x86_64 supports 256 vectors)
+ */
+static constexpr size_t IDT_ENTRIES = 256;
+
+/**
+ * @brief GDT code segment selector (kernel, Ring 0)
+ */
+static constexpr uint32_t GDT_KERNEL_CODE_SELECTOR = 0x08;
+
+/**
+ * @brief GDT data segment selector (kernel, Ring 0)
+ */
+static constexpr uint32_t GDT_KERNEL_DATA_SELECTOR = 0x10;
+
+/**
+ * @brief FXSAVE/FXRSTOR state size in bytes
+ */
+static constexpr size_t FX_STATE_SIZE = 512;
+
+/**
+ * @brief Default base address for user-space mmap regions
+ */
+static constexpr uintptr_t MMAP_DEFAULT_BASE = 0x40000000;
+
+/**
  * @brief Virtual address range for DMA buffer mappings.
  *
- * DMA buffers are mapped here instead of using identity mapping.
- * This avoids polluting the 0-4 GiB identity-mapped region and
- * keeps DMA mappings in the kernel PML4 (inherited by all processes).
+ * DMA buffers reside in their own PML4 entry (264) isolated from the
+ * higher-half direct map at PML4[256] (KERNEL_VIRT_BASE).  This prevents
+ * page-table conflicts when map_page() creates 4 KiB PTEs inside 2 MiB
+ * HugePage PD entries set up by extend_direct_map().
  *
- * Range: 0xFFFF800000000000 - 0xFFFF800040000000 (1 GiB)
+ * Range: 0xFFFF840000000000 - 0xFFFF840040000000 (1 GiB)
  */
-static constexpr uintptr_t DMA_REGION_BASE = 0xFFFF800000000000;
+static constexpr uintptr_t DMA_REGION_BASE = 0xFFFF840000000000;
 static constexpr size_t DMA_REGION_SIZE = 1 * fk::types::GiB;

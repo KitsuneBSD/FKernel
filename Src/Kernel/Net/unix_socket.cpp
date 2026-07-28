@@ -1,4 +1,5 @@
 #include <Kernel/Fs/Vfs/dentry.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Net/unix_socket.h>
 #include <Kernel/Scheduler/scheduler.h>
@@ -72,11 +73,7 @@ fk::core::Result<void, fk::core::Error> UnixSocket::connect(const char* path) {
   m_peer = peer;
   m_connected = true;
 
-  // Wake any task blocked in accept()
-  if (peer->m_accept_waiter) {
-    SchedulerManager::the().wake_task(peer->m_accept_waiter);
-    peer->m_accept_waiter = nullptr;
-  }
+  peer->m_accept_endpoint.signal(fk::NotificationBits(1));
 
   return {};
 }
@@ -88,7 +85,6 @@ fk::core::Result<void, fk::core::Error> UnixSocket::listen() {
 }
 
 fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> UnixSocket::accept() {
-  auto& scheduler = SchedulerManager::the();
   while (true) {
     {
       fk::synchronization::ScopedLockIRQ lock(m_lock);
@@ -97,18 +93,19 @@ fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> UnixSocket::accept() {
         for (size_t i = 0; i < m_backlog_count - 1; i++)
           m_backlog[i] = m_backlog[i + 1];
         m_backlog_count--;
-        m_accept_waiter = nullptr;
         return fk::RefPtr<Socket>(client.get());
       }
-      m_accept_waiter = scheduler.current();
     }
-    scheduler.block_current();
+    m_accept_endpoint.wait();
   }
 }
 
 fk::core::Result<size_t, fk::core::Error> UnixSocket::read(uint64_t, size_t size, uint8_t* buffer) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
-  return m_rx_buffer.read(buffer, size);
+  size_t n = m_rx_buffer.read(buffer, size);
+  if (n > 0 && m_peer)
+    notify_kqueue_writers(m_peer);
+  return n;
 }
 
 fk::core::Result<size_t, fk::core::Error> UnixSocket::write(uint64_t, size_t size,
@@ -117,7 +114,10 @@ fk::core::Result<size_t, fk::core::Error> UnixSocket::write(uint64_t, size_t siz
     return fk::core::Error::IOError;
 
   fk::synchronization::ScopedLockIRQ lock(m_peer->m_lock);
-  return m_peer->m_rx_buffer.write(buffer, size);
+  size_t n = m_peer->m_rx_buffer.write(buffer, size);
+  if (n > 0)
+    notify_kqueue_readers(m_peer);
+  return n;
 }
 
 fk::core::Result<void, fk::core::Error> UnixSocket::getsockname(char* addr, uint32_t* addrlen) {

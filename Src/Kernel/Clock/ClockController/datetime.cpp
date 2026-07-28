@@ -10,6 +10,6 @@ fk::text::String DateTime::to_string() const {
 }
 
 void DateTime::print() {
-  fk::algorithms::klog("CLOCK MANAGER", "%02u/%02u/%04u %02u:%02u:%02u", day,
+  fk::algorithms::klog("CLOCK_MANAGER", "%02u/%02u/%04u %02u:%02u:%02u", day,
                        month, year, hour, minute, second);
 }

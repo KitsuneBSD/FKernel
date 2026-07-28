@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/endpoint.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 
@@ -33,7 +33,7 @@ private:
     uint64_t m_counter;
     bool m_is_semaphore;
     bool m_nonblock;
-    ipc::Notification m_readable;
+    ipc::Endpoint m_endpoint;
 };
 
 }

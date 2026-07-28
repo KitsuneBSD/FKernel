@@ -16,8 +16,12 @@ public:
     
     fk::core::Result<bool, fk::core::Error>
     check_interpreter_needed(const fk::containers::Vector<Elf64_Phdr>& headers);
+
+    uintptr_t interpreter_base() const { return m_interpreter_base; }
     
 private:
+    uintptr_t m_interpreter_base{0};
+
     fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
     resolve_interpreter_path(const fk::text::String& path);
     

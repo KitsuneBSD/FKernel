@@ -1,6 +1,8 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Terminal/vga_terminal.h>
 #include <Kernel/Driver/Keyboard/keymap_manager.h>
+#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
@@ -87,6 +89,7 @@ void VGATerminal::on_char(char c) {
     Display::the().flush();
   }
   m_input_queue.enqueue(c);
+  m_read_endpoint.signal(fk::NotificationBits(1));
 }
 
 fk::core::Result<size_t, fk::core::Error> VGATerminal::read(uint64_t, size_t size,
@@ -94,11 +97,19 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read(uint64_t, size_t siz
   if (size == 0 || !buffer)
     return fk::core::Error::InvalidParameter;
 
-  if (m_state.raw_mode) {
-    if (m_input_queue.is_empty()) {
-      SchedulerManager::the().yield();
-      return 0;
+  // SIGTTIN: block background processes from reading the terminal
+  if (m_state.foreground_pgid > 0) {
+    auto* task = SchedulerManager::the().current();
+    if (task && !task->control.lifecycle.is_a_kernel_task &&
+        (int)task->control.identity.pgid.value() != m_state.foreground_pgid) {
+      fkernel::ipc::SignalDelivery::send_signal(task, SIGTTIN);
+      return fk::core::Error::Interrupted;
     }
+  }
+
+  if (m_state.raw_mode) {
+    while (m_input_queue.is_empty())
+      m_read_endpoint.wait();
     buffer[0] = static_cast<uint8_t>(m_input_queue.dequeue());
     return 1;
   }
@@ -117,7 +128,7 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read(uint64_t, size_t siz
         return to_copy;
       }
     }
-    SchedulerManager::the().yield();
+    m_read_endpoint.wait();
   }
 }
 
@@ -126,10 +137,13 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::write(uint64_t, size_t si
   if (!buffer)
     return fk::core::Error::InvalidParameter;
   fk::synchronization::ScopedLock lock(m_lock);
-  if (TerminalManager::the().active_terminal() == this) {
-    m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
-    Display::the().flush();
+  if (TerminalManager::the().active_terminal() != this) {
+    fk::algorithms::kwarn("VGATERM", "write to inactive terminal tty%d (%zu bytes discarded)",
+                          m_index, size);
+    return size;
   }
+  m_ansi_parser.process_data(reinterpret_cast<const char*>(buffer), size);
+  Display::the().flush();
   return size;
 }
 
@@ -276,42 +290,49 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
   static constexpr unsigned int ISIG   = 0x1;
 
   if (request == 0x5401 /* TCGETS */) {
-    auto* t = reinterpret_cast<linux_termios*>(arg);
-    if (!t) return fk::core::Error::InvalidParameter;
-    fk::memory::set(t, 0, sizeof(*t));
-    t->c_cflag = 0xBF;  // B9600 | CS8
-    if (m_state.echo_enabled) t->c_lflag |= ECHO;
-    if (!m_state.raw_mode)    t->c_lflag |= ICANON;
-    t->c_lflag |= ISIG;
-    t->c_cc[4] = 1;  // VMIN
-    t->c_cc[5] = 0;  // VTIME
+    // Build termios in kernel memory, copy to user
+    struct linux_termios kt;
+    fk::memory::set(&kt, 0, sizeof(kt));
+    kt.c_cflag = 0xBF;  // B9600 | CS8
+    if (m_state.echo_enabled) kt.c_lflag |= ECHO;
+    if (!m_state.raw_mode)    kt.c_lflag |= ICANON;
+    kt.c_lflag |= ISIG;
+    kt.c_cc[4] = 1;  // VMIN
+    kt.c_cc[5] = 0;  // VTIME
+    if (fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &kt, sizeof(kt)).is_error())
+      return fk::core::Error::InvalidParameter;
     return 0;
   }
   if (request == 0x5402 /* TCSETS */ || request == 0x5403 /* TCSETSW */ ||
       request == 0x5404 /* TCSETSF */) {
-    auto* t = reinterpret_cast<const linux_termios*>(arg);
-    if (!t) return fk::core::Error::InvalidParameter;
-    m_state.echo_enabled = (t->c_lflag & ECHO)   != 0;
-    m_state.raw_mode     = (t->c_lflag & ICANON) == 0;
+    struct linux_termios kt;
+    if (fkernel::memory::copy_from_user(&kt, reinterpret_cast<const void*>(arg), sizeof(kt)).is_error())
+      return fk::core::Error::InvalidParameter;
+    m_state.echo_enabled = (kt.c_lflag & ECHO)   != 0;
+    m_state.raw_mode     = (kt.c_lflag & ICANON) == 0;
     return 0;
   }
   if (request == 0x5413 /* TIOCGWINSZ */) {
-    struct ws { uint16_t r, c, x, y; }* w = (ws*)arg;
-    if (!w) return fk::core::Error::InvalidParameter;
-    w->r = m_state.rows;
-    w->c = m_state.cols;
+    struct ws { uint16_t r, c, x, y; } w;
+    w.r = m_state.rows;
+    w.c = m_state.cols;
+    w.x = 0;
+    w.y = 0;
+    if (fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &w, sizeof(w)).is_error())
+      return fk::core::Error::InvalidParameter;
     return 0;
   }
   if (request == 0x540F /* TIOCGPGRP */) {
-    int* pgid_ptr = reinterpret_cast<int*>(arg);
-    if (!pgid_ptr) return fk::core::Error::InvalidParameter;
-    *pgid_ptr = m_state.foreground_pgid;
+    int pgid = m_state.foreground_pgid;
+    if (fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &pgid, sizeof(pgid)).is_error())
+      return fk::core::Error::InvalidParameter;
     return 0;
   }
   if (request == 0x5410 /* TIOCSPGRP */) {
-    const int* pgid_ptr = reinterpret_cast<const int*>(arg);
-    if (!pgid_ptr) return fk::core::Error::InvalidParameter;
-    m_state.foreground_pgid = *pgid_ptr;
+    int pgid;
+    if (fkernel::memory::copy_from_user(&pgid, reinterpret_cast<const void*>(arg), sizeof(pgid)).is_error())
+      return fk::core::Error::InvalidParameter;
+    m_state.foreground_pgid = pgid;
     return 0;
   }
   if (request == 0x540E /* TIOCSCTTY */) {

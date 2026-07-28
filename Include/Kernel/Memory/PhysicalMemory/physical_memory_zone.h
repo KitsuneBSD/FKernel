@@ -22,6 +22,8 @@ struct PhysicalZone {
   Zone zone;           ///< Metadata about the physical range and type.
   BuddyAllocator buddy; ///< Allocator for large contiguous blocks.
   fk::containers::Bitmap<uint64_t> bitmap; ///< Tracker for individual 4KB pages.
+  uint16_t* cow_refcounts{nullptr}; ///< Per-frame CoW reference counts.
+  size_t cow_frame_count{0}; ///< Number of frames tracked by cow_refcounts.
   uint32_t proximity_domain{0}; ///< NUMA node ID.
   bool is_initialized{false}; ///< Initialization status.
 };

@@ -206,27 +206,28 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
 
     if (slash) {
       size_t len = slash - relative_name;
-      if (len == 0) { // Entry started with / but we already skipped prefix
+      if (len == 0) {
         relative_name++;
         slash = strnchr(relative_name, '/', 256);
-        if (slash)
+        if (slash) {
           len = slash - relative_name;
-        else {
+          fk::memory::copy_n(component, relative_name, len);
+          component[len] = '\0';
+          is_dir = true;
+        } else {
           fk::memory::copy_n(component, relative_name, sizeof(component) - 1);
           is_dir = false;
-          goto skip_slash_logic;
         }
+      } else {
+        fk::memory::copy_n(component, relative_name, len);
+        component[len] = '\0';
+        is_dir = true;
       }
-      fk::memory::copy_n(component, relative_name, len);
-      component[len] = '\0';
-      is_dir = true;
     } else {
       fk::memory::copy_n(component, relative_name, sizeof(component) - 1);
       component[sizeof(component) - 1] = '\0';
       is_dir = false;
     }
-
-  skip_slash_logic:
     if (fk::algorithms::find_if(entries.begin(), entries.size(),
           [&](const DirectoryEntry& e) { return fk::memory::compare(e.name, component) == 0; })
         == entries.size()) {

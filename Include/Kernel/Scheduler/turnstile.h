@@ -6,6 +6,8 @@ struct Task;
 
 namespace fkernel::scheduler {
 
+static constexpr size_t MAX_CHAIN_DEPTH = 8;
+
 struct Turnstile {
     Task* holder{nullptr};
     Task* waiter{nullptr};

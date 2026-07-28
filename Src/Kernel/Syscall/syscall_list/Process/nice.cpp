@@ -17,7 +17,7 @@ extern "C" uint64_t sys_nice(uint64_t increment, uint64_t, uint64_t, uint64_t,
   if (new_nice > 19) new_nice = 19;
   task->control.lifecycle.nice = (int8_t)new_nice;
   task->control.lifecycle.base_priority =
-      priority_for_qos(task->control.lifecycle.qos, task->control.lifecycle.nice);
+      priority_for_qos(task->control.lifecycle.qos, fk::NiceValue(task->control.lifecycle.nice)).value();
   task->control.lifecycle.priority = task->control.lifecycle.base_priority;
   return (uint64_t)(uint32_t)new_nice;
 }
@@ -42,7 +42,7 @@ extern "C" uint64_t sys_setpriority([[maybe_unused]] uint64_t which,
   if (nice > 19) nice = 19;
   task->control.lifecycle.nice = (int8_t)nice;
   task->control.lifecycle.base_priority =
-      priority_for_qos(task->control.lifecycle.qos, task->control.lifecycle.nice);
+      priority_for_qos(task->control.lifecycle.qos, fk::NiceValue(task->control.lifecycle.nice)).value();
   task->control.lifecycle.priority = task->control.lifecycle.base_priority;
   return 0;
 }

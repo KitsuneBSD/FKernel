@@ -25,6 +25,11 @@ ElfHeaderResult ParserDomain::validate_header() {
   if (header.e_ident[0] != 0x7f || header.e_ident[1] != 'E' || header.e_ident[2] != 'L' ||
       header.e_ident[3] != 'F')
     return fk::core::Error::InvalidParameter;
+  if (header.e_ident[EI_DATA] != ELFDATA2LSB) {
+    fk::algorithms::kwarn("ELF", "validate_header: Not little-endian (EI_DATA=%u)",
+                          (unsigned)header.e_ident[EI_DATA]);
+    return fk::core::Error::InvalidParameter;
+  }
   if (header.e_ident[4] != 2) {
     fk::algorithms::kwarn("ELF", "validate_header: Not a 64-bit ELF");
     return fk::core::Error::InvalidParameter;
@@ -75,7 +80,6 @@ static uintptr_t aslr_random_base() {
   seed ^= seed >> 17;
   seed *= 0xBF58476D1CE4E5B9ULL;
   seed ^= seed >> 31;
-  // Map to [0x10000000, 0x70000000) page-aligned
   static constexpr uintptr_t ASLR_MIN  = 0x10000000;
   static constexpr uintptr_t ASLR_RANGE = 0x60000000;
   return ASLR_MIN + ((seed & 0x0FFFF000ULL) % ASLR_RANGE & ~0xFFFULL);

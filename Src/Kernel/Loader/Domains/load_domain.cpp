@@ -1,5 +1,6 @@
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Utilities/memory.h>
 
@@ -56,8 +57,10 @@ fk::core::Result<void, fk::core::Error> LoadDomain::copy_segment_data(const Memo
     return {};
   }
 
+  arch_smap_begin();
   auto read_res = read_from_node(region.file_offset, region.file_size,
                                  reinterpret_cast<uint8_t*>(region.actual_vaddr));
+  arch_smap_end();
   if (read_res.is_error())
     return read_res.error();
   if (read_res.value() < region.file_size)
@@ -70,7 +73,9 @@ void LoadDomain::zero_fill_bss(const MemoryRegion& region) {
   if (region.memory_size > region.file_size) {
     uintptr_t bss_start = region.actual_vaddr + region.file_size;
     size_t bss_size = region.memory_size - region.file_size;
+    arch_smap_begin();
     fk::memory::set(reinterpret_cast<void*>(bss_start), 0, bss_size);
+    arch_smap_end();
   }
 }
 
@@ -88,6 +93,13 @@ fk::core::Result<void, fk::core::Error>
 LoadDomain::process_single_load_segment(const Elf64_Phdr& phdr, uintptr_t load_base) {
   MemoryDomain memory(m_node);
   MemoryRegion region = calculate_memory_region(phdr, load_base);
+
+  if (phdr.p_offset + phdr.p_filesz > m_node->size()) {
+    fk::algorithms::kwarn("ELF", "Segment exceeds file bounds: offset=%llu + filesz=%llu > size=%zu",
+                          (unsigned long long)phdr.p_offset, (unsigned long long)phdr.p_filesz,
+                          m_node->size());
+    return fk::core::Error::InvalidParameter;
+  }
 
   auto alloc_res = memory.allocate_memory_region(region, true);
   if (alloc_res.is_error())
