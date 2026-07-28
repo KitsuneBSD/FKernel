@@ -28,7 +28,7 @@ local function create_etc_configs()
   local inittab = io.open(INITRD_DIR .. "/etc/inittab", "w")
   if inittab then
       inittab:write("::sysinit:/etc/init.d/rcS\n")
-      inittab:write("::respawn:-/bin/sh\n")
+      inittab:write("tty0::respawn:-/bin/sh\n")
       inittab:close()
   end
 
