@@ -18,24 +18,30 @@ struct CpuAffinity {
 };
 
 class TopologyManager {
+  TopologyManager() = default;
+  TopologyManager(const TopologyManager&) = delete;
+  TopologyManager& operator=(const TopologyManager&) = delete;
+  TopologyManager(TopologyManager&&) = delete;
+  TopologyManager& operator=(TopologyManager&&) = delete;
+
+  bool m_is_initialized{false};
+  fk::containers::Vector<NUMANode> m_nodes;
+  fk::containers::Vector<CpuAffinity> m_cpu_affinities;
+
+  void parse_srat(SRATHeader* srat);
+
 public:
-    static TopologyManager& the();
+  static TopologyManager& the();
 
-    void initialize();
-    
-    const fk::containers::Vector<NUMANode>& nodes() const { return m_nodes; }
-    const fk::containers::Vector<CpuAffinity>& cpu_affinities() const { return m_cpu_affinities; }
+  bool is_initialized() const { return m_is_initialized; }
 
-    uint32_t get_node_for_paddr(uintptr_t phys) const;
-    uint32_t get_node_for_cpu(uint32_t apic_id) const;
+  void initialize();
 
-private:
-    TopologyManager() = default;
-    
-    fk::containers::Vector<NUMANode> m_nodes;
-    fk::containers::Vector<CpuAffinity> m_cpu_affinities;
-    
-    void parse_srat(SRATHeader* srat);
+  const fk::containers::Vector<NUMANode>& nodes() const { return m_nodes; }
+  const fk::containers::Vector<CpuAffinity>& cpu_affinities() const { return m_cpu_affinities; }
+
+  uint32_t get_node_for_paddr(uintptr_t phys) const;
+  uint32_t get_node_for_cpu(uint32_t apic_id) const;
 };
 
 } // namespace fkernel::acpi

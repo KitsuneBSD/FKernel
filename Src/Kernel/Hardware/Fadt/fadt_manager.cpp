@@ -3,16 +3,17 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
 
-FadtManager &FadtManager::the() {
+FadtManager& FadtManager::the() {
   static FadtManager instance;
   return instance;
 }
 
-void initialize_fadt_from_acpi(ACPIManager *acpi) {
+void initialize_fadt_from_acpi(fkernel::ACPIManager* acpi) {
   FadtManager::the().initialize(acpi);
 }
 
-void FadtManager::initialize(ACPIManager *acpi) {
+void FadtManager::initialize(fkernel::ACPIManager* acpi) {
+  if (m_is_initialized) return;
   if (!acpi) {
     m_fadt = nullptr;
     return;
@@ -56,6 +57,7 @@ void FadtManager::initialize(ACPIManager *acpi) {
   }
 
   validate_ports();
+  m_is_initialized = true;
 }
 
 bool FadtManager::validate_ports() const {

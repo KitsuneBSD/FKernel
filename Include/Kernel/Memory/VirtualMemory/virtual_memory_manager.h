@@ -11,37 +11,27 @@ extern "C" void write_on_cr3(void *pml4_virt_addr);
 extern "C" uintptr_t read_on_cr3();
 extern "C" int invalid_tlb(uintptr_t addr);
 
-/**
- * @class VirtualMemoryManager
- * @brief Manages virtual address spaces and page table mappings for x86_64.
- */
+namespace fkernel {
+
 class VirtualMemoryManager {
-private:
   fk::synchronization::Spinlock m_lock;
-  PageTable *m_pml4 = nullptr; ///< Pointer to the active PML4 table.
-  uintptr_t m_pml4_phys = 0;   ///< Physical address of the PML4.
-  uintptr_t m_kernel_pml4_phys = 0; ///< Physical address of the kernel's PML4 (never freed).
-
-protected:
-  /** @brief Allocates and zeroes a new page table. */
-  PageTable *alloc_page_table();
-
-  /** @brief Performs identity mapping for the lower kernel regions. */
-  void perform_initial_identity_mapping();
-
-  /** @brief Invalidates a single TLB entry. */
-  void invlpg(uintptr_t addr);
-
-  /** @brief (Internal) Calculates the virtual address of a page table. */
-  uintptr_t get_table_virtual_address(uint16_t pml4_idx, uint16_t pdpt_idx = 0,
-                                      uint16_t pd_idx = 0,
-                                      uint16_t pt_idx = 0) const;
-
+  PageTable* m_pml4 = nullptr;
+  uintptr_t m_pml4_phys{0};
+  uintptr_t m_kernel_pml4_phys{0};
   bool m_is_initialized{false};
 
   VirtualMemoryManager();
-  VirtualMemoryManager(const VirtualMemoryManager &) = delete;
-  VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
+  VirtualMemoryManager(const VirtualMemoryManager&) = delete;
+  VirtualMemoryManager& operator=(const VirtualMemoryManager&) = delete;
+  VirtualMemoryManager(VirtualMemoryManager&&) = delete;
+  VirtualMemoryManager& operator=(VirtualMemoryManager&&) = delete;
+
+  PageTable* alloc_page_table();
+  void perform_initial_identity_mapping();
+  void invlpg(uintptr_t addr);
+  uintptr_t get_table_virtual_address(uint16_t pml4_idx, uint16_t pdpt_idx = 0,
+                                      uint16_t pd_idx = 0,
+                                      uint16_t pt_idx = 0) const;
 
 public:
   /** @return The singleton instance. */
@@ -103,9 +93,19 @@ public:
   /** @brief Flushes the entire TLB by reloading CR3. Public so fork can flush after CoW marking. */
   void flush_tlb();
 
-private:
-  void unmap_page_range(uintptr_t start, uintptr_t end);
+  /** @brief Creates a KPTI user-side shadow PML4 from a full kernel PML4.
+   *  The shadow contains only user-accessible PML4 entries (User bit set) and the
+   *  kernel-global identity entries needed to run the syscall trampoline in ring 0.
+   *  Returns the physical address of the new PML4, or 0 on OOM.
+   */
+  uintptr_t create_kpti_user_pml4(uintptr_t kernel_pml4_phys);
 
-  /** @brief Ensures a page table level exists, creating it if necessary. */
+  /** @brief Frees a KPTI user-side shadow PML4 (does NOT free the shared page tables). */
+  void free_kpti_user_pml4(uintptr_t user_pml4_phys);
+
+  void unmap_page_range(uintptr_t start, uintptr_t end);
   PageTable* ensure_table(PageTable* parent, size_t index, PageFlags flags, bool& changed);
 };
+
+} // namespace fkernel
+using fkernel::VirtualMemoryManager;

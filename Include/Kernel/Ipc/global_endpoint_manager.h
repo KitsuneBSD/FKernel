@@ -8,16 +8,24 @@ namespace fkernel {
 namespace ipc {
 
 class GlobalEndpointManager {
-  fk::containers::HashMap<uint64_t, Endpoint *> m_endpoints;
-  fk::containers::HashMap<uint64_t, Notification *> m_notifications;
+  fk::containers::HashMap<uint64_t, Endpoint*> m_endpoints;
+  fk::containers::HashMap<uint64_t, Notification*> m_notifications;
+  bool m_is_initialized{false};
 
   GlobalEndpointManager() = default;
+  GlobalEndpointManager(const GlobalEndpointManager&) = delete;
+  GlobalEndpointManager& operator=(const GlobalEndpointManager&) = delete;
+  GlobalEndpointManager(GlobalEndpointManager&&) = delete;
+  GlobalEndpointManager& operator=(GlobalEndpointManager&&) = delete;
 
 public:
-  static GlobalEndpointManager &the() {
+  static GlobalEndpointManager& the() {
     static GlobalEndpointManager instance;
     return instance;
   }
+
+  bool is_initialized() const { return m_is_initialized; }
+  void initialize() { m_is_initialized = true; }
 
   Endpoint *get_endpoint(uint64_t id) {
     auto opt = m_endpoints.get(id);
@@ -48,3 +56,4 @@ public:
 
 } // namespace ipc
 } // namespace fkernel
+using fkernel::ipc::GlobalEndpointManager;

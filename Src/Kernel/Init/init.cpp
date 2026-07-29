@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/Stages/init.h>
 #include <Kernel/Boot/boot_info.h>
@@ -20,10 +21,12 @@
 
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
+// Interrupt-jitter entropy pool: updated each tick by tick_manager.cpp
+volatile uint64_t g_interrupt_entropy_pool = 0;
+
 static uint64_t rdtsc_entropy_source() {
-  uint32_t lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return (static_cast<uint64_t>(hi) << 32) | lo;
+  uint64_t tsc = arch_read_tsc();
+  return tsc ^ g_interrupt_entropy_pool;
 }
 
 void init() {
@@ -74,6 +77,11 @@ void init() {
   }
 
   // Initialize Driver Framework
+  fk::algorithms::klog("INIT", "Initializing driver manager...");
+  fkernel::DriverManager::the().initialize();
+  if (!fkernel::DriverManager::the().is_initialized())
+    fk::algorithms::kfatal("INIT", "Driver manager failed to initialize");
+
   fk::algorithms::klog("INIT", "Probing all drivers...");
   auto& driver_manager = fkernel::DriverManager::the();
 
@@ -124,7 +132,7 @@ void init() {
   // Disable interrupts for the scheduler transition. Timer interrupts firing
   // during boot log output and context initialization can race. The idle task's
   // idle_loop() will re-enable interrupts via sti;hlt.
-  asm volatile("cli");
+  arch_disable_interrupts();
 
   fk::algorithms::klog("INIT", "Starting scheduler...");
   BootTimer::the().mark("init_end");

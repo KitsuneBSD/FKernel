@@ -10,50 +10,36 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 
-/**
- * @class PhysicalMemoryManager
- * @brief Singleton class that manages all physical memory zones in the system.
- */
+namespace fkernel {
+
 class PhysicalMemoryManager {
-private:
   fk::synchronization::Spinlock m_lock;
-  PhysicalZone m_zones[MAX_PHYSICAL_ZONES]; ///< Array of available memory zones.
+  PhysicalZone m_zones[MAX_PHYSICAL_ZONES];
   size_t m_zone_count{0};
 
-  size_t m_total_memory{0}; ///< Total usable RAM detected.
-  size_t m_free_memory{0};  ///< Currently available RAM.
+  size_t m_total_memory{0};
+  size_t m_free_memory{0};
 
   bool m_is_initialized{false};
 
-private:
-  /** @brief Creates and initializes a new memory zone. */
-  PhysicalZone *create_zone(uintptr_t base, size_t length, ZoneType type,
-                            uint64_t *bitmap_storage, size_t bitmap_bits);
+  PhysicalMemoryManager() = default;
+  PhysicalMemoryManager(const PhysicalMemoryManager&) = delete;
+  PhysicalMemoryManager& operator=(const PhysicalMemoryManager&) = delete;
+  PhysicalMemoryManager(PhysicalMemoryManager&&) = delete;
+  PhysicalMemoryManager& operator=(PhysicalMemoryManager&&) = delete;
 
-  /** @brief Finds the zone containing a specific physical address. */
-  PhysicalZone *find_zone_for_paddr(uintptr_t phys);
-
-  /** @brief Selects a zone based on type preference and availability. */
-  PhysicalZone *select_zone(ZoneType preferred, uint32_t preferred_node = 0);
-
-  /** @brief Processes a raw memory range into one or more zones. */
-  void process_range(uintptr_t base, uintptr_t end, uint64_t *&bitmap_cursor,
+  PhysicalZone* create_zone(uintptr_t base, size_t length, ZoneType type,
+                            uint64_t* bitmap_storage, size_t bitmap_bits);
+  PhysicalZone* find_zone_for_paddr(uintptr_t phys);
+  PhysicalZone* select_zone(ZoneType preferred, uint32_t preferred_node = 0);
+  void process_range(uintptr_t base, uintptr_t end, uint64_t*& bitmap_cursor,
                      size_t bitmap_words_remaining);
-
-  /** @brief Internal single-page alloc bypassing init guard (used during boot). */
   uintptr_t alloc_page_internal(ZoneType preferred, uint32_t preferred_node);
-
-  /** @brief Internal contiguous alloc bypassing init guard (used during boot). */
   uintptr_t alloc_contiguous_internal(size_t order, ZoneType preferred,
                                       uint32_t preferred_node);
 
 public:
-  PhysicalMemoryManager() = default;
-  PhysicalMemoryManager(const PhysicalMemoryManager &) = delete;
-  PhysicalMemoryManager &operator=(const PhysicalMemoryManager &) = delete;
-
-  /** @return The singleton instance. */
-  static PhysicalMemoryManager &the() {
+  static PhysicalMemoryManager& the() {
     static PhysicalMemoryManager instance;
     return instance;
   }
@@ -123,3 +109,6 @@ public:
   /** @return Total free RAM in bytes. */
   size_t free_memory() const { return m_free_memory; }
 };
+
+} // namespace fkernel
+using fkernel::PhysicalMemoryManager;

@@ -22,6 +22,11 @@ KeymapManager& KeymapManager::the() {
     return instance;
 }
 
+void KeymapManager::initialize() {
+    if (m_is_initialized) return;
+    m_is_initialized = true;
+}
+
 void KeymapManager::set_layout(KeyboardLayout layout) {
     m_current_layout = layout;
     m_dead_key = 0;

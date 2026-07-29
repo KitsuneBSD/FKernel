@@ -6,7 +6,9 @@
 #include <Kernel/Hardware/Cpu/cpu.h>
 
 void TimerManager::initialize(uint32_t freq) {
+  if (m_is_initialized) return;
   select_and_configure_timer(freq);
+  m_is_initialized = true;
 }
 
 void TimerManager::select_and_configure_timer(uint32_t freq) {
@@ -50,7 +52,7 @@ void TimerManager::sleep(uint64_t awaited_ticks) {
     // counts increments. The actual hardware timer (PIT, APIC, HPET) is
     // responsible for calling increment_ticks. So, here we just use the
     // TickManager to wait for a certain number of ticks.
-    m_tick.sleep(awaited_ticks);
+    TickManager::the().sleep(awaited_ticks);
   } else {
     fk::algorithms::kwarn("TIMER", "No timer available to sleep!");
   }
