@@ -1,4 +1,3 @@
-#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/Stages/init.h>
 #include <Kernel/Boot/boot_info.h>
@@ -21,12 +20,10 @@
 
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
-// Interrupt-jitter entropy pool: updated each tick by tick_manager.cpp
-volatile uint64_t g_interrupt_entropy_pool = 0;
-
 static uint64_t rdtsc_entropy_source() {
-  uint64_t tsc = arch_read_tsc();
-  return tsc ^ g_interrupt_entropy_pool;
+  uint32_t lo, hi;
+  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+  return (static_cast<uint64_t>(hi) << 32) | lo;
 }
 
 void init() {
@@ -77,11 +74,6 @@ void init() {
   }
 
   // Initialize Driver Framework
-  fk::algorithms::klog("INIT", "Initializing driver manager...");
-  fkernel::DriverManager::the().initialize();
-  if (!fkernel::DriverManager::the().is_initialized())
-    fk::algorithms::kfatal("INIT", "Driver manager failed to initialize");
-
   fk::algorithms::klog("INIT", "Probing all drivers...");
   auto& driver_manager = fkernel::DriverManager::the();
 
@@ -111,14 +103,18 @@ void init() {
   if (!SchedulerManager::the().is_initialized())
     fk::algorithms::kfatal("INIT", "Scheduler manager failed to initialize");
 
-  fk::algorithms::klog("INIT", "Starting application processors...");
-  SchedulerManager::the().start_aps();
-
+  // init_syscalls(0) must run before start_aps(): the timer interrupt fires during AP
+  // startup and calls schedule() → load_next_task_context() → current_cpu_block() →
+  // get_current_cpu_id() (gs:32). Without MSR_GS_BASE pointing to g_cpu_blocks[0] first,
+  // that read returns garbage and the resulting non-canonical write faults (GPF vector 13).
   fk::algorithms::klog("INIT", "Initializing syscall manager...");
   SyscallManager::the().initialize();
   if (!SyscallManager::the().is_initialized())
     fk::algorithms::kfatal("INIT", "Syscall manager failed to initialize");
   BootTimer::the().mark("scheduler_init");
+
+  fk::algorithms::klog("INIT", "Starting application processors...");
+  SchedulerManager::the().start_aps();
 
   fk::algorithms::klog("INIT", "Enabling hardware interrupts...");
   HardwareInterruptManager::the().unmask_interrupt(0);  // Timer
@@ -132,7 +128,7 @@ void init() {
   // Disable interrupts for the scheduler transition. Timer interrupts firing
   // during boot log output and context initialization can race. The idle task's
   // idle_loop() will re-enable interrupts via sti;hlt.
-  arch_disable_interrupts();
+  asm volatile("cli");
 
   fk::algorithms::klog("INIT", "Starting scheduler...");
   BootTimer::the().mark("init_end");
