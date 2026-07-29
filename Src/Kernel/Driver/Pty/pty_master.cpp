@@ -42,10 +42,10 @@ fk::core::Result<size_t, fk::core::Error>
 PtyMaster::write(uint64_t, size_t size, const uint8_t* buf) {
   if (!buf || size == 0) return fk::core::Error::InvalidParameter;
 
-  size_t written = 0;
+  bool icanon = m_ldisc.termios().has_lflag(Termios::ICANON);
+
   for (size_t i = 0; i < size; ++i) {
-    bool echo = false;
-    int result = m_ldisc.process_input(buf[i], &echo);
+    m_ldisc.process_input(buf[i]);
 
     int sig = m_ldisc.pending_signal();
     if (sig) {
@@ -54,18 +54,28 @@ PtyMaster::write(uint64_t, size_t size, const uint8_t* buf) {
       if (task) ipc::SignalDelivery::send_signal(task, sig);
     }
 
-    if (result > 0) {
-      uint8_t c = buf[i];
-      m_to_slave->write(&c, 1);
-      ++written;
+    // Drain echo bytes back to terminal (master reads these)
+    if (m_ldisc.echo_available()) {
+      uint8_t echobuf[MAX_CANON * 3];
+      size_t n = m_ldisc.drain_echo(echobuf, sizeof(echobuf));
+      m_from_slave->write(echobuf, n);
     }
 
-    if (echo) {
-      uint8_t c = buf[i];
-      m_from_slave->write(&c, 1);
+    // Deliver data to slave
+    if (icanon) {
+      if (m_ldisc.has_canonical_line()) {
+        uint8_t linebuf[MAX_CANON];
+        size_t n = m_ldisc.drain_canonical_line(linebuf, sizeof(linebuf));
+        m_to_slave->write(linebuf, n);
+      }
+    } else {
+      if (m_ldisc.has_raw_byte()) {
+        uint8_t c = m_ldisc.drain_raw_byte();
+        m_to_slave->write(&c, 1);
+      }
     }
   }
-  return written;
+  return size;
 }
 
 fk::core::Result<int, fk::core::Error>
@@ -76,6 +86,8 @@ PtyMaster::ioctl(uint64_t request, uint64_t arg) {
   static constexpr uint64_t TIOCGWINSZ = 0x5413;
   static constexpr uint64_t TIOCSWINSZ = 0x5414;
   static constexpr uint64_t TIOCSCTTY  = 0x540E;
+  static constexpr uint64_t TIOCGPGRP  = 0x540F;
+  static constexpr uint64_t TIOCSPGRP  = 0x5410;
 
   if (request == TIOCGPTN) {
     const char* p = name().c_str() + 3;
@@ -106,11 +118,24 @@ PtyMaster::ioctl(uint64_t request, uint64_t arg) {
 
   if (request == TIOCSCTTY) {
     auto* task = SchedulerManager::the().current();
-    if (task) {
-      task->control.identity.pgid = task->control.identity.id;
-      return 0;
-    }
-    return fk::core::Error::PermissionDenied;
+    if (!task) return fk::core::Error::PermissionDenied;
+    m_foreground_pgid = static_cast<int>(task->control.identity.pgid.value());
+    return 0;
+  }
+
+  if (request == TIOCGPGRP) {
+    int pgid = m_foreground_pgid;
+    if (fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &pgid, sizeof(pgid)).is_error())
+      return fk::core::Error::InvalidParameter;
+    return 0;
+  }
+
+  if (request == TIOCSPGRP) {
+    int pgid = 0;
+    if (fkernel::memory::copy_from_user(&pgid, reinterpret_cast<const void*>(arg), sizeof(pgid)).is_error())
+      return fk::core::Error::InvalidParameter;
+    m_foreground_pgid = pgid;
+    return 0;
   }
 
   if (request == TCGETS) {
