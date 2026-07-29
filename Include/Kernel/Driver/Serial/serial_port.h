@@ -21,8 +21,8 @@ private:
    * @brief Check if the transmit buffer is empty
    * @return true if ready to transmit, false otherwise
    */
-  static inline bool is_transmit_empty() { return inb(COM1 + 5) & 0x20; }
-  static inline bool is_data_ready()     { return inb(COM1 + 5) & 0x01; }
+  static inline bool is_transmit_empty() { return arch_inb(COM1 + 5) & 0x20; }
+  static inline bool is_data_ready()     { return arch_inb(COM1 + 5) & 0x01; }
 
 public:
   /**

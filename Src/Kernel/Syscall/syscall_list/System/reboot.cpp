@@ -27,11 +27,11 @@ static void write_acpi_register(const GenericAddressStructure &reg, uint8_t valu
   uintptr_t addr = reg.address + (reg.register_bit_offset / 8);
   if (reg.address_space_id == ACPI_ADDR_SPACE_IO) {
     if (reg.register_bit_width <= 8) {
-      outb(static_cast<uint16_t>(addr), value);
+      arch_outb(static_cast<uint16_t>(addr), value);
     } else if (reg.register_bit_width <= 16) {
-      outw(static_cast<uint16_t>(addr), value);
+      arch_outw(static_cast<uint16_t>(addr), value);
     } else {
-      outl(static_cast<uint16_t>(addr), value);
+      arch_outl(static_cast<uint16_t>(addr), value);
     }
   } else {
     auto *ptr = reinterpret_cast<volatile uint8_t *>(addr);
@@ -51,7 +51,7 @@ static bool acpi_reboot() {
                        reset_reg.address, reset_value);
   write_acpi_register(reset_reg, reset_value);
 
-  for (uint32_t i = 0; i < 100000; ++i) asm volatile("pause" ::: "memory");
+  for (uint32_t i = 0; i < 100000; ++i) arch_cpu_relax();
   return false;
 }
 
@@ -64,14 +64,14 @@ static bool acpi_poweroff() {
     uint16_t pm1_cnt = (slp_typa << PM1_CNT_SLP_TYP_SHIFT) | PM1_CNT_SLP_EN;
     fk::algorithms::klog("REBOOT", "ACPI poweroff: PM1a=0x%x SLP_TYPa=%u",
                          pm1a_port, slp_typa);
-    outw(static_cast<uint16_t>(pm1a_port), pm1_cnt);
+    arch_outw(static_cast<uint16_t>(pm1a_port), pm1_cnt);
 
     uint32_t pm1b_port;
     if (FadtManager::the().get_pm1b_control_block(pm1b_port) && pm1b_port != 0) {
-      outw(static_cast<uint16_t>(pm1b_port), pm1_cnt);
+      arch_outw(static_cast<uint16_t>(pm1b_port), pm1_cnt);
     }
 
-    for (uint32_t i = 0; i < 100000; ++i) asm volatile("pause" ::: "memory");
+    for (uint32_t i = 0; i < 100000; ++i) arch_cpu_relax();
   }
   return false;
 }
@@ -86,12 +86,12 @@ static void do_poweroff() {
     FadtManager::the().get_reset_value(reset_value);
     fk::algorithms::klog("REBOOT", "Poweroff fallback: ACPI reset");
     write_acpi_register(reset_reg, reset_value);
-    for (uint32_t i = 0; i < 100000; ++i) asm volatile("pause" ::: "memory");
+    for (uint32_t i = 0; i < 100000; ++i) arch_cpu_relax();
   }
 
   fk::algorithms::klog("REBOOT", "Poweroff fallback: QEMU ISA debug port");
-  outw(0x604, 0x2000);
-  outb(0x501, 0x00);
+  arch_outw(0x604, 0x2000);
+  arch_outb(0x501, 0x00);
   arch_triple_fault();
 }
 
@@ -100,8 +100,8 @@ static void do_reboot() {
     return;
 
   fk::algorithms::klog("REBOOT", "Reboot fallback: keyboard controller pulse");
-  while (inb(0x64) & 0x02);
-  outb(0x64, 0xFE);
+  while (arch_inb(0x64) & 0x02);
+  arch_outb(0x64, 0xFE);
   arch_halt_loop();
 }
 

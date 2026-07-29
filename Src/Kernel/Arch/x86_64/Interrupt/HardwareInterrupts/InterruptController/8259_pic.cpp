@@ -19,9 +19,9 @@ static constexpr uint8_t PIC_READ_ISR = 0x0B;
 
 // Low-level helper
 static uint16_t __get_irq_reg(uint8_t ocw3) {
-  outb(PIC1_CMD, ocw3);
-  outb(PIC2_CMD, ocw3);
-  return (inb(PIC2_CMD) << 8) | inb(PIC1_CMD);
+  arch_outb(PIC1_CMD, ocw3);
+  arch_outb(PIC2_CMD, ocw3);
+  return (arch_inb(PIC2_CMD) << 8) | arch_inb(PIC1_CMD);
 }
 
 uint16_t PIC8259::get_irr() { return __get_irq_reg(PIC_READ_IRR); }
@@ -32,41 +32,41 @@ void PIC8259::initialize() {
   fk::algorithms::kdebug("PIC", "Initializing PIC8259...");
   */
  
-  outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);
+  arch_outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);
   io_wait();
-  outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4);
+  arch_outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4);
   io_wait();
-  outb(PIC1_DATA, 0x20);
+  arch_outb(PIC1_DATA, 0x20);
   io_wait();
-  outb(PIC2_DATA, 0x28);
+  arch_outb(PIC2_DATA, 0x28);
   io_wait();
-  outb(PIC1_DATA, 0x04);
+  arch_outb(PIC1_DATA, 0x04);
   io_wait();
-  outb(PIC2_DATA, 0x02);
+  arch_outb(PIC2_DATA, 0x02);
   io_wait();
-  outb(PIC1_DATA, ICW4_8086);
+  arch_outb(PIC1_DATA, ICW4_8086);
   io_wait();
-  outb(PIC2_DATA, ICW4_8086);
+  arch_outb(PIC2_DATA, ICW4_8086);
   io_wait();
 
-  outb(PIC1_DATA, 0xFF);
-  outb(PIC2_DATA, 0xFF);
+  arch_outb(PIC1_DATA, 0xFF);
+  arch_outb(PIC2_DATA, 0xFF);
 
   fk::algorithms::klog("PIC", "PIC initialized, all IRQs masked");
 }
 
 void PIC8259::mask_interrupt(uint8_t irq) {
   if (irq < 8)
-    outb(PIC1_DATA, inb(PIC1_DATA) | (1 << irq));
+    arch_outb(PIC1_DATA, arch_inb(PIC1_DATA) | (1 << irq));
   else
-    outb(PIC2_DATA, inb(PIC2_DATA) | (1 << (irq - 8)));
+    arch_outb(PIC2_DATA, arch_inb(PIC2_DATA) | (1 << (irq - 8)));
 }
 
 void PIC8259::unmask_interrupt(uint8_t irq) {
   if (irq < 8)
-    outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
+    arch_outb(PIC1_DATA, arch_inb(PIC1_DATA) & ~(1 << irq));
   else
-    outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));
+    arch_outb(PIC2_DATA, arch_inb(PIC2_DATA) & ~(1 << (irq - 8)));
 }
 
 void PIC8259::send_eoi(uint8_t irq) {
@@ -76,12 +76,12 @@ void PIC8259::send_eoi(uint8_t irq) {
     return;
 
   if (irq >= 8)
-    outb(PIC2_CMD, 0x20);
-  outb(PIC1_CMD, 0x20);
+    arch_outb(PIC2_CMD, 0x20);
+  arch_outb(PIC1_CMD, 0x20);
 }
 
 void PIC8259::disable() {
-  outb(PIC1_DATA, 0xFF);
-  outb(PIC2_DATA, 0xFF);
+  arch_outb(PIC1_DATA, 0xFF);
+  arch_outb(PIC2_DATA, 0xFF);
   fk::algorithms::klog("PIC", "PIC disabled by masking all IRQs");
 }

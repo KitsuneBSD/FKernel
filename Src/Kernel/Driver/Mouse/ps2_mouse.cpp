@@ -23,25 +23,25 @@ PS2Mouse::PS2Mouse() {
 
 static void ps2_wait_write() {
     for (int i = 0; i < 100000; ++i) {
-        if (!(inb(PS2_STATUS_PORT) & 0x02)) return;
+        if (!(arch_inb(PS2_STATUS_PORT) & 0x02)) return;
     }
     fk::algorithms::kwarn("MOUSE", "ps2_wait_write timeout");
 }
 
 static void ps2_wait_read() {
     for (int i = 0; i < 100000; ++i) {
-        if (inb(PS2_STATUS_PORT) & 0x01) return;
+        if (arch_inb(PS2_STATUS_PORT) & 0x01) return;
     }
     fk::algorithms::kwarn("MOUSE", "ps2_wait_read timeout");
 }
 
 void PS2Mouse::send_command(uint8_t cmd) {
     ps2_wait_write();
-    outb(PS2_STATUS_PORT, PS2_CMD_SEND_TO_MOUSE);
+    arch_outb(PS2_STATUS_PORT, PS2_CMD_SEND_TO_MOUSE);
     ps2_wait_write();
-    outb(PS2_DATA_PORT, cmd);
+    arch_outb(PS2_DATA_PORT, cmd);
     ps2_wait_read();
-    inb(PS2_DATA_PORT); // consume ACK
+    arch_inb(PS2_DATA_PORT); // consume ACK
 }
 
 void PS2Mouse::initialize() {
@@ -49,19 +49,19 @@ void PS2Mouse::initialize() {
 
     // Enable mouse port
     ps2_wait_write();
-    outb(PS2_STATUS_PORT, PS2_CMD_ENABLE_MOUSE);
+    arch_outb(PS2_STATUS_PORT, PS2_CMD_ENABLE_MOUSE);
 
     // Read controller config, enable mouse interrupt (bit 1)
     ps2_wait_write();
-    outb(PS2_STATUS_PORT, PS2_CMD_READ_CONFIG);
+    arch_outb(PS2_STATUS_PORT, PS2_CMD_READ_CONFIG);
     ps2_wait_read();
-    uint8_t config = inb(PS2_DATA_PORT);
+    uint8_t config = arch_inb(PS2_DATA_PORT);
     config |= 0x02; // enable mouse interrupt
 
     ps2_wait_write();
-    outb(PS2_STATUS_PORT, PS2_CMD_WRITE_CONFIG);
+    arch_outb(PS2_STATUS_PORT, PS2_CMD_WRITE_CONFIG);
     ps2_wait_write();
-    outb(PS2_DATA_PORT, config);
+    arch_outb(PS2_DATA_PORT, config);
 
     send_command(MOUSE_CMD_SET_DEFAULTS);
     send_command(MOUSE_CMD_ENABLE_STREAM);
@@ -76,8 +76,8 @@ fk::core::Result<void, fk::core::Error> PS2Mouse::on_open() {
 }
 
 void PS2Mouse::irq_handler() {
-    if (!m_hw_initialized) { inb(PS2_DATA_PORT); return; } // drain spurious byte
-    uint8_t data = inb(PS2_DATA_PORT);
+    if (!m_hw_initialized) { arch_inb(PS2_DATA_PORT); return; } // drain spurious byte
+    uint8_t data = arch_inb(PS2_DATA_PORT);
     m_packet[m_packet_byte++] = data;
 
     if (m_packet_byte == 1) {

@@ -2,8 +2,8 @@
 #include <LibFK/Utilities/converter.h>
 
 uint8_t CMOSClock::read_register(uint8_t reg) {
-  outb(CMOS_ADDRESS_PORT, (inb(CMOS_ADDRESS_PORT) & 0x80) | reg);
-  return inb(CMOS_DATA_PORT);
+  arch_outb(CMOS_ADDRESS_PORT, (arch_inb(CMOS_ADDRESS_PORT) & 0x80) | reg);
+  return arch_inb(CMOS_DATA_PORT);
 }
 
 fk::core::Result<void> CMOSClock::initialize(uint32_t frequency) {

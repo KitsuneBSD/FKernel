@@ -75,7 +75,7 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
 }
 
 void PS2Keyboard::irq_handler() {
-  uint8_t scancode = inb(PS2_DATA_PORT);
+  uint8_t scancode = arch_inb(PS2_DATA_PORT);
   handle_scancode(scancode);
 }
 

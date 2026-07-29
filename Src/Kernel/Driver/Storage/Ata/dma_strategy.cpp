@@ -16,17 +16,17 @@ static constexpr uint8_t ATA_SR_ERR = 0x01;
 
 void DMAStrategy::wait_busy() {
     int timeout = 10000000;
-    while ((inb(m_io_base + ATA_REG_STATUS) & ATA_SR_BSY) && --timeout > 0) {}
+    while ((arch_inb(m_io_base + ATA_REG_STATUS) & ATA_SR_BSY) && --timeout > 0) {}
     if (timeout == 0) fk::algorithms::kwarn("DMA", "wait_busy timeout");
 }
 
 void DMAStrategy::prepare_transfer(uint64_t start_sector, uint8_t count, bool write) {
-    outb(m_io_base + 6, (m_is_master ? 0xE0 : 0xF0) | ((start_sector >> 24) & 0x0F));
-    outb(m_io_base + 2, count);
-    outb(m_io_base + 3, (uint8_t)start_sector);
-    outb(m_io_base + 4, (uint8_t)(start_sector >> 8));
-    outb(m_io_base + 5, (uint8_t)(start_sector >> 16));
-    outb(m_io_base + 7, write ? ATA_CMD_WRITE_DMA : ATA_CMD_READ_DMA);
+    arch_outb(m_io_base + 6, (m_is_master ? 0xE0 : 0xF0) | ((start_sector >> 24) & 0x0F));
+    arch_outb(m_io_base + 2, count);
+    arch_outb(m_io_base + 3, (uint8_t)start_sector);
+    arch_outb(m_io_base + 4, (uint8_t)(start_sector >> 8));
+    arch_outb(m_io_base + 5, (uint8_t)(start_sector >> 16));
+    arch_outb(m_io_base + 7, write ? ATA_CMD_WRITE_DMA : ATA_CMD_READ_DMA);
 }
 
 fk::core::Result<size_t, fk::core::Error> DMAStrategy::read_sectors(uint64_t start_sector, size_t count, uint8_t* buffer) {
@@ -75,26 +75,26 @@ fk::core::Result<size_t, fk::core::Error> DMAStrategy::read_sectors(uint64_t sta
     prdt[prd_idx - 1].last_entry = 1;
 
     // 2. Setup Bus Master
-    outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.phys);
+    arch_outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.phys);
     
     // Set direction (Read from drive = 1 in Bit 3 of BM Command)
-    outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ);
+    arch_outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ);
     
     // Clear Error and Interrupt bits in Status Register
-    outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
+    arch_outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
 
     // 3. Command Drive
     wait_busy();
     prepare_transfer(start_sector, (uint8_t)(count == 256 ? 0 : count), false);
 
     // 4. Start Bus Master
-    outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ | BM_CMD_START);
+    arch_outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ | BM_CMD_START);
 
     // 5. Wait for completion (Polling status for now, ideally IRQ based)
     int timeout = 10000000;
     while (timeout-- > 0) {
-        uint8_t status = inb(m_bm_base + BM_STATUS_REG);
-        uint8_t drive_status = inb(m_io_base + ATA_REG_STATUS);
+        uint8_t status = arch_inb(m_bm_base + BM_STATUS_REG);
+        uint8_t drive_status = arch_inb(m_io_base + ATA_REG_STATUS);
 
         if (!(status & BM_STATUS_ACTIVE)) {
             if (status & BM_STATUS_ERROR) {
@@ -116,7 +116,7 @@ fk::core::Result<size_t, fk::core::Error> DMAStrategy::read_sectors(uint64_t sta
     }
 
     // 6. Stop Bus Master
-    outb(m_bm_base + BM_COMMAND_REG, 0x00);
+    arch_outb(m_bm_base + BM_COMMAND_REG, 0x00);
 
     return count;
 }
@@ -162,13 +162,13 @@ fk::core::Result<size_t, fk::core::Error> DMAStrategy::write_sectors(uint64_t st
     }
     prdt[prd_idx - 1].last_entry = 1;
 
-    outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.phys);
-    outb(m_bm_base + BM_COMMAND_REG, 0); // Write to drive = 0 in Bit 3
-    outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
+    arch_outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.phys);
+    arch_outb(m_bm_base + BM_COMMAND_REG, 0); // Write to drive = 0 in Bit 3
+    arch_outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
 
     wait_busy();
     {
-        uint8_t ata_status = inb(m_io_base + ATA_REG_STATUS);
+        uint8_t ata_status = arch_inb(m_io_base + ATA_REG_STATUS);
         if (ata_status & ATA_SR_ERR) {
             fk::algorithms::kwarn("DMA", "write: ATA error before transfer, status=0x%02x", ata_status);
             return fk::core::Error::IOError;
@@ -176,11 +176,11 @@ fk::core::Result<size_t, fk::core::Error> DMAStrategy::write_sectors(uint64_t st
     }
     prepare_transfer(start_sector, (uint8_t)(count == 256 ? 0 : count), true);
 
-    outb(m_bm_base + BM_COMMAND_REG, BM_CMD_START);
+    arch_outb(m_bm_base + BM_COMMAND_REG, BM_CMD_START);
 
     int timeout = 10000000;
     while (timeout-- > 0) {
-        uint8_t status = inb(m_bm_base + BM_STATUS_REG);
+        uint8_t status = arch_inb(m_bm_base + BM_STATUS_REG);
         if (!(status & BM_STATUS_ACTIVE)) {
             if (status & BM_STATUS_ERROR) {
                 fk::algorithms::kwarn("DMA", "write: bus master error");
@@ -195,7 +195,7 @@ fk::core::Result<size_t, fk::core::Error> DMAStrategy::write_sectors(uint64_t st
         return fk::core::Error::DeviceError;
     }
 
-    outb(m_bm_base + BM_COMMAND_REG, 0x00);
+    arch_outb(m_bm_base + BM_COMMAND_REG, 0x00);
     return count;
 }
 

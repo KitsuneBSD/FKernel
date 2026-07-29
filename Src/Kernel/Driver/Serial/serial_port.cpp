@@ -1,19 +1,19 @@
 #include <Kernel/Driver/Serial/serial_port.h>
 
 void serial::init() {
-  outb(COM1 + 1, 0x00);
-  outb(COM1 + 3, 0x80);
-  outb(COM1 + 0, 0x03);
-  outb(COM1 + 1, 0x00);
-  outb(COM1 + 3, 0x03);
-  outb(COM1 + 2, 0xC7);
-  outb(COM1 + 4, 0x0B);
+  arch_outb(COM1 + 1, 0x00);
+  arch_outb(COM1 + 3, 0x80);
+  arch_outb(COM1 + 0, 0x03);
+  arch_outb(COM1 + 1, 0x00);
+  arch_outb(COM1 + 3, 0x03);
+  arch_outb(COM1 + 2, 0xC7);
+  arch_outb(COM1 + 4, 0x0B);
 }
 
 void serial::write_char(char c) {
   while (!is_transmit_empty())
     ;
-  outb(COM1, c);
+  arch_outb(COM1, c);
 }
 
 void serial::write_buffer(const char *data, size_t len) {
@@ -25,7 +25,7 @@ void serial::write_buffer(const char *data, size_t len) {
     size_t chunk = len - i;
     if (chunk > FIFO_DEPTH) chunk = FIFO_DEPTH;
     for (size_t j = 0; j < chunk; ++j)
-      outb(COM1, data[i + j]);
+      arch_outb(COM1, data[i + j]);
     i += chunk;
   }
 }
@@ -62,7 +62,7 @@ void serial::write_dec(int64_t value) {
 size_t serial::read(uint8_t* buf, size_t max) {
   size_t n = 0;
   while (n < max && is_data_ready())
-    buf[n++] = static_cast<uint8_t>(inb(COM1));
+    buf[n++] = static_cast<uint8_t>(arch_inb(COM1));
   return n;
 }
 

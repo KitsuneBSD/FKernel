@@ -502,16 +502,16 @@ All 13 managers now follow the canonical pattern:
 |---|------|-------|-----|
 | 1 | `Src/Kernel/Init/init.cpp:25` | ✅ `arch_read_tsc()` added to `cpu_ops.h/cpp`. `rdtsc_entropy_source()` uses `arch_read_tsc()`. | — |
 | 2 | `Src/Kernel/Init/init.cpp:127` | ✅ `asm volatile("cli")` replaced with `arch_disable_interrupts()`. | — |
-| 3 | `Src/Kernel/Scheduler/scheduler_manager.cpp:196,199` | `asm volatile("xsave64")` / `asm volatile("fxsave")` | Extract to `arch_fpu_save()` / `arch_fpu_restore()` (Phase 42c-9) |
-| 4 | `Src/Kernel/Scheduler/scheduler_manager.cpp:275` | `asm volatile("sti; hlt")` in `idle_loop()` | Already marked Phase 42c-8 — use `arch_cpu_idle()` |
+| 3 | `Src/Kernel/Scheduler/scheduler_manager.cpp:196,199` | ✅ `asm volatile("xsave64")` / `asm volatile("fxsave")` replaced with `arch_fpu_save()` / `arch_fpu_restore()`. Implemented in `cpu_ops.cpp`, declared in `cpu_ops.h`. | — |
+| 4 | `Src/Kernel/Scheduler/scheduler_manager.cpp:275` | ✅ `asm volatile("sti; hlt")` replaced with `arch_cpu_idle()` in `idle_loop()`. | — |
 | 5 | `Src/Kernel/Scheduler/scheduler_manager.cpp:240` | `asm volatile("lea ap_entry")` | Extract to `arch_start_secondary_cpus()` (Phase 42c-7) |
 | 6 | `Src/Kernel/Boot/boot_timer.cpp:8` | ✅ `arch_read_tsc_serialized()` added to `cpu_ops.h/cpp` (LFENCE+RDTSC). `boot_timer.cpp` uses `arch_read_tsc_serialized()`. `tick_manager.cpp` uses `arch_read_tsc()` and `arch_cpu_relax()`. | — |
-| 7 | `Src/Kernel/Syscall/System/reboot.cpp:54,74,89` | `asm volatile("pause")` × 3 | ✅ Replaced with `arch_cpu_relax()` — already declared in `cpu_ops.h`, included via existing include |
-| 8 | 13 generic files | `inb`/`outb`/`inw`/`outw`/`inl`/`outl` (93+ calls) — port I/O without `arch_` abstraction | Rename to `arch_inb()`/`arch_outb()` or add abstraction layer |
-| 9 | `Include/Kernel/Memory/.../virtual_memory_manager.h:10-12` | `extern "C"` functions `invalid_tlb`, `write_on_cr3`, `read_on_cr3` without `arch_` prefix | Rename to `arch_invalid_tlb`, `arch_write_cr3`, `arch_read_cr3` |
-| 10 | `Src/Kernel/Arch/x86_64/Segments/gdt.cpp` | `extern "C"` `flush_tss`, `flush_gdt` without `arch_` prefix | Rename to `arch_flush_tss`, `arch_flush_gdt` |
-| 11 | `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp` | `extern "C"` `flush_idt` without `arch_` prefix | Rename to `arch_flush_idt` |
-| 12 | `Include/Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h` | `arch_cpu_idle()` **missing** (declared in AGENTS.md but not implemented) | Implement (Phase 42c-8) |
+| 7 | `Src/Kernel/Syscall/System/reboot.cpp:54,74,89` | ✅ Replaced with `arch_cpu_relax()` — already declared in `cpu_ops.h`, included via existing include | — |
+| 8 | 19 files | ✅ `inb`/`outb`/`inw`/`outw`/`inl`/`outl`/`insw` renamed to `arch_inb()`/`arch_outb()`/`arch_inw()`/`arch_outw()`/`arch_inl()`/`arch_outl()`/`arch_insw()` in `io.h` and all 19 callers. | — |
+| 9 | `Include/Kernel/Memory/.../virtual_memory_manager.h:10-12` | ✅ `invalid_tlb`→`arch_invlpg`, `write_on_cr3`→`arch_write_cr3`, `read_on_cr3`→`arch_read_cr3`. ASM files and all callers updated. | — |
+| 10 | `Src/Kernel/Arch/x86_64/Segments/gdt.cpp` | ✅ `flush_tss`→`arch_flush_tss`, `flush_gdt`→`arch_flush_gdt`. ASM files and callers updated. | — |
+| 11 | `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp` | ✅ `flush_idt`→`arch_flush_idt`. ASM file and callers updated. | — |
+| 12 | `Include/Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h` | ✅ `arch_cpu_idle()` implemented in `cpu_ops.cpp` (`asm volatile("sti; hlt")`). | — |
 
 ### 🔴 P1 — Secret Rule: One Class/File + No Nested Types (AGENTS.md:100–105)
 

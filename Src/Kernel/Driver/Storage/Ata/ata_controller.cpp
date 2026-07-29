@@ -94,27 +94,27 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index,
                          "Probing %s on channel %d (IO: %04x, CTRL: %04x)...",
                          is_master ? "Master" : "Slave", channel_index, io, ctrl);
 
-    outb(io + 6, is_master ? 0xA0 : 0xB0);
-    outb(io + 2, 0);
-    outb(io + 3, 0);
-    outb(io + 4, 0);
-    outb(io + 5, 0);
-    outb(io + 7, 0xEC); // IDENTIFY
+    arch_outb(io + 6, is_master ? 0xA0 : 0xB0);
+    arch_outb(io + 2, 0);
+    arch_outb(io + 3, 0);
+    arch_outb(io + 4, 0);
+    arch_outb(io + 5, 0);
+    arch_outb(io + 7, 0xEC); // IDENTIFY
 
-    uint8_t status = inb(io + 7);
+    uint8_t status = arch_inb(io + 7);
     if (status == 0) continue;
 
-    { int t = 1000000; uint8_t s; do { s = inb(io + 7); } while ((s & 0x80) && --t > 0);
+    { int t = 1000000; uint8_t s; do { s = arch_inb(io + 7); } while ((s & 0x80) && --t > 0);
       if (t <= 0) { fk::algorithms::kwarn("ATA", "IDENTIFY BSY timeout"); continue; } }
 
-    if (inb(io + 4) != 0 || inb(io + 5) != 0) continue;
+    if (arch_inb(io + 4) != 0 || arch_inb(io + 5) != 0) continue;
 
-    { int t = 1000000; uint8_t s; do { s = inb(io + 7); } while (!(s & 0x08) && --t > 0);
+    { int t = 1000000; uint8_t s; do { s = arch_inb(io + 7); } while (!(s & 0x08) && --t > 0);
       if (t <= 0) { fk::algorithms::kwarn("ATA", "IDENTIFY DRQ timeout"); continue; } }
 
     uint16_t data[256];
     for (int j = 0; j < 256; ++j) {
-      data[j] = inw(io);
+      data[j] = arch_inw(io);
     }
 
     uint64_t sectors = 0;

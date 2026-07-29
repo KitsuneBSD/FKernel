@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Segments/Gdt/gdt_structures.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
@@ -7,8 +8,6 @@
 
 extern "C" uint64_t stack_top;
 extern "C" uint64_t stack_bottom;
-extern "C" void flush_tss(uint16_t tss_selector);
-extern "C" void flush_gdt(void *gdtr);
 
 static_assert(sizeof(TSS64) == 112, "TSS64 size unexpected; check packing/alignment");
 
@@ -92,7 +91,7 @@ void GDTController::init_per_cpu(uint32_t cpu_index) {
 void GDTController::load_per_cpu(uint32_t cpu_index) {
   auto& gdtr = m_gdtr_per_cpu[cpu_index];
 
-  flush_gdt(&gdtr);
+  arch_flush_gdt(&gdtr);
 
   asm volatile("mov $0x10, %%ax\n"
                "mov %%ax, %%ds\n"
@@ -109,7 +108,7 @@ void GDTController::load_per_cpu(uint32_t cpu_index) {
                :
                : "rax");
 
-  flush_tss(TSS_SELECTOR);
+  arch_flush_tss(TSS_SELECTOR);
 }
 
 void GDTController::set_kernel_stack(uint64_t stack_addr) {

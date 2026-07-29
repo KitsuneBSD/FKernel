@@ -19,11 +19,11 @@ VirtualMemoryManager& VirtualMemoryManager::the() {
 }
 
 void VirtualMemoryManager::invlpg(uintptr_t addr) {
-  invalid_tlb(addr);
+  arch_invlpg(addr);
 }
 
 void VirtualMemoryManager::flush_tlb() {
-  write_on_cr3(reinterpret_cast<void*>(read_on_cr3()));
+  arch_write_cr3(reinterpret_cast<void*>(arch_read_cr3()));
 }
 
 void VirtualMemoryManager::perform_initial_identity_mapping() {
@@ -75,7 +75,7 @@ void VirtualMemoryManager::initialize() {
                          (void*)end);
   }
 
-  write_on_cr3(static_cast<void*>(m_pml4));
+  arch_write_cr3(static_cast<void*>(m_pml4));
 
   fk::algorithms::klog("VIRT_MEM", "Initialize done: cr3=%p", m_pml4);
   m_is_initialized = true;
@@ -322,7 +322,7 @@ void VirtualMemoryManager::switch_address_space(uintptr_t cr3) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   m_pml4_phys = cr3;
   m_pml4 = reinterpret_cast<PageTable*>(cr3);
-  write_on_cr3(reinterpret_cast<void*>(cr3));
+  arch_write_cr3(reinterpret_cast<void*>(cr3));
 }
 
 void VirtualMemoryManager::free_address_space(uintptr_t cr3) {
@@ -540,4 +540,36 @@ void VirtualMemoryManager::extend_direct_map() {
   flush_tlb();
 
   fk::algorithms::klog("VMM", "Direct map extended: %zu MB", aligned_total / (1024 * 1024));
+}
+
+uintptr_t VirtualMemoryManager::create_kpti_user_pml4(uintptr_t kernel_pml4_phys) {
+  // Allocate a fresh PML4 page for the KPTI user shadow.
+  uintptr_t shadow_phys = PhysicalMemoryManager::the().alloc_page();
+  if (!shadow_phys) return 0;
+  auto* shadow = reinterpret_cast<PageTable*>(shadow_phys);
+  fk::memory::set(shadow, 0, PAGE_SIZE);
+
+  const auto* kpml4 = reinterpret_cast<const PageTable*>(kernel_pml4_phys);
+
+  // Copy all PML4 entries.
+  // Strategy: include user-accessible entries (User flag set) and the kernel's
+  // global identity mapping entries (no User flag, but needed for the syscall
+  // trampoline to execute in ring 0 after SYSCALL, before the CR3 swap completes).
+  // Specifically: entries without User bit ARE included so ring-0 can access
+  // kernel text/GS data immediately after SYSCALL. Per-process kernel stacks
+  // and heap pages are mixed into the same identity range; full isolation
+  // requires removing those specific PTEs, which is a future refinement.
+  for (size_t i = 0; i < PT_ENTRIES / 2; ++i) {
+    uint64_t entry = kpml4->entries[i];
+    if (entry & static_cast<uint64_t>(PageFlags::Present))
+      shadow->entries[i] = entry;
+  }
+
+  return shadow_phys;
+}
+
+void VirtualMemoryManager::free_kpti_user_pml4(uintptr_t user_pml4_phys) {
+  // Only free the PML4 page itself; the PDPT/PD/PT pages are shared with
+  // the kernel PML4 and must NOT be freed here.
+  if (user_pml4_phys) PhysicalMemoryManager::the().free_page(user_pml4_phys);
 }

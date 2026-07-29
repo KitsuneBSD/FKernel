@@ -1,3 +1,4 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
@@ -24,8 +25,6 @@
 using namespace fkernel::scheduler;
 
 extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr);
-extern "C" uint8_t g_use_xsave;
-extern "C" size_t g_xsave_area_size;
 extern "C" void trampoline_start();
 extern "C" void trampoline_end();
 extern "C" uint64_t stack_bottom;
@@ -195,13 +194,7 @@ void SchedulerManager::schedule() {
   // Lazy FPU: save outgoing task's FPU state if it currently owns the FPU registers.
   if (prev_task && prev_task == current_processor().last_fpu_task) {
     void* area = get_fpu_save_area(prev_task->resources.context);
-    if (g_use_xsave) {
-      uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
-      asm volatile("xsave64 %0" : "=m"(*static_cast<uint8_t*>(area))
-                   : "a"(mask_lo), "d"(mask_hi) : "memory");
-    } else {
-      asm volatile("fxsave %0" : "=m"(*static_cast<uint8_t*>(area)) :: "memory");
-    }
+    arch_fpu_save(area);
   }
 
   if (prev_task) {
@@ -276,7 +269,7 @@ void SchedulerManager::start_aps() {
 
 void SchedulerManager::idle_loop() {
   for (;;) {
-    asm volatile("sti; hlt");
+    arch_cpu_idle();
     schedule();
   }
 }

@@ -1,11 +1,11 @@
-global flush_tss 
+global arch_flush_tss 
 
 section .text 
 
 
-global flush_tss
+global arch_flush_tss
 section .text
-flush_tss:
+arch_flush_tss:
     mov ax, di
     ltr ax
     ret

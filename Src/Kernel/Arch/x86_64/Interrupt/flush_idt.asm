@@ -1,8 +1,8 @@
-global flush_idt
+global arch_flush_idt
 
 section .text 
 bits 64 
 
-flush_idt:
+arch_flush_idt:
   lidt [rdi]
   ret

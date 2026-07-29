@@ -13,7 +13,7 @@
 
 #include <LibFK/Algorithms/log.h>
 
-extern "C" void flush_idt(void *idtr);
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 
 void InterruptController::initialize() {
   if (m_initialized) {
@@ -114,7 +114,7 @@ void InterruptController::load() {
   idt_ptr ptr;
   ptr.limit = static_cast<uint16_t>(sizeof(m_entries) - 1);
   ptr.base = reinterpret_cast<uint64_t>(&m_entries);
-  flush_idt(&ptr);
+  arch_flush_idt(&ptr);
 }
 
 interrupt InterruptController::get_interrupt(uint8_t vector) {

@@ -5,6 +5,8 @@
 #include <LibFK/Algorithms/log.h>
 
 size_t g_xsave_area_size = 512;  // default: FXSAVE size, updated in arch_enable_cpu_features
+uint8_t g_use_xsave = 0;         // 1 when XSAVE/XRSTOR should be used in context switch
+uint8_t g_has_ermsb = 0;         // 1 when ERMSB (Enhanced REP MOVSB/STOSB) is available
 
 extern "C" void arch_cpuid(uint32_t leaf, uint32_t subleaf,
                             uint32_t* eax, uint32_t* ebx, uint32_t* ecx, uint32_t* edx) {
@@ -25,9 +27,31 @@ extern "C" uint64_t arch_read_msr(uint32_t msr) {
   return ((uint64_t)high << 32) | low;
 }
 
+static void enable_fast_strings_ermsb() {
+  constexpr uint32_t MSR_IA32_MISC_ENABLE = 0x1A0;
+  uint32_t lo, hi;
+  asm volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(MSR_IA32_MISC_ENABLE));
+  if (!(lo & 1u)) {
+    lo |= 1u; // bit 0: Fast Strings Enable
+    asm volatile("wrmsr" :: "c"(MSR_IA32_MISC_ENABLE), "a"(lo), "d"(hi));
+    fk::algorithms::klog("CPU", "Fast Strings enabled via IA32_MISC_ENABLE");
+  }
+  // ERMSB: CPUID leaf 7, EBX bit 9 — detect only, no MSR write
+  uint32_t eax, ebx, ecx, edx;
+  arch_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+  if (ebx & (1u << 9)) {
+    g_has_ermsb = 1;
+    fk::algorithms::klog("CPU", "ERMSB supported");
+  }
+}
+
 extern "C" void arch_enable_cpu_features(bool has_smep, bool has_smap, bool has_nx,
-                                         bool has_xsave, bool has_avx) {
-  fk::algorithms::klog("CPU", "Initializing features (SSE, NX)...");
+                                         bool has_xsave, bool has_avx,
+                                         bool has_fsgsbase, bool has_umip, bool has_invpcid) {
+  fk::algorithms::klog("CPU", "Initializing features (SSE, NX, PCID)...");
+
+  // Enable Fast Strings and detect ERMSB before touching CR0/CR4
+  enable_fast_strings_ermsb();
 
   uint64_t cr0, cr4;
   asm volatile("mov %%cr0, %0" : "=r"(cr0));
@@ -43,9 +67,29 @@ extern "C" void arch_enable_cpu_features(bool has_smep, bool has_smap, bool has_
     cr4 |= (1ULL << 20); // SMEP: prevent kernel executing user-space pages
   if (has_smap)
     cr4 |= (1ULL << 21); // SMAP: prevent kernel accessing user-space pages directly
+  if (has_fsgsbase)
+    cr4 |= (1ULL << 16); // FSGSBASE: enable RDFSBASE/WRFSBASE/RDGSBASE/WRGSBASE instructions
+  if (has_umip)
+    cr4 |= (1ULL << 11); // UMIP: prevent ring-3 from executing SGDT/SIDT/SLDT/SMSW/STR
   if (has_xsave)
     cr4 |= (1ULL << 18); // OSXSAVE: enable XSAVE/XRSTOR instructions
+  // PCID: CPUID leaf 1, ECX bit 17
+  {
+    uint32_t c1_eax, c1_ebx, c1_ecx, c1_edx;
+    arch_cpuid(1, 0, &c1_eax, &c1_ebx, &c1_ecx, &c1_edx);
+    if (c1_ecx & (1u << 17)) {
+      cr4 |= (1ULL << 17); // CR4.PCIDE: enable Process-Context Identifiers
+      fk::algorithms::klog("CPU", "PCID enabled (CR4.PCIDE=1)");
+    }
+  }
   asm volatile("mov %0, %%cr4" ::"r"(cr4));
+
+  if (has_fsgsbase)
+    fk::algorithms::klog("CPU", "FSGSBASE enabled (CR4.FSGSBASE=1)");
+  if (has_umip)
+    fk::algorithms::klog("CPU", "UMIP enabled (CR4.UMIP=1)");
+  if (has_invpcid)
+    fk::algorithms::klog("CPU", "INVPCID available");
 
   if (has_nx) {
     uint64_t efer = arch_read_msr(MSR_EFER);
@@ -70,12 +114,49 @@ extern "C" void arch_enable_cpu_features(bool has_smep, bool has_smap, bool has_
                  : "a"(0x0D), "c"(0));
     g_xsave_area_size = xsave_ebx > 512 ? xsave_ebx : 512;
     fk::algorithms::klog("CPU", "XSAVE area size: %zu bytes (EBX=%u)", g_xsave_area_size, xsave_ebx);
+    g_use_xsave = 1;
   }
 }
 
 extern "C" [[noreturn]] void arch_halt_loop() {
   for (;;)
     asm volatile("hlt");
+}
+
+extern "C" void arch_cpu_idle() {
+  asm volatile("sti; hlt");
+}
+
+extern "C" void arch_fpu_save(void* area) {
+  if (g_use_xsave) {
+    uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
+    asm volatile("xsave64 %0" : "=m"(*static_cast<uint8_t*>(area))
+                 : "a"(mask_lo), "d"(mask_hi) : "memory");
+  } else {
+    asm volatile("fxsave %0" : "=m"(*static_cast<uint8_t*>(area)) :: "memory");
+  }
+}
+
+extern "C" void arch_fpu_restore(const void* area) {
+  if (g_use_xsave) {
+    uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
+    asm volatile("xrstor64 %0" :: "m"(*static_cast<const uint8_t*>(area)),
+                 "a"(mask_lo), "d"(mask_hi) : "memory");
+  } else {
+    asm volatile("fxrstor %0" :: "m"(*static_cast<const uint8_t*>(area)) : "memory");
+  }
+}
+
+extern "C" uint64_t arch_read_tsc() {
+  uint32_t lo, hi;
+  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+  return (static_cast<uint64_t>(hi) << 32) | lo;
+}
+
+extern "C" uint64_t arch_read_tsc_serialized() {
+  uint32_t lo, hi;
+  asm volatile("lfence; rdtsc" : "=a"(lo), "=d"(hi));
+  return (static_cast<uint64_t>(hi) << 32) | lo;
 }
 
 void detect_tsc_frequency() {
