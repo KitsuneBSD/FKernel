@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Ipc/endpoint.h>
 #include <Kernel/Net/socket.h>
 #include <Kernel/Net/unix_socket_buffer.h>
@@ -9,6 +10,13 @@
 #include <LibFK/Text/fixed_string.h>
 
 namespace fkernel {
+
+// Credentials attached at connect time for SO_PEERCRED / SCM_CREDENTIALS.
+struct PeerCredentials {
+    uint32_t pid{0};
+    uint32_t uid{0};
+    uint32_t gid{0};
+};
 
 class UnixSocket final : public Socket {
 public:
@@ -32,6 +40,9 @@ public:
 
     virtual fk::core::Result<void, fk::core::Error> getsockname(char* addr, uint32_t* addrlen) override;
     virtual fk::core::Result<void, fk::core::Error> getpeername(char* addr, uint32_t* addrlen) override;
+    virtual fk::core::Result<void, fk::core::Error> getsockopt(
+        int level, int optname, void* optval, uint32_t* optlen) override;
+
     virtual short poll() const override {
         short r = 0;
         if (m_rx_buffer.available() > 0 || (m_listening && m_backlog_count > 0)) r |= POLLIN;
@@ -39,6 +50,14 @@ public:
         if (!m_connected && !m_listening) r |= POLLHUP;
         return r;
     }
+
+    // SCM_RIGHTS: enqueue FileDescriptions to pass to the next recvmsg caller.
+    void send_fds(fk::containers::Vector<fk::RefPtr<FileDescription>>& fds);
+    // SCM_RIGHTS: dequeue previously sent FileDescriptions into out (caller installs them).
+    void recv_fds(fk::containers::Vector<fk::RefPtr<FileDescription>>& out);
+
+    // SO_PEERCRED: credentials of the process that called connect().
+    PeerCredentials peer_credentials() const { return m_peer_creds; }
 
     UnixSocket(SocketType type);
 
@@ -55,6 +74,14 @@ private:
     ipc::Endpoint m_accept_endpoint;
 
     UnixSocketBuffer m_rx_buffer;
+
+    // Pending file descriptions waiting to be received via SCM_RIGHTS (owned by peer's send).
+    static constexpr size_t MAX_PENDING_FDS = 64;
+    fk::RefPtr<FileDescription> m_pending_fds[MAX_PENDING_FDS];
+    size_t m_pending_fd_count{0};
+
+    // Credentials of the connected peer (filled at connect() time).
+    PeerCredentials m_peer_creds{};
 };
 
 } // namespace fkernel

@@ -33,7 +33,9 @@
 #define SIGPWR    30
 #define SIGSYS    31
 
-#define NSIG 32
+#define NSIG       65   // 64 signals + sentinel; supports SIGRTMIN(34)..SIGRTMAX(64)
+#define SIGRTMIN   34
+#define SIGRTMAX   64
 
 #define SI_MAX_SIZE 128
 

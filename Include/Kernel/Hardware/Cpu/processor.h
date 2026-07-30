@@ -11,6 +11,7 @@ struct Processor {
     uint32_t id;
     Task* current_task { nullptr };
     Task* idle_task { nullptr };
+    Task* last_fpu_task { nullptr }; // task whose FPU state is live in registers on this CPU
     bool need_resched { false };
     fk::synchronization::Spinlock run_queue_lock;
     scheduler::MLFQQueue run_queues[scheduler::MLFQ_LEVELS];

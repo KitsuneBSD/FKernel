@@ -4,7 +4,6 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Hardware/Pci/pci.h>
 #include <LibFK/Container/vector.h>
-#include <LibFK/Memory/retain_ptr.h>
 
 class ATAController final : public fkernel::Driver {
 private:

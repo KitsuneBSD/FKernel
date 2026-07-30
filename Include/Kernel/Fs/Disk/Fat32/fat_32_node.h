@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Memory/retain_ptr.h>
 
 namespace fkernel {
 

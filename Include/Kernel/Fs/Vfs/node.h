@@ -4,7 +4,6 @@
 #include <LibFK/Container/vector.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
@@ -27,6 +26,8 @@ struct KNoteHook {
     fkernel::KQueueNode* kq{nullptr};
     uint64_t ident{0};
     int16_t filter{0};
+    // Pending event flags for EVFILT_PROC (NOTE_EXIT/FORK/EXEC) and EVFILT_SIGNAL (signum).
+    uint32_t pending_fflags{0};
 };
 
 struct DirectoryEntry {
@@ -48,6 +49,9 @@ public:
 
   // Called on each open(); device nodes override to do lazy hardware init.
   virtual fk::core::Result<void, fk::core::Error> on_open() { return {}; }
+
+  // Called when the last FileDescription referencing this node is destroyed.
+  virtual void on_close() {}
 
   virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> lookup(const char* /*name*/) {
     return fk::core::Error::NotADirectory;

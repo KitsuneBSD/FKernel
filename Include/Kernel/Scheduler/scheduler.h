@@ -1,7 +1,6 @@
 #pragma once
 
 #include <LibFK/Container/intrusive_list.h>
-#include <LibFK/Container/hash_map.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Types/cpu_count.h>
 #include <LibFK/Types/tick_count.h>
@@ -15,14 +14,9 @@
 #include <Kernel/Scheduler/qos.h>
 #include <Kernel/Hardware/Cpu/processor.h>
 
-namespace fkernel {
-
 class SchedulerManager {
+private:
     SchedulerManager();
-    SchedulerManager(const SchedulerManager&) = delete;
-    SchedulerManager& operator=(const SchedulerManager&) = delete;
-    SchedulerManager(SchedulerManager&&) = delete;
-    SchedulerManager& operator=(SchedulerManager&&) = delete;
 
     fk::synchronization::Spinlock m_lock;
     fkernel::Processor m_processors[32];
@@ -31,10 +25,8 @@ class SchedulerManager {
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_wait_queue;
     fk::containers::IntrusiveList<Task, &Task::sleep_node> m_sleep_queue;
     fk::containers::IntrusiveList<Task, &Task::zombie_node> m_zombie_queue;
-    // Phase 39b: O(1) PID→Task* lookup (keyed by pid as uint64_t)
-    fk::containers::HashMap<uint64_t, Task*> m_task_map;
 
-    bool m_is_initialized{false};
+    bool m_is_initialized = false;
     fk::TickCount m_default_quantum{5};
     uint64_t m_next_pid = 1;
     fk::TickCount m_global_tick_counter{0};
@@ -74,7 +66,6 @@ public:
     fk::RefPtr<Task> find_any_child(fk::ProcessId ppid);
     void reap_zombie(Task* task);
     void send_signal_to_pgrp(int pgid, int signum);
-    void send_signal_to_tgid(fk::ProcessId tgid, int signum, const siginfo_t* info = nullptr);
 
     Task* pick_next();
     Task* steal_task(fk::CpuCount stealing_cpu);
@@ -93,6 +84,3 @@ public:
     void idle_loop();
     fk::CpuCount processor_count() const { return m_processor_count; }
 };
-
-} // namespace fkernel
-using fkernel::SchedulerManager;

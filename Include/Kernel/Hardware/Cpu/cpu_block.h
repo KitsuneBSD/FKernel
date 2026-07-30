@@ -1,9 +1,10 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Types/types.h>
 
-// This structure is used to store per-CPU data, accessed via GS segment.
-// It MUST match the offsets used in syscall_stub.asm.
+// Per-CPU data block accessed via GS segment.
+// Offsets MUST match syscall_stub.asm and context_switch.asm.
 struct CpuControlBlock {
     uint64_t kernel_stack;         // Offset 0
     uint64_t user_rsp;             // Offset 8
@@ -12,3 +13,18 @@ struct CpuControlBlock {
     uint64_t cpu_id;               // Offset 32
     struct Task* current_task;     // Offset 40
 };
+
+// Per-CPU array — each AP sets MSR_GS_BASE to &g_cpu_blocks[cpu_index].
+extern CpuControlBlock g_cpu_blocks[MAX_CPUS];
+
+// Read the current CPU id from GS:32 (valid after init_syscalls() has run).
+inline uint64_t get_current_cpu_id() {
+    uint64_t id;
+    asm volatile("mov %%gs:32, %0" : "=r"(id));
+    return id;
+}
+
+// Return the CpuControlBlock for the currently executing CPU.
+inline CpuControlBlock& current_cpu_block() {
+    return g_cpu_blocks[get_current_cpu_id()];
+}

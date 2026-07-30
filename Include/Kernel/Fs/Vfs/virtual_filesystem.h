@@ -4,7 +4,6 @@
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Fs/Vfs/path_resolver.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/retain_ptr.h>
 
 #include <LibFK/Container/vector.h>
 #include <LibFK/Text/string.h>

@@ -26,6 +26,16 @@ private:
   bool m_has_smap = false;
   bool m_has_xsave = false;
   bool m_has_avx = false;
+  bool m_has_avx2 = false;
+  bool m_has_avx512 = false;
+  bool m_has_1gb_pages = false;
+  bool m_has_invpcid = false;
+  bool m_has_fsgsbase = false;
+  bool m_has_umip = false;
+  bool m_has_la57 = false;
+  bool m_has_cet = false;
+  uint8_t m_phys_addr_width = 36;
+  uint8_t m_virt_addr_width = 48;
   uint8_t m_lapic_id = 0;
 
   void cpuid(uint32_t eax, uint32_t ecx, uint32_t *a, uint32_t *b, uint32_t *c,
@@ -49,6 +59,16 @@ public:
   bool has_smap() const { return m_has_smap; }
   bool has_xsave() const { return m_has_xsave; }
   bool has_avx() const { return m_has_avx; }
+  bool has_avx2() const { return m_has_avx2; }
+  bool has_avx512() const { return m_has_avx512; }
+  bool has_1gb_pages() const { return m_has_1gb_pages; }
+  bool has_invpcid() const { return m_has_invpcid; }
+  bool has_fsgsbase() const { return m_has_fsgsbase; }
+  bool has_umip() const { return m_has_umip; }
+  bool has_la57() const { return m_has_la57; }
+  bool has_cet() const { return m_has_cet; }
+  uint8_t phys_addr_width() const { return m_phys_addr_width; }
+  uint8_t virt_addr_width() const { return m_virt_addr_width; }
   uint8_t lapic_id() const { return m_lapic_id; }
 
   void initialize_features();

@@ -52,14 +52,6 @@ struct TaskIdentity {
     uint32_t ngroups{0};
 };
 
-// Tracks file-backed MAP_SHARED mappings for writeback (msync)
-struct FileMmapRecord {
-    uintptr_t vaddr;
-    size_t size;
-    fk::RefPtr<Node> node;
-    uint64_t file_offset;
-};
-
 /**
  * @brief Task Memory regions and address space
  */
@@ -73,7 +65,6 @@ struct TaskMemory {
         uintptr_t mmap_end{0};
         fk::containers::Vector<::fkernel::MemoryRegion> list;
     } regions{};
-    fk::containers::Vector<FileMmapRecord> file_mmaps;
 };
 
 static constexpr size_t MAX_OPEN_FILES = 1024;

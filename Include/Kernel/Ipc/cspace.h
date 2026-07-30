@@ -78,6 +78,23 @@ public:
     }
   }
 
+  uint32_t install_fd(void* desc, CapabilityRights rights) {
+    return install(Capability(desc, CapabilityType::FileDescription, rights));
+  }
+
+  void* lookup_fd(uint32_t handle) const {
+    auto cap = get(handle);
+    if (!cap.is_valid()) return nullptr;
+    if (cap.type() != CapabilityType::FileDescription) return nullptr;
+    return cap.object();
+  }
+
+  void revoke_fd(uint32_t handle) {
+    auto cap = get(handle);
+    if (cap.type() == CapabilityType::FileDescription)
+      remove(handle);
+  }
+
   void grant_all_to(CSpace& dest, CapabilityType type = CapabilityType::None) {
     for (size_t i = 0; i < m_capabilities.size(); ++i) {
       if (!m_capabilities[i].is_valid()) continue;

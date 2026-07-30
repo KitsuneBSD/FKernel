@@ -11,7 +11,7 @@
 namespace fkernel {
 namespace ipc {
 
-static constexpr size_t NOTIFICATION_PAYLOAD_SIZE = 64;
+static constexpr size_t NOTIFICATION_PAYLOAD_SIZE = 128;
 static constexpr size_t NOTIFICATION_MAX_PAYLOADS = 16;
 
 struct NotificationPayload {

@@ -87,13 +87,16 @@ public:
                                                    const struct timespec* timeout);
 
     void signal_notification() { m_notification.signal(fk::NotificationBits(1)); }
-private:
+
     struct RegisteredEvent {
         struct kevent event;
         bool enabled{true};
         short last_poll_result{0};
+        uint64_t timer_deadline_ticks{0}; // EVFILT_TIMER: absolute tick deadline
         KNoteHook knote;
     };
+
+private:
 
     void process_changelist(const struct kevent* changelist, int nchanges);
     int scan_ready_events(struct kevent* eventlist, int nevents);
@@ -108,4 +111,8 @@ private:
 namespace fkernel {
     void notify_kqueue_readers(Node* node);
     void notify_kqueue_writers(Node* node);
+    // Phase 37a: notify all kqueues watching a task for process events.
+    void notify_proc_kqueue(struct ::Task* task, uint32_t fflags);
+    // Phase 37b: notify all kqueues watching a task for a specific signal.
+    void notify_signal_kqueue(struct ::Task* task, int signum);
 }

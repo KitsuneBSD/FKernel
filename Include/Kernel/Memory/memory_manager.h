@@ -8,18 +8,21 @@
 #include <LibFK/Types/types.h>
 #include <LibFK/Synchronization/spinlock.h>
 
-namespace fkernel {
+namespace fkernel { class IOMMU; }
 
-class IOMMU;
-
+/**
+ * @class MemoryManager
+ * @brief Singleton class that coordinates virtual and physical memory managers.
+ */
 class MemoryManager {
+private:
+  /** @brief Private constructor for Singleton pattern. */
   MemoryManager() = default;
-  MemoryManager(const MemoryManager&) = delete;
-  MemoryManager& operator=(const MemoryManager&) = delete;
-  MemoryManager(MemoryManager&&) = delete;
-  MemoryManager& operator=(MemoryManager&&) = delete;
 
-  bool m_is_initialized{false};
+  MemoryManager(const MemoryManager &) = delete;
+  MemoryManager &operator=(const MemoryManager &) = delete;
+
+  bool m_is_initialized = false;
 
   struct alignas(16) BlockHeader {
     size_t size;
@@ -99,7 +102,7 @@ public:
   /**
    * @brief Get the active IOMMU controller if present.
    */
-  IOMMU* get_iommu() const;
+  fkernel::IOMMU* get_iommu() const;
 
   /**
    * @brief Allocates a memory block from the kernel heap.
@@ -121,6 +124,3 @@ public:
    */
   void heap_stats(size_t& total_out, size_t& free_out) const;
 };
-
-} // namespace fkernel
-using fkernel::MemoryManager;

@@ -3,7 +3,6 @@
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/definitions.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Utilities/pair.h>

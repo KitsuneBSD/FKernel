@@ -3,7 +3,6 @@
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Fs/Disk/Fat32/directory_entry.h>
 #include <Kernel/Driver/Storage/storage_device.h>
-#include <LibFK/Memory/retain_ptr.h>
 
 namespace fkernel {
 

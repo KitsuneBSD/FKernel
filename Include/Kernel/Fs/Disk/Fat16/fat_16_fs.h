@@ -2,7 +2,6 @@
 
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Driver/Storage/storage_device.h>
-#include <LibFK/Memory/retain_ptr.h>
 
 namespace fkernel {
 

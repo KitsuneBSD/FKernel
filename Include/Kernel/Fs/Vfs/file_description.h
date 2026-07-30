@@ -38,4 +38,5 @@ public:
 
   fk::RefPtr<fkernel::Dentry> dentry() const;
   fk::RefPtr<Node> node() const;
+  bool resolve_dentry() const;
 };

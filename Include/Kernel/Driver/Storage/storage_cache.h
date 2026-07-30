@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Kernel/Driver/Storage/storage_device.h>
-#include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Container/vector.h>
 
 class StorageCache : public StorageDevice {

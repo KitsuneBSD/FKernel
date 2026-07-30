@@ -23,8 +23,6 @@ class DriverManager {
   DriverManager() = default;
   DriverManager(const DriverManager&) = delete;
   DriverManager& operator=(const DriverManager&) = delete;
-  DriverManager(DriverManager&&) = delete;
-  DriverManager& operator=(DriverManager&&) = delete;
 
   fk::containers::Vector<fk::memory::OwnPtr<Driver>> m_drivers;
   fk::containers::Vector<fk::RefPtr<Node>> m_devices;
@@ -45,4 +43,3 @@ public:
 };
 
 } // namespace fkernel
-using fkernel::DriverManager;
