@@ -126,18 +126,9 @@ Route POSIX file descriptors through CSpace capabilities. See `.ai-docs/ROADMAP.
 
 ---
 
-## Phase 32c — UFS/UFS2 (5–7 days) — HIGH
+## ✅ Phase 32c — UFS/UFS2 — DONE
 
-BSD native filesystem. See `.ai-docs/ROADMAP.md#phase-32c` for full spec.
-
-| # | Task | Priority |
-|---|------|----------|
-| 1 | 5 headers in `Include/Kernel/Fs/Disk/Ufs/` | HIGH |
-| 2 | 3 sources in `Src/Kernel/Fs/Disk/Ufs/` | HIGH |
-| 3 | Triple-indirect block traversal | HIGH |
-| 4 | Fragment support | MEDIUM |
-| 5 | Register in `AutoMounter` as `"ufs"` | HIGH |
-| 6 | Short symlink inline support | MEDIUM |
+All tasks complete: 5 headers + 2 sources in `Fs/Disk/Ufs/`, triple-indirect block traversal (UFS1 and UFS2), fragment-level addressing via `fsize`, AutoMounter registration as "ufs", short symlink inline support in `UfsNode::read_link()`.
 
 ## Phase 32d — HFS+ (10–14 days) — HIGH
 
@@ -190,9 +181,14 @@ IRQ affinity, microcode update on APs, MTRR synchronisation, trampoline relocati
 
 `/proc/<pid>/sched` exposes qos, nice, base_priority, mlfq_level, policy, cpu_affinity, cpu_time_consumed, boosted, turnstile_active. `/proc/<pid>/stat` includes qos/nice/policy/mlfq_level/cpu_affinity fields.
 
-## Phase 35c — Transitive Turnstile Chain (1 day) — MEDIUM
+## ✅ Phase 35c — Transitive Turnstile Chain — DONE
 
-Walk `holder->active_turnstile->chain` transitively for PI with 3+ participants. See `.ai-docs/ROADMAP.md#phase-35c` for details.
+Implemented in `Src/Kernel/Scheduler/turnstile.cpp`:
+- `extend_chain()`: extends active_turnstile chain for re-boost on already-boosted holder
+- `propagate_transitive()`: follows `holder->resources.ipc.pending_turnstile` chain to boost all intermediate holders (3+ participants)
+- `remove_from_holder_chain()`: removes one waiter from a holder's chain on unboost
+- `pending_turnstile` now set on the waiter in both the fresh-boost and chain-extend paths
+- `unboost_task()` clears `pending_turnstile` on waiters and calls `remove_from_holder_chain` for transitive unboost
 
 ---
 
@@ -378,10 +374,10 @@ Pré-requisito: pivot_root + filesystems básicos (já existentes).
 
 | # | Item | Detalhe | Arquivos | Dias |
 |---|------|---------|----------|------|
-| 1 | Block devices em `/dev/` | StorageDevices registrados como `/dev/<name>` (ex: `/dev/nvme0n1`) em vez de montados em `/mnt/` | `dev_fs.cpp`, `driver_manager.cpp` | 1 |
-| 2 | Partições em `/dev/` | `Partition` nodes expostos como `/dev/<name>p<N>` (ex: `/dev/nvme0n1p1`) | `partition_manager.h/cpp` | 1 |
+| 1 | Block devices em `/dev/` | ✅ ATA devices registered via `DriverManager::register_device()` which auto-routes to DevFs. Accessible as `/dev/<name>` | `ata_controller.cpp`, `driver_manager.cpp` | — |
+| 2 | Partições em `/dev/` | ✅ `PartitionManager::add_partition()` calls `DriverManager::register_device(partition)`. Partition naming updated to `<disk>p<N>` format (e.g., `ad0p1`) via `StorageDeviceName::partition()` | `storage_device_name.h`, `mbr.cpp`, `gpt.cpp` | — |
 | 3 | Kernel cmdline parsing | ✅ Parses `init=`, `root=`, `rootfstype=`, `quiet` from Multiboot2 TagType::Cmdline. `/proc/cmdline` exposed. `init_task.cpp` uses `get_init_path()` | `boot_info.h/cpp`, `proc_cmdline_node.h/cpp` | — |
-| 4 | Corrigir `DT_type` no getdents64 | FKernel usa 0=REG, 1=DIR, 2=SYM. Linux espera DT_REG=8, DT_DIR=4, DT_LNK=10. BusyBox `ls` mostra tudo errado | `definitions.h`, `vfs_directory.cpp` | 0.5 |
+| 4 | Corrigir `DT_type` no getdents64 | ✅ `definitions.h` uses Linux DT_DIR=4, DT_BLK=6, DT_REG=8, DT_LNK=10. `vfs_directory.cpp` maps `entry.type` to correct DT_ values. | `definitions.h`, `vfs_directory.cpp` | — |
 
 ### Expected Result
 
@@ -480,7 +476,7 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 |---|-----|-------|-----|
 | 9 | `stat`/`chdir`/`mkdir` unsafe user pointer | `stat.cpp`, `chdir.cpp`, `mkdir.cpp` | ✅ All use `copy_from_user()` |
 | 10 | `utimensat` not registered | `syscall_numbers.h`, `syscall.cpp` | ✅ Registered as SYS_UTIMENSAT=280 |
-| 11 | fcntl advisory locks are no-ops | `FileSystem/fcntl.cpp` | Per-node lock list with (pid, type, start, len) |
+| 11 | fcntl advisory locks are no-ops | `FileSystem/fcntl.cpp` | ✅ `FileLockList` per-node with pid, type, start, end. F_GETLK/F_SETLK/F_SETLKW implemented. Locks released on exit via `release_all_file_locks()` |
 | 12 | `getrandom` uses xorshift64 (not cryptographic) | `System/getrandom.cpp`, `urandom_device.cpp` | Seed from RDTSC + interrupt jitter |
 | 13 | `close()` doesn't call `node->close()` | `FileSystem/close.cpp` | ✅ `on_close()` called in `close_file_descriptor()` |
 
@@ -488,10 +484,10 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 
 | # | Gap | Priority |
 |---|-----|----------|
-| 14 | `mmap MAP_SHARED` file-backed | MEDIUM |
+| 14 | `mmap MAP_SHARED` file-backed | ✅ MEDIUM — mmap.cpp: MAP_SHARED+file fd calls mmap_file() and registers FileMmapRecord in task->resources.memory.file_mmaps for writeback tracking |
 | 15 | `mmap MAP_FIXED` | ✅ HIGH — Fixed: file-backed and shm paths now respect MAP_FIXED |
 | 16 | File-backed mmap with `PROT_WRITE` | ✅ HIGH — Already worked via prot_to_page_flags |
-| 17 | mmap shared mapping writeback / `msync` | MEDIUM |
+| 17 | mmap shared mapping writeback / `msync` | ✅ MEDIUM — msync.cpp: walks file_mmaps, checks x86_64 PTE dirty bit (bit 6), writes dirty pages back via node->write(), clears dirty bit + invlpg |
 | 18 | inotify | LOW |
 | 19 | `/proc/sys/` writable nodes | LOW |
 | 20 | Coredumps | LOW |
@@ -502,7 +498,7 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 |---|-----|-------|
 | 21 | `TIOCSCTTY` on PtyMaster | ✅ `pty_master.cpp` |
 | 22 | `TIOCGPGRP`/`TIOCSPGRP` on PtyMaster | ✅ `pty_master.cpp` |
-| 23 | ICANON line editing in PtyLineDiscipline | `pty_line_discipline.cpp` |
+| 23 | ICANON line editing in PtyLineDiscipline | ✅ `pty_line_discipline.cpp` — VERASE (BS-SP-BS echo), VKILL (visual erase), VEOF, canonical line buffering with line-ready flag, ECHO/ECHOE/ECHONL |
 | 24 | OPOST output processing (`\n` → `\r\n`) | ✅ `pty_slave.cpp` — ONLCR applied in slave write |
 | 25 | Userspace terminal emulator | New program |
 
@@ -516,6 +512,110 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 | 16 | Unify TLS setup in loader (split across execve.cpp + init_task.cpp; init_task has no TLS) | `elf_loader_core.cpp`, `execve.cpp`, `init_task.cpp` | LOW |
 | 17 | ELF loader tests | `tests/Loader/` | LOW |
 | — | Symbol versioning parsing (DT_VERSYM/VERNEED macros defined; parsing not implemented) | `dynamic_domain.cpp` | LOW |
+
+---
+
+---
+
+## AGENTS.md Compliance — Code Audit Findings
+
+Audit of the entire codebase against rules in `AGENTS.md`. Each entry includes which rule is violated, severity, and affected files.
+
+### 🔴 P1 — Manager Pattern (AGENTS.md:107–140)
+
+| # | Manager | Violation | Fix |
+|---|---------|-----------|-----|
+| 1 | **SchedulerManager** | Not in `namespace fkernel`; no deleted copy/move; `m_is_initialized` set at **start** of `initialize()` | Move to `fkernel`, add `= delete`, move flag to end |
+| 2 | **MemoryManager** | Global scope (not `fkernel`); `assert`-based double-init (crashes) | Namespace + early-return guard |
+| 3 | **VirtualMemoryManager** | Global scope; `protected` ctor (should be `private`); double-init checks `m_pml4` not `m_is_initialized` | Namespace + private ctor + proper guard |
+| 4 | **PhysicalMemoryManager** | **Public** default constructor; global scope | Private ctor + namespace |
+| 5 | **ClockManager** | Global scope; no deleted copy/move; uses `m_initialized` not `m_is_initialized` | Namespace + rename + `= delete` |
+| 6 | **TimerManager** | Global scope; public ctor; no `m_is_initialized`/`is_initialized()` at all | Full pattern adoption |
+| 7 | **TickManager** | Global scope; public ctor; no init-tracking at all | Full pattern adoption |
+| 8 | **FadtManager** | Global scope; no copy/move delete; no init-tracking; `initialize(ACPIManager*)` takes param | Full pattern or document as non-manager |
+| 9 | **GlobalEndpointManager** | No copy/move delete; **no `initialize()`** at all | Full pattern adoption |
+| 10 | **TopologyManager** | No copy/move delete; no `m_is_initialized`/`is_initialized()` | Full pattern adoption |
+| 11 | **KeymapManager** | No copy/move delete; **no `initialize()`** at all | Full pattern adoption |
+| 12 | **DriverManager** | No `using fkernel::DriverManager;` alias | Add alias |
+| 13 | **TerminalManager** | Lives in `fkernel::terminal` sub-namespace (acceptable but inconsistent) | Document or move to `fkernel` |
+| — | **init.cpp** | `DriverManager::initialize()` **never called** in boot flow; `HardwareInterruptManager`/`ClockManager` init without `is_initialized()` assert; `early_init.cpp` missing asserts for `MemoryManager`/`ACPIManager` | Add calls + asserts |
+
+**Files**: `scheduler.h`, `memory_manager.h`, `virtual_memory_manager.h`, `physical_memory_manager.h`, `clock_interrupt.h`, `timer_interrupt.h`, `tick_manager.h`, `fadt_manager.h`, `global_endpoint_manager.h`, `topology_manager.h`, `keymap_manager.h`, `driver_manager.h`, `terminal_manager.h`, `init.cpp`, `early_init.cpp`, `interrupt_controller.cpp`
+
+### 🔴 P1 — Architecture Portability (AGENTS.md:142–170)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 1 | `Src/Kernel/Init/init.cpp:25` | `asm volatile("rdtsc")` — inline asm in generic code | Use `detect_tsc_frequency()` or add `arch_read_tsc()` |
+| 2 | `Src/Kernel/Init/init.cpp:127` | `asm volatile("cli")` — inline asm in generic code | Replace with `arch_disable_interrupts()` |
+| 3 | `Src/Kernel/Scheduler/scheduler_manager.cpp:196,199` | `asm volatile("xsave64")` / `asm volatile("fxsave")` | Extract to `arch_fpu_save()` / `arch_fpu_restore()` (Phase 42c-9) |
+| 4 | `Src/Kernel/Scheduler/scheduler_manager.cpp:275` | `asm volatile("sti; hlt")` in `idle_loop()` | Already marked Phase 42c-8 — use `arch_cpu_idle()` |
+| 5 | `Src/Kernel/Scheduler/scheduler_manager.cpp:240` | `asm volatile("lea ap_entry")` | Extract to `arch_start_secondary_cpus()` (Phase 42c-7) |
+| 6 | `Src/Kernel/Boot/boot_timer.cpp:8` | `asm volatile("lfence; rdtsc")` | Add LFENCE variant to `arch_read_tsc()` |
+| 7 | `Src/Kernel/Syscall/System/reboot.cpp:54,74,89` | `asm volatile("pause")` × 3 | Replace with `arch_cpu_relax()` (exists!) |
+| 8 | 13 generic files | `inb`/`outb`/`inw`/`outw`/`inl`/`outl` (93+ calls) — port I/O without `arch_` abstraction | Rename to `arch_inb()`/`arch_outb()` or add abstraction layer |
+| 9 | `Include/Kernel/Memory/.../virtual_memory_manager.h:10-12` | `extern "C"` functions `invalid_tlb`, `write_on_cr3`, `read_on_cr3` without `arch_` prefix | Rename to `arch_invalid_tlb`, `arch_write_cr3`, `arch_read_cr3` |
+| 10 | `Src/Kernel/Arch/x86_64/Segments/gdt.cpp` | `extern "C"` `flush_tss`, `flush_gdt` without `arch_` prefix | Rename to `arch_flush_tss`, `arch_flush_gdt` |
+| 11 | `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp` | `extern "C"` `flush_idt` without `arch_` prefix | Rename to `arch_flush_idt` |
+| 12 | `Include/Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h` | `arch_cpu_idle()` **missing** (declared in AGENTS.md but not implemented) | Implement (Phase 42c-8) |
+
+### 🔴 P1 — Secret Rule: One Class/File + No Nested Types (AGENTS.md:100–105)
+
+| # | File | Types | Fix |
+|---|------|-------|-----|
+| 1 | `Include/Kernel/Scheduler/Task/task.h` | **8 top-level** + **2 nested** + **4 anonymous nested** — worst violator | Extract each `Task*` struct to own file; remove nested `Control`/`Resources` |
+| 2 | `Include/Kernel/Boot/boot_info.h` | **7 top-level** types | Extract `ModuleInfo`, `BootMode`, `MemoryMapEntry`, `FramebufferInfo`, `AcpiTableInfo`, `MemoryMapIterator` |
+| 3 | `Include/Kernel/Hardware/Acpi/srat.h` | **5 types** | Extract SRAT entry structs |
+| 4 | `Include/Kernel/Fs/Disk/Exfat/exfat_bpb.h` | **5 types** | Extract on-disk entry structs |
+| 5 | `Include/Kernel/Fs/Disk/MinixFs/minix_super.h` | **4 types** | Extract on-disk structs |
+| 6 | `Include/Kernel/Fs/Disk/Ext2/ext2_super.h` | **4 types** | Extract on-disk structs |
+| 7 | `Include/Kernel/Driver/Storage/Nvme/nvme_utilities.h` | **4 types** | Extract NvmeQueueManager, etc. |
+| 8 | `Include/Kernel/Driver/Storage/Nvme/nvme_command.h` | **4 types** | Extract NvmeCompletion, queues |
+| 9 | `Include/Kernel/Loader/Domains/dynamic_domain.h` | **2 top-level** + **2 nested** (known tech debt) | Extract `RelaTable`, `SymbolContext`, `LibraryContext` |
+| 10 | `Include/Kernel/Boot/boot_timer.h` | **1 nested** `Mark` (known tech debt) | Extract to `boot_timer_mark.h` |
+| 11 | `Include/Kernel/Driver/Storage/Ahci/ahci_controller.h` | **6 nested** structs (HBA_PORT, PRDT, etc.) | Extract each to own header |
+| 12 | `Include/Kernel/Driver/Storage/Nvme/nvme_controller.h` | **4 nested** (Namespace, QueuePair, etc.) | Extract each to own header |
+| 13 | 40+ files with **2 top-level types** each | Helper struct + main class | Extract helper to own file |
+| 14 | 30+ files with **nested types** in various drivers/containers | Various | Extract to own files |
+| 15 | `Include/LibFK/Container/vector.h`, `list.h`, `forward_list.h`, `hash_map.h`, `intrusive_list.h`, `rb_tree.h` | Nested iterator/node types | Acceptable STL-like pattern, but document exemption |
+
+### 🔴 P1 — Include Order Reversed (AGENTS.md:223–228)
+
+All kernel `.cpp` files place **Kernel headers before LibFK headers**. Correct order: LibC → LibFK → Kernel → Local.
+
+**Fix**: Bulk reorder includes across all `Src/Kernel/` files (Kernel after LibFK). Estimated ~200 files affected.
+
+### 🟠 P2 — Object Calisthenics (AGENTS.md:86–105)
+
+| Rule | Status | Details |
+|------|--------|---------|
+| 1 indentation level/method | 🟡 Not audited | Recommend static analysis |
+| No `else` — early returns | **30+ files violate** | Worst: `display_framebuffer.cpp` (26 else), `ansi_parser.cpp` (25), `kqueue.cpp` (12), `ram_disk.cpp` (11), `rtc.cpp` (11) |
+| Wrap all primitives | 🟡 Not audited | Recommend partial check |
+| First-class collections | 🟡 Not audited | `Vector` used directly in many places |
+| 1 dot per line | 🟡 Not audited | Recommend grep for `->.*->` chains |
+| No abbreviations | **3 violations** | `BootInfo` (→ `BootInformation`), `MessageInfo` (→ `MessageInformation`), `DmaBuffer` (→ `DMABuffer`) |
+| Keep entities small | **5 files >500 lines** | `ext2_fs.cpp` (752), `exfat_fs.cpp` (703), `virtual_memory_manager.cpp` (543), `minix_fs.cpp` (521), `syscall.cpp` (504) |
+| Max 2 instance variables | **Virtually every class violates** | `DisplayFramebuffer` (18+ vars), `SchedulerManager` (12+), `VirtualMemoryManager` (10+) |
+| No getters/setters | **Widespread** | VGA Display, VFS Node, APIC/IOAPIC, Scheduler use `get_*()`/`set_*()` instead of behavioral methods |
+
+### 🟠 P2 — Coding Style Violations (AGENTS.md:194–221)
+
+| Violation | Files | Fix |
+|-----------|-------|-----|
+| `m_` prefix **inconsistent** — worst offenders | `display_framebuffer.h` (13/18 without), `task.h` sub-structs (30+ without), `ps2_keyboard.h` (6 without), many NVMe structs | Add `m_` to all members across entire codebase |
+| Lowercase class names (PascalCase violation) | `serial_port.h:16` (`class serial`), `vga_adapter.h:12` (`class vga`) | Rename to `Serial`, `VGA` |
+| Directory naming (should be PascalCase) | `Src/Kernel/Syscall/syscall_list/`, `Include/Kernel/Syscall/syscall_list/` (snake_case) | Rename to `SyscallList/` |
+| File `8259_pic.h/.cpp` starts with digit | `8259_pic.h`, `8259_pic.cpp` | Rename to `i8259_pic.h/.cpp` |
+
+### 🟡 P3 — Kernel Logging Issues (AGENTS.md:272–315)
+
+| # | Issue | Location | Fix |
+|---|-------|----------|-----|
+| 1 | `kerror()` used for **recoverable errors** (should be `kwarn()`) | NVMe, AHCI, ATA PIO, E1000, ELF loader, syscall validation — **15 call sites** | Replace with `kwarn()` for recoverable paths |
+| 2 | Prefix `"Page Fault"` (title case, not UPPER_SNAKE_CASE) | `pf_handler.cpp:108` | Change to `"PF"` |
+| 3 | Prefix `"General Protection"` (title case, not UPPER_SNAKE_CASE) | `gp_handler.cpp:34,40,45,50` | Change to `"GPF"` |
+| 4 | AGENTS.md says `kerror()` **halts CPU** — outdated | `AGENTS.md:280` | Update docs: `kfatal()` halts, `kerror()` returns |
 
 ---
 
