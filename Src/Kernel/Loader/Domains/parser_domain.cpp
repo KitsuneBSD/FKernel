@@ -1,4 +1,5 @@
 #include <Kernel/Loader/Domains/parser_domain.h>
+#include <Kernel/Loader/elf_validation.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -22,32 +23,10 @@ ElfHeaderResult ParserDomain::validate_header() {
                          header.e_ident[1], header.e_ident[2], header.e_ident[3],
                          (uint32_t)header.e_type);
 
-  if (header.e_ident[0] != 0x7f || header.e_ident[1] != 'E' || header.e_ident[2] != 'L' ||
-      header.e_ident[3] != 'F')
-    return fk::core::Error::InvalidParameter;
-  if (header.e_ident[EI_DATA] != ELFDATA2LSB) {
-    fk::algorithms::kwarn("ELF", "validate_header: Not little-endian (EI_DATA=%u)",
-                          (unsigned)header.e_ident[EI_DATA]);
-    return fk::core::Error::InvalidParameter;
-  }
-  if (header.e_ident[4] != 2) {
-    fk::algorithms::kwarn("ELF", "validate_header: Not a 64-bit ELF");
-    return fk::core::Error::InvalidParameter;
-  }
-  if (header.e_machine != EM_X86_64) {
-    fk::algorithms::kwarn("ELF", "validate_header: e_machine=%u, expected %u (x86_64)",
-                          (unsigned)header.e_machine, (unsigned)EM_X86_64);
-    return fk::core::Error::InvalidParameter;
-  }
-  if (header.e_phnum > ELF_MAX_PHNUM) {
-    fk::algorithms::kwarn("ELF", "validate_header: e_phnum=%u exceeds limit %u",
-                          (unsigned)header.e_phnum, (unsigned)ELF_MAX_PHNUM);
-    return fk::core::Error::InvalidParameter;
-  }
-  if (header.e_phnum > 0 && header.e_phoff < sizeof(Elf64_Ehdr)) {
-    fk::algorithms::kwarn("ELF", "validate_header: e_phoff=%llu overlaps ELF header",
-                          (unsigned long long)header.e_phoff);
-    return fk::core::Error::InvalidParameter;
+  auto check = fkernel::elf_check_header(header);
+  if (check.is_error()) {
+    fk::algorithms::kwarn("ELF", "validate_header: header check failed");
+    return check.error();
   }
 
   return header;

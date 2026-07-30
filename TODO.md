@@ -163,7 +163,7 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 
 | Atual | Complexidade | Substituir por | Status |
 |-------|-------------|----------------|--------|
-| `m_sleep_queue` scan a cada tick | O(S) | Timer wheel (O(1)) ou binary heap (O(log S)) | Open |
+| `m_sleep_queue` scan a cada tick | O(S) | Timer wheel (O(1)) ou binary heap (O(log S)) | ✅ Done — sorted intrusive list; `on_tick()` stops at first non-due task (O(W) per tick, O(1) average); `insert_sorted()` added to IntrusiveList; double-remove guard fixes pre-existing corruption bug |
 | `find_task(pid)` scan 6 filas | O(N_total) | `HashMap<ProcessId, Task*>` global | ✅ Done — `m_task_registry` HashMap in SchedulerManager; `add_task()` registers, `reap_zombie()` unregisters; `DefaultHasher<ProcessId>` added to hash_map.h |
 | `pick_next()` affinity scan por nível | O(·N_lvl) | Per-CPU bitmap por afinidade | Open |
 
@@ -404,21 +404,21 @@ Advanced socket options, multicast, `MSG_DONTWAIT`, `sendmmsg`/`recvmmsg`, `TCP_
 
 Target: kernel critical paths at 75%. See `.ai-docs/ROADMAP.md#phase-43` for full spec.
 
-### 43a — Test Infrastructure (2 days)
-| # | Task |
-|---|------|
-| 1 | Kernel test runner — host-side with mocked hardware |
-| 2 | Mock page allocator, timer, interrupt controller |
-| 3 | CI integration — `xmake run Test` covers kernel tests |
+### ✅ 43a — Test Infrastructure (2 days)
+| # | Task | Status |
+|---|------|--------|
+| 1 | Kernel test runner — host-side with mocked hardware | ✅ `ScopedLockIRQ` host alias + FileLockList/CSpace tests |
+| 2 | Mock page allocator, timer, interrupt controller | ✅ `tests/Kernel/mocks/` |
+| 3 | CI integration — `xmake run Test` covers kernel tests | ✅ 23 kernel tests pass |
 
 ### 43b-43f — Subsystem Tests (13 days total)
-| Sub-phase | Component | Days |
-|-----------|-----------|------|
-| 43b | VFS: path resolution, dentry cache, file description | 3 |
-| 43c | Memory: buddy allocator, slab, multi-zone | 2 |
-| 43d | ELF loader: header validation, relocations, segments | 2 |
-| 43e | Scheduler: MLFQ demotion, QoS ordering, turnstile chain | 2 |
-| 43f | TCP: handshake, sliding window, retransmit | 2 |
+| Sub-phase | Component | Days | Status |
+|-----------|-----------|------|--------|
+| 43b | VFS: path resolution, dentry cache, file description | 3 | Open |
+| 43c | Memory: buddy allocator, slab, multi-zone | 2 | Open |
+| 43d | ELF loader: header validation, relocations, segments | 2 | ✅ Done — `elf_check_header()` extracted to `elf_validation.h`; 15 tests |
+| 43e | Scheduler: MLFQ demotion, QoS ordering, turnstile chain | 2 | Open |
+| 43f | TCP: handshake, sliding window, retransmit | 2 | Open |
 
 ---
 

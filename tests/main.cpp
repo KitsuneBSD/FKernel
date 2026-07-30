@@ -21,6 +21,11 @@ int run_libfk_byte_checksum_tests();
 int run_libfk_byte_order_tests();
 int run_libfk_crc32_tests();
 
+// Kernel subsystem tests (host-side, mocked hardware)
+int run_kernel_file_lock_tests();
+int run_kernel_cspace_tests();
+int run_kernel_elf_header_tests();
+
 int main() {
     int failed = 0;
 
@@ -43,6 +48,11 @@ int main() {
     failed += run_libfk_byte_checksum_tests();
     failed += run_libfk_byte_order_tests();
     failed += run_libfk_crc32_tests();
+
+    // Kernel subsystem tests
+    failed += run_kernel_file_lock_tests();
+    failed += run_kernel_cspace_tests();
+    failed += run_kernel_elf_header_tests();
 
     if (failed == 0) {
         TEST_LOG("\n>>> SUMMARY: ALL TEST SUITES PASSED!\n");

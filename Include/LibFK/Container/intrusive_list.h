@@ -90,6 +90,11 @@ public:
 
     auto &node = obj->*NodeMember;
 
+    // Guard: if the node is not linked and not the head, it's not in this list.
+    // Prevents size underflow and head/tail corruption on double-remove.
+    if (node.prev == nullptr && node.next == nullptr && m_head != obj)
+      return;
+
     if (node.prev) {
       (node.prev->*NodeMember).next = node.next;
     } else {
@@ -105,6 +110,39 @@ public:
     node.prev = nullptr;
     node.next = nullptr;
     --m_size;
+  }
+
+  // Insert obj immediately before position.
+  // If position is nullptr, appends to the back.
+  void insert_before(T *position, T *obj) {
+    if (!obj) return;
+    if (!position) { push_back(obj); return; }
+
+    auto &node     = obj->*NodeMember;
+    auto &pos_node = position->*NodeMember;
+
+    node.prev = pos_node.prev;
+    node.next = position;
+
+    if (pos_node.prev)
+      (pos_node.prev->*NodeMember).next = obj;
+    else
+      m_head = obj;
+
+    pos_node.prev = obj;
+    ++m_size;
+  }
+
+  // Insert obj in sorted order using comparator cmp(obj, candidate) → true means obj comes before candidate.
+  template <typename Cmp>
+  void insert_sorted(T *obj, Cmp &&cmp) {
+    if (!obj) return;
+    T *pos = m_head;
+    while (pos) {
+      if (cmp(obj, pos)) break;
+      pos = (pos->*NodeMember).next;
+    }
+    insert_before(pos, obj);
   }
 
   T *pop_front() {

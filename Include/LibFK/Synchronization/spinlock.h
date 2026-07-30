@@ -136,6 +136,9 @@ private:
     Spinlock& m_lock;
     bool m_interrupt_state;
 };
+#else
+// Host-side stub for unit tests: no interrupts to manage, single-threaded context.
+using ScopedLockIRQ = ScopedLock;
 #endif
 
 } // namespace fk::synchronization

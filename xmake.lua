@@ -207,6 +207,13 @@ target("Test")
   add_files("tests/LibFK/test_byte_checksum.cpp")
   add_files("tests/LibFK/test_byte_order.cpp")
   add_files("tests/LibFK/test_crc32.cpp")
+
+  -- Kernel unit tests (host-side with mocked hardware)
+  add_files("tests/Kernel/test_file_lock.cpp")
+  add_files("tests/Kernel/test_cspace.cpp")
+  add_files("tests/Kernel/test_elf_header.cpp")
+  add_files("Src/Kernel/Fs/Vfs/FileLock/file_lock_list.cpp")
+
   add_files("Src/LibFK/Text/string.cpp")
   add_files("Src/LibFK/Text/string_builder.cpp")
   add_files("Src/LibFK/Memory/new.cpp")

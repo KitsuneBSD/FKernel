@@ -4,6 +4,45 @@
 
 ---
 
+## Phase 43d — ELF Header Validation Tests ✅ (session 18)
+
+- `Include/Kernel/Loader/elf_validation.h` (NEW): `elf_check_header(const Elf64_Ehdr&)` inline function — pure validation with no I/O, no hardware, no Node dependency; checks magic, endian, class, machine, phnum limit, phoff bounds
+- `Src/Kernel/Loader/Domains/parser_domain.cpp`: `validate_header()` now delegates field-level checks to `elf_check_header()`; read path unchanged
+- `tests/Kernel/test_elf_header.cpp` (NEW): 15 tests — valid EXEC/DYN, wrong magic (all 4 bytes), big-endian, 32-bit class, wrong machine, phnum at/above limit, phoff overlap with header, phoff=0 with no phdrs, phoff exact boundary, return value preserves all fields
+
+---
+
+## Phase 39b — Sleep Queue O(S)→O(1) ✅ (session 18)
+
+- `Include/LibFK/Container/intrusive_list.h`:
+  - `remove()` now guards against double-remove: `if (prev==null && next==null && head!=obj) return;` — prevents head/tail corruption and m_size underflow on duplicate remove (pre-existing bug fixed)
+  - `insert_before(T* position, T* obj)` added — O(1) splice before a known node
+  - `insert_sorted(T* obj, Cmp&& cmp)` template method added — walks list once to find sorted position, then calls `insert_before`
+- `Src/Kernel/Scheduler/scheduler_lifecycle.cpp`:
+  - `sleep_current()` uses `insert_sorted` with `wake_up_time_ticks` comparator — sleep queue now always sorted earliest-first
+  - `on_tick()` sleep scan changed from full iteration to front-check loop: stops at the first task not yet due, making average cost O(1) per tick (was O(S))
+  - Old O(S) per-tick worst case replaced by O(W) where W = tasks waking up this tick (usually 0)
+
+---
+
+## Phase 43a — Kernel Test Harness: Infrastructure ✅ (session 18)
+
+### 43a-1 Mock infrastructure ✅
+- `tests/Kernel/mocks/mock_page_allocator.h` — `posix_memalign`-based 4 KiB page allocator stub
+- `tests/Kernel/mocks/mock_timer.h` — manual-tick `MockTimer` singleton
+- `tests/Kernel/mocks/mock_interrupt_controller.h` — mask/EOI no-ops with assertion counters
+
+### 43a-2 Host-side kernel tests ✅
+- `Include/LibFK/Synchronization/spinlock.h` — `ScopedLockIRQ` aliased to `ScopedLock` on non-`__fkernel__` builds, enabling kernel `.cpp` files to compile on the host
+- `tests/Kernel/test_file_lock.cpp` — 11 tests for `FileLockList`: RDLCK/WRLCK semantics, conflict detection, `release()`, `release_all_for_process()` swap-and-pop correctness, boundary / non-overlapping ranges, `test_conflict()` idempotency
+- `tests/Kernel/test_cspace.cpp` — 12 tests for `CSpace`: install/get, invalid handle, remove, `contains`, `find_by_object`, `remove_by_object`, `grant`, `transfer`, `grant_all_to` with type filter, `size()` tracking, free-list slot reuse
+- `Src/Kernel/Fs/Vfs/FileLock/file_lock_list.cpp` added to `Test` xmake target
+
+### 43a-3 CI integration ✅
+- `xmake run Test` now covers 23 kernel unit tests (FileLockList + CSpace) in addition to existing LibFK/LibC tests (all pass)
+
+---
+
 ## Phase 38 — Kernel Hot-Path Performance ✅ (session 16)
 
 ### 38a — memcpy/memmove optimisation ✅

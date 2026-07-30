@@ -79,7 +79,13 @@ void SchedulerManager::sleep_current(fk::TickCount ticks) {
   fk::algorithms::kdebug("SCHEDULER", "Task %lu sleeping for %lu ticks", task->control.identity.id.value(), ticks.value());
   {
     ScopedLock lock(m_lock);
-    m_sleep_queue.push_back(task);
+    // Sorted insertion keeps sleep queue ordered by wakeup time (earliest first).
+    // on_tick() can then stop at the first non-ready task instead of scanning all.
+    uint64_t wakeup = task->control.lifecycle.wake_up_time_ticks;
+    m_sleep_queue.insert_sorted(task, [wakeup](Task* a, Task* b) {
+      (void)a;
+      return wakeup < b->control.lifecycle.wake_up_time_ticks;
+    });
   }
   proc.need_resched = true;
 }
@@ -271,13 +277,13 @@ void SchedulerManager::on_tick() {
 
   {
     ScopedLock lock(m_lock);
-    for (auto it = m_sleep_queue.begin(); it != m_sleep_queue.end();) {
-      Task* task = &*it;
-      ++it;
-      if (task->control.lifecycle.wake_up_time_ticks <= now) {
-        m_sleep_queue.remove(task);
-        wake_task(task);
-      }
+    // Sleep queue is sorted by wakeup time (earliest first).
+    // Stop at the first task not yet due — all following tasks sleep longer.
+    Task* task;
+    while ((task = m_sleep_queue.front()) != nullptr) {
+      if (task->control.lifecycle.wake_up_time_ticks > now) break;
+      m_sleep_queue.remove(task);
+      wake_task(task);
     }
   }
 
