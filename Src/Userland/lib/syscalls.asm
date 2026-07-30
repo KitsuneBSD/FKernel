@@ -44,6 +44,11 @@ global sys_umount
 global sys_setsid
 global sys_setpgid
 global sys_getpgid
+global sys_chmod
+global sys_fchmod
+global sys_access
+global sys_utimensat
+global sys_fcntl
 
 section .text
 
@@ -356,5 +361,30 @@ sys_setpgid:
 
 sys_getpgid:
     mov rax, SYS_GETPGID
+    syscall
+    ret
+
+sys_chmod:
+    mov rax, SYS_CHMOD
+    syscall
+    ret
+
+sys_fchmod:
+    mov rax, SYS_FCHMOD
+    syscall
+    ret
+
+sys_access:
+    mov rax, SYS_ACCESS
+    syscall
+    ret
+
+sys_utimensat:
+    mov rax, SYS_UTIMENSAT
+    syscall
+    ret
+
+sys_fcntl:
+    mov rax, SYS_FCNTL
     syscall
     ret

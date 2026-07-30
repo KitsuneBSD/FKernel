@@ -57,6 +57,10 @@
 %define SYS_SETSID 112
 %define SYS_SETPGID 109
 %define SYS_GETPGID 121
+%define SYS_CHMOD 90
+%define SYS_FCHMOD 91
+%define SYS_ACCESS 21
+%define SYS_UTIMENSAT 280
 %define SYS_OPEN 2
 %define SYS_STAT 4
 %define SYS_FSTAT 5

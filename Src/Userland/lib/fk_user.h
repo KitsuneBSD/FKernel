@@ -93,6 +93,11 @@ int sys_umount(const char* target, int flags);
 int sys_setsid(void);
 int sys_setpgid(int pid, int pgid);
 int sys_getpgid(int pid);
+int sys_chmod(const char* path, int mode);
+int sys_fchmod(int fd, int mode);
+int sys_access(const char* path, int mode);
+int sys_utimensat(int dirfd, const char* path, const struct timespec times[2], int flags);
+int sys_fcntl(int fd, int cmd, long arg);
 
 // basic LibC-style functions
 static inline void print(const char* str) {
