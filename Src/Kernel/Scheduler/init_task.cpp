@@ -64,9 +64,10 @@ static bool setup_initial_file_descriptors(Task* current_task) {
 
 static fk::core::Result<ElfLoadResult, fk::core::Error>
 load_init_executable_and_setup_address_space() {
-  auto init_dentry_res = VirtualFileSystem::the().resolve_path("/sbin/init");
+  const char* init_path = boot::BootInfo::the().get_init_path();
+  auto init_dentry_res = VirtualFileSystem::the().resolve_path(init_path);
   if (init_dentry_res.is_error()) {
-    fk::algorithms::kerror("INIT", "Could not find /sbin/init in VFS");
+    fk::algorithms::kerror("INIT", "Could not find %s in VFS", init_path);
     return init_dentry_res.error();
   }
 
@@ -95,7 +96,7 @@ static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintp
                                                           const ElfLoadResult& elf_res) {
   // Setup initial stack frame for Musl/BusyBox
   char* string_area = reinterpret_cast<char*>(user_stack_top) - 128;
-  fk::memory::copy_string(string_area, "/sbin/init");
+  fk::memory::copy_string(string_area, boot::BootInfo::the().get_init_path());
   fk::memory::copy_string(string_area + 32, "PATH=/bin:/sbin:/usr/bin:/usr/sbin");
   uintptr_t argv0_addr = user_stack_top - 128;
   uintptr_t envp0_addr = user_stack_top - 96;
@@ -145,7 +146,8 @@ extern "C" void init_task_entry() {
 
   auto elf_load_res = load_init_executable_and_setup_address_space();
   if (elf_load_res.is_error()) {
-    fk::algorithms::kfatal("INIT", "Failed to load /sbin/init ELF (Error %d)",
+    fk::algorithms::kfatal("INIT", "Failed to load %s ELF (Error %d)",
+                           boot::BootInfo::the().get_init_path(),
                            (int)elf_load_res.error());
   }
   ElfLoadResult elf_res = elf_load_res.value();

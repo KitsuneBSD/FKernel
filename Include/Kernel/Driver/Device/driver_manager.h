@@ -38,6 +38,8 @@ public:
   void unregister_device(fk::RefPtr<Node> device);
 
   void probe_all();
+
+  const fk::containers::Vector<fk::RefPtr<Node>>& devices() const { return m_devices; }
 };
 
 } // namespace fkernel

@@ -16,6 +16,7 @@
 #include <Kernel/Fs/Virtual/ShmFs/shm_dir_node.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_fs.h>
+#include <Kernel/Fs/Virtual/SysFs/sys_fs.h>
 #include <Kernel/Fs/Virtual/TmpFs/tmp_fs.h>
 #include <Kernel/Fs/Vfs/definitions.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
@@ -45,6 +46,7 @@ void VirtualFileSystem::initialize() {
 
   (void)vfs.mkdir("/dev", 0755);
   (void)vfs.mkdir("/proc", 0755);
+  (void)vfs.mkdir("/sys", 0755);
   (void)vfs.mkdir("/debug", 0755);
   (void)vfs.mkdir("/mnt", 0755);
   (void)vfs.mkdir("/tmp", 0755);
@@ -56,6 +58,11 @@ void VirtualFileSystem::initialize() {
   if (auto proc_res = fk::make_ref<ProcFsNode>()) {
     proc_res.value()->set_name("proc");
     (void)vfs.mount("/proc", proc_res.value(), "proc");
+  }
+
+  if (auto sysfs_res = fk::make_ref<SysFsNode>()) {
+    sysfs_res.value()->set_name("sys");
+    (void)vfs.mount("/sys", sysfs_res.value(), "sysfs");
   }
 
   if (auto debugfs_res = fk::make_ref<fkernel::DebugFsNode>()) {
