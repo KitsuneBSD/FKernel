@@ -36,25 +36,16 @@ void SchedulerManager::print_all_tasks() {
 }
 
 fk::RefPtr<Task> SchedulerManager::find_task(fk::ProcessId id) {
-  for (uint32_t i = 0; i < m_processor_count.value(); ++i) {
-    fk::synchronization::ScopedLockIRQ per_cpu_lock(m_processors[i].run_queue_lock);
-    if (m_processors[i].current_task && m_processors[i].current_task->control.identity.id == id)
-      return m_processors[i].current_task;
-    if (m_processors[i].idle_task && m_processors[i].idle_task->control.identity.id == id)
-      return m_processors[i].idle_task;
-    for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
-      for (auto& task : m_processors[i].run_queues[level].queue) {
-        if (task.control.identity.id == id) return &task;
-      }
-    }
-  }
-  fk::synchronization::ScopedLockIRQ lock(m_lock);
-  for (auto& task : m_wait_queue) if (task.control.identity.id == id) return &task;
-  for (auto& task : m_zombie_queue) if (task.control.identity.id == id) return &task;
-  for (auto& task : m_sleep_queue) if (task.control.identity.id == id) return &task;
-  if (id.is_valid())
+  if (!id.is_valid()) return nullptr;
+  fk::synchronization::ScopedLockIRQ lock(m_task_registry_lock);
+  auto entry = m_task_registry.get(id);
+  if (!entry.has_value() || !entry.value()) {
     fk::algorithms::kdebug("SCHEDULER", "find_task: PID %lu not found", id.value());
-  return nullptr;
+    return nullptr;
+  }
+  // Construct RefPtr (calls task->ref()) while holding the registry lock so the
+  // task cannot be reaped between pointer extraction and ref-count increment.
+  return fk::RefPtr<Task>(entry.value());
 }
 
 fk::RefPtr<Task> SchedulerManager::find_terminated_child(fk::ProcessId ppid) {

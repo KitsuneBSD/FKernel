@@ -333,8 +333,12 @@ void Task::close_file_descriptor(int fd) {
     resources.files.descriptors[fd] = nullptr;
   }
   // Call on_close() outside the task lock to avoid lock-order inversion.
-  if (desc && desc->node())
+  // POSIX: all advisory locks on this file held by this process are released
+  // when any fd to the file is closed.
+  if (desc && desc->node()) {
     desc->node()->on_close();
+    desc->node()->release_all_locks_for_process(control.identity.id);
+  }
 }
 
 void Task::release_all_file_locks() {

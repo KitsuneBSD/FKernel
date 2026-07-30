@@ -89,6 +89,10 @@ void SchedulerManager::reap_zombie(Task* task) {
   ScopedInterruptDisabler intr_disabler;
   fk::algorithms::kdebug("SCHEDULER", "Reaping zombie task %lu", task->control.identity.id.value());
   {
+    fk::synchronization::ScopedLockIRQ reg_lock(m_task_registry_lock);
+    m_task_registry.remove(task->control.identity.id);
+  }
+  {
     ScopedLock lock(m_lock);
     m_zombie_queue.remove(task);
   }
@@ -199,6 +203,11 @@ static uint32_t find_least_loaded_cpu(fkernel::Processor* processors, uint32_t c
 void SchedulerManager::add_task(Task* task) {
   if (!task || !task->is_valid()) return;
   ScopedInterruptDisabler intr_disabler;
+
+  {
+    fk::synchronization::ScopedLockIRQ reg_lock(m_task_registry_lock);
+    m_task_registry.insert(task->control.identity.id, task);
+  }
 
   task->control.lifecycle.state = TaskState::Ready;
   task->control.lifecycle.time_slice_ticks = quantum_for_level(fk::MlqfLevel(task->control.lifecycle.mlfq_level)).value();

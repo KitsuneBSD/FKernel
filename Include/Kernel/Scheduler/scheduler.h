@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibFK/Container/intrusive_list.h>
+#include <LibFK/Container/hash_map.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Types/cpu_count.h>
 #include <LibFK/Types/tick_count.h>
@@ -29,6 +30,10 @@ private:
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_wait_queue;
     fk::containers::IntrusiveList<Task, &Task::sleep_node> m_sleep_queue;
     fk::containers::IntrusiveList<Task, &Task::zombie_node> m_zombie_queue;
+
+    // O(1) task lookup registry — maintained alongside the queue lists
+    fk::containers::HashMap<fk::ProcessId, Task*> m_task_registry;
+    fk::synchronization::Spinlock m_task_registry_lock;
 
     bool m_is_initialized = false;
     fk::TickCount m_default_quantum{5};

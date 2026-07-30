@@ -7,6 +7,7 @@
 #include <LibFK/Memory/optional.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Types/process_id.h>
 
 namespace fk {
 namespace containers {
@@ -51,6 +52,12 @@ template <typename T> struct DefaultHasher {
 template <> struct DefaultHasher<fk::text::String> {
   size_t operator()(const fk::text::String &value) const {
     return static_cast<size_t>(fk::algorithms::djb2(value.c_str(), value.length()));
+  }
+};
+
+template <> struct DefaultHasher<fk::ProcessId> {
+  size_t operator()(const fk::ProcessId &id) const {
+    return static_cast<size_t>(id.value());
   }
 };
 

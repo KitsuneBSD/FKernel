@@ -161,19 +161,19 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 
 ### 39b — Scheduler
 
-| Atual | Complexidade | Substituir por |
-|-------|-------------|----------------|
-| `m_sleep_queue` scan a cada tick | O(S) | Timer wheel (O(1)) ou binary heap (O(log S)) |
-| `find_task(pid)` scan 6 filas | O(N_total) | `HashMap<ProcessId, Task*>` global |
-| `pick_next()` affinity scan por nível | O(·N_lvl) | Per-CPU bitmap por afinidade |
+| Atual | Complexidade | Substituir por | Status |
+|-------|-------------|----------------|--------|
+| `m_sleep_queue` scan a cada tick | O(S) | Timer wheel (O(1)) ou binary heap (O(log S)) | Open |
+| `find_task(pid)` scan 6 filas | O(N_total) | `HashMap<ProcessId, Task*>` global | ✅ Done — `m_task_registry` HashMap in SchedulerManager; `add_task()` registers, `reap_zombie()` unregisters; `DefaultHasher<ProcessId>` added to hash_map.h |
+| `pick_next()` affinity scan por nível | O(·N_lvl) | Per-CPU bitmap por afinidade | Open |
 
 ### 39c — IPC / CSpace
 
-| Atual | Complexidade | Substituir por |
-|-------|-------------|----------------|
-| `cap_grant/transfer` via `find_task` | O(N_total) | Resolvido por HashMap em 39b |
-| `CSpace::find_by_object/remove_by_object` | O(C) | `HashMap<void*, cap_index>` reverso |
-| `CSpace::grant_all_to` | O(C) | Iterar slots válidos via free-list |
+| Atual | Complexidade | Substituir por | Status |
+|-------|-------------|----------------|--------|
+| `cap_grant/transfer` via `find_task` | O(N_total) | Resolvido por HashMap em 39b | ✅ Done (transitively fixed by 39b) |
+| `CSpace::find_by_object/remove_by_object` | O(C) | `HashMap<void*, cap_index>` reverso | Open |
+| `CSpace::grant_all_to` | O(C) | Iterar slots válidos via free-list | Open |
 
 ### 39d — VFS
 
@@ -455,8 +455,8 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 |---|-----|-------|-----|
 | 9 | `stat`/`chdir`/`mkdir` unsafe user pointer | `stat.cpp`, `chdir.cpp`, `mkdir.cpp` | ✅ All use `copy_from_user()` |
 | 10 | `utimensat` not registered | `syscall_numbers.h`, `syscall.cpp` | ✅ Registered as SYS_UTIMENSAT=280 |
-| 11 | fcntl advisory locks are no-ops | `FileSystem/fcntl.cpp` | Per-node lock list with (pid, type, start, len) |
-| 12 | `getrandom` uses xorshift64 (not cryptographic) | `System/getrandom.cpp`, `urandom_device.cpp` | Seed from RDTSC + interrupt jitter |
+| 11 | fcntl advisory locks are no-ops | `FileSystem/fcntl.cpp` | ✅ `FileLockList` per-node fully implemented (try_acquire/release/test_conflict). POSIX on-close release added to `Task::close_file_descriptor()`. |
+| 12 | `getrandom` uses xorshift64 (not cryptographic) | `System/getrandom.cpp`, `urandom_device.cpp` | ✅ `getrandom.cpp` uses `ChaCha20PRNG::the().fill_buffer()`. ChaCha20 seeded from `arch_read_tsc()` in `init.cpp` (see Bug 9 fix). |
 | 13 | `close()` doesn't call `node->close()` | `FileSystem/close.cpp` | ✅ `on_close()` called in `close_file_descriptor()` |
 
 ### Missing Subsystems (31d)
