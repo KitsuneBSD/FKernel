@@ -9,7 +9,9 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_stat_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_sys_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_loadavg_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_cmdline_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_cpuinfo_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_filesystems_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_dir_node.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
@@ -68,6 +70,16 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
   cpuinfo_de.type = 0;
   entries.push_back(cpuinfo_de);
 
+  DirectoryEntry fs_de;
+  fk::memory::copy_n(fs_de.name, "filesystems", sizeof(fs_de.name));
+  fs_de.type = 0;
+  entries.push_back(fs_de);
+
+  DirectoryEntry cmdline_de;
+  fk::memory::copy_n(cmdline_de.name, "cmdline", sizeof(cmdline_de.name));
+  cmdline_de.type = 0;
+  entries.push_back(cmdline_de);
+
   auto& scheduler = SchedulerManager::the();
   uint64_t max_pid = scheduler.last_pid().value();
   for (uint64_t pid = 1; pid < max_pid; ++pid) {
@@ -110,6 +122,10 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> ProcFsNode::lookup(const cha
     return fk::RefPtr<Node>(fk::make_ref<ProcLoadavgNode>().value());
   if (fk::memory::compare(name, "cpuinfo") == 0)
     return fk::RefPtr<Node>(fk::make_ref<ProcCpuinfoNode>().value());
+  if (fk::memory::compare(name, "filesystems") == 0)
+    return fk::RefPtr<Node>(fk::make_ref<ProcFilesystemsNode>().value());
+  if (fk::memory::compare(name, "cmdline") == 0)
+    return fk::RefPtr<Node>(fk::make_ref<ProcCmdlineNode>().value());
 
   uint64_t pid = 0;
   const char* p = name;
