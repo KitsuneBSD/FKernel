@@ -3,6 +3,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Fs/Virtual/TimerFd/timer_fd_registry.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <Kernel/Net/Tcp/tcp_socket.h>
 #include <Kernel/Ipc/signal_delivery.h>
 #include <Kernel/Posix/signal_defs.h>
@@ -139,6 +140,8 @@ void SchedulerManager::terminate_current(int status) {
   curr->release_all_file_locks();
 
   fk::algorithms::klog("SCHEDULER", "Task %lu exiting with status %d", curr->control.identity.id.value(), status);
+  // Notify kqueue watchers (EVFILT_PROC NOTE_EXIT) before the task is zombified.
+  fkernel::notify_proc_kqueue(curr, fkernel::NOTE_EXIT);
   curr->control.lifecycle.terminated = true;
   curr->control.lifecycle.exit_status = status;
 

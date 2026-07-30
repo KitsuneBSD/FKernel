@@ -4,6 +4,7 @@
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Loader/elf_loader.h>
@@ -147,7 +148,11 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
 
   fkernel::ElfLoadResult elf_res = entry_res.value();
   uintptr_t entry = elf_res.entry;
+  fkernel::notify_proc_kqueue(task, fkernel::NOTE_EXEC);
   fk::algorithms::klog("EXEC", "execve: loading %s, entry=%p", path.c_str(), (void*)entry);
+
+  task->resources.files.exe_path = path.c_str();
+  task->control.identity.name = path.c_str();
 
   task->set_heap_regions(elf_res.highest_load_end, elf_res.highest_load_end);
   task->set_mmap_regions(0x40000000, 0x40000000);
@@ -277,10 +282,9 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   regs->rsp = final_rsp;
   regs->rflags = 0x202; // IF | Reserved
 
-  extern CpuControlBlock g_cpu_block;
-  g_cpu_block.saved_rip = entry;
-  g_cpu_block.user_rsp = final_rsp;
-  g_cpu_block.saved_rflags = 0x202;
+  current_cpu_block().saved_rip = entry;
+  current_cpu_block().user_rsp = final_rsp;
+  current_cpu_block().saved_rflags = 0x202;
 
   task->resources.context.user_rsp = final_rsp;
   task->resources.context.saved_rip = entry;
@@ -290,8 +294,12 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   for (size_t i = 0; i < task->resources.files.descriptors.size(); ++i) {
     auto& desc = task->resources.files.descriptors[i];
     if (desc && desc->is_cloexec()) {
-      if (task->resources.ipc.cspace)
-        task->resources.ipc.cspace->remove_by_object(desc.get());
+      if (task->resources.ipc.cspace && i < task->resources.files.cap_handles.size()) {
+        uint32_t h = task->resources.files.cap_handles[i];
+        if (h != fkernel::ipc::INVALID_HANDLE)
+          task->resources.ipc.cspace->revoke_fd(h);
+        task->resources.files.cap_handles[i] = fkernel::ipc::INVALID_HANDLE;
+      }
       desc = nullptr;
     }
   }

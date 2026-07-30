@@ -10,7 +10,6 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #endif
 
-extern CpuControlBlock g_cpu_block;
 
 SyscallManager& SyscallManager::the() {
   static SyscallManager instance;
@@ -241,6 +240,10 @@ uint64_t sys_rt_sigtimedwait(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, u
 uint64_t sys_reboot(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_accept4(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_utimensat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_personality(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_prctl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_set_robust_list(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_get_robust_list(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 }
 
 extern "C" void initialize_syscalls() {
@@ -442,6 +445,10 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_RT_SIGTIMEDWAIT, sys_rt_sigtimedwait);
   SyscallManager::the().register_syscall(SYS_REBOOT, sys_reboot);
   SyscallManager::the().register_syscall(SYS_UTIMENSAT, sys_utimensat);
+  SyscallManager::the().register_syscall(SYS_PERSONALITY, sys_personality);
+  SyscallManager::the().register_syscall(SYS_PRCTL, sys_prctl);
+  SyscallManager::the().register_syscall(SYS_SET_ROBUST_LIST, sys_set_robust_list);
+  SyscallManager::the().register_syscall(SYS_GET_ROBUST_LIST, sys_get_robust_list);
 }
 extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
                                        uint64_t arg4, uint64_t arg5, uint64_t arg6, PtRegs* regs) {
@@ -488,9 +495,9 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1, uint64_t arg
     // Sync the GS-based return registers from PtRegs. sysretq uses [gs:16]/[gs:24]/[gs:8]
     // directly (not PtRegs), so any modification to regs->rip/rflags/rsp (e.g. by
     // install_handler_frame for signal delivery, or by execve) must be reflected here.
-    g_cpu_block.saved_rip    = regs->rip;
-    g_cpu_block.saved_rflags = regs->rflags;
-    g_cpu_block.user_rsp     = regs->rsp;
+    current_cpu_block().saved_rip    = regs->rip;
+    current_cpu_block().saved_rflags = regs->rflags;
+    current_cpu_block().user_rsp     = regs->rsp;
   }
 
   return result;

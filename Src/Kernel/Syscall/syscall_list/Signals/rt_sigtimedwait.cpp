@@ -16,13 +16,13 @@ struct kernel_siginfo {
     int _pad[29];
 };
 
-static int dequeue_signal(Task* task, uint32_t mask) {
-    uint32_t pending  = task->resources.ipc.signals.pending;
-    uint32_t matchable = pending & ~task->resources.ipc.signals.blocked & mask;
+static int dequeue_signal(Task* task, uint64_t mask) {
+    uint64_t pending   = task->resources.ipc.signals.pending;
+    uint64_t matchable = pending & ~task->resources.ipc.signals.blocked & mask;
     if (!matchable) return 0;
-    for (int sig = 1; sig < 32; ++sig) {
-        if (matchable & (1u << (sig - 1))) {
-            task->resources.ipc.signals.pending &= ~(1u << (sig - 1));
+    for (int sig = 1; sig < NSIG; ++sig) {
+        if (matchable & (1ULL << (sig - 1))) {
+            task->resources.ipc.signals.pending &= ~(1ULL << (sig - 1));
             return sig;
         }
     }
@@ -47,7 +47,7 @@ extern "C" uint64_t sys_rt_sigtimedwait(uint64_t set_ptr, uint64_t info_ptr,
         if (res.is_error()) return (uint64_t)-14; // EFAULT
         raw_mask = ks.sig[0];
     }
-    uint32_t mask = (uint32_t)raw_mask;
+    uint64_t mask = raw_mask;
 
     // Check for already-pending signal
     int sig = dequeue_signal(task, mask);

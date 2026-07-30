@@ -68,9 +68,23 @@ extern "C" uint64_t sys_vfork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] u
     child->resources.ipc.signals.actions[i] = parent->resources.ipc.signals.actions[i];
   }
 
-  // 3. Clone file descriptors
+  // 3. Clone file descriptors with independent CSpace capabilities
   for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
-    child->resources.files.descriptors.push_back(parent->resources.files.descriptors[i]);
+    auto desc = parent->resources.files.descriptors[i];
+    child->resources.files.descriptors.push_back(desc);
+    uint32_t child_handle = fkernel::ipc::INVALID_HANDLE;
+    if (desc && child->resources.ipc.cspace) {
+      fkernel::ipc::CapabilityRights rights = fkernel::ipc::CapabilityRights::All;
+      if (parent->resources.ipc.cspace && i < parent->resources.files.cap_handles.size()) {
+        uint32_t ph = parent->resources.files.cap_handles[i];
+        if (ph != fkernel::ipc::INVALID_HANDLE) {
+          auto pcap = parent->resources.ipc.cspace->get(ph);
+          if (pcap.is_valid()) rights = pcap.rights();
+        }
+      }
+      child_handle = child->resources.ipc.cspace->install_fd(desc.get(), rights);
+    }
+    child->resources.files.cap_handles.push_back(child_handle);
   }
   child->dump_file_descriptors();
 

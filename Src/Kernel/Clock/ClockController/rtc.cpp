@@ -6,13 +6,13 @@
 uint64_t RTCClock::s_ticks = 0;
 
 uint8_t RTCClock::read_register(uint8_t reg) {
-  arch_outb(RTC_ADDRESS_PORT, (arch_inb(RTC_ADDRESS_PORT) & 0x80) | reg);
-  return arch_inb(RTC_DATA_PORT);
+  outb(RTC_ADDRESS_PORT, (inb(RTC_ADDRESS_PORT) & 0x80) | reg);
+  return inb(RTC_DATA_PORT);
 }
 
 void RTCClock::write_register(uint8_t reg, uint8_t value) {
-  arch_outb(RTC_ADDRESS_PORT, (arch_inb(RTC_ADDRESS_PORT) & 0x80) | reg);
-  arch_outb(RTC_DATA_PORT, value);
+  outb(RTC_ADDRESS_PORT, (inb(RTC_ADDRESS_PORT) & 0x80) | reg);
+  outb(RTC_DATA_PORT, value);
 }
 
 fk::core::Result<void> RTCClock::initialize(uint32_t frequency) {

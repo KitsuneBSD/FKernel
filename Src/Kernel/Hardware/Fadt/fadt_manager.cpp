@@ -3,17 +3,16 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/log.h>
 
-FadtManager& FadtManager::the() {
+FadtManager &FadtManager::the() {
   static FadtManager instance;
   return instance;
 }
 
-void initialize_fadt_from_acpi(fkernel::ACPIManager* acpi) {
+void initialize_fadt_from_acpi(ACPIManager *acpi) {
   FadtManager::the().initialize(acpi);
 }
 
-void FadtManager::initialize(fkernel::ACPIManager* acpi) {
-  if (m_is_initialized) return;
+void FadtManager::initialize(ACPIManager *acpi) {
   if (!acpi) {
     m_fadt = nullptr;
     return;
@@ -57,7 +56,6 @@ void FadtManager::initialize(fkernel::ACPIManager* acpi) {
   }
 
   validate_ports();
-  m_is_initialized = true;
 }
 
 bool FadtManager::validate_ports() const {
@@ -65,11 +63,11 @@ bool FadtManager::validate_ports() const {
 
   uint32_t timer_port;
   if (get_pm_timer_block(timer_port) && timer_port != 0) {
-    uint32_t val1 = arch_inl(timer_port);
+    uint32_t val1 = inl(timer_port);
     for (int i = 0; i < 10000; i++) {
         asm volatile("" ::: "memory");
     }
-    uint32_t val2 = arch_inl(timer_port);
+    uint32_t val2 = inl(timer_port);
 
     if (val1 == val2) {
       fk::algorithms::klog("FADT", "  [TEST] PM Timer at port 0x%x seems STATIC (val=0x%x)", timer_port, val1);

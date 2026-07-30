@@ -28,7 +28,7 @@ void PIOStrategy::wait_ready() { wait_status(ATA_SR_DRDY, ATA_SR_DRDY); }
 bool PIOStrategy::wait_status(uint8_t mask, uint8_t value,
                               uint32_t timeout_loops) {
   for (uint32_t i = 0; i < timeout_loops; ++i) {
-    uint8_t status = arch_inb(m_io_base + ATA_REG_STATUS);
+    uint8_t status = inb(m_io_base + ATA_REG_STATUS);
     if (status == 0xFF)
       return false; // Floating bus
     if ((status & mask) == value)
@@ -41,12 +41,12 @@ bool PIOStrategy::wait_status(uint8_t mask, uint8_t value,
 }
 
 void PIOStrategy::select_drive(uint64_t lba, uint8_t count) {
-  arch_outb(m_io_base + ATA_REG_HDDEVSEL,
+  outb(m_io_base + ATA_REG_HDDEVSEL,
        (m_is_master ? 0xE0 : 0xF0) | ((lba >> 24) & 0x0F));
-  arch_outb(m_io_base + ATA_REG_SECCOUNT, count);
-  arch_outb(m_io_base + ATA_REG_LBA0, (uint8_t)lba);
-  arch_outb(m_io_base + ATA_REG_LBA1, (uint8_t)(lba >> 8));
-  arch_outb(m_io_base + ATA_REG_LBA2, (uint8_t)(lba >> 16));
+  outb(m_io_base + ATA_REG_SECCOUNT, count);
+  outb(m_io_base + ATA_REG_LBA0, (uint8_t)lba);
+  outb(m_io_base + ATA_REG_LBA1, (uint8_t)(lba >> 8));
+  outb(m_io_base + ATA_REG_LBA2, (uint8_t)(lba >> 16));
 }
 
 fk::core::Result<size_t, fk::core::Error>
@@ -65,14 +65,16 @@ PIOStrategy::read_sectors(uint64_t start_sector, size_t count,
       return fk::core::Error::IOError;
 
     select_drive(start_sector + i, 1);
-    arch_outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_READ_PIO);
+    outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_READ_PIO);
 
     if (!wait_status(ATA_SR_DRQ, ATA_SR_DRQ)) {
-      fk::algorithms::kwarn("PIO", "DRQ timeout during read at LBA %lu", start_sector + i);
+      fk::algorithms::kerror(
+          "PIO", "Error or timeout waiting for DRQ during read at LBA %lu",
+          start_sector + i);
       return fk::core::Error::IOError;
     }
 
-    arch_insw(m_io_base + ATA_REG_DATA, ptr, 256);
+    insw(m_io_base + ATA_REG_DATA, ptr, 256);
     ptr += 256;
   }
 
@@ -95,20 +97,22 @@ PIOStrategy::write_sectors(uint64_t start_sector, size_t count,
       return fk::core::Error::IOError;
 
     select_drive(start_sector + i, 1);
-    arch_outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_WRITE_PIO);
+    outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_WRITE_PIO);
 
     if (!wait_status(ATA_SR_DRQ, ATA_SR_DRQ)) {
-      fk::algorithms::kwarn("PIO", "DRQ timeout during write at LBA %lu", start_sector + i);
+      fk::algorithms::kerror(
+          "PIO", "Error or timeout waiting for DRQ during write at LBA %lu",
+          start_sector + i);
       return fk::core::Error::IOError;
     }
 
     for (int j = 0; j < 256; ++j) {
-      arch_outw(m_io_base + ATA_REG_DATA, ptr[j]);
+      outw(m_io_base + ATA_REG_DATA, ptr[j]);
     }
     ptr += 256;
   }
 
-  arch_outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_CACHE_FLUSH);
+  outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_CACHE_FLUSH);
   wait_status(ATA_SR_BSY, 0);
 
   return count;

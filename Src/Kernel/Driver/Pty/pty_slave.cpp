@@ -5,8 +5,8 @@ namespace fkernel {
 
 PtySlave::PtySlave(fk::RefPtr<PtyBuffer> from_master,
                    fk::RefPtr<PtyBuffer> to_master,
-                   uint32_t index)
-    : m_from_master(from_master), m_to_master(to_master) {
+                   uint32_t index, PtyLineDiscipline* ldisc)
+    : m_from_master(from_master), m_to_master(to_master), m_ldisc(ldisc) {
   fk::text::String name("pts");
   char idx_buf[16];
   size_t i = 0;
@@ -32,7 +32,20 @@ PtySlave::read(uint64_t, size_t size, uint8_t* buf) {
 fk::core::Result<size_t, fk::core::Error>
 PtySlave::write(uint64_t, size_t size, const uint8_t* buf) {
   if (!buf || size == 0) return fk::core::Error::InvalidParameter;
-  return m_to_master->write(buf, size);
+  bool opost = m_ldisc && m_ldisc->termios().has_oflag(Termios::OPOST);
+  bool onlcr = opost && m_ldisc->termios().has_oflag(Termios::ONLCR);
+  if (!onlcr)
+    return m_to_master->write(buf, size);
+  // Translate \n → \r\n for each byte
+  for (size_t i = 0; i < size; ++i) {
+    if (buf[i] == '\n') {
+      static const uint8_t crlf[2] = {'\r', '\n'};
+      m_to_master->write(crlf, 2);
+    } else {
+      m_to_master->write(buf + i, 1);
+    }
+  }
+  return size;
 }
 
 } // namespace fkernel

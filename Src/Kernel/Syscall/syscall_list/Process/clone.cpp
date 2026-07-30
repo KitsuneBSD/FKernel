@@ -12,6 +12,7 @@
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <LibFK/Utilities/memory.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/heap_malloc.h>
 
@@ -41,6 +42,11 @@ extern "C" uint64_t sys_clone(uint64_t flags, uint64_t child_stack,
     if (!child) return fkernel::return_error(fk::core::Error::OutOfMemory);
 
     child->control.identity.id   = SchedulerManager::the().generate_pid();
+    // CLONE_THREAD: child joins parent's thread group; otherwise new group
+    if (flags & CLONE_THREAD)
+      child->control.identity.tgid = parent->control.identity.tgid;
+    else
+      child->control.identity.tgid = child->control.identity.id;
     child->control.identity.ppid = parent->control.identity.id;
     child->control.identity.name = parent->control.identity.name;
     child->control.lifecycle.state           = TaskState::Ready;
@@ -84,8 +90,23 @@ extern "C" uint64_t sys_clone(uint64_t flags, uint64_t child_stack,
     }
 
     if (flags & CLONE_FILES) {
-        for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i)
-            child->resources.files.descriptors.push_back(parent->resources.files.descriptors[i]);
+        for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
+            auto desc = parent->resources.files.descriptors[i];
+            child->resources.files.descriptors.push_back(desc);
+            uint32_t child_handle = fkernel::ipc::INVALID_HANDLE;
+            if (desc && child->resources.ipc.cspace) {
+                fkernel::ipc::CapabilityRights rights = fkernel::ipc::CapabilityRights::All;
+                if (parent->resources.ipc.cspace && i < parent->resources.files.cap_handles.size()) {
+                    uint32_t ph = parent->resources.files.cap_handles[i];
+                    if (ph != fkernel::ipc::INVALID_HANDLE) {
+                        auto pcap = parent->resources.ipc.cspace->get(ph);
+                        if (pcap.is_valid()) rights = pcap.rights();
+                    }
+                }
+                child_handle = child->resources.ipc.cspace->install_fd(desc.get(), rights);
+            }
+            child->resources.files.cap_handles.push_back(child_handle);
+        }
     }
 
     const size_t STACK_SIZE = 16 * 1024;
@@ -183,6 +204,8 @@ extern "C" uint64_t sys_clone(uint64_t flags, uint64_t child_stack,
     fk::algorithms::klog("CLONE", "clone: parent=%lu child=%lu flags=%lx",
                           parent->control.identity.id.value(),
                           child->control.identity.id.value(), flags);
+
+    fkernel::notify_proc_kqueue(parent, fkernel::NOTE_FORK | (child->control.identity.id.value() & 0x00FFFFFFu));
 
     return child->control.identity.id.value();
 }

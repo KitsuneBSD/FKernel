@@ -7,7 +7,6 @@
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Algorithms/log.h>
 
-extern CpuControlBlock g_cpu_block;
 
 extern "C" {
 
@@ -132,9 +131,9 @@ uint64_t sys_sigreturn(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_
 
     *regs = saved_regs;
 
-    g_cpu_block.saved_rip    = saved_regs.rip;
-    g_cpu_block.saved_rflags = saved_regs.rflags;
-    g_cpu_block.user_rsp     = saved_regs.rsp;
+    current_cpu_block().saved_rip    = saved_regs.rip;
+    current_cpu_block().saved_rflags = saved_regs.rflags;
+    current_cpu_block().user_rsp     = saved_regs.rsp;
 
     return regs->rax;
 }

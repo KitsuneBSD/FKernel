@@ -8,9 +8,15 @@
 FileDescription::FileDescription(fk::RefPtr<fkernel::Dentry> dentry, int flags)
     : m_dentry(dentry), m_flags(flags) {}
 
+bool FileDescription::resolve_dentry() const {
+    if (!m_dentry) return false;
+    return m_dentry->top_node() != nullptr;
+}
+
 FileDescription::~FileDescription() {
+    auto n = node();
+    if (n) n->on_close();
     if ((m_flags & O_ACCMODE) == O_RDONLY) {
-        auto n = node();
         auto* pipe = fkernel::PipeNode::from_node(n.ptr());
         if (pipe) pipe->remove_reader();
     }
@@ -21,6 +27,8 @@ fk::RefPtr<Node> FileDescription::node() const { return m_dentry ? m_dentry->top
 
 fk::core::Result<size_t, fk::core::Error>
 FileDescription::read(size_t size, uint8_t *buffer) {
+  if (!resolve_dentry())
+    return fk::core::Error::InvalidHandle;
   auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;
@@ -52,6 +60,8 @@ FileDescription::read(size_t size, uint8_t *buffer) {
 
 fk::core::Result<size_t, fk::core::Error>
 FileDescription::write(size_t size, const uint8_t *buffer) {
+  if (!resolve_dentry())
+    return fk::core::Error::InvalidHandle;
   auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;
@@ -83,6 +93,8 @@ FileDescription::write(size_t size, const uint8_t *buffer) {
 
 fk::core::Result<uint64_t, fk::core::Error>
 FileDescription::seek(uint64_t offset, SeekMode mode) {
+  if (!resolve_dentry())
+    return fk::core::Error::InvalidHandle;
   auto m_node = node();
   if (!m_node) return fk::core::Error::InvalidHandle;
 
@@ -110,6 +122,8 @@ FileDescription::seek(uint64_t offset, SeekMode mode) {
 
 fk::core::Result<int, fk::core::Error>
 FileDescription::ioctl(uint64_t request, uint64_t arg) {
+  if (!resolve_dentry())
+    return fk::core::Error::InvalidHandle;
   auto m_node = node();
   if (!m_node) {
     return fk::core::Error::InvalidHandle;

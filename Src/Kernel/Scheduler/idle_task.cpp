@@ -14,7 +14,7 @@ extern "C" void idle_task_entry() {
     if (!init) {
       fk::algorithms::kfatal("IDLE", "Failed to allocate init task");
     }
-    *init = create_a_new_task(fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
+    initialize_task(init, fk::ProcessId(1), "init", init_task_entry, false, 5, 1, 0, 0);
     fk::algorithms::klog("IDLE", "Init task created (PID 1)");
 
     init->set_heap_regions(0x10000000, 0x10000000);

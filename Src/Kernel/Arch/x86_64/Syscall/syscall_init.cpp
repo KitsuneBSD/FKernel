@@ -11,18 +11,23 @@ extern "C" uint64_t syscall_kernel_stack;
 
 #define MSR_KERNEL_GS_BASE 0xC0000102
 
-CpuControlBlock g_cpu_block;
+CpuControlBlock g_cpu_blocks[MAX_CPUS];
 
-void init_syscalls(size_t) {
-  g_cpu_block.kernel_stack = (uint64_t)&stack_top;
-  g_cpu_block.user_rsp = 0;
-  g_cpu_block.cpu_id = 0;
-  g_cpu_block.current_task = nullptr;
+void init_syscalls(size_t cpu_index) {
+  if (cpu_index >= MAX_CPUS) cpu_index = 0;
 
-  CPU::the().write_msr(MSR_GS_BASE, (uint64_t)&g_cpu_block);
+  CpuControlBlock& block = g_cpu_blocks[cpu_index];
+  block.kernel_stack = (uint64_t)&stack_top;
+  block.user_rsp = 0;
+  block.cpu_id = cpu_index;
+  block.current_task = nullptr;
+
+  CPU::the().write_msr(MSR_GS_BASE, (uint64_t)&block);
   CPU::the().write_msr(MSR_KERNEL_GS_BASE, 0);
 
-  syscall_kernel_stack = g_cpu_block.kernel_stack;
+  // Keep legacy variable in sync for BSP (AP stacks are set at context-switch time).
+  if (cpu_index == 0)
+    syscall_kernel_stack = block.kernel_stack;
 
   uint64_t efer = CPU::the().read_msr(MSR_EFER);
   if (!(efer & EFER_SCE)) {
@@ -34,7 +39,8 @@ void init_syscalls(size_t) {
 
   CPU::the().write_msr(MSR_LSTAR, (uint64_t)syscall_stub);
 
-  CPU::the().write_msr(MSR_SFMASK, (uint64_t)0x200);
+  // Clear IF(9)+TF(8)+DF(10)+AC(18)+NT(14) on syscall entry — Linux convention 0x4700
+  CPU::the().write_msr(MSR_SFMASK, (uint64_t)0x4700);
 
-  fk::algorithms::klog("SYSCALL", "Initialized SYSCALL/SYSRET MSRs and GS Base");
+  fk::algorithms::klog("SYSCALL", "CPU %zu: SYSCALL/SYSRET MSRs and GS Base initialized", cpu_index);
 }

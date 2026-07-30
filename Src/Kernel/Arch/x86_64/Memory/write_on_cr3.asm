@@ -3,11 +3,11 @@ section .rodata
 
 section .text
 extern kernel_panic_log
-global arch_write_cr3
+global write_on_cr3
 
 ; Replace the current PML4 / PDPT table by writing to CR3
 ; rdi = pointer to new table (must be 4KiB aligned)
-arch_write_cr3:
+write_on_cr3:
     cli                     ; disable interrupts
 
     ; verify 4KiB alignment

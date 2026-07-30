@@ -11,9 +11,9 @@ namespace {
 
 static constexpr size_t SLAB_PAGE_SIZE = 4096;
 
-static constexpr size_t CACHE_COUNT = 8;
+static constexpr size_t CACHE_COUNT = 10;
 static constexpr size_t CACHE_SIZES[CACHE_COUNT] = {
-    16, 32, 64, 128, 256, 512, 1024, 2048
+    16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192
 };
 
 static SlabCache s_caches[CACHE_COUNT];
@@ -26,15 +26,19 @@ static size_t slab_header_size() {
   return align_up(sizeof(Slab), 16);
 }
 
+// Object pointer is always in the first page of the slab (header < 4KB,
+// first object starts at header_offset), so rounding to the first 4KB boundary
+// always yields the slab base — even for multi-page slabs.
 static Slab *ptr_to_slab(void *ptr) {
   uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
   return reinterpret_cast<Slab *>(addr & ~(SLAB_PAGE_SIZE - 1));
 }
 
 static void init_slab(Slab *slab, SlabCache *cache) {
+  size_t slab_size = SLAB_PAGE_SIZE << cache->pages_order;
   size_t header_sz = slab_header_size();
   size_t obj_sz = cache->object_size;
-  size_t count = cache->objects_per_slab;
+  size_t count = (slab_size - header_sz) / obj_sz;
 
   slab->cache = cache;
   slab->next = nullptr;
@@ -44,15 +48,20 @@ static void init_slab(Slab *slab, SlabCache *cache) {
 }
 
 static Slab *grow_slab(SlabCache *cache) {
-  uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
+  uintptr_t phys;
+  if (cache->pages_order == 0) {
+    phys = PhysicalMemoryManager::the().alloc_page();
+  } else {
+    phys = PhysicalMemoryManager::the().alloc_contiguous(cache->pages_order);
+  }
   if (!phys) {
-    fk::algorithms::kwarn("SLAB", "grow_slab: PMM out of pages for size %zu",
-                          cache->object_size);
+    fk::algorithms::kwarn("SLAB", "grow_slab: out of memory for size %zu", cache->object_size);
     return nullptr;
   }
 
+  size_t slab_size = SLAB_PAGE_SIZE << cache->pages_order;
   Slab *slab = reinterpret_cast<Slab *>(phys);
-  fk::memory::set(slab, 0, SLAB_PAGE_SIZE);
+  fk::memory::set(slab, 0, slab_size);
 
   init_slab(slab, cache);
 
@@ -81,22 +90,31 @@ void SlabAllocator::initialize() {
 
   for (size_t i = 0; i < CACHE_COUNT; i++) {
     size_t obj_sz = CACHE_SIZES[i];
-    size_t usable = SLAB_PAGE_SIZE - header_sz;
+
+    // Compute minimum page order such that (pages * 4096 - header) >= obj_sz
+    uint8_t order = 0;
+    while (((SLAB_PAGE_SIZE << order) - header_sz) < obj_sz)
+      ++order;
+
+    size_t slab_sz = SLAB_PAGE_SIZE << order;
+    size_t usable = slab_sz - header_sz;
     size_t count = usable / obj_sz;
 
     s_caches[i].object_size = obj_sz;
     s_caches[i].objects_per_slab = count;
+    s_caches[i].pages_order = order;
     s_caches[i].slab_header_offset = header_sz;
     s_caches[i].partial_slabs = nullptr;
     s_caches[i].total_objects = 0;
     s_caches[i].total_free = 0;
 
-    fk::algorithms::klog("SLAB", "Cache %zu: objsize=%zu count=%zu waste=%zu",
-                         i, obj_sz, count, usable - count * obj_sz);
+    fk::algorithms::klog("SLAB", "Cache %zu: objsize=%zu order=%u count=%zu waste=%zu",
+                         i, obj_sz, (unsigned)order, count, usable - count * obj_sz);
   }
 
   m_is_initialized = true;
-  fk::algorithms::klog("SLAB", "SlabAllocator initialized with %zu caches", CACHE_COUNT);
+  fk::algorithms::klog("SLAB", "SlabAllocator initialized (%zu caches, max %zu B)",
+                       CACHE_COUNT, CACHE_SIZES[CACHE_COUNT - 1]);
 }
 
 void *SlabAllocator::allocate(size_t size) {

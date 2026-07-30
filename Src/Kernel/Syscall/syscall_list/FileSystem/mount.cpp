@@ -10,7 +10,6 @@
 #include <Kernel/Syscall/syscall_utils.h>
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/error.h>
-#include <LibFK/Memory/retain_ptr.h>
 #include <LibFK/Utilities/memory.h>
 
 static bool copy_user_string(const char* user_ptr, char* kbuf, size_t kbuf_size) {

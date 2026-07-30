@@ -4,6 +4,7 @@
 #include <Kernel/Net/unix_socket.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -73,6 +74,14 @@ fk::core::Result<void, fk::core::Error> UnixSocket::connect(const char* path) {
   m_peer = peer;
   m_connected = true;
 
+  // Capture caller's credentials for SO_PEERCRED / SCM_CREDENTIALS.
+  auto* current = SchedulerManager::the().current();
+  if (current) {
+    m_peer_creds.pid = current->control.identity.id.value();
+    m_peer_creds.uid = current->control.identity.uid;
+    m_peer_creds.gid = current->control.identity.gid;
+  }
+
   peer->m_accept_endpoint.signal(fk::NotificationBits(1));
 
   return {};
@@ -137,6 +146,42 @@ fk::core::Result<void, fk::core::Error> UnixSocket::getpeername(char* addr, uint
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   if (!m_peer) return fk::core::Error::InvalidParameter;
   return m_peer->getsockname(addr, addrlen);
+}
+
+// SO_PEERCRED returns the credentials of the socket that called connect() (i.e. m_peer_creds).
+// For the server side, getsockopt is called on the accepted client socket, so m_peer_creds holds
+// the connecting process's pid/uid/gid — exactly what SO_PEERCRED should return.
+fk::core::Result<void, fk::core::Error> UnixSocket::getsockopt(
+    int level, int optname, void* optval, uint32_t* optlen) {
+  static constexpr int SOL_SOCKET = 1;
+  static constexpr int SO_PEERCRED = 17;
+  if (level != SOL_SOCKET || optname != SO_PEERCRED)
+    return fk::core::Error::NotImplemented;
+  if (!optval || !optlen)
+    return fk::core::Error::InvalidParameter;
+  if (*optlen < sizeof(PeerCredentials))
+    return fk::core::Error::InvalidParameter;
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  PeerCredentials creds = m_peer_creds;
+  fk::memory::copy(optval, &creds, sizeof(PeerCredentials));
+  *optlen = sizeof(PeerCredentials);
+  return {};
+}
+
+void UnixSocket::send_fds(fk::containers::Vector<fk::RefPtr<FileDescription>>& fds) {
+  if (!m_peer) return;
+  fk::synchronization::ScopedLockIRQ lock(m_peer->m_lock);
+  for (size_t i = 0; i < fds.size(); ++i) {
+    if (m_peer->m_pending_fd_count >= MAX_PENDING_FDS) break;
+    m_peer->m_pending_fds[m_peer->m_pending_fd_count++] = fds[i];
+  }
+}
+
+void UnixSocket::recv_fds(fk::containers::Vector<fk::RefPtr<FileDescription>>& out) {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  for (size_t i = 0; i < m_pending_fd_count; ++i)
+    out.push_back(fk::types::move(m_pending_fds[i]));
+  m_pending_fd_count = 0;
 }
 
 } // namespace fkernel

@@ -41,48 +41,61 @@ void CPU::cpuid(uint32_t eax, uint32_t ecx, uint32_t *a, uint32_t *b,
 void CPU::detect_cpu_features() {
   uint32_t eax, ebx, ecx, edx;
 
-  // Check for APIC
+  // Leaf 1: basic feature flags
   cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-  if (edx & (1 << 9)) {
+  m_lapic_id = static_cast<uint8_t>(ebx >> 24);
+  if (edx & (1u << 9)) {
     fk::algorithms::kdebug("CPU", "Found APIC support");
     m_has_apic = true;
   }
-  m_lapic_id = static_cast<uint8_t>(ebx >> 24);
-
-  // Check for x2APIC
-  if (ecx & (1 << 21)) {
+  if (ecx & (1u << 21)) {
     fk::algorithms::kdebug("CPU", "Found x2APIC support");
     m_has_x2apic = true;
   }
+  // XSAVE: leaf 1, ECX bit 26; AVX: leaf 1, ECX bit 28
+  m_has_xsave = (ecx & (1u << 26)) != 0;
+  m_has_avx   = (ecx & (1u << 28)) != 0;
 
-  // Check for hpet
+  // HPET via ACPI table
   if (ACPIManager::the().find_table("HPET")) {
     fk::algorithms::kdebug("CPU", "Found HPET support");
     m_has_hpet = true;
   }
 
-  // Check for NX support (CPUID 0x80000001, EDX bit 20)
+  // Leaf 0x80000001: extended feature flags
   cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
-  if (edx & (1 << 20))
-    m_has_nx = true;
+  m_has_nx         = (edx & (1u << 20)) != 0;
+  m_has_1gb_pages  = (edx & (1u << 26)) != 0;
 
-  // Check for SMEP (bit 7) and SMAP (bit 20) via CPUID leaf 7, subleaf 0
+  // Physical/virtual address widths
+  cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
+  m_phys_addr_width = static_cast<uint8_t>(eax & 0xFF);
+  m_virt_addr_width = static_cast<uint8_t>((eax >> 8) & 0xFF);
+  if (!m_phys_addr_width) m_phys_addr_width = 36;
+  if (!m_virt_addr_width) m_virt_addr_width = 48;
+  fk::algorithms::klog("CPU", "Address widths: phys=%u virt=%u", m_phys_addr_width, m_virt_addr_width);
+
+  // Leaf 7, subleaf 0: structured feature flags
   cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-  if (ebx & (1 << 7))
-    m_has_smep = true;
-  if (ebx & (1 << 20))
-    m_has_smap = true;
+  m_has_fsgsbase = (ebx & (1u << 0)) != 0;
+  m_has_smep     = (ebx & (1u << 7)) != 0;
+  m_has_invpcid  = (ebx & (1u << 10)) != 0;
+  m_has_avx2     = (ebx & (1u << 5)) != 0;
+  m_has_avx512   = (ebx & (1u << 16)) != 0;  // AVX-512F
+  m_has_smap     = (ebx & (1u << 20)) != 0;
+  m_has_umip     = (ecx & (1u << 2)) != 0;
+  m_has_la57     = (ecx & (1u << 16)) != 0;
+  m_has_cet      = (ecx & (1u << 7)) != 0;   // CET shadow stack (user)
 
-  // Check for XSAVE + AVX (leaf 1, ECX bits 26-28)
-  // Already have ecx from leaf 1 above
-  if (ecx & (1 << 26))
-    m_has_xsave = true;
-  if (ecx & (1 << 28))
-    m_has_avx = true;
+  fk::algorithms::klog("CPU", "Features: SMEP=%d SMAP=%d NX=%d XSAVE=%d AVX=%d AVX2=%d AVX512=%d",
+    m_has_smep, m_has_smap, m_has_nx, m_has_xsave, m_has_avx, m_has_avx2, m_has_avx512);
+  fk::algorithms::klog("CPU", "Features: FSGSBASE=%d UMIP=%d INVPCID=%d 1GB=%d LA57=%d CET=%d",
+    m_has_fsgsbase, m_has_umip, m_has_invpcid, m_has_1gb_pages, m_has_la57, m_has_cet);
 }
 
 void CPU::initialize_features() {
-  arch_enable_cpu_features(m_has_smep, m_has_smap, m_has_nx, m_has_xsave, m_has_avx);
+  arch_enable_cpu_features(m_has_smep, m_has_smap, m_has_nx, m_has_xsave, m_has_avx,
+                           m_has_fsgsbase, m_has_umip, m_has_invpcid);
 }
 
 void CPU::write_msr(uint32_t msr, uint64_t value) {

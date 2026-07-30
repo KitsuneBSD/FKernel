@@ -13,19 +13,19 @@ DisplayText::DisplayText() : row(0), col(0), color(0x07) {
 void DisplayText::update_cursor() {
   uint16_t pos = static_cast<uint16_t>(row * WIDTH + col);
 
-  arch_outb(0x3D4, 0x0F);
-  arch_outb(0x3D5, static_cast<uint8_t>(pos & 0xFF));
+  outb(0x3D4, 0x0F);
+  outb(0x3D5, static_cast<uint8_t>(pos & 0xFF));
 
-  arch_outb(0x3D4, 0x0E);
-  arch_outb(0x3D5, static_cast<uint8_t>((pos >> 8) & 0xFF));
+  outb(0x3D4, 0x0E);
+  outb(0x3D5, static_cast<uint8_t>((pos >> 8) & 0xFF));
 }
 
 void DisplayText::enable_cursor() {
-  arch_outb(0x3D4, 0x0A);
-  arch_outb(0x3D5, (arch_inb(0x3D5) & 0xC0) | 6);
+  outb(0x3D4, 0x0A);
+  outb(0x3D5, (inb(0x3D5) & 0xC0) | 6);
 
-  arch_outb(0x3D4, 0x0B);
-  arch_outb(0x3D5, (arch_inb(0x3D5) & 0xE0) | 7);
+  outb(0x3D4, 0x0B);
+  outb(0x3D5, (inb(0x3D5) & 0xE0) | 7);
 }
 
 void DisplayText::scroll() {
@@ -62,10 +62,10 @@ void DisplayText::show_cursor(bool visible) {
     else {
         // VGA doesn't have a simple "hide" bit without risk, 
         // a common trick is to move it off-screen
-        arch_outb(0x3D4, 0x0F);
-        arch_outb(0x3D5, 0xFF);
-        arch_outb(0x3D4, 0x0E);
-        arch_outb(0x3D5, 0xFF);
+        outb(0x3D4, 0x0F);
+        outb(0x3D5, 0xFF);
+        outb(0x3D4, 0x0E);
+        outb(0x3D5, 0xFF);
     }
 }
 

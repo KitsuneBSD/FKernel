@@ -4,7 +4,6 @@
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/Task/task.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
@@ -132,21 +131,6 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
             shm->map_into(task, target_addr, pg_flags);
             return target_addr;
         }
-        // File-backed MAP_SHARED: read into private pages, track for writeback
-        bool is_fixed = (flags & MAP_FIXED) != 0;
-        uint64_t target = mmap_file(task, addr, len, prot, fd, offset, is_fixed);
-        if (target < (uint64_t)-4096ULL) {
-            auto file = task->get_file_descriptor(static_cast<int>(fd));
-            if (file && file->node()) {
-                FileMmapRecord rec;
-                rec.vaddr       = static_cast<uintptr_t>(target);
-                rec.size        = static_cast<size_t>(len);
-                rec.node        = file->node();
-                rec.file_offset = offset;
-                task->resources.memory.file_mmaps.push_back(fk::types::move(rec));
-            }
-        }
-        return target;
     }
 
     bool is_fixed = (flags & MAP_FIXED) != 0;

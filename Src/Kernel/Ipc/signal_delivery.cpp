@@ -1,5 +1,6 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Fs/Virtual/SignalFd/signal_fd_node.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <Kernel/Ipc/cspace.h>
 #include <Kernel/Ipc/notification.h>
 #include <Kernel/Ipc/signal_delivery.h>
@@ -47,6 +48,7 @@ void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info
     target->resources.ipc.signal_notification->signal_with_payload(
         fk::NotificationBits(1ULL << signum), &si, sizeof(si));
 
+  fkernel::notify_signal_kqueue(target, signum);
   fk::algorithms::klog("SIGNAL", "Signal %d sent to PID %lu code=%d",
                        signum, target->control.identity.id.value(), si.si_code);
 }

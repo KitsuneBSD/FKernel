@@ -1,4 +1,3 @@
-#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
@@ -25,6 +24,8 @@
 using namespace fkernel::scheduler;
 
 extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr);
+extern "C" uint8_t g_use_xsave;
+extern "C" size_t g_xsave_area_size;
 extern "C" void trampoline_start();
 extern "C" void trampoline_end();
 extern "C" uint64_t stack_bottom;
@@ -36,7 +37,7 @@ SchedulerManager::SchedulerManager() {
 }
 
 void SchedulerManager::initialize() {
-  if (m_is_initialized) return;
+  m_is_initialized = true;
 
   if (ACPIManager::the().is_initialized()) {
     uint32_t detected = ACPIManager::the().cpu_count();
@@ -56,7 +57,6 @@ void SchedulerManager::initialize() {
   m_next_pid = 2;
   fk::algorithms::klog("SCHEDULER", "MLFQ Scheduler initialized (%d levels, %d CPUs)",
                        MLFQ_LEVELS, m_processor_count.value());
-  m_is_initialized = true;
 }
 
 Task* SchedulerManager::steal_task(fk::CpuCount stealing_cpu) {
@@ -74,18 +74,18 @@ Task* SchedulerManager::steal_task(fk::CpuCount stealing_cpu) {
   if (busiest_cpu == stealing_cpu.value()) return nullptr;
   fk::synchronization::ScopedLockIRQ lock(m_processors[busiest_cpu].run_queue_lock);
 
-  uint32_t stealer_id = stealing_cpu.value();
   for (int level = MLFQ_LEVELS - 1; level >= 0; --level) {
-    auto& mlfq = m_processors[busiest_cpu].run_queues[level];
-    if (mlfq.queue.empty()) continue;
-    if (!mlfq.can_serve_cpu(stealer_id)) continue; // O(1) affinity bitmap check
-    for (auto it = mlfq.queue.begin(); it != mlfq.queue.end(); ++it) {
+    auto& queue = m_processors[busiest_cpu].run_queues[level].queue;
+    if (queue.empty()) continue;
+
+    uint32_t stealer_id = stealing_cpu.value();
+    for (auto it = queue.begin(); it != queue.end(); ++it) {
       Task* task = &*it;
       if (task->control.lifecycle.cpu_affinity != 0 &&
           !(task->control.lifecycle.cpu_affinity & (1ULL << stealer_id)))
         continue;
-      mlfq.dequeue(task);
-      task->control.lifecycle.time_slice_ticks = mlfq.quantum_ticks.value();
+      queue.remove(task);
+      task->control.lifecycle.time_slice_ticks = m_processors[busiest_cpu].run_queues[level].quantum_ticks.value();
       return task;
     }
   }
@@ -98,17 +98,17 @@ Task* SchedulerManager::pick_next() {
   {
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
     for (uint32_t level = 0; level < MLFQ_LEVELS; ++level) {
-      auto& mlfq = proc.run_queues[level];
-      if (mlfq.queue.empty()) continue;
-      if (!mlfq.can_serve_cpu(cpu_id)) continue; // O(1) skip via affinity bitmap
-      for (auto it = mlfq.queue.begin(); it != mlfq.queue.end(); ++it) {
+      auto& queue = proc.run_queues[level].queue;
+      if (queue.empty()) continue;
+
+      for (auto it = queue.begin(); it != queue.end(); ++it) {
         Task* task = &*it;
         if (task->control.lifecycle.cpu_affinity != 0 &&
             !(task->control.lifecycle.cpu_affinity & (1ULL << cpu_id)))
           continue;
-        mlfq.dequeue(task);
+        queue.remove(task);
         task->control.lifecycle.state = TaskState::Running;
-        task->control.lifecycle.time_slice_ticks = mlfq.quantum_ticks.value();
+        task->control.lifecycle.time_slice_ticks = proc.run_queues[level].quantum_ticks.value();
         proc.current_task = task;
         proc.need_resched = false;
         return proc.current_task;
@@ -163,9 +163,6 @@ static void load_next_task_context(Task* next_task) {
   CPU::the().write_msr(MSR_FS_BASE, next_task->resources.context.fs_base);
   CPU::the().write_msr(MSR_KERNEL_GS_BASE, next_task->resources.context.gs_base);
   GDTController::the().set_kernel_stack(next_task->resources.context.kernel_stack_top);
-  // KPTI: update per-CPU CR3 pointers for syscall entry/exit CR3 swap.
-  blk.kernel_cr3 = next_task->resources.memory.cr3;
-  blk.user_cr3   = next_task->resources.memory.user_cr3;
 }
 
 void SchedulerManager::schedule() {
@@ -184,7 +181,7 @@ void SchedulerManager::schedule() {
     prev_task->control.lifecycle.state = TaskState::Ready;
     uint8_t level = prev_task->control.lifecycle.mlfq_level;
     fk::synchronization::ScopedLock lock(proc.run_queue_lock);
-    proc.run_queues[level].enqueue(prev_task);
+    proc.run_queues[level].queue.push_back(prev_task);
   }
 
   switch_address_space_if_needed(prev_task, next_task);
@@ -194,7 +191,13 @@ void SchedulerManager::schedule() {
   // Lazy FPU: save outgoing task's FPU state if it currently owns the FPU registers.
   if (prev_task && prev_task == current_processor().last_fpu_task) {
     void* area = get_fpu_save_area(prev_task->resources.context);
-    arch_fpu_save(area);
+    if (g_use_xsave) {
+      uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
+      asm volatile("xsave64 %0" : "=m"(*static_cast<uint8_t*>(area))
+                   : "a"(mask_lo), "d"(mask_hi) : "memory");
+    } else {
+      asm volatile("fxsave %0" : "=m"(*static_cast<uint8_t*>(area)) :: "memory");
+    }
   }
 
   if (prev_task) {
@@ -269,7 +272,7 @@ void SchedulerManager::start_aps() {
 
 void SchedulerManager::idle_loop() {
   for (;;) {
-    arch_cpu_idle();
+    asm volatile("sti; hlt");
     schedule();
   }
 }

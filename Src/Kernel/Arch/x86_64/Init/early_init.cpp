@@ -31,8 +31,6 @@ void early_init() {
   // Heap
   fk::algorithms::klog("EARLY_INIT", "Initializing kernel heap...");
   MemoryManager::the().initialize_heap();
-  if (!MemoryManager::the().is_heap_initialized())
-    fk::algorithms::kfatal("EARLY_INIT", "Kernel heap failed to initialize");
   fk::algorithms::klog("EARLY_INIT", "Kernel heap ready");
 
   // Finalize BootInfo iterators (needs heap)
@@ -46,8 +44,6 @@ void early_init() {
   // Physical + Virtual memory managers
   fk::algorithms::klog("EARLY_INIT", "Initializing memory manager...");
   MemoryManager::the().initialize();
-  if (!MemoryManager::the().is_initialized())
-    fk::algorithms::kfatal("EARLY_INIT", "Memory manager failed to initialize");
 
   auto &pmm = PhysicalMemoryManager::the();
   size_t total_mib = pmm.total_memory() / (1024 * 1024);

@@ -10,7 +10,7 @@ void StringBuilder::append(char c) {
 
 void StringBuilder::append(const char* s) {
     if (!s) return;
-    while (*s) m_buffer.push_back(*s++);
+    m_buffer.push_range(s, __builtin_strlen(s));
 }
 
 void StringBuilder::append(const String& s) {

@@ -1,12 +1,12 @@
-global arch_invlpg
+global invalid_tlb
 
 section .text
-arch_invlpg:
+invalid_tlb:
   push rbp 
   mov rbp, rsp 
 
   test rdi, 0xFFF
-  jnz arch_invlpg_error
+  jnz invalid_tlb_error
 
   invlpg [rdi]
 
@@ -15,7 +15,7 @@ arch_invlpg:
   pop rbp 
   xor rax, rax 
   ret 
-arch_invlpg_error:
+invalid_tlb_error:
   mov rsp, rbp
   pop rbp 
   mov rax, 1

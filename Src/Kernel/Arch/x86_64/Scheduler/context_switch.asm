@@ -6,17 +6,20 @@ extern syscall_stub_post_dispatch
 section .text
 bits 64
 
-; void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr,
-;                     void* prev_fx, void* next_fx)
+; void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr)
 ; rdi = pointer to prev_stack_ptr
 ; rsi = next_stack_ptr
-; rdx = prev_fx (16-byte aligned, always valid)
-; rcx = next_fx (16-byte aligned, always valid)
+;
+; FPU save/restore is LAZY: handled by #NM (#DeviceNotAvailable) handler.
+; We set CR0.TS here so the next task traps into the #NM handler if it
+; uses FPU before the scheduler has loaded its FPU state.
 switch_context:
-    ; Save FPU/SSE state for outgoing task
-    fxsave [rdx]
+    ; Mark FPU as unavailable for the incoming task
+    mov rax, cr0
+    or  rax, 8          ; CR0.TS (bit 3) = 1 → trap FPU access
+    mov cr0, rax
 
-    ; Save callee-saved registers
+    ; Save callee-saved registers of outgoing task
     push rbx
     push rbp
     push r12
@@ -27,19 +30,16 @@ switch_context:
     ; Save current stack pointer
     mov [rdi], rsp
 
-    ; Switch to new stack
+    ; Switch to incoming task's stack
     mov rsp, rsi
 
-    ; Restore callee-saved registers
+    ; Restore callee-saved registers of incoming task
     pop r15
     pop r14
     pop r13
     pop r12
     pop rbp
     pop rbx
-
-    ; Restore FPU/SSE state for incoming task
-    fxrstor [rcx]
 
     ret
 
@@ -49,22 +49,17 @@ task_trampoline:
     mov rdi, r12
     mov rsi, r13
     call r14
-    
-    ; If the task returns, we are in trouble. 
-    ; In a real kernel, we would call exit() here.
+
+    ; If the task returns, spin
 .loop:
     hlt
     jmp .loop
 
 fork_child_trampoline:
     xor rax, rax ; return 0 for child
-    ; The syscall_stub_post_dispatch expects to cleanup 24 bytes of arguments/padding
-    ; from the stack before restoring registers. We must match this layout.
     sub rsp, 24
     ; Sync the child's fork-time user context from PtRegs into g_cpu_block so that
     ; syscall_stub_post_dispatch returns to the right user RSP/RIP/RFLAGS.
-    ; Without this, g_cpu_block holds stale values from whatever syscall the parent
-    ; (or another task) ran last, causing the child to sysret to the wrong address.
     ;
     ; After sub rsp,24: PtRegs base = rsp+24, so:
     ;   PtRegs.rip    = [rsp+128]   (base+104)

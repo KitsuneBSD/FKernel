@@ -18,13 +18,11 @@ uint64_t sys_dup3(uint64_t oldfd_u64, uint64_t newfd_u64, uint64_t flags,
     auto desc = task->get_file_descriptor(oldfd);
     if (!desc) return (uint64_t)-9; // EBADF
 
-    if (task->resources.files.descriptors[newfd])
-        task->close_file_descriptor(newfd);
-
-    task->resources.files.descriptors[newfd] = desc;
-
     bool cloexec = (flags & 02000000) != 0; // O_CLOEXEC
     desc->set_cloexec(cloexec);
+
+    if (task->install_at(newfd, desc) < 0)
+        return (uint64_t)-22; // EINVAL
 
     return (uint64_t)newfd;
 }

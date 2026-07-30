@@ -9,14 +9,18 @@ void *memmove(void *dest, const void *src, size_t n) {
   const unsigned char *s = (const unsigned char *)src;
 
   if (d < s) {
-    // Copy forwards
-    for (size_t i = 0; i < n; i++)
-      d[i] = s[i];
+    __asm__ volatile("rep movsb"
+                     : "+D"(d), "+S"(s), "+c"(n)
+                     :
+                     : "memory");
   } else {
-    // Copy backwards
-    for (size_t i = n; i > 0; i--)
-      d[i - 1] = s[i - 1];
+    /* Copy backwards: set DF, start from last byte, then clear DF */
+    d += n - 1;
+    s += n - 1;
+    __asm__ volatile("std; rep movsb; cld"
+                     : "+D"(d), "+S"(s), "+c"(n)
+                     :
+                     : "memory");
   }
-
   return dest;
 }

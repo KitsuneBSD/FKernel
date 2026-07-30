@@ -299,8 +299,8 @@ void DisplayFramebuffer::allocate_back_buffer() {
 }
 void DisplayFramebuffer::free_back_buffer() { if (back_buffer) { MemoryManager::the().free(back_buffer); back_buffer = nullptr; double_buffering_enabled = false; } }
 void DisplayFramebuffer::wait_vblank() {
-    while (arch_inb(0x3DA) & 8) { arch_cpu_relax(); }
-    while (!(arch_inb(0x3DA) & 8)) { arch_cpu_relax(); }
+    while (inb(0x3DA) & 8) { arch_cpu_relax(); }
+    while (!(inb(0x3DA) & 8)) { arch_cpu_relax(); }
 }
 void DisplayFramebuffer::swap_buffers() { if (!double_buffering_enabled || !back_buffer || !framebuffer) return; fk::memory::copy(framebuffer, back_buffer, fb_height * fb_pitch); }
 

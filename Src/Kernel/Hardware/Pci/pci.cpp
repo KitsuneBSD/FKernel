@@ -42,23 +42,13 @@ void PciManager::initialize() {
     }
   }
 
-  // Initialize /dev/pci event node
+  // Initialize event delivery node
   auto pci_node_res = fk::make_ref<fkernel::PCIDeviceNode>();
   if (pci_node_res.is_error()) {
       fk::algorithms::klog("PCI", "Failed to allocate PCI device node!");
   } else {
       m_pci_node = pci_node_res.value();
       fkernel::DevFs::the().register_device(m_pci_node, "pci");
-  }
-
-  // Initialize /dev/udi — userspace driver interface
-  auto udi_node_res = fk::make_ref<fkernel::UdiNode>();
-  if (udi_node_res.is_error()) {
-      fk::algorithms::klog("PCI", "Failed to allocate UDI node!");
-  } else {
-      m_udi_node = udi_node_res.value();
-      fkernel::DevFs::the().register_device(m_udi_node, "udi");
-      fk::algorithms::klog("PCI", "/dev/udi registered");
   }
 
   fk::algorithms::klog("PCI", "Manager initialized");
@@ -68,8 +58,8 @@ void PciManager::initialize() {
 void PciManager::detect_legacy_ports() {
   // Try to read VendorID of Bus 0, Device 0, Function 0
   uint32_t address = 0x80000000; // Bus 0, Dev 0, Func 0, Reg 0
-  arch_outl(m_legacy_ports.address_port, address);
-  uint32_t value = arch_inl(m_legacy_ports.data_port);
+  outl(m_legacy_ports.address_port, address);
+  uint32_t value = inl(m_legacy_ports.data_port);
 
   if (value != 0xFFFFFFFF && value != 0x00000000) {
     m_legacy_ports.functional = true;
@@ -95,8 +85,8 @@ uint32_t PciManager::read_config_dword(PciAddress address, uint8_t offset) {
     return *reinterpret_cast<volatile uint32_t *>(config_addr);
   }
 
-  arch_outl(m_legacy_ports.address_port, address.to_config_address(offset));
-  return arch_inl(m_legacy_ports.data_port);
+  outl(m_legacy_ports.address_port, address.to_config_address(offset));
+  return inl(m_legacy_ports.data_port);
 }
 
 uint16_t PciManager::read_config_word(PciAddress address, uint8_t offset) {
@@ -118,8 +108,8 @@ void PciManager::write_config_dword(PciAddress address, uint8_t offset, uint32_t
                              (offset & 0xFFF));
     *reinterpret_cast<volatile uint32_t *>(config_addr) = value;
   } else {
-    arch_outl(m_legacy_ports.address_port, address.to_config_address(offset));
-    arch_outl(m_legacy_ports.data_port, value);
+    outl(m_legacy_ports.address_port, address.to_config_address(offset));
+    outl(m_legacy_ports.data_port, value);
   }
 }
 
@@ -222,11 +212,7 @@ void PciManager::instantiate_drivers() {
       }
     }
     if (!driver_found) {
-        fk::algorithms::kdebug("PCI", "No kernel driver for %02x:%02x.%d (class=%02x sub=%02x) — publishing to /dev/udi",
-                               device.address().bus(), device.address().device(), device.address().function(),
-                               device.class_code(), device.subclass_code());
-        if (m_udi_node)
-            m_udi_node->push_attach(device);
+        // Optional: log devices without drivers at debug level
     }
   }
 }
@@ -352,7 +338,7 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
         m_devices.push_back(new_device);
 
         fk::algorithms::klog("PCI", "Hotplug: New device inserted at %02x:%02x.%d", bus, device, function);
-
+        
         // Notify userspace node
         if (m_pci_node) {
             m_pci_node->push_event({fkernel::PCIEvent::Type::Insertion, bus, device, function, vendor, dev_id});
@@ -363,20 +349,16 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
             cb(new_device, true);
         }
 
-        // Try to instantiate kernel driver; if none, expose to /dev/udi
-        bool kernel_driver_found = false;
+        // Try to instantiate driver
         for (const auto &driver : m_drivers) {
-            if (new_device.class_code() == driver.class_code &&
+            if (new_device.class_code() == driver.class_code && 
                 new_device.subclass_code() == driver.subclass) {
                 auto node = driver.factory(new_device);
                 if (node) {
                     m_device_nodes.insert(address, node);
                 }
-                kernel_driver_found = true;
             }
         }
-        if (!kernel_driver_found && m_udi_node)
-            m_udi_node->push_attach(new_device);
     } else if (!exists && known_index != m_devices.size()) {
         // Device removed
         PciDevice removed_device = m_devices[known_index];
@@ -393,14 +375,11 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
             m_pci_node->push_event({fkernel::PCIEvent::Type::Removal, bus, device, function, removed_device.vendor_id(), removed_device.device_id()});
         }
 
-        // Unregister from DriverManager if we have a kernel node;
-        // otherwise notify /dev/udi so userspace can clean up
+        // Unregister from DriverManager if we have a node
         auto node_opt = m_device_nodes.get(address);
         if (node_opt.has_value()) {
             fkernel::DriverManager::the().unregister_device(node_opt.value());
             m_device_nodes.remove(address);
-        } else if (m_udi_node) {
-            m_udi_node->push_detach(removed_device);
         }
 
         // Remove from known devices

@@ -210,6 +210,7 @@ target("Test")
   add_files("Src/LibFK/Text/string_builder.cpp")
   add_files("Src/LibFK/Memory/new.cpp")
   add_files("Src/LibFK/Algorithms/crc32.cpp")
+  add_files("Src/LibFK/Algorithms/log_targets.cpp")
   add_files("tests/test_mock.c")
 
   on_run(function(target)

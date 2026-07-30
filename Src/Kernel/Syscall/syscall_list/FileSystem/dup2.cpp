@@ -35,9 +35,8 @@ uint64_t sys_dup2(uint64_t oldfd_u64, uint64_t newfd_u64, uint64_t, uint64_t,
 
     if (oldfd == newfd) return newfd;
 
-    if (newfd < 0 || newfd >= static_cast<int>(MAX_OPEN_FILES)) return -static_cast<int>(fk::core::Error::InvalidParameter);
-
-    current->resources.files.descriptors[newfd] = desc;
+    if (current->install_at(newfd, desc) < 0)
+      return -static_cast<int>(fk::core::Error::InvalidParameter);
     return newfd;
 }
 }

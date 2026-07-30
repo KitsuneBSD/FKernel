@@ -7,6 +7,7 @@
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Fs/Vfs/kqueue.h>
 #include <Kernel/Scheduler/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
@@ -38,6 +39,7 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
 
   // 2. Clone metadata
   child->control.identity.id = SchedulerManager::the().generate_pid();
+  child->control.identity.tgid = child->control.identity.id; // new process = new thread group
   child->control.identity.ppid = parent->control.identity.id;
   child->control.identity.pgid = parent->control.identity.pgid;
   child->control.identity.sid = parent->control.identity.sid;
@@ -97,13 +99,24 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
   child->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
   child->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
 
-  // 3. Clone File Descriptors + grant capabilities to child's CSpace
+  // 3. Clone File Descriptors — install independent caps in child CSpace
   for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
-    child->resources.files.descriptors.push_back(parent->resources.files.descriptors[i]);
+    auto desc = parent->resources.files.descriptors[i];
+    child->resources.files.descriptors.push_back(desc);
+    uint32_t child_handle = fkernel::ipc::INVALID_HANDLE;
+    if (desc && child->resources.ipc.cspace) {
+      fkernel::ipc::CapabilityRights rights = fkernel::ipc::CapabilityRights::All;
+      if (parent->resources.ipc.cspace && i < parent->resources.files.cap_handles.size()) {
+        uint32_t ph = parent->resources.files.cap_handles[i];
+        if (ph != fkernel::ipc::INVALID_HANDLE) {
+          auto pcap = parent->resources.ipc.cspace->get(ph);
+          if (pcap.is_valid()) rights = pcap.rights();
+        }
+      }
+      child_handle = child->resources.ipc.cspace->install_fd(desc.get(), rights);
+    }
+    child->resources.files.cap_handles.push_back(child_handle);
   }
-  if (parent->resources.ipc.cspace)
-    parent->resources.ipc.cspace->grant_all_to(*child->resources.ipc.cspace,
-                                                fkernel::ipc::CapabilityType::FileDescription);
   child->dump_file_descriptors();
 
   // 4. Setup Kernel Stack
@@ -152,6 +165,9 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
   fk::algorithms::klog("FORK", "fork: parent=%lu, child=%lu",
                        parent->control.identity.id.value(),
                        child->control.identity.id.value());
+
+  // Notify kqueue watchers (EVFILT_PROC NOTE_FORK) with child pid in the low bits.
+  fkernel::notify_proc_kqueue(parent, fkernel::NOTE_FORK | (child->control.identity.id.value() & 0x00FFFFFFu));
 
   return child->control.identity.id.value();
 }

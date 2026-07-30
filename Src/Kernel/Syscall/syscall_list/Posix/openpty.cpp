@@ -31,7 +31,7 @@ uint64_t sys_openpty(uint64_t master_ptr, uint64_t slave_ptr,
   auto to_slave   = fk::make_ref<PtyBuffer>().value();
   auto to_master  = fk::make_ref<PtyBuffer>().value();
   auto master_node = fk::make_ref<PtyMaster>(to_slave, to_master, index).value();
-  auto slave_node  = fk::make_ref<PtySlave>(to_slave, to_master, index).value();
+  auto slave_node  = fk::make_ref<PtySlave>(to_slave, to_master, index, &master_node->ldisc()).value();
 
   auto pts_dir = get_pts_dir();
   if (pts_dir) pts_dir->register_slave(index, fk::RefPtr<Node>(slave_node.get()));

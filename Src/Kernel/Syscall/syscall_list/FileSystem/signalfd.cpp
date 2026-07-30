@@ -30,7 +30,7 @@ static uint64_t do_signalfd(int fd, uint64_t mask_ptr, uint64_t sizemask) {
         if (!node || !node->is_signalfd()) return -static_cast<int>(fk::core::Error::InvalidParameter);
         auto* sfd = static_cast<SignalFdNode*>(node.get());
         sfd->update_mask(mask);
-        task->resources.ipc.signals.blocked = static_cast<uint32_t>(mask & 0xFFFFFFFF);
+        task->resources.ipc.signals.blocked = mask;
         return static_cast<uint64_t>(fd);
     }
 
@@ -38,7 +38,7 @@ static uint64_t do_signalfd(int fd, uint64_t mask_ptr, uint64_t sizemask) {
     if (node_res.is_error()) return -static_cast<int>(node_res.error());
 
     task->resources.ipc.signal_fd = node_res.value().get();
-    task->resources.ipc.signals.blocked |= static_cast<uint32_t>(mask & 0xFFFFFFFF);
+    task->resources.ipc.signals.blocked |= mask;
 
     auto dentry_res = Dentry::create("signalfd", nullptr);
     if (dentry_res.is_error()) return -1;
@@ -72,7 +72,7 @@ static uint64_t do_signalfd4(int fd, uint64_t mask_ptr, uint64_t sizemask, int f
         auto* sfd = static_cast<SignalFdNode*>(node.get());
         sfd->update_mask(mask);
         sfd->set_nonblock(nonblock);
-        task->resources.ipc.signals.blocked = static_cast<uint32_t>(mask & 0xFFFFFFFF);
+        task->resources.ipc.signals.blocked = mask;
         return static_cast<uint64_t>(fd);
     }
 
@@ -81,7 +81,7 @@ static uint64_t do_signalfd4(int fd, uint64_t mask_ptr, uint64_t sizemask, int f
     node_res.value()->set_nonblock(nonblock);
 
     task->resources.ipc.signal_fd = node_res.value().get();
-    task->resources.ipc.signals.blocked |= static_cast<uint32_t>(mask & 0xFFFFFFFF);
+    task->resources.ipc.signals.blocked |= mask;
 
     auto dentry_res = Dentry::create("signalfd", nullptr);
     if (dentry_res.is_error()) return -1;

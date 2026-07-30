@@ -123,42 +123,6 @@ extern "C" [[noreturn]] void arch_halt_loop() {
     asm volatile("hlt");
 }
 
-extern "C" void arch_cpu_idle() {
-  asm volatile("sti; hlt");
-}
-
-extern "C" void arch_fpu_save(void* area) {
-  if (g_use_xsave) {
-    uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
-    asm volatile("xsave64 %0" : "=m"(*static_cast<uint8_t*>(area))
-                 : "a"(mask_lo), "d"(mask_hi) : "memory");
-  } else {
-    asm volatile("fxsave %0" : "=m"(*static_cast<uint8_t*>(area)) :: "memory");
-  }
-}
-
-extern "C" void arch_fpu_restore(const void* area) {
-  if (g_use_xsave) {
-    uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
-    asm volatile("xrstor64 %0" :: "m"(*static_cast<const uint8_t*>(area)),
-                 "a"(mask_lo), "d"(mask_hi) : "memory");
-  } else {
-    asm volatile("fxrstor %0" :: "m"(*static_cast<const uint8_t*>(area)) : "memory");
-  }
-}
-
-extern "C" uint64_t arch_read_tsc() {
-  uint32_t lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return (static_cast<uint64_t>(hi) << 32) | lo;
-}
-
-extern "C" uint64_t arch_read_tsc_serialized() {
-  uint32_t lo, hi;
-  asm volatile("lfence; rdtsc" : "=a"(lo), "=d"(hi));
-  return (static_cast<uint64_t>(hi) << 32) | lo;
-}
-
 void detect_tsc_frequency() {
   uint32_t eax, ebx, ecx, edx;
 

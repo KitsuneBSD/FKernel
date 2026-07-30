@@ -11,17 +11,18 @@ uint64_t sys_exit_group(uint64_t status, uint64_t, uint64_t, uint64_t, uint64_t,
     auto* current = SchedulerManager::the().current();
     if (!current) return 0;
 
-    auto pid = current->control.identity.id;
+    auto self_pid = current->control.identity.id;
+    auto tgid = current->control.identity.tgid;
 
-    // Send SIGKILL to all sibling threads (same PID) to terminate them
-    // when they next enter the kernel. We exit last.
-    for (uint64_t probe_pid = 1; probe_pid < 1024; ++probe_pid) {
-        if (probe_pid == pid.value()) continue;
-        auto task = SchedulerManager::the().find_task(fk::ProcessId(probe_pid));
-        if (task && task->control.identity.id == pid) {
-            fk::algorithms::klog("EXIT_GROUP", "Sending SIGKILL to sibling %lu", probe_pid);
-            fkernel::ipc::SignalDelivery::send_signal(task.get(), SIGKILL);
-        }
+    // Kill all threads in the same thread group (same tgid), except ourselves.
+    uint64_t max_pid = SchedulerManager::the().last_pid().value();
+    for (uint64_t probe = 1; probe <= max_pid; ++probe) {
+        if (probe == self_pid.value()) continue;
+        auto task = SchedulerManager::the().find_task(fk::ProcessId(probe));
+        if (!task) continue;
+        if (task->control.identity.tgid != tgid) continue;
+        fk::algorithms::klog("EXIT_GROUP", "Sending SIGKILL to thread %lu (tgid=%lu)", probe, tgid.value());
+        fkernel::ipc::SignalDelivery::send_signal(task.get(), SIGKILL);
     }
 
     return sys_exit(status, 0, 0, 0, 0, 0, regs);

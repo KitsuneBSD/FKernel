@@ -10,7 +10,7 @@ void PITTimer::initialize(uint32_t frequency) {
 
 void PITTimer::set_frequency(uint32_t frequency) {
   uint16_t divisor = 1193180 / frequency;
-  arch_outb(PIT_COMMAND, PIT_CMD_RATE_GEN);
-  arch_outb(PIT_CHANNEL0, (uint8_t)(divisor & 0xFF));
-  arch_outb(PIT_CHANNEL0, (uint8_t)((divisor >> 8) & 0xFF));
+  outb(PIT_COMMAND, PIT_CMD_RATE_GEN);
+  outb(PIT_CHANNEL0, (uint8_t)(divisor & 0xFF));
+  outb(PIT_CHANNEL0, (uint8_t)((divisor >> 8) & 0xFF));
 }

@@ -136,6 +136,18 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::write(uint64_t, size_t si
                                                              const uint8_t* buffer) {
   if (!buffer)
     return fk::core::Error::InvalidParameter;
+
+  // SIGTTOU: block background processes from writing if TOSTOP is set.
+  // For simplicity we always deliver SIGTTOU to background writers.
+  if (m_state.foreground_pgid > 0) {
+    auto* task = SchedulerManager::the().current();
+    if (task && !task->control.lifecycle.is_a_kernel_task &&
+        (int)task->control.identity.pgid.value() != m_state.foreground_pgid) {
+      fkernel::ipc::SignalDelivery::send_signal(task, SIGTTOU);
+      return fk::core::Error::Interrupted;
+    }
+  }
+
   fk::synchronization::ScopedLock lock(m_lock);
   if (TerminalManager::the().active_terminal() != this) {
     fk::algorithms::kwarn("VGATERM", "write to inactive terminal tty%d (%zu bytes discarded)",

@@ -8,8 +8,13 @@
 #include <Kernel/Scheduler/scheduler.h>
 #include <LibFK/Algorithms/log.h>
 
+extern void init_syscalls(size_t cpu_index);
+
 extern "C" void ap_entry(uint32_t cpu_index) {
     GDTController::the().load_per_cpu(cpu_index);
+
+    // Set up per-CPU GS base and SYSCALL MSRs for this AP.
+    init_syscalls(cpu_index);
 
     if (CPU::the().has_x2apic()) {
         X2APIC::the().calibrate_timer();

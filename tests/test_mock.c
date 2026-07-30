@@ -25,3 +25,4 @@ void kprintf(const char *fmt, ...) {
 void libc_puts(const char *s) { puts(s); }
 void libc_putc(char c) { putchar((unsigned char)c); }
 void libc_set_heap_ready(void) { /* no-op in test */ }
+

@@ -15,19 +15,18 @@ uint64_t sys_rt_sigsuspend(uint64_t mask_ptr, uint64_t sigsetsize, uint64_t, uin
     if (!task) return (uint64_t)-1;
 
     // Save current signal mask
-    uint32_t old_blocked = task->resources.ipc.signals.blocked;
+    uint64_t old_blocked = task->resources.ipc.signals.blocked;
 
     // Apply new mask if provided (SIGKILL and SIGSTOP cannot be blocked)
     if (mask_ptr) {
-        uint64_t new_mask_raw = 0;
-        auto res = fkernel::memory::copy_from_user(&new_mask_raw,
+        uint64_t new_mask = 0;
+        auto res = fkernel::memory::copy_from_user(&new_mask,
                                                     reinterpret_cast<const void*>(mask_ptr),
                                                     sizeof(uint64_t));
         if (res.is_error()) return (uint64_t)-14; // EFAULT
 
-        uint32_t new_mask = (uint32_t)new_mask_raw;
         // Cannot block SIGKILL (9) or SIGSTOP (19)
-        new_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
+        new_mask &= ~((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)));
         task->resources.ipc.signals.blocked = new_mask;
     }
 

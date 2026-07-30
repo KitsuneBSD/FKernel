@@ -81,8 +81,7 @@ void initialize_task(Task* task, fk::ProcessId id, const fk::text::fixed_string<
                              .boosted = false,
                              .original_qos = qos};
 
-  task->resources.memory = {};
-  task->resources.memory.cr3 = arch_read_cr3();
+  task->resources.memory = {.cr3 = read_on_cr3()};
   task->resources.files.cwd = "/";
   task->resources.ipc.cspace = cspace;
   task->resources.ipc.signal_notification = signal_notification;
@@ -139,12 +138,6 @@ void Task::destroy() {
   if (resources.memory.prev_cr3) {
     VirtualMemoryManager::the().free_address_space(resources.memory.prev_cr3);
     resources.memory.prev_cr3 = 0;
-  }
-
-  // Free KPTI user-side shadow PML4 (PML4 page only; shared page tables freed below)
-  if (resources.memory.user_cr3) {
-    VirtualMemoryManager::the().free_kpti_user_pml4(resources.memory.user_cr3);
-    resources.memory.user_cr3 = 0;
   }
 
   // Free the current user address space
@@ -319,21 +312,6 @@ fk::RefPtr<FileDescription> Task::get_file_descriptor(int fd) {
       return {};
   }
 
-  return desc;
-}
-
-fk::RefPtr<FileDescription> Task::get_file_descriptor_with_rights(
-    int fd, fkernel::ipc::CapabilityRights required) {
-  if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size()))
-    return {};
-  auto desc = resources.files.descriptors[fd];
-  if (!desc) return {};
-  if (!resources.ipc.cspace) return desc; // no CSpace → no enforcement
-  if (fd >= static_cast<int>(resources.files.cap_handles.size())) return {};
-  uint32_t handle = resources.files.cap_handles[fd];
-  if (handle == fkernel::ipc::INVALID_HANDLE) return {};
-  fkernel::ipc::CapabilityRights actual = resources.ipc.cspace->get_fd_rights(handle);
-  if ((actual & required) != required) return {};
   return desc;
 }
 
