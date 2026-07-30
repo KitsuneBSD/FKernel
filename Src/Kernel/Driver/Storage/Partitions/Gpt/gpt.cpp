@@ -217,7 +217,7 @@ GPTParser::parse(fk::RefPtr<StorageDevice> device) {
     // BSD/Linux style naming: ad0p1, ad0p2, etc. where the number is the 1-based index in the table.
     // However, FKernel's StorageDeviceName::generate just appends. 
     // We'll use i + 1 to maintain consistency with entry indices.
-    fk::text::String name = StorageDeviceName::generate(device->name().c_str(), i + 1);
+    fk::text::String name = StorageDeviceName::partition(device->name().c_str(), i + 1);
     
     auto partition_res = Partition::create(device, entry->starting_lba, count, fk::types::move(name));
     if (partition_res.is_ok()) {

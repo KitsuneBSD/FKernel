@@ -63,7 +63,7 @@ MBRParser::parse(fk::RefPtr<StorageDevice> device) {
       continue;
     }
 
-    fk::text::String name = StorageDeviceName::generate(device->name().c_str(), i + 1);
+    fk::text::String name = StorageDeviceName::partition(device->name().c_str(), i + 1);
     auto partition_res = Partition::create(device, entry.lba_start, entry.lba_length, fk::types::move(name));
     if (partition_res.is_ok()) {
         PartitionManager::the().add_partition(partition_res.value());
@@ -101,7 +101,7 @@ MBRParser::parse_extended(fk::RefPtr<StorageDevice> device,
 
   // First entry is the logical partition
   if (mbr->entries[0].lba_length > 0 && mbr->entries[0].system_id != 0) {
-    fk::text::String name = StorageDeviceName::generate(device->name().c_str(), ++partition_count);
+    fk::text::String name = StorageDeviceName::partition(device->name().c_str(), ++partition_count);
     auto partition_res = Partition::create(device, ebr_lba + mbr->entries[0].lba_start,
                                           mbr->entries[0].lba_length, fk::types::move(name));
     if (partition_res.is_ok()) {
