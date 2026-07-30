@@ -49,7 +49,7 @@ Found during static architecture audit. See also `.ai-docs/AUDITS.md`.
 | # | File | Line | Issue | Severity |
 |---|------|------|-------|----------|
 | 3 | `Include/LibFK/Synchronization/spinlock.h` | 22–28 | `cpuid` instruction on every lock/unlock (~100 serializing cycles) | Performance |
-| 4 | `Include/LibFK/Core/result.h` | 29–38 | `value()` on error only warns, does not assert — silent invalid-state propagation | Design |
+| 4 | `Include/LibFK/Core/result.h` | 29–38 | `value()` on error only warns, does not assert — silent invalid-state propagation | ✅ Fixed — `__builtin_trap()` on `value()` when error and `error()` when ok; removed kwarn noise |
 | 5 | `Include/LibFK/Memory/retain_ptr.h` | 39 | Refcount allocated separately from object (`allocate<uint32_t>()`): fragmentation + leak if `allocate` fails after object constructed | Design |
 | 6 | `Include/LibFK/Memory/ref_counted.h` | 17 | `virtual ~RefCounted()` adds vtable to every refcounted class | Overhead |
 | 7 | `Include/LibFK/Text/string.h` | — | SSO never shrinks back to inline after growth — permanent memory retention | Memory |

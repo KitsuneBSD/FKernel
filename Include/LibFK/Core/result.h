@@ -27,20 +27,17 @@ public:
   explicit operator bool() const { return is_ok(); }
 
   const T &value() const {
-    if (is_error())
-      fk::algorithms::kwarn("RESULT", "value() called on error result");
+    if (is_error()) __builtin_trap();
     return m_value.value();
   }
 
   T &value() {
-    if (is_error())
-      fk::algorithms::kwarn("RESULT", "value() called on error result");
+    if (is_error()) __builtin_trap();
     return m_value.value();
   }
 
   E error() const {
-    if (is_ok())
-      fk::algorithms::kwarn("RESULT", "error() called on ok result");
+    if (is_ok()) __builtin_trap();
     return m_error;
   }
 
