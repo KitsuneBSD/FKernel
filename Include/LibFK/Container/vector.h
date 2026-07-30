@@ -144,6 +144,8 @@ private:
   }
 
   void reallocate_to(size_t new_capacity) {
+    if (new_capacity > static_cast<size_t>(-1) / sizeof(T))
+      return;
     T *new_data = static_cast<T *>(kmalloc(new_capacity * sizeof(T)));
     if (!new_data) return;
 

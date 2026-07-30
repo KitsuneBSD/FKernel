@@ -39,10 +39,10 @@ Found during static architecture audit. See also `.ai-docs/AUDITS.md`.
 
 ### UB / Bugs
 
-| # | File | Line | Issue | Severity |
-|---|------|------|-------|----------|
-| 1 | `Include/LibFK/Container/vector.h` | 147 | Integer overflow in `new_capacity * sizeof(T)` with no overflow check before `allocate()` | **UB** |
-| 2 | `Include/LibFK/Traits/type_traits.h` | 179 | `is_base_of<void, int>` gives wrong result (non-class types not handled) | **Bug** |
+| # | File | Line | Issue | Severity | Status |
+|---|------|------|-------|----------|--------|
+| 1 | `Include/LibFK/Container/vector.h` | 147 | Integer overflow in `new_capacity * sizeof(T)` with no overflow check before `allocate()` | **UB** | ✅ Fixed — guard `new_capacity > SIZE_MAX/sizeof(T)` in `reallocate_to()` |
+| 2 | `Include/LibFK/Traits/type_traits.h` | 179 | `is_base_of<void, int>` gives wrong result (non-class types not handled) | **Bug** | ✅ Fixed — added `is_class<T>` helper + `is_base_of` now requires both types be class; `tests/LibFK/test_traits.cpp` added |
 
 ### Design / Performance
 

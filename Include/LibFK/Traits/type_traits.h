@@ -172,19 +172,36 @@ template <typename T, size_t N> struct remove_extent<T[N]> {
 template <typename T> using remove_extent_t = typename remove_extent<T>::type;
 
 /**
+ * @brief Detects whether T is a class or struct type.
+ *
+ * Uses pointer-to-member SFINAE: int T::* is only valid for class types.
+ */
+template <typename T> struct is_class {
+private:
+  template <typename U> static char  check(int U::*);
+  template <typename U> static int   check(...);
+public:
+  static constexpr bool value = (sizeof(check<T>(nullptr)) == sizeof(char));
+};
+
+template <typename T>
+inline constexpr bool is_class_v = is_class<T>::value;
+
+/**
  * @brief Checks whether Base is a base class of Derived.
  *
- * Uses SFINAE with pointer conversion to detect inheritance.
+ * Requires both types to be class types to avoid the false-positive case
+ * where void* accepts any pointer (e.g. is_base_of<void, int> was true).
  */
 template <typename Base, typename Derived> struct is_base_of {
 private:
-  // This overload is chosen if Derived* can be converted to Base*
   static constexpr char test(const Base *);
-  // This overload is chosen otherwise
-  static constexpr int test(...);
+  static constexpr int  test(...);
 
 public:
   static constexpr bool value =
+      is_class<Base>::value &&
+      is_class<Derived>::value &&
       sizeof(test(static_cast<Derived *>(nullptr))) == sizeof(char);
 };
 

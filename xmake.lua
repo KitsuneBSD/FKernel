@@ -189,6 +189,7 @@ target("Test")
   -- Add test files
   add_files("tests/main.cpp")
   add_files("tests/LibC/test_string_memory_comprehensive.cpp")
+  add_files("tests/LibFK/test_traits.cpp")
   add_files("tests/LibFK/test_circular_buffer.cpp")
   add_files("tests/LibFK/test_containers.cpp")
   add_files("tests/LibFK/test_smart_pointers.cpp")

@@ -1,6 +1,7 @@
 #include <tests/test_framework.h>
 
 // Forward declarations of test runners
+int run_libfk_traits_tests();
 int run_libc_string_tests();
 int run_libfk_container_tests();
 int run_libfk_container_advanced_tests();
@@ -23,6 +24,7 @@ int run_libfk_crc32_tests();
 int main() {
     int failed = 0;
 
+    failed += run_libfk_traits_tests();
     failed += run_libc_string_tests();
     failed += run_libfk_container_tests();
     failed += run_libfk_container_advanced_tests();
