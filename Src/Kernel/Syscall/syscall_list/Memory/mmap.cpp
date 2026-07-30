@@ -4,6 +4,7 @@
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 #include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Task/task.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
@@ -62,14 +63,14 @@ static PageFlags prot_to_page_flags(uint64_t prot) {
 }
 
 static uint64_t mmap_file(Task* task, uintptr_t addr, uint64_t len, uint64_t prot,
-                           uint64_t fd, uint64_t offset) {
+                           uint64_t fd, uint64_t offset, bool is_fixed) {
     auto file = task->get_file_descriptor(static_cast<int>(fd));
     if (!file) {
         fk::algorithms::kwarn("MMAP", "invalid fd=%lu", fd);
         return fkernel::return_error(fk::core::Error::InvalidParameter);
     }
 
-    uintptr_t target = reserve_mmap_range(task, addr, len, false);
+    uintptr_t target = reserve_mmap_range(task, addr, len, is_fixed);
     PageFlags flags = prot_to_page_flags(prot);
     uint64_t pages = (len + 0xFFF) >> 12;
 
@@ -125,14 +126,31 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
     if ((flags & MAP_SHARED) && fd != (uint64_t)-1) {
         auto shm = resolve_shm(task, static_cast<int>(fd));
         if (shm) {
-            uintptr_t target_addr = reserve_mmap_range(task, addr, len, false);
+            bool is_fixed = (flags & MAP_FIXED) != 0;
+            uintptr_t target_addr = reserve_mmap_range(task, addr, len, is_fixed);
             PageFlags pg_flags = prot_to_page_flags(prot);
             shm->map_into(task, target_addr, pg_flags);
             return target_addr;
         }
+        // File-backed MAP_SHARED: read into private pages, track for writeback
+        bool is_fixed = (flags & MAP_FIXED) != 0;
+        uint64_t target = mmap_file(task, addr, len, prot, fd, offset, is_fixed);
+        if (target < (uint64_t)-4096ULL) {
+            auto file = task->get_file_descriptor(static_cast<int>(fd));
+            if (file && file->node()) {
+                FileMmapRecord rec;
+                rec.vaddr       = static_cast<uintptr_t>(target);
+                rec.size        = static_cast<size_t>(len);
+                rec.node        = file->node();
+                rec.file_offset = offset;
+                task->resources.memory.file_mmaps.push_back(fk::types::move(rec));
+            }
+        }
+        return target;
     }
 
-    return mmap_file(task, addr, len, prot, fd, offset);
+    bool is_fixed = (flags & MAP_FIXED) != 0;
+    return mmap_file(task, addr, len, prot, fd, offset, is_fixed);
 }
 
 uint64_t sys_munmap(uint64_t addr, uint64_t length, [[maybe_unused]] uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*) {
