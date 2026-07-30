@@ -3,6 +3,7 @@
 #include <Kernel/Fs/Vfs/node.h>
 #include <Kernel/Fs/Vfs/dentry_node_stack.h>
 #include <Kernel/Fs/Vfs/mount_namespace.h>
+#include <LibFK/Container/hash_map.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Memory/ref_counted.h>
 #include <LibFK/Memory/ref_ptr.h>
@@ -48,6 +49,8 @@ private:
     fk::RefPtr<Dentry> m_parent;
     DentryNodeStack m_node_stack;
     fk::containers::Vector<fk::RefPtr<Dentry>> m_children;
+    // O(1) name → child lookup index; maintained in sync with m_children
+    fk::containers::HashMap<fk::text::String, Dentry*> m_child_map;
 };
 
 } // namespace fkernel

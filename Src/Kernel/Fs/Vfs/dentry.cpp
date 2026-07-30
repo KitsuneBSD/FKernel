@@ -1,6 +1,5 @@
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/mount_namespace.h>
-#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Memory/new.h>
 #include <LibFK/Utilities/memory.h>
 
@@ -72,9 +71,9 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
 
     {
         fk::synchronization::ScopedLock lock(m_lock);
-        size_t idx = fk::algorithms::find_if(m_children.begin(), m_children.size(),
-            [&name](const auto& c) { return c->name() == name; });
-        if (idx != m_children.size()) return m_children[idx];
+        auto cached = m_child_map.get(fk::text::String(name));
+        if (cached.has_value() && cached.value())
+            return fk::RefPtr<Dentry>(cached.value());
     }
 
     const auto& all_nodes = dentry_stack(this).all();
@@ -93,9 +92,11 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
         }
 
         fk::synchronization::ScopedLock lock(m_lock);
-        size_t idx = fk::algorithms::find_if(m_children.begin(), m_children.size(),
-            [&name](const auto& c) { return c->name() == name; });
-        if (idx != m_children.size()) return m_children[idx];
+        // Re-check under lock (another thread may have raced us)
+        auto cached = m_child_map.get(fk::text::String(name));
+        if (cached.has_value() && cached.value())
+            return fk::RefPtr<Dentry>(cached.value());
+        m_child_map.insert(new_dentry->name(), new_dentry.get());
         m_children.push_back(new_dentry);
         return new_dentry;
     }
@@ -105,6 +106,7 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
 
 void Dentry::add_child(fk::RefPtr<Dentry> child) {
     fk::synchronization::ScopedLock lock(m_lock);
+    m_child_map.insert(child->name(), child.get());
     m_children.push_back(child);
 }
 

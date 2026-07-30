@@ -177,11 +177,11 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 
 ### 39d — VFS
 
-| Atual | Complexidade | Substituir por |
-|-------|-------------|----------------|
-| Dentry child lookup `find_if(name)` | O(C) | `HashMap<StringView, Dentry*>` por parent |
-| `readdir()` dedup `insert_if_absent` | O(E²) | `HashSet<ino_t>` temporário |
-| File lock `release_all_for_process` | O(L²) | IntrusiveList + O(1) remove |
+| Atual | Complexidade | Substituir por | Status |
+|-------|-------------|----------------|--------|
+| Dentry child lookup `find_if(name)` | O(C) | `HashMap<String, Dentry*>` por parent | ✅ Done — `m_child_map` alongside `m_children`; `lookup()` and `add_child()` maintain both |
+| `readdir()` dedup `insert_if_absent` | O(E²) | `HashSet<ino_t>` temporário | Open |
+| File lock `release_all_for_process` | O(L²) | IntrusiveList + O(1) remove | Open |
 
 ### 39e — Network
 
