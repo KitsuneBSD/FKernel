@@ -8,7 +8,7 @@ namespace fk {
 namespace containers {
 
 template <typename T>
-class Set {
+class [[deprecated("Use HashMap<T, bool> or UnorderedSet<T> instead — O(n) insert/remove")]] Set {
 public:
   using iterator = T *;
   using const_iterator = const T *;

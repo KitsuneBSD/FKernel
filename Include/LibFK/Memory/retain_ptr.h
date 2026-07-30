@@ -22,7 +22,8 @@ namespace memory {
  *
  * @tparam T Type of object being managed
  */
-template <typename T> class RetainPtr {
+template <typename T>
+class [[deprecated("Use RefPtr<T> + RefCounted<T> instead — intrusive refcount is safer and single-allocation")]] RetainPtr {
 public:
   /// @brief Tag to adopt a pointer without creating a new reference count
   enum class Adopt { Yes };

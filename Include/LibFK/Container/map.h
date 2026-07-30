@@ -9,7 +9,7 @@ namespace fk {
 namespace containers {
 
 template <typename K, typename V>
-class Map {
+class [[deprecated("Use HashMap<K,V> instead — O(log n) get but O(n) insert/remove on this one")]] Map {
 public:
   using Entry = fk::utilities::Pair<K, V>;
   using iterator = Entry *;

@@ -6,7 +6,8 @@
 namespace fk {
 namespace containers {
 
-template <typename Type, size_t MAX_SIZE = 4096> class Stack {
+template <typename Type, size_t MAX_SIZE = 4096>
+class [[deprecated("Use Vector<Type> instead — prefer dynamic growth")]] Stack {
 private:
   array<Type, MAX_SIZE> m_stack;
   size_t top_index = 0;
@@ -44,7 +45,11 @@ public:
     return true;
   }
 
-  void clear() { top_index = 0; }
+  void clear() {
+    for (size_t i = 0; i < top_index; ++i)
+      m_stack[i].~Type();
+    top_index = 0;
+  }
 };
 
 } // namespace containers

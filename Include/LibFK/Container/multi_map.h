@@ -7,7 +7,7 @@ namespace fk {
 namespace containers {
 
 template <typename K, typename V>
-class MultiMap {
+class [[deprecated("Use HashMap<K, Vector<V>> instead — O(n) insert/remove, O(k·n) remove_all")]] MultiMap {
 public:
   using Entry = fk::utilities::Pair<K, V>;
   using iterator = Entry *;

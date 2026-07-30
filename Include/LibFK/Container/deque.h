@@ -7,7 +7,7 @@ namespace fk {
 namespace containers {
 
 template <typename T>
-class Deque {
+class [[deprecated("Use CircularBuffer<T> or Vector<T> instead — O(n) push_front/pop_front on this one")]] Deque {
 public:
   Deque() = default;
 

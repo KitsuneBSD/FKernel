@@ -7,7 +7,7 @@ namespace fk {
 namespace containers {
 
 template <typename T>
-class MultiSet {
+class [[deprecated("Use HashMap<T, size_t> instead — O(n) insert/remove, O(k·n) remove_all")]] MultiSet {
 public:
   using iterator = T *;
   using const_iterator = const T *;
