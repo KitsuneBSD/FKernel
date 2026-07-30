@@ -181,7 +181,7 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 |-------|-------------|----------------|--------|
 | Dentry child lookup `find_if(name)` | O(C) | `HashMap<String, Dentry*>` por parent | ✅ Done — `m_child_map` alongside `m_children`; `lookup()` and `add_child()` maintain both |
 | `readdir()` dedup `insert_if_absent` | O(E²) | `HashSet<ino_t>` temporário | ✅ Done — both `readdir()` overloads now use `UnorderedSet<String>` for O(1) per-entry dedup; removed `add_directory_entry()` helper |
-| File lock `release_all_for_process` | O(L²) | IntrusiveList + O(1) remove | Open |
+| File lock `release_all_for_process` | O(L²) | IntrusiveList + O(1) remove | ✅ Done — swap-and-pop replaces remove_at; O(L) instead of O(L²) without heap allocation |
 
 ### 39e — Network
 

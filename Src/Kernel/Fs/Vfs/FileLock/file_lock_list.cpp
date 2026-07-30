@@ -47,12 +47,15 @@ void FileLockList::release(fk::ProcessId pid, int64_t start, int64_t end) {
 void FileLockList::release_all_for_process(fk::ProcessId pid) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
+  // Swap-and-pop: O(L) total vs O(L²) with remove_at.
   size_t i = 0;
   while (i < m_entries.size()) {
-    if (m_entries[i].pid == pid)
-      m_entries.remove_at(i);
-    else
+    if (m_entries[i].pid == pid) {
+      m_entries[i] = m_entries[m_entries.size() - 1];
+      m_entries.pop_back();
+    } else {
       ++i;
+    }
   }
 }
 
