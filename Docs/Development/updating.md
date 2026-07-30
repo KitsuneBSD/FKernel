@@ -17,9 +17,8 @@ Architecture specific code resides in `Src/Kernel/Arch/x86_64/`. When updating t
 - Ensure any assembly changes are matched with C++ declarations.
 - Update documentation in `Docs/Kernel/Architecture/` if changes affect the memory layout or task switching.
 
-## Porting Real Projects (ash, OpenRC)
-To bring real utilities to FKernel:
+## Testing Against Validation Tooling (BusyBox, musl)
+To validate syscall compatibility:
 1.  **Toolchain**: Use scripts in `Toolchain/` to download and patch projects.
-2.  **LibC**: Musl is the preferred library. Patch it to use FKernel's `syscall` interface.
-3.  **BusyBox**: Provides `ash` and standard tools (`ls`, `cat`, `mkdir`). It should be compiled statically against Musl.
-4.  **OpenRC**: The init suite. Requires a `/etc/init.d` structure in the RamDisk.
+2.  **LibC**: Musl is the preferred validation library. Patch it to use FKernel's `syscall` interface.
+3.  **BusyBox**: Provides `ash` and standard tools (`ls`, `cat`, `mkdir`). Compiled statically against Musl for MockOS test ISO.

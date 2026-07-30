@@ -28,10 +28,14 @@ All filesystem objects inherit from `Node`, which provides a virtual interface:
 
 ```
 Node (RefCounted)
-├── Fat12Node, Fat16Node, Fat32Node   (on-disk filesystem nodes)
+├── Ext2Node, Ext3Node, Ext4Node      (extended filesystem family)
+├── Fat12Node, Fat16Node, Fat32Node   (FAT filesystem family)
+├── ExfatNode, Iso9660Node, MinixNode (other on-disk filesystems)
 ├── TmpFsNode, TmpFsDirectoryNode     (in-memory filesystem)
 ├── DevFsNode → NullDevice, URandomDevice, PtmxDevice
-├── DebugLogNode, SyscallLogNode, IpcLogNode  (debug ring buffers)
+├── DebugFsNode → DebugLogNode, SyscallLogNode, IpcLogNode
+├── PtsFsNode                          (pseudo-terminal FS)
+├── SemFsNode, MqueueFsNode, ShmFsNode (POSIX IPC virtual FS)
 ├── PipeNode, EventFdNode, TimerFdNode, SignalFdNode
 ├── EpollNode, KqueueNode
 ├── ProcFsNode → ProcStatNode, ProcMemInfoNode, ... (19 /proc nodes)
@@ -260,3 +264,56 @@ proc/
 Each node implements `read()` returning formatted text on demand. No data is cached — it's generated fresh on each read (Linux-compatible behavior).
 
 Key files: `Include/Kernel/Fs/Virtual/ProcFs/` (18 headers)
+
+## 12. Non-standard Syscalls
+
+Beyond the Linux POSIX ABI, FKernel implements native syscalls for IPC, capability management, kernel event notification, and kernel TTY management:
+
+| Syscall | Purpose |
+|---------|---------|
+| `SYS_IPC_SEND` | Send message via capability-guarded Endpoint |
+| `SYS_IPC_RECEIVE` | Blocking receive on Endpoint |
+| `SYS_IPC_CALL` | Send + receive rendezvous |
+| `SYS_CAP_REVOKE` | Revoke all capabilities referencing a kernel object |
+| `SYS_CAP_TRANSFER` | Transfer capability to another process's CSpace |
+| `SYS_CAP_GRANT` | Grant capability access to another process |
+| `SYS_KQUEUE` | Create kqueue event notification descriptor |
+| `SYS_KEVENT` | Register/retrieve kqueue events |
+| `SYS_TTY_CREATE` | Create kernel TTY device |
+| `SYS_TTY_DELETE` | Delete kernel TTY device |
+| `SYS_TTY_LIST` | List kernel TTY devices |
+
+Key files: `Include/Kernel/Syscall/syscall.h`, `Src/Kernel/Syscall/`
+
+## 13. Slab Cache Object Sizes
+
+The SlabAllocator (`Src/Kernel/Memory/ObjectMemory/slab_allocator.cpp`) maintains 10 fixed-size caches:
+
+| Cache Index | Object Size | Pages per Slab |
+|------------:|------------:|---------------:|
+| 0 | 16 bytes | 1 |
+| 1 | 32 bytes | 1 |
+| 2 | 64 bytes | 1 |
+| 3 | 128 bytes | 1 |
+| 4 | 256 bytes | 1 |
+| 5 | 512 bytes | 1 |
+| 6 | 1024 bytes | 1 |
+| 7 | 2048 bytes | 1 |
+| 8 | 4096 bytes | 1 |
+| 9 | 8192 bytes | 2 |
+
+Allocations are rounded up to the next cache size. Caches grow by adding new slabs (page(s) + free list header). The `CACHE_COUNT = 10` and `CACHE_SIZES` array are defined in `slab_allocator.cpp`.
+
+## 14. Subsystem Completion Status
+
+Estimated implementation maturity as of current codebase:
+
+| Subsystem | Completion | Key Features |
+|-----------|-----------:|--------------|
+| Memory Management | 95% | Buddy + Zones + Slab, VMM 4-level paging, CoW fork, demand paging, MMIO remapping |
+| Process/Scheduling | 90% | Priority queues, work stealing, SMP AP boot (INIT/STARTUP IPI), SCHED_FIFO/RR (32 levels), lazy FPU context switch |
+| Filesystems | 95% | VFS (BSD dentry/vnode/mount), Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS, 13 virtual FS types |
+| Networking | 85% | TCP state machine + sliding window + exponential backoff retransmit, UDP, ARP, ICMP, DHCP, DNS, AF_UNIX/AF_INET |
+| IPC/Capabilities | 80% | seL4-style CSpace, generation-based revocation, Endpoint rendezvous, Notification, SCM_RIGHTS/CREDENTIALS |
+| ELF/Loader | 90% | ASLR (ChaCha20, 30-bit), RELRO, W^X, NX, SMEP/SMAP, TLS, dynamic linking |
+| Drivers | 75% | ATA PIO/DMA, AHCI, NVMe, E1000, PS/2 keyboard, serial, PTY, USB (headers only) |

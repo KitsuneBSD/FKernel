@@ -1,32 +1,32 @@
-# FKernel Architecture Overview
+# FKernel — Kernel Architecture Overview
 
-## System Architecture
+## Kernel Architecture
 
-FKernel follows a **layered architecture** inspired by BSD/XNU with strict separation of concerns:
+FKernel follows a **hybrid kernel architecture** with strict layer separation:
 
 ```mermaid
 flowchart TD
-    U["Userspace<br/>Applications, Shell, BusyBox, musl"]
+    T["Test Harness (MockOS)<br/>BusyBox + musl — syscall validation"]
     K["Kernel<br/>Core kernel functionality (LibFK only)"]
     LFK["LibFK<br/>STL-like library (uses LibC + self)"]
     LC["LibC<br/>Minimal freestanding C library"]
-    U -->|"syscall (Linux x86_64 ABI)"| K
+    T -->|"syscall (Linux x86_64 ABI)"| K
     K --> LFK
     LFK --> LC
 ```
 
-### System Context
+### Kernel Context
 
 ```mermaid
 flowchart LR
-    subgraph Userspace
+    subgraph MockOS["MockOS (Test Harness)"]
         BB["BusyBox 1.36.1"]
         MUSL["musl 1.2.4"]
     end
     subgraph FKernel["FKernel Kernel"]
         MEM["Memory<br/>Buddy+Zones+VMM"]
         SCHED["Scheduler<br/>Priority+WorkStealing"]
-        VFS["VFS<br/>FAT32/DevFs/ProcFs"]
+        VFS["VFS<br/>Ext2/3/4, FAT, TmpFs, ..."]
         IPC["IPC<br/>seL4 Capabilities"]
         NET["Networking<br/>TCP/IP+E1000"]
         ELF["ELF Loader<br/>ASLR+TLS+RELRO"]
@@ -43,23 +43,25 @@ flowchart LR
 
 ## Architectural Identity
 
-FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.md) for full rationale:
+FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.md) for full rationale:
 - **ABI**: Linux x86_64 (syscall numbers, ELF loading)
 - **Internals**: BSD-inspired (VFS, scheduler, process model, kqueue, driver framework)
 - **Practices**: Rust-style errors, seL4 capabilities, Object Calisthenics
 
 ## Project Status
 
-**Completion**: ~85% -- boots to userspace with BusyBox 1.36.1 (~60 applets, ~40 fully functional)
-**POSIX Compliance**: ~50% (IPC/POSIX Phases 0-10 complete, ELF dynamic linking complete, FAT32 writable)
-**Immediate Priority**: IPC Capability Integration (Phase 29 — route POSIX mechanisms through CSpace/Endpoint)
-**Long-term Goal**: Full POSIX compliance -> OpenRC boot -> multi-service OS
+**Kernel Completion**: ~70% — POSIX-compatible x86_64 hobby kernel, boots to MockOS test harness with BusyBox 1.36.1 (~60 applets, ~40 fully functional)
+**POSIX Compliance**: ~60% (199/450+ syscalls, ELF dynamic linking, real-time scheduling, all major FS families)
+**Immediate Priority**: IPC Capability Integration (Phase 27 — route POSIX mechanisms through CSpace/Endpoint)
+**Long-term Goal**: Full POSIX compliance for a well-designed hobby kernel
+
+> **Note**: FKernel is a **kernel**, not an operating system. MockOS is a test harness for validating POSIX syscall compatibility, not a userspace OS. BusyBox, musl, and OpenRC are validation tools, not the project's "userspace."
 
 ## Architectural Principles
 
 ### 1. Strict Layer Separation
-- **LibC**: Minimal C standard library (strings, memory, types) -- C17 freestanding
-- **LibFK**: STL-like containers and utilities (uses only LibC) -- C++20 freestanding
+- **LibC**: Minimal C standard library (strings, memory, types) — C17 freestanding
+- **LibFK**: STL-like containers and utilities (uses only LibC) — C++20 freestanding
 - **Kernel**: Core kernel functionality (uses only LibFK, NEVER LibC)
 
 ### 2. Domain-Based Organization
@@ -82,23 +84,24 @@ FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.m
 
 ### Core Kernel Domains
 - **Memory**: Physical (Buddy+Zones), Virtual (4-level paging), Object (Slab)
-- **Process**: Task management, scheduling (priority queues + load balancing), IPC
+- **Process**: Task management, scheduling (priority + work stealing + real-time SCHED_FIFO/RR with 32 priority levels), SMP AP startup (INIT/STARTUP IPI), IPC, lazy FPU context switching
 - **Hardware**: CPU, ACPI, PCI, APIC/IOAPIC, MSI-X
-- **Filesystem**: VFS (BSD-style dentry/vnode/mount), FAT12/16/32, DevFs, ProcFs, TmpFs
+- **Filesystem**: VFS (BSD-style dentry/vnode/mount), Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS, TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd
 - **Drivers**: Storage (ATA/AHCI/NVMe), Network (E1000), PS/2 mouse, Serial, PTY, USB (headers)
-- **Syscalls**: POSIX-compatible Linux x86_64 interface (~139 registered syscalls)
+- **Syscalls**: POSIX-compatible Linux x86_64 interface (199 registered syscalls)
 
 ### Networking (Full Stack)
 - **E1000**: MMIO, RX/TX rings, MAC
 - **IPv4**: TCP, UDP, ARP, ICMP
 - **Sockets**: AF_UNIX, AF_INET
-- **Advanced**: TCP sliding window, routing table, DHCP client, DNS resolver
+- **Advanced**: TCP sliding window, retransmit with exponential backoff, routing table, DHCP client, DNS resolver
 
 ### Security & Isolation
-- **Capabilities**: seL4-style fine-grained rights (send/receive/manage) via CSpace + generation-based revocation. Used by raw `sys_ipc_*` syscalls. POSIX mechanisms use `Notification` directly — capability integration (Phase 29) pending.
-- **IPC**: Endpoint (synchronous rendezvous), Notification (async bitmask + payload queue), SharedMemory (page-level). PipeNode, EventFd, Semaphore, Mqueue, Epoll/KQueue, SignalFd all use Notification embedded members.
-- **ELF Security**: ASLR (ChaCha20PRNG, 30-bit), NX, SMEP, SMAP, W^X enforcement, RELRO (all segments), TLS
-- **Memory**: NX pages, user/kernel isolation, SMAP/SMEP enabled, CoW fork, demand paging
+- **Capabilities**: seL4-style fine-grained rights (send/receive/manage) via CSpace + generation-based revocation. Used by raw `sys_ipc_*` syscalls. POSIX mechanisms use `Notification` directly — capability integration (Phase 27) pending.
+- **IPC**: Endpoint (synchronous rendezvous), Notification (async bitmask + payload queue), SharedMemory (page-level). SCM_RIGHTS and SCM_CREDENTIALS via sendmsg/recvmsg. PipeNode, EventFd, Semaphore, Mqueue, Epoll/KQueue, SignalFd all use Notification embedded members.
+- **Kernel Events**: EVFILT_PROC, EVFILT_SIGNAL, EVFILT_TIMER in kqueue.
+- **ELF Security**: ASLR (ChaCha20PRNG, 30-bit), NX, SMEP, SMAP, W^X enforcement, RELRO (all segments), TLS, dynamic linking.
+- **Memory**: NX pages, user/kernel isolation, SMAP/SMEP enabled, CoW fork (`clone_table_recursive`), demand paging (`handle_demand_paging`).
 
 ## Design Patterns
 
@@ -124,8 +127,8 @@ FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.m
 - **Build System**: XMake (Lua-based)
 - **Compiler**: Clang/LLD with freestanding flags (`-ffreestanding`, `-fno-exceptions`, `-fno-rtti`)
 - **Boot**: GRUB + Multiboot2
-- **Testing**: Custom framework (coverage targets: LibC 90%, LibFK 85%, Kernel 75%)
-- **Userland**: BusyBox 1.36.1 + musl 1.2.4 (OpenRC 0.52.1 as planned init system)
+- **Testing**: Custom framework (coverage targets: LibC 90%, LibFK 85%)
+- **Test Harness**: BusyBox 1.36.1 + musl 1.2.4 via MockOS ISO image
 
 ## Development Philosophy
 
@@ -134,4 +137,4 @@ FKernel is a **hybrid kernel** -- see [design-philosophy.md](design-philosophy.m
 3. **Code Quality First**: Object Calisthenics non-negotiable
 4. **Security by Design**: Capabilities, isolation, minimal trust
 5. **Hardware Realism**: Support real hardware, not just emulation
-6. **ABI Pragmatism**: Linux compatibility for userspace, BSD design for kernel internals
+6. **ABI Pragmatism**: Linux compatibility for test tooling, BSD design for kernel internals

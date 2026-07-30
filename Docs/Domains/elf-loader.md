@@ -132,7 +132,22 @@ All 10 X86_64 relocation types implemented with SMAP STAC/CLAC:
 - **SMAP**: `arch_smap_begin()`/`arch_smap_end()` in all user-memory write paths: `copy_segment_data`, `zero_fill_bss`, `apply_single_rela` targets, `map_single_page` zero-fill.
 - **SMEP**: CR4.SMEP enabled — kernel cannot execute user pages.
 - **Architecture check**: `e_machine` must be `EM_X86_64`.
-- **Bounds checking**: `e_phoff`, `e_phnum` validated against file size (header-level only; per-segment p_offset + p_filesz not yet validated).
+- **Bounds checking**: `e_phoff`, `e_phnum`, and per-segment `p_offset + p_filesz` validated against file size.
+- **Endianness checking**: `EI_DATA` verified to match host endianness (little-endian).
+
+### Security Features Matrix
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| W^X | ✅ | Rejects Writable+Executable segments at load |
+| RELRO | ✅ | All PT_GNU_RELRO segments, correct alignment |
+| ASLR | ✅ | ChaCha20PRNG, 30-bit entropy, randomized ld.so |
+| NX | ✅ | PT_GNU_STACK, non-exec segments |
+| SMAP | ✅ | STAC/CLAC in all user-memory paths |
+| SMEP | ✅ | CR4.SMEP enabled |
+| kASLR | 🔄 Planned | Kernel image randomization |
+| CET Shadow Stack | 🔄 Planned | Intel CET hardware shadow stack |
+| Retpoline Injection | 🔄 Planned | Spectre v2 mitigation |
 
 ### TLS (Variant II)
 - TLS block allocated at `0x7FFFFE000000`
@@ -164,4 +179,4 @@ All 10 X86_64 relocation types implemented with SMAP STAC/CLAC:
 
 ## Current Status
 
-~85% complete. ET_EXEC and ET_DYN loading fully functional. Dynamic linking with DT_NEEDED + shared library loading + ld.so self-relocation. All 10 X86_64 relocation types. Cross-object symbol resolution via global library registry. ASLR with ChaCha20PRNG + 30-bit entropy + randomized ld.so base. Full RELRO (all segments, correct alignment, interpreter RELRO). W^X enforcement. SMAP STAC/CLAC safety. TLS Variant II at 0x7FFFFE000000. Init/fini addresses extracted. Remaining gaps: endianness check (EI_DATA), file-size bounds on p_offset + p_filesz, symbol versioning (DT_VERSYM/DT_VERNEED macros defined, parsing not implemented). ET_REL not yet supported.
+~90% complete. ET_EXEC and ET_DYN loading fully functional. Dynamic linking with DT_NEEDED + shared library loading + ld.so self-relocation. All 10 X86_64 relocation types. Cross-object symbol resolution via global library registry. ASLR with ChaCha20PRNG + 30-bit entropy + randomized ld.so base. Full RELRO (all segments, correct alignment, interpreter RELRO). W^X enforcement. SMAP STAC/CLAC safety. TLS Variant II at 0x7FFFFE000000. Init/fini addresses extracted. Endianness checking (EI_DATA) implemented. Per-segment file-size bounds checking implemented. Remaining: symbol versioning (DT_VERSYM/DT_VERNEED macros defined, parsing not implemented). ET_REL not yet supported. Planned security features: kASLR, Intel CET shadow stack, retpoline injection.

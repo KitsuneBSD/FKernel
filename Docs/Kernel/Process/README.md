@@ -118,6 +118,14 @@ All states are actively used. `Stopped` is set by `SignalDelivery::apply_default
 
 Atomic PID allocation via `__sync_fetch_and_add` in `SchedulerManager::generate_pid()` — lock-free, SMP-safe. Starts at PID 2 (PID 0 = idle, PID 1 = init).
 
+## Demand Paging
+
+Anonymous memory allocated via `mmap(MAP_ANONYMOUS)` is mapped lazily. The page fault handler (`pf_handler.cpp`) detects not-present faults on anonymous regions and allocates a zero-filled physical page on first access. This defers physical page allocation until actual memory use, reducing memory overhead for sparse mappings.
+
+## Lazy FPU Context Switching
+
+FPU/SSE state (512 bytes per task) is saved and restored lazily. On context switch, the current task's FPU state is saved only if it was used since the last save. On first FPU access by a new task, a `DeviceNotAvailable` (#NM) exception triggers `fpu_restore()` which reloads the saved state. This minimizes the cost of FPU context switching for tasks that don't use floating-point.
+
 ## vfork Semantics
 
 `vfork()` creates a child that shares the parent's address space. Parent is blocked (`vfork_waiting = true`) until child calls `execve()` or `exit()`. `terminate_current()` checks `vfork_parent_id` and clears `vfork_waiting` on child exit.
@@ -172,4 +180,4 @@ Atomic PID allocation via `__sync_fetch_and_add` in `SchedulerManager::generate_
 
 ## Current Status
 
-~85% complete. Fork, vfork, clone, execve, exit, wait4 all functional. Process groups, sessions, and job control signals (SIGSTOP/SIGCONT/SIGTSTP) wired. Signal delivery with siginfo_t via notification endpoint. CoW fork with refcounted physical pages. Zombie reaping with full resource cleanup. vfork parent blocking. No thread groups (clone with CLONE_THREAD) yet. No resource limits enforcement (rlimit). No cgroups.
+~85% complete. Fork, vfork, clone, execve, exit, wait4 all functional. Process groups, sessions, and job control signals (SIGSTOP/SIGCONT/SIGTSTP) wired. Signal delivery with siginfo_t via notification endpoint. CoW fork with refcounted physical pages. Demand paging for anonymous memory via not-present page faults. Lazy FPU context switching with #NM trap and delayed restore. Zombie reaping with full resource cleanup. vfork parent blocking. No thread groups (clone with CLONE_THREAD) yet. No resource limits enforcement (rlimit). No cgroups.

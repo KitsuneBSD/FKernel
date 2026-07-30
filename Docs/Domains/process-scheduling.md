@@ -120,6 +120,24 @@ Every `BOOST_PERIOD_TICKS` (500 ticks), `priority_boost_all()` moves all tasks f
 | `Batch` | Normal MLFQ behavior |
 | `Idle` | Runs only when nothing else is ready |
 
+### Real-Time Scheduling
+
+Real-time scheduling follows the POSIX SCHED_FIFO and SCHED_RR policies with 32 priority levels (0–31), managed within the MLFQ framework:
+
+**SCHED_FIFO**:
+- Run-to-completion: a running task is never preempted by another FIFO task of equal or lower priority
+- Preempted only by a higher-priority FIFO task or a SCHED_RR task of higher priority
+- No time-slicing; tasks yield voluntarily or block on I/O/IPC
+- Mapped to `SchedulingPolicy::Fifo` in the QoS system
+
+**SCHED_RR**:
+- Time-sliced round-robin within the same priority level
+- Each task receives a fixed quantum (configurable, default 4 ticks)
+- On quantum expiry, the task is re-enqueued at the tail of its priority level
+- Mapped to `SchedulingPolicy::RoundRobin` in the QoS system
+
+Priority levels 0–31 map directly into MLFQ level 0, ensuring real-time tasks are scheduled before any non-real-time work. The `sched_setscheduler()` syscall accepts `SCHED_FIFO` and `SCHED_RR` with `sched_priority` in the range [1, 99] (Linux ABI), which is mapped to internal level [0, 31].
+
 ### Work Stealing
 
 `steal_task()` scans all CPUs for the busiest run queue, then steals from the **lowest** MLFQ level (scanning 3→0) to minimize disruption to interactive tasks at higher levels.
@@ -210,6 +228,8 @@ stateDiagram-v2
     RUNNING --> READY : on_tick() (demotion / preemption)
     RUNNING --> BLOCKED : sleep_current() / IPC wait
     BLOCKED --> READY : wake_task() (preserves MLFQ level)
+    RUNNING --> BLOCKED_TURNSTILE : turnstile_wait (PI mutex)
+    BLOCKED_TURNSTILE --> READY : turnstile_unblock (priority restored)
     RUNNING --> STOPPED : SIGSTOP/SIGTSTP/SIGTTIN/SIGTTOU
     STOPPED --> READY : SIGCONT
     RUNNING --> ZOMBIE : terminate_current()
@@ -220,6 +240,7 @@ stateDiagram-v2
 - **READY**: Runnable, waiting for CPU at a specific MLFQ level
 - **RUNNING**: Currently executing on a CPU
 - **BLOCKED**: Waiting on a resource (I/O, sleep, IPC endpoint)
+- **BLOCKED_TURNSTILE**: Blocked on a PI mutex via turnstile; priority inheritance active
 - **STOPPED**: Suspended by signal (job control)
 - **ZOMBIE**: Terminated, awaiting `wait4()`/`waitpid()`
 
@@ -359,6 +380,15 @@ flowchart LR
 - **BSD-style process groups** over Linux's `CLONE_*` flags for most cases
 - `ScopedLockIRQ` for interrupt-safe scheduler state access
 - `SchedulingPolicy::Fifo` tasks are exempt from MLFQ demotion (real-time semantics)
+- **Real-time scheduling**: SCHED_FIFO (run-to-completion) and SCHED_RR (time-sliced) with 32 priority levels mapped to MLFQ level 0
+- **Per-CPU run queues**: Each CPU has its own run queue with work-stealing for load balance
+
+## Future Enhancements
+
+### Planned
+1. CPU affinity (`sched_setaffinity`/`sched_getaffinity`) — Phase 34
+2. CPU hotplug — Phase 34
+3. Energy-aware scheduling (EAS) with frequency scaling hints
 
 ## Key Files
 

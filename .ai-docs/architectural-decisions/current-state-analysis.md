@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-FKernel is at ~85% completion -- boots successfully to userspace with BusyBox 1.36.1 in QEMU. The codebase contains ~400 source files (362 Kernel .cpp + 324 Kernel headers + 39 LibC .c + 12 LibFK .cpp). All major subsystems functional: PCI, VFS (BSD-style), drivers (AHCI/NVMe/E1000/ATA/PS2/PTY), QoS+MLFQ scheduler with turnstile priority inheritance + SMP, networking (full TCP/IP), ELF loader (DT_NEEDED dynamic linking + ASLR + W^X + RELRO), and IPC (capability-based with POSIX wrappers). ~0 bugs open (all reported bugs verified as fixed in source). Phases 1-31b complete.
+FKernel is a hobby kernel at ~70% kernel completeness -- boots successfully to MockOS test harness with BusyBox 1.36.1 in QEMU. The codebase contains ~400 source files (362 Kernel .cpp + 324 Kernel headers + 39 LibC .c + 12 LibFK .cpp). All major kernel subsystems functional: PCI, VFS (BSD-style), drivers (AHCI/NVMe/E1000/ATA/PS2/PTY), QoS+MLFQ scheduler with turnstile priority inheritance + SMP, networking (full TCP/IP), ELF loader (DT_NEEDED dynamic linking + ASLR + W^X + RELRO), and IPC (capability-based with POSIX wrappers). ~5 bugs open. Phases 1-31b complete.
 
 ## Completed Milestones
 
@@ -13,7 +13,7 @@ FKernel is at ~85% completion -- boots successfully to userspace with BusyBox 1.
 - Security: SMEP, SMAP, NX, ASLR, RELRO, atomic refcounts, SMAP-aware user access
 - Networking: full TCP/IP stack
 
-### Phase 10-12: Userspace + BusyBox (Complete)
+### Phase 10-12: MockOS + BusyBox Integration (Complete)
 - Minimal init + shell, FAT32 rewritten (lookup, list_dir, subdirectory, LFN, metadata write)
 - /dev/null, /dev/zero, /dev/urandom, /dev/ptmx registered
 - PTY blocking reads, select/poll blocking, TCP connect/accept
@@ -90,13 +90,12 @@ FKernel is at ~85% completion -- boots successfully to userspace with BusyBox 1.
 
 | Gap | Detail |
 |-----|--------|
-| IPC fragmentation | POSIX mechanisms use Notification directly; CSpace/Endpoint is parallel subsystem (Phase 29) |
-| ELF bounds | No endianness check (EI_DATA), no file-size bounds on p_offset + p_filesz |
+| IPC fragmentation | POSIX mechanisms use Notification directly; CSpace/Endpoint is parallel subsystem (Phase 27) |
+| Thread group signal delivery | CLONE_THREAD tgid set, but signal delivery to thread groups not implemented |
 | TCP out-of-order | process_data() only accepts in-order segments (seq must match recv_next exactly) |
 | Kernel tests | 0% coverage -- all 207 tests are LibC/LibFK only |
-| Thread groups | No CLONE_THREAD support |
-| OpenRC | Build never executed; /proc/sys/ missing |
 | CSPRNG | init.cpp lines 105-107 commented out; ASLR may use unseeded PRNG |
+| POSIX networking syscalls | ~25 advanced socket options still missing |
 
 ## Test Coverage
 
@@ -110,9 +109,9 @@ FKernel is at ~85% completion -- boots successfully to userspace with BusyBox 1.
 
 ## Strategic Recommendations
 
-1. Phase 29 (IPC Capability Integration) -- route POSIX mechanisms through CSpace/Endpoint for unified security model
-2. OpenRC integration -- build + test the init system as PID 1
-3. Kernel integration tests -- at minimum VFS, scheduler, and memory manager test coverage
+1. Phase 27 (IPC Capability Integration) -- route POSIX mechanisms through CSpace/Endpoint for unified security model
+2. Phase 43 (Kernel Test Harness) -- VFS, scheduler, and memory manager test coverage
+3. Phase 44 (Signal Completion) -- thread group signal delivery for multi-threaded POSIX compliance
 4. Fix remaining ELF gaps -- endianness check, file-size bounds, symbol versioning
-5. Thread group support (CLONE_THREAD) -- needed for multi-threaded userspace
-6. Enable CSPRNG seeding -- uncomment init.cpp:105-107 for real ASLR entropy
+5. Enable CSPRNG seeding -- uncomment init.cpp:105-107 for real ASLR entropy
+6. Complete POSIX networking syscalls (~25 remaining)

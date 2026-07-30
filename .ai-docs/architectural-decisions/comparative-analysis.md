@@ -1,4 +1,4 @@
-# Comparative Analysis: FKernel vs Other Operating Systems
+# Comparative Analysis: FKernel vs Other Kernels
 
 ## Overview
 
@@ -7,7 +7,7 @@ This document captures architectural insights from comparing FKernel against Lin
 ## Architectural Identity
 
 FKernel is a **hybrid kernel** combining:
-- **Linux x86_64 ABI** (syscall numbers, ELF loading) — pragmatic compatibility
+- **Linux x86_64 ABI** (syscall numbers, ELF loading) — pragmatic compatibility for test tooling
 - **BSD internals** (VFS vnode/dentry/mount, scheduler, process model) — cleaner design
 - **seL4 capability model** (CSpace, Endpoints, revocation) — security primitives
 - **SerenityOS C++ style** (smart pointers, containers, error handling) — modern practices
@@ -18,7 +18,7 @@ This combination is unusual and a deliberate design choice documented in `design
 
 ### 1. Dual Bitmap+Buddy Allocator
 
-Per the analysis, FKernel uses **both** a bitmap (O(1) amortized single-page alloc) and buddy allocator (contiguous multi-page) per physical memory zone. This is an unusual approach — most OSes use one or the other. Linux uses buddy only; FreeBSD uses buddy + UMA; seL4 uses simple buddy.
+FKernel uses **both** a bitmap (O(1) amortized single-page alloc) and buddy allocator (contiguous multi-page) per physical memory zone. Linux uses buddy only; FreeBSD uses buddy + UMA; seL4 uses simple buddy.
 
 **Decision:** Keep this design. It gives optimal single-page allocation (bitmap) with contiguous fallback (buddy). The tradeoff is ~32MB bitmap overhead for 1TB support, which is acceptable.
 
@@ -26,65 +26,57 @@ Per the analysis, FKernel uses **both** a bitmap (O(1) amortized single-page all
 
 seL4 uses capabilities because it's a microkernel — all services run in userspace and must communicate via IPC. FKernel runs drivers in kernel space but still uses capability-based IPC for process-to-process communication.
 
-**Decision:** Keep the hybrid model. Capabilities provide fine-grained security properties (revocation, rights decomposition) without the performance penalty of microkernel IPC for driver operations. The generation-counter revocation pattern is lightweight and effective.
+**Decision:** Keep the hybrid model. Capabilities provide fine-grained security properties (revocation, rights decomposition) without the performance penalty of microkernel IPC for driver operations.
 
-### 3. No COW for fork() — Critical Gap
+### 3. No COW for fork() — Critical Gap (Fixed)
 
-Linux, FreeBSD, and SerenityOS all implement copy-on-write for fork(). FKernel deep-copies the entire address space. This is a significant performance gap for:
-- Server workloads with frequent fork()
-- OpenRC service supervision (fork per service)
-- Shell command execution (fork+exec)
-
-**Recommendation:** Implement COW as a Phase 22 priority. Requires:
-- Shared page table entries with read-only bit set
-- Page fault handler that copies on write
-- Reference counting for physical pages
+CoW fork is now implemented (`clone_table_recursive()` with per-frame refcount arrays). Previously a deep-copy bottleneck.
 
 ### 4. Scheduler Simplicity vs Fairness
 
-FKernel's scheduler is a simple priority+round-robin design (similar to 4.4BSD SVR4). Linux uses CFS/EEVDF (virtual runtime, red-black tree). FreeBSD uses decay-based priority. SerenityOS uses priority+round-robin with dynamic adjustment.
+FKernel's scheduler is a priority+round-robin design (similar to 4.4BSD SVR4) with XNU-inspired QoS (6 classes) + MLFQ (4 levels) + turnstile priority inheritance. SMP with work stealing.
 
-**Current gap:** `nice` values are stored but not used in scheduling decisions. No I/O boosting, no starvation prevention.
+**Current gap:** `nice` values are stored but not used in scheduling decisions.
 
-**Recommendation:** Wire `nice` into priority calculation as minimum viable improvement. Full CFS implementation is lower priority — the simple scheduler works for the current workload (BusyBox + ~40 applets).
+**Recommendation:** Wire `nice` into priority calculation.
 
 ### 5. Fixed 32MB Heap — Architectural Limitation
 
-The kernel heap is statically defined in the linker script at 32MB. Linux has vmalloc + kmalloc with dynamic growth. FreeBSD has UMA zones. SerenityOS has a growing kernel heap.
+The kernel heap is statically defined in the linker script at 32MB. Linux has vmalloc + kmalloc with dynamic growth. FreeBSD has UMA zones.
 
 **Risk:** Heap exhaustion under load (many open files, many processes) causes silent failure or kernel panic.
 
-**Recommendation:** Implement vmalloc-style virtually-contiguous allocation, or at minimum make the heap size configurable at boot via Multiboot2 memory map.
+**Recommendation:** Implement vmalloc-style virtually-contiguous allocation, or make heap size configurable at boot.
 
-### 6. VFS Mount Overlay — BSD-Inspired, DentryNodeStack
+### 6. VFS Mount Overlay — BSD-Inspired DentryNodeStack
 
-FKernel's `DentryNodeStack` pushes/pops filesystem nodes on a dentry for mount overlaying. This is different from Linux's mount-on-dentry approach. The key difference: FKernel merges directory listings from ALL layers with deduplication.
+FKernel's `DentryNodeStack` pushes/pops filesystem nodes on a dentry for mount overlaying. Merges directory listings from ALL layers with deduplication.
 
-**Decision:** This is a clean design. Keep it. The merge behavior is more flexible than Linux's opaque mount overlay.
+**Decision:** Keep. The merge behavior is more flexible than Linux's opaque mount overlay.
 
 ### 7. Event Notification Breadth
 
-FKernel supports kqueue (BSD), epoll (Linux), select (POSIX), eventfd, timerfd, and signalfd — all as VFS nodes. This is a deliberate breadth-over-simplicity choice.
+FKernel supports kqueue (BSD), epoll (Linux), select (POSIX), eventfd, timerfd, and signalfd — all as VFS nodes. Deliberate breadth-over-simplicity choice.
 
 **Decision:** Keep all mechanisms. They serve different userspace programs (BSD apps use kqueue, Linux apps use epoll, legacy apps use select).
 
 ### 8. Layer Separation Enforcement (Build-Time)
 
-FKernel's `xmake check-layers` script scans for forbidden include patterns (Kernel→LibC, LibFK→Kernel). Neither Linux, FreeBSD, nor SerenityOS has automated layer enforcement.
+FKernel's `xmake check-layers` script scans for forbidden include patterns. Neither Linux, FreeBSD, nor SerenityOS has automated layer enforcement.
 
 **Decision:** This is a strength. Keep and extend. Consider adding LibC→LibFK direction check.
 
 ### 9. Heap Corruption Detection (0xC0FFEE Magic)
 
-Every heap block header in FKernel carries a magic number checked on every operation. Linux has CONFIG_DEBUG_HEAP but it's not always enabled. FKernel always checks.
+Every heap block header carries a magic number checked on every operation.
 
-**Decision:** Keep. The overhead is negligible and catches corruption early. Consider adding guard pages between heap blocks for stronger detection.
+**Decision:** Keep. Consider adding guard pages between heap blocks.
 
 ### 10. Three-Tier Smart Pointers
 
-FKernel provides OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr (non-intrusive ref-counted). SerenityOS has NonnullRefPtr + OwnPtr. Linux has none. Windows has COM-style ref counting.
+OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr (non-intrusive, deprecated). SerenityOS has NonnullRefPtr + OwnPtr. Linux has none.
 
-**Decision:** Keep the three tiers. RefPtr is used for kernel objects (Task, Node, FileDescription). RetainPtr is used for non-intrusive cases. OwnPtr is for exclusive ownership.
+**Decision:** Keep OwnPtr + RefPtr. RetainPtr is deprecated (zero production call sites).
 
 ## Comparison Tables
 
@@ -93,8 +85,8 @@ FKernel provides OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr 
 | Aspect | FKernel | Linux | FreeBSD | SerenityOS | seL4 |
 |--------|---------|-------|---------|------------|------|
 | Physical allocator | Bitmap+Buddy per zone | Buddy orders 0-10 | Buddy+UMA | Buddy | Simple buddy |
-| COW | No (deep copy) | Yes | Yes | Yes | N/A |
-| Slab/UMA | Not implemented | SLUB | UMA | Slab-like | None |
+| COW | Yes (fixed) | Yes | Yes | Yes | N/A |
+| Slab/UMA | Slab (8 caches, 16B-2048B) | SLUB | UMA | Slab-like | None |
 | Heap | 32MB fixed, first-fit | kmalloc+vmalloc | UMA zones | Growing heap | Static pool |
 | Page tables | 4-level PML4 | 4/5-level | 4/5-level | 4-level | 4-level |
 | NUMA | Basic zone selection | Full NUMA | Full NUMA | Basic | None |
@@ -104,19 +96,19 @@ FKernel provides OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr 
 
 | Aspect | FKernel | Linux (EEVDF) | FreeBSD | SerenityOS |
 |--------|---------|---------------|---------|------------|
-| Algorithm | Priority + RR | Earliest Eligible VFD | Priority decay | Priority + RR |
-| Fairness | FIFO within priority | Mathematically fair | Decay-based | Dynamic adjustment |
+| Algorithm | QoS + MLFQ + RR | Earliest Eligible VFD | Priority decay | Priority + RR |
+| QoS classes | 6 (XNU-inspired) | cgroups | None | None |
+| Priority inheritance | Turnstile chain (depth 8) | PI-futex | Priority propagation | None |
 | Time slice | Fixed 5 ticks | Dynamic (weight-based) | Variable | Fixed |
 | nice integration | Stored, unused | Weight-based | Decay modifier | Used |
 | SMP balancing | Work stealing | Periodic load balance | Per-CPU + polling | Work stealing |
-| Real-time | Stub (SCHED_OTHER only) | SCHED_FIFO/RR | SCHED_FIFO/RR | Not implemented |
 
 ### VFS & Filesystems
 
 | Aspect | FKernel | Linux | FreeBSD | SerenityOS |
 |--------|---------|-------|---------|------------|
 | Core model | Node+Dentry+Stack | inode+dentry | vnode+namecache | Inode+dentry |
-| Supported FS | FAT12/16/32, DevFs, ProcFs, TmpFs | ext4, Btrfs, XFS, FAT, NFS... | UFS, ZFS, FAT, NFS... | Ext2, FAT, TmpFs |
+| Supported FS | 13 FS: Ext2/3/4, FAT12/16/32, ExFAT, ISO9660, MinixFS, TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd | ext4, Btrfs, XFS, FAT, NFS... | UFS, ZFS, FAT, NFS... | Ext2, FAT, TmpFs |
 | Event polling | kqueue+epoll+select+eventfd+timerfd+signalfd | epoll+select+poll+signalfd | kqueue+poll | kqueue+select |
 | Mount overlay | DentryNodeStack (merge) | mount-on-dentry | mount-on-vnode | mount-on-vnode |
 
@@ -140,25 +132,24 @@ FKernel provides OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr 
 | Storage | ATA+AHCI+NVMe | Hundreds | Dozens | AHCI+NVMe+VirtIO |
 | Network | E1000 | Thousands | Hundreds | E1000+VirtIO+RTL8168 |
 
-## Lessons Learned from Comparison
+## Lessons Learned
 
-1. **Start simple, iterate** — FKernel's simple scheduler works for 40 applets. CFS complexity isn't needed until hundreds of concurrent processes.
+1. **Start simple, iterate** — FKernel's scheduler works for 40 applets. CFS complexity not needed yet.
 
-2. **COW is not optional for production** — Every production kernel implements COW. The current deep-copy fork is a significant limitation.
+2. **COW is not optional for production** — Now fixed. CoW fork with per-frame refcounts.
 
-3. **Slab/UMA is necessary for kernel longevity** — First-fit heap fragments badly. Linux's SLUB and FreeBSD's UMA solve this for kernels with many small allocations.
+3. **Slab/UMA is necessary for kernel longevity** — First-fit heap fragments badly. SlabAllocator (8 caches) implemented.
 
-4. **Layer enforcement is rare and valuable** — FKernel's automated layer checking is ahead of most projects. Keep it.
+4. **Layer enforcement is rare and valuable** — FKernel's automated layer checking is ahead of most projects.
 
-5. **Capabilities in monolithic is unusual** — seL4-style capabilities are normally only found in microkernels. FKernel is exploring whether they make sense in a hybrid context.
+5. **Capabilities in monolithic is unusual** — seL4-style capabilities normally only in microkernels. FKernel explores hybrid context.
 
-6. **Test coverage is the biggest debt** — At ~10-15%, FKernel is far below production standards. Linux has kunit; SerenityOS has host-side tests. FKernel needs both.
+6. **Test coverage is the biggest debt** — At 0% kernel tests, FKernel needs a dedicated test infrastructure (Phase 43).
 
 ## References
 
-- Intel Software Developer Manual (SDM) Vol. 3 — x86 memory management, paging, protection
-- Linux kernel documentation — scheduler/CFS design (docs.kernel.org/scheduler/)
+- Intel SDM Vol. 3 — x86 memory management, paging, protection
+- Linux kernel documentation — scheduler design (docs.kernel.org/scheduler/)
 - seL4 Reference Manual v16.0 — capability model, IPC, CSpace design
 - FreeBSD Architecture Handbook — Newbus driver framework, VFS vnode model
 - SerenityOS AK library — container and smart pointer design patterns
-- cppreference.com — C++ standard library semantics for freestanding implementations

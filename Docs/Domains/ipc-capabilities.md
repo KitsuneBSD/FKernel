@@ -18,7 +18,7 @@ flowchart TD
     subgraph "Kernel IPC Objects"
         EP["Endpoint<br/>Synchronous rendezvous"]
         NTF["Notification<br/>Async bitmask signal"]
-        SHM["SharedMemory<br/>(planned)"]
+        SHM["SharedMemory<br/>Page-level sharing"]
     end
     subgraph "Process B"
         CSB["CSpace B"]
@@ -50,6 +50,19 @@ flowchart TD
 | `Receive` | Receive a message through this capability |
 | `Manage` | Modify/move/revoke this capability |
 
+### Capability Types
+
+| Type | Kernel Object | Access |
+|------|--------------|--------|
+| `Endpoint` | Synchronous IPC channel | Send, Receive, Manage |
+| `IRQ` | Interrupt line binding | Ack, Manage |
+| `IO` | I/O port range | In, Out, Manage |
+| `Memory` | Physical memory region | Map, Read, Write, Manage |
+| `Node` | VFS filesystem node | Read, Write, Lookup, Manage |
+| `Process` | Process handle | Kill, Signal, Manage |
+| `Thread` | Thread handle | Suspend, Resume, SetPriority, Manage |
+| `SharedMemory` | Shared memory region | Map, Read, Write, Manage |
+
 ### CSpace
 
 - Array of capability slots per task
@@ -72,7 +85,55 @@ flowchart LR
 
 No need to search all process CSpaces — just increment the generation counter and capabilities become invalid on next use.
 
+### Revocation Details
+
+Revocation uses a **lazy** strategy: each Capability stores an `m_issued_generation` from the moment of its creation/transfer. The kernel object holds a `m_revoke_counter` (monotonically incrementing generation). On `revoke()`, the counter increments — all existing capabilities with a stale generation become invalid on next use without scanning CSpaces.
+
+```cpp
+struct Capability {
+  CapabilityType m_type;
+  Rights m_rights;
+  uint64_t m_revoke_counter;   // matches object's counter at issuance
+  uint64_t m_generation;       // CSpace slot generation for reuse
+  KernelObject* m_object;
+};
+
+struct KernelObject {
+  uint64_t m_revoke_counter;   // incremented on each revoke()
+};
+```
+
+- `sys_cap_revoke(handle)`: increments `object->m_revoke_counter`, invalidates all copies
+- `check_validity()`: compares `cap->m_revoke_counter == object->m_revoke_counter`
+- No CSpace traversal required — O(1) per capability check
+
 ## IPC Primitives
+
+### Migration from Port-Based IPC
+
+Earlier FKernel versions used a **port** abstraction (similar to L4) for message passing. The current architecture migrates to **Endpoint** as the sole synchronous IPC primitive:
+
+| Aspect | Old (Port) | Current (Endpoint) |
+|--------|-----------|-------------------|
+| Binding | Port needs explicit binding | Endpoint referenced via capability |
+| Wait queues | Single shared queue | Separate `m_senders` / `m_receivers` |
+| Reply routing | Port-based reply | Direct `m_call_sender` tracking |
+| Capability transfer | Not supported | `send_cap()` / `recv_cap()` |
+| Revocation | Port deletion | Generation counter (O(1)) |
+
+### IPC Syscalls
+
+| Syscall | Purpose |
+|---------|---------|
+| `sys_ipc_send(ep_handle, msg_info, args...)` | Send message via Endpoint capability |
+| `sys_ipc_recv(ep_handle, msg_info)` | Receive message via Endpoint capability |
+| `sys_ipc_send_cap(ep_handle, cap_handle)` | Transfer a capability through an Endpoint |
+| `sys_ipc_recv_cap(ep_handle)` | Receive a capability through an Endpoint |
+| `sys_ipc_call(ep_handle, msg_info, args...)` | Atomic send+recv (blocking RPC) |
+| `sys_cap_grant(pid, local_handle, rights)` | Copy capability to another process's CSpace |
+| `sys_cap_revoke(handle)` | Increment revoke counter on kernel object |
+
+Total syscall count: **199**.
 
 ### Endpoint
 
@@ -157,11 +218,13 @@ sequenceDiagram
 flowchart TD
     IPC["IPC Core<br/>Endpoint, Notification"]
     PIPE["PipeNode<br/>Uses Notification for<br/>DATA_AVAILABLE / SPACE_AVAILABLE"]
-    KQ["KQueue<br/>BSD event polling<br/>EVFILT_READ/WRITE"]
+    KQ["KQueue<br/>BSD event polling<br/>5 EVFILT types"]
+    EPOLL["Epoll<br/>Linux-compatible<br/>EPOLLIN/OUT/ET"]
     PTY["PTY Master/Slave<br/>Blocking reads via<br/>Notification::wait()"]
     SIG["Unix Signals<br/>KernelSignalFrame<br/>sa_restorer trampoline"]
     PIPE --> IPC
     KQ --> IPC
+    EPOLL --> IPC
     PTY --> IPC
     SIG --> IPC
 ```
@@ -171,9 +234,9 @@ flowchart TD
 - Reader blocks via `Notification::wait()`, writer signals via `Notification::signal()`
 
 ### KQueue
-- BSD-style event notification (not epoll)
+- BSD-style event notification with `EVFILT_READ`, `EVFILT_WRITE`, `EVFILT_PROC`, `EVFILT_SIGNAL`, `EVFILT_TIMER`
 - Integrates with scheduler for proper blocking with timeout
-- Used by `select()`/`poll()` implementations
+- Used by `select()`/`poll()` implementations (epoll available as a separate VFS node)
 
 ### PTY
 - `PtyMaster`/`PtySlave` block reader via `Notification::wait()`
@@ -186,6 +249,16 @@ flowchart TD
 - **Separate send/receive wait nodes** to prevent corruption
 - **Register-passing IPC** — short messages in CPU registers, no memory copies
 - **OS-level integration**: signals, pipes, kqueue all use underlying IPC primitives
+
+### Userspace Drivers and Filesystems (Architectural Support)
+
+The Capability model enables userspace drivers and filesystems natively:
+
+1. **Userspace Drivers**: A driver process holds `IO` capabilities for port ranges and `IRQ` capabilities for interrupt lines. Interrupt delivery routes through Endpoint IPC (the IRQ capability is bound to an Endpoint, and the handler's `recv()` blocks waiting for interrupt notifications).
+
+2. **Userspace Filesystems**: A filesystem process holds `Node` capabilities. The VFS layer can delegate `read()`/`write()`/`lookup()` operations via Endpoint IPC to a userspace server, analogous to FUSE but built directly on the capability primitives.
+
+**Status**: Architectural foundation is complete (CSpace, Endpoint IPC, capability types). **Implementation: pending** — no userspace drivers or filesystem servers are active in the current boot flow.
 
 ## Enhanced IPC Primitives (2026-07-26)
 
@@ -290,9 +363,10 @@ flowchart TD
 
 ### Capability Transfer
 
-Two new syscalls enable runtime capability sharing between processes:
+Runtime capability sharing between processes (see IPC syscall table above):
 
-- `sys_cap_transfer(pid, handle, rights_mask)` — moves capability from current CSpace to target
-- `sys_cap_grant(pid, handle, rights_mask)` — copies capability (original stays)
+- `sys_cap_grant(pid, handle, rights_mask)` — copies capability from current CSpace to target
+- `sys_ipc_send_cap(ep_handle, cap_handle)` — transfers a capability through an Endpoint
+- `sys_ipc_recv_cap(ep_handle)` — receives a capability through an Endpoint
 
-Both require `Manage` rights on the source capability.
+All transfer operations require `Manage` rights on the source capability.

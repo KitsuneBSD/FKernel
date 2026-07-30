@@ -17,7 +17,7 @@ flowchart TD
     end
 
     subgraph Object
-        F["SlabAllocator<br/>8 caches: 16B, 32B, 64B, 128B,<br/>256B, 512B, 1024B, 2048B"]
+        F["SlabAllocator<br/>10 caches: 16B, 32B, 64B, 128B,<br/>256B, 512B, 1KB, 2KB, 4KB, 8KB"]
     end
 
     subgraph Virtual
@@ -129,7 +129,7 @@ Write-protection faults trigger `handle_write_protection()` which allocates a ne
 
 ## Slab Allocator
 
-`SlabAllocator` provides fast, fixed-size object allocation with 8 caches:
+`SlabAllocator` provides fast, fixed-size object allocation with 10 caches:
 
 | Cache | Object Size |
 |-------|-------------|
@@ -139,10 +139,12 @@ Write-protection faults trigger `handle_write_protection()` which allocates a ne
 | 128B | |
 | 256B | |
 | 512B | |
-| 1024B | |
-| 2048B | Max slab size |
+| 1KB | |
+| 2KB | |
+| 4KB | |
+| 8KB | Max slab size |
 
-The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤2048 bytes before falling back to the linked-list heap.
+The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤2KB before falling back to the linked-list heap.
 
 ## Kernel Heap
 
@@ -166,8 +168,8 @@ SMAP-aware memory copy between kernel and userspace:
 2. **VirtualMemoryManager::initialize()** — allocates PML4, identity-maps lower memory + framebuffer, writes CR3
 3. **VirtualMemoryManager::extend_direct_map()** — maps all physical RAM at KERNEL_VIRT_BASE with 2MB huge pages
 4. **PhysicalMemoryManager::reconcile_buddies()** — syncs buddy state from bitmap (requires direct map)
-5. **SlabAllocator::initialize()** — sets up 8 object caches
-6. **IntelIOMMU::initialize()** — probes VT-d hardware
+5. **SlabAllocator::initialize()** — sets up 10 object caches (16B through 8KB)
+6. **IntelIOMMU::initialize()** — probes VT-d hardware, enables DMA remapping
 7. **MemoryManager::initialize_heap()** — sets up linked-list heap, wires LibFK allocator backend
 
 ## Key Files
@@ -180,7 +182,7 @@ SMAP-aware memory copy between kernel and userspace:
 | `Src/Kernel/Memory/PhysicalMemory/Buddy/buddy_state.cpp` | Buddy state tracking |
 | `Src/Kernel/Memory/VirtualMemory/virtual_memory_manager.cpp` | 4-level paging, address space management, direct map |
 | `Src/Kernel/Memory/VirtualMemory/RegionSplitter/region_splitter.cpp` | Virtual memory region split/merge |
-| `Src/Kernel/Memory/ObjectMemory/slab_allocator.cpp` | Slab allocator (8 caches) |
+| `Src/Kernel/Memory/ObjectMemory/slab_allocator.cpp` | Slab allocator (10 caches, 16B–8KB) |
 | `Src/Kernel/Memory/UserAccess/user_access.cpp` | SMAP-aware user memory copy |
 | `Include/Kernel/Memory/iommu.h` | IOMMU abstract interface |
 | `Src/Kernel/Arch/x86_64/Interrupt/Handler/Exception/pf_handler.cpp` | Page fault handler (demand paging + CoW) |
@@ -192,10 +194,11 @@ SMAP-aware memory copy between kernel and userspace:
 - **CoW refcounts**: Per-zone uint16_t arrays for accurate page sharing tracking
 - **COW-safe page table cloning**: `ensure_table()` copies shared kernel tables when user bit needed
 - **2MB huge pages**: Direct map uses `PageFlags::HugePage` for low TLB pressure
-- **Slab-first heap**: kernel `allocate()` tries slab for ≤2048B, falls back to linked-list heap
+- **Slab-first heap**: kernel `allocate()` tries slab for ≤2KB, falls back to linked-list heap
+- **ASLR/W^X/RELRO**: Page permissions enforce NX, W^X, and RELRO via mprotect and PTE flag manipulation
 - **NUMA-aware**: Zone selection considers proximity domain from SRAT
 - **Interrupt-safe**: All heap and PMM operations save/restore interrupt state
 
 ## Current Status
 
-~90% complete. Physical buddy + bitmap + zones functional. Virtual memory with 4-level paging, CoW fork, demand paging for anonymous memory. Slab allocator with 8 caches. Kernel heap operational. Direct map with 2MB huge pages. CoW refcount arrays per zone. UserAccess with SMAP support. IOMMU interface defined, Intel VT-d stub initialized. No swap support. No transparent huge pages beyond the kernel direct map.
+~90% complete. Physical buddy + bitmap + zones functional. Virtual memory with 4-level paging, CoW fork, demand paging for anonymous memory. Slab allocator with 10 caches (16B–8KB). Kernel heap operational. Direct map with 2MB huge pages. CoW refcount arrays per zone. UserAccess with SMAP support. IOMMU with Intel VT-d DMA remapping enabled. ASLR, W^X, and RELRO enforced via page permissions. No swap support. No transparent huge pages beyond the kernel direct map.

@@ -47,6 +47,10 @@ flowchart TD
 | `Src/Kernel/Hardware/Cpu/cpu.cpp` | CPUID vendor/brand, feature detection (SMEP, SMAP, NX, APIC) |
 | `Src/Kernel/Hardware/Cpu/cpu_register.cpp` | Register abstraction (CR0, CR3, EFER, etc.) |
 | `Src/Kernel/Hardware/Cpu/cpu_context.cpp` | Context save/restore (FPU/SSE state) |
+| `Src/Kernel/Drivers/Storage/Ahci/ahci_controller.cpp` | AHCI SATA controller |
+| `Src/Kernel/Drivers/Storage/Nvme/nvme_controller.cpp` | NVMe SSD controller |
+| `Src/Kernel/Drivers/Storage/Ata/ata_controller.cpp` | Legacy ATA PIO/DMA |
+| `Src/Kernel/Drivers/Network/E1000/e1000.cpp` | Intel E1000 NIC (interrupt-driven) |
 
 ## Key Data Structures
 
@@ -72,7 +76,7 @@ flowchart TD
 | MCFG | PCI Express Memory-Mapped Configuration (ECAM) | Active |
 | SRAT | System Resource Affinity Table (NUMA topology) | Active (via TopologyManager) |
 | HPET | High Precision Event Timer | Detected via CPUID + table lookup |
-| DMAR | DMA Remapping Table (IOMMU) | Struct defined, not yet initialized |
+| DMAR | DMA Remapping Table (IOMMU) | Active — DMA remapping enabled |
 
 ## PCI Enumeration
 
@@ -103,4 +107,4 @@ CPUID-based detection at construction:
 
 ## Current Status
 
-~85% complete. ACPI table parsing is functional (RSDP, RSDT/XSDT, MADT, FADT, MCFG, SRAT). PCI enumeration works via both ECAM and legacy paths. CPU feature detection covers SMEP, SMAP, NX, APIC, x2APIC. DMAR (IOMMU) table struct exists but initialization is not yet implemented. HPET initialization deferred to architecture layer.
+~90% complete. ACPI table parsing is functional (RSDP, RSDT/XSDT, MADT, FADT, MCFG, SRAT, DMAR, HPET). PCI enumeration works via both ECAM and legacy paths. CPU feature detection covers SMEP, SMAP, NX, APIC, x2APIC, xSAVE. DMAR DMA remapping enabled via IOMMU. SMP support with per-CPU Processor data and INIT/STARTUP IPI boot. Storage: AHCI, NVMe, and legacy ATA drivers. Networking: Intel E1000 interrupt-driven NIC. HPET detected and configured. No IOAPIC rebalancing. No CPU hotplug.

@@ -136,10 +136,14 @@ Turnstiles prevent priority inversion during IPC. When a higher-QoS task waits o
 
 Up to 32 processors. Each `Processor` struct contains:
 - Current task pointer
-- Idle task pointer
+- Idle task pointer (per-CPU idle task, runs when no other task is ready)
 - 4 MLFQ run queues (intrusive linked lists)
 - `run_queue_lock` (Spinlock, IRQ-safe)
 - `need_resched` flag
+
+### Real-Time Scheduling
+
+SCHED_FIFO tasks run until they block or yield; they are never demoted across MLFQ levels and are exempt from the priority boost mechanism. SCHED_RR tasks are similar but yield voluntarily when their timeslice expires and are re-enqueued at the same priority. Both enforce strict priority ordering: a real-time task at any MLFQ level preempts non-real-time tasks at the same or lower level.
 
 ## Context Switch
 
@@ -190,4 +194,4 @@ Assembly: `Src/Kernel/Arch/x86_64/Scheduler/context_switch.asm`.
 
 ## Current Status
 
-~90% complete. MLFQ scheduler with 6 QoS classes and 4 levels functional. Priority inheritance via turnstiles for IPC. Per-CPU processors and work stealing implemented. Context switch with FPU/SSE save/restore. Timer-based preemption with periodic priority boost. Stopped state wired for job control signals. Linux ABI: `sched_*`, `nice`/`getpriority`/`setpriority`, QoS syscalls. Real-time scheduling policies (Fifo, RoundRobin) exempt from MLFQ demotion. No CPU hotplug. No cgroup integration.
+~90% complete. MLFQ scheduler with 6 QoS classes and 4 levels functional. SCHED_FIFO and SCHED_RR real-time policies with strict priority ordering. Priority inheritance via turnstiles for IPC. Per-CPU processors with per-CPU idle tasks and work stealing implemented. Context switch with lazy FPU/SSE save/restore. Timer-based preemption with periodic priority boost. Stopped state wired for job control signals. Linux ABI: `sched_*`, `nice`/`getpriority`/`setpriority`, QoS syscalls, real-time policy setters. No CPU hotplug. No cgroup integration.

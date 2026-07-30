@@ -2,7 +2,7 @@
 
 ## Overview
 
-FKernel's VFS is inspired by BSD's vnode/dentry/mount model. It provides a unified interface for multiple filesystem types, device nodes, and process information. Supports mount namespaces, `pivot_root`, and KQueue as the unified event notification backend.
+FKernel's VFS is inspired by BSD's vnode/dentry/mount model. It provides a unified interface for 23 filesystem types (10 on-disk, 13 virtual), device nodes, and process information. Supports mount namespaces, `pivot_root`, and KQueue as the unified event notification backend.
 
 ## Architecture
 
@@ -69,17 +69,37 @@ Full `pivot_root(new_root, put_old)` implementation:
 4. Updates all mount records to reflect the new hierarchy
 5. Supports both namespace and global mount tables
 
-### Filesystem Types
+### Filesystem Types — On-Disk (10)
 
 | FS | Mount Point | Type | Notes |
 |----|-------------|------|-------|
-| TmpFS | `/` | In-memory | Root filesystem, directory + file nodes |
-| DevFS | `/dev` | Dynamic | Device nodes (null, zero, urandom, ptmx, tty, serial, console, pts/, sem/, mqueue/, shm/) |
-| ProcFS | `/proc` | Virtual | Process info (19 node types: stat, meminfo, uptime, version, mounts, pid/, self→ symlink) |
-| DebugFS | `/debug` | Virtual | Kernel debug ring buffers (debug_log, syscall_log, ipc_log) |
-| FAT32 | Auto-detected | Disk | Primary disk FS with LFN, full metadata write support |
-| FAT16 | Auto-detected | Disk | Legacy support with LFN |
+| Ext2 | Auto-detected | Disk | Extended FS v2 |
+| Ext3 | Auto-detected | Disk | Extended FS v3 with journal |
+| Ext4 | Auto-detected | Disk | Extended FS v4 with extents |
 | FAT12 | Auto-detected | Disk | Floppy images with LFN |
+| FAT16 | Auto-detected | Disk | Legacy support with LFN |
+| FAT32 | Auto-detected | Disk | Primary disk FS with LFN, full metadata write |
+| exFAT | Auto-detected | Disk | Extended FAT for large volumes |
+| ISO9660 | Auto-detected | Disk | CD/DVD optical media |
+| MinixFS | Auto-detected | Disk | Minix filesystem (v1/v2/v3) |
+
+### Filesystem Types — Virtual (13)
+
+| FS | Mount Point | Type | Notes |
+|----|-------------|------|-------|
+| TmpFs | `/` | In-memory | Root filesystem, directory + file nodes |
+| DevFs | `/dev` | Dynamic | Device nodes (null, zero, urandom, ptmx, tty, serial, console) |
+| ProcFs | `/proc` | Virtual | Process info (19 node types: stat, meminfo, uptime, version, mounts, pid/, self→ symlink) |
+| DebugFs | `/debug` | Virtual | Kernel debug ring buffers (debug_log, syscall_log, ipc_log) |
+| PtsFs | `/dev/pts` | Virtual | Pseudo-terminal slave devices |
+| SemFs | `/dev/sem` | Virtual | POSIX semaphores |
+| MqueueFs | `/dev/mqueue` | Virtual | POSIX message queues |
+| ShmFs | `/dev/shm` | Virtual | POSIX shared memory |
+| PipeFs | — | Virtual | Anonymous pipe pairs |
+| Epoll | — | Virtual | Event poll backend |
+| EventFd | — | Virtual | Event notification file descriptors |
+| SignalFd | — | Virtual | Signal delivery file descriptors |
+| TimerFd | — | Virtual | Timer file descriptors |
 
 ## KQueue — Unified Event Backend
 
@@ -127,8 +147,12 @@ All VFS operations acquire `m_lock` (Spinlock, IRQ-safe) during path resolution.
 
 ```
 Node (RefCounted)
-├── Fat12Node, Fat16Node, Fat32Node     (disk filesystem nodes)
-├── TmpFsNode, TmpFsDirectoryNode       (in-memory filesystem)
+├── Ext2Node, Ext3Node, Ext4Node          (journaling disk FS)
+├── Fat12Node, Fat16Node, Fat32Node       (FAT disk FS)
+├── ExFatNode                             (exFAT disk FS)
+├── Iso9660Node                           (optical media FS)
+├── MinixNode                             (Minix FS)
+├── TmpFsNode, TmpFsDirectoryNode         (in-memory filesystem)
 ├── DevFs: NullDevice, ZeroDevice, UrandomDevice, PtmxDevice, SerialNode, ConsoleNode
 ├── PipeNode, EventFdNode, TimerFdNode, SignalFdNode
 ├── EpollNode, KQueueNode
@@ -164,4 +188,4 @@ Node (RefCounted)
 
 ## Current Status
 
-~85% complete. Full VFS operations: open (with O_CREAT), mkdir, mkfifo, symlink, rmdir, unlink, link, rename, mount, unmount, pivot_root, stat, truncate, chmod, chown, fsync. Mount namespaces for per-process isolation. KQueue as unified event backend for epoll/poll/select. FAT12/16/32 with LFN and full metadata write. DevFs with all standard device nodes. ProcFs with 19 node types. TmpFs for root. DebugFs ring buffers. No page cache. No extended attributes (xattr). No ACLs.
+~85% complete. Full VFS operations: open (with O_CREAT), mkdir, mkfifo, symlink, rmdir, unlink, link, rename, mount, unmount, pivot_root, stat, truncate, chmod, chown, fsync. Mount namespaces for per-process isolation. KQueue as unified event backend for epoll/poll/select. 10 on-disk filesystems: Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS. 13 virtual filesystems: TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd. DevFs with all standard device nodes. ProcFs with 19 node types. TmpFs for root. DebugFs ring buffers. No page cache. No extended attributes (xattr). No ACLs.

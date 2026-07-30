@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Memory Management domain handles all memory operations in FKernel, from physical page allocation to virtual memory management. Features: dual bitmap+buddy per zone, CoW reference counting, slab allocator, demand paging for anonymous memory, 2MB huge pages for direct map, and NUMA-aware zone selection.
+The Memory Management domain handles all memory operations in FKernel, from physical page allocation to virtual memory management. Features: dual bitmap+buddy per zone, CoW reference counting with fork support, slab allocator, demand paging for anonymous and file-backed memory, 2MB huge pages for direct map, ASLR, W^X enforcement, RELRO, and NUMA-aware zone selection.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ flowchart TD
     MM["MemoryManager<br/>Top-level coordinator"]
     PMM["PhysicalMemoryManager<br/>Zone-based allocation"]
     VMM["VirtualMemoryManager<br/>4-level page tables"]
-    SLAB["SlabAllocator<br/>8 caches (16B-2048B)"]
+    SLAB["SlabAllocator<br/>10 caches (16B-8192B)"]
     HEAP["Kernel Heap<br/>First-fit linked list<br/>tries Slab first"]
     IOMMU["IOMMU<br/>Intel VT-d (abstract)"]
 
@@ -61,7 +61,7 @@ flowchart TD
     CR3["Write CR3 register"]
     DIRECT_MAP["extend_direct_map()<br/>2MB huge pages at KERNEL_VIRT_BASE"]
     RECONCILE["reconcile_buddies()<br/>sync buddy from bitmap"]
-    SLAB_INIT["SlabAllocator::initialize()<br/>8 caches"]
+    SLAB_INIT["SlabAllocator::initialize()<br/>10 caches"]
     HEAP_INIT["MemoryManager::initialize_heap()<br/>linked-list heap + LibFK backend"]
 
     INIT --> PMM_INIT
@@ -229,12 +229,23 @@ flowchart TD
     EXEC --> CLONE_SHALLOW
 ```
 
+### CoW Fork Details
+
+`clone_table_recursive(cr3, target_cr3, virtual_address, max_depth, deep_copy)` implements the actual page table copying:
+- `deep_copy = true` (fork): Allocates new physical pages at every table level, copies entries, sets user pages read-only and increments CoW refcounts
+- `deep_copy = false` (exec): Creates a shallow clone of the table hierarchy (will be swapped during ELF loading)
+
 ### Demand Paging
 
-Anonymous memory (`mmap MAP_ANONYMOUS`) is mapped lazily. The page fault handler (`pf_handler.cpp`) handles two cases:
+Memory is mapped lazily on first access. The page fault handler (`pf_handler.cpp` — `handle_demand_paging()`) handles two types of regions:
 
-1. **Not-present fault** (`error_code & 1 == 0`): Allocate + zero-fill a physical page, map into user address space
-2. **Write-protection fault**: CoW handling — allocate new page, copy data, update PTE with Writable
+1. **Anonymous memory** (`mmap MAP_ANONYMOUS`):
+   - **Not-present fault**: Allocate + zero-fill a physical page, map into user address space
+   - **Write-protection fault**: CoW break — allocate new page, copy data, update PTE with Writable
+
+2. **File-backed memory** (`mmap of a file descriptor`):
+   - **Not-present fault**: Read the missing page from the file's page cache via the filesystem; map into address space
+   - **Write-protection fault**: CoW break for private mappings; for shared mappings, write-through to page cache
 
 ### Direct Map
 
@@ -249,9 +260,29 @@ Anonymous memory (`mmap MAP_ANONYMOUS`) is mapped lazily. The page fault handler
 - Uses STAC/CLAC instructions when hardware SMAP is available
 - Returns `Result<void, Error>` for error propagation
 
+## ASLR, W^X, and RELRO
+
+Implemented in Phase 30b:
+
+**ASLR (Address Space Layout Randomization)**:
+- Randomizes `mmap` base address and ELF load address per process
+- Stack and heap randomization included
+- Entropy sources: CPU RDRAND or TSC-based seed mixed with per-process PID
+
+**W^X Enforcement**:
+- No page may be simultaneously writable and executable
+- ELF segment mapping sets W or X, never both
+- `mprotect` rejects PROT_WRITE | PROT_EXEC combinations
+- Applied at page-table level via NX bit (bit 63) and Writable bit
+
+**RELRO (Relocation Read-Only)**:
+- After ELF relocations are applied, the GOT is marked read-only
+- Full RELRO: entire GOT read-only after initialization
+- Partial RELRO: GOT entries used before initialization remain writable
+
 ## Slab Allocator
 
-`SlabAllocator` provides fast, fixed-size object allocation with 8 caches:
+`SlabAllocator` provides fast, fixed-size object allocation with 10 caches:
 
 | Cache Size | Use Case |
 |------------|----------|
@@ -262,9 +293,11 @@ Anonymous memory (`mmap MAP_ANONYMOUS`) is mapped lazily. The page fault handler
 | 256B | |
 | 512B | |
 | 1024B | |
-| 2048B | Large kernel objects |
+| 2048B | |
+| 4096B | Page-sized allocations |
+| 8192B | Large kernel objects |
 
-The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤2048 bytes, falling back to the linked-list heap only when the slab cache is exhausted.
+The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤8192 bytes, falling back to the linked-list heap only when the slab cache is exhausted.
 
 ## Kernel Heap
 
@@ -304,7 +337,10 @@ flowchart TD
 - **CoW refcounts**: Per-zone uint16_t arrays for accurate shared page tracking
 - **COW-safe table creation**: `ensure_table()` copies shared kernel tables when user bit needed
 - **2MB huge pages**: Direct map via `PageFlags::HugePage` for low TLB pressure
-- **Slab-first heap**: `allocate()` tries slab for ≤2048B, falls back to linked-list heap
+- **Slab-first heap**: `allocate()` tries slab for ≤8192B, falls back to linked-list heap
+- **ASLR**: Randomized mmap/ELF/stack/heap base per process (Phase 30b)
+- **W^X**: No page may be simultaneously writable and executable; enforced at PTE level
+- **RELRO**: GOT marked read-only after ELF relocations applied (Phase 30b)
 - **NUMA-aware**: Zone selection considers proximity domain with 4-level fallback
 - **SMAP/STAC-CLAC**: Hardware-enforced user/kernel memory access control
 
@@ -319,4 +355,4 @@ flowchart TD
 1. Transparent huge pages (2MB/1GB) for user mappings
 2. Swap support
 3. Memory hot-plug
-4. Advanced NUMA policies with distance metrics
+4. Advanced NUMA policies with distance metrics (Phase 34)

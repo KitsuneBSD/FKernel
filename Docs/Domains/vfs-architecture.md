@@ -13,7 +13,7 @@ flowchart TD
     VFS["VirtualFilesystem<br/>Mount table, path resolution<br/>dentry cache"]
     D["Dentry<br/>Directory entry cache<br/>Node stack for mount overlay"]
     N["Node<br/>Abstract filesystem node<br/>read/write/ioctl vtable"]
-    FS["FS Drivers<br/>Fat32, DevFs, ProcFs<br/>TmpFs, Pipe, KQueue"]
+    FS["FS Drivers<br/>10 on-disk + 13 virtual<br/>Ext2/3/4, FAT, TmpFs, DevFs, ..."]
 
     U -->|"syscall layer"| FD
     FD --> VFS
@@ -110,8 +110,10 @@ Multiple filesystems can be stacked on the same dentry. The topmost node wins fo
 ### Node (filesystem node)
 
 - Abstract interface for all filesystem objects (`RefCounted`)
-- Common operations: `read()`, `write()`, `ioctl()`, `truncate()`, `fsync()`, `poll()`
-- Directory operations: `lookup()`, `list_dir()`, `create_child()`, `mkdir()`, `symlink()`, `rmdir()`, `unlink()`, `link()`, `rename()`
+- I/O: `read()`, `write()`, `ioctl()`, `truncate()`, `fsync()`, `select()`, `poll()`
+- Directory ops: `lookup()`, `list_dir()`, `create_child()`, `mkdir()`, `symlink()`, `rmdir()`, `unlink()`, `link()`, `rename()`, `readlink()`
+- Metadata: `stat()`, `chmod()`, `chown()`, `utimens()`
+- Socket ops: `bind()`, `connect()`, `accept()`, `listen()`, `shutdown()`, `getsockname()`, `getpeername()`, `setsockopt()`, `getsockopt()`
 - Type queries: `is_directory()`, `is_symlink()`, `is_block_device()`, `is_character_device()`, `is_pipe()`
 - Atomic inode allocation via `__sync_fetch_and_add`
 
@@ -119,15 +121,53 @@ Multiple filesystems can be stacked on the same dentry. The topmost node wins fo
 
 | Filesystem | Mount Point | Type | Key Features |
 |------------|------------|------|--------------|
+| **Ext2** | `/mnt/<disk>` | Disk-backed | Linux ext2, block-oriented, inode table |
+| **Ext3** | `/mnt/<disk>` | Disk-backed | ext2 + journaling, V1/V2 superblocks |
+| **Ext4** | `/mnt/<disk>` | Disk-backed | extents, flex_bg, 48-bit block numbers, journal |
 | **FAT32** | `/mnt/<disk>` | Disk-backed | LFN support, cluster chain traversal, write support |
 | **FAT16** | `/mnt/<disk>` | Disk-backed | LFN support, cluster chain reading |
 | **FAT12** | `/mnt/<disk>` | Disk-backed | Floppy images, cluster chain traversal |
+| **ExFAT** | `/mnt/<disk>` | Disk-backed | Large file support, contiguous clusters |
+| **ISO9660** | `/mnt/<disk>` | Disk-backed | CD/DVD images, Rock Ridge extensions |
+| **MinixFS** | `/mnt/<disk>` | Disk-backed | Minix v1/v2/v3 filesystem |
+| **TmpFs** | `/tmp`, `/var/run` | In-memory | Temporary file storage |
 | **DevFs** | `/dev` | Virtual | Dynamic device registration, pseudo-devices |
-| **ProcFs** | `/proc` | Virtual | Process info, `/proc/self`, `/proc/version` |
-| **TmpFs** | `/tmp`, `/var/run` | In-memory | Temporary storage |
+| **ProcFs** | `/proc` | Virtual | Per-pid entries: cmdline, status, mem, fd, maps, cwd, exe, root |
 | **DebugFs** | `/debug` | Virtual | Debug info, IPC log at `/debug/ipc` |
+| **PtsFs** | `/dev/pts` | Virtual | PTY slave device files |
+| **SemFs** | `/dev/sem` | Virtual | POSIX named semaphores |
+| **MqueueFs** | `/dev/mqueue` | Virtual | POSIX message queues |
+| **ShmFs** | `/dev/shm` | Virtual | POSIX shared memory |
 | **Pipe** | (anonymous) | In-memory | Circular buffer, Notification-based signaling |
-| **KQueue** | (anonymous) | In-memory | BSD-style event polling (EVFILT_READ/WRITE) |
+| **Epoll** | (anonymous) | In-memory | Full epoll implementation, fd event monitoring |
+| **EventFd** | (anonymous) | In-memory | eventfd counter + Notification signaling |
+| **SignalFd** | (anonymous) | In-memory | Signal-to-fd demultiplexing |
+| **TimerFd** | (anonymous) | In-memory | Timer expiration via file descriptor |
+| **KQueue** | (anonymous) | In-memory | BSD event polling (EVFILT_READ/WRITE/PROC/SIGNAL/TIMER) |
+
+### Userspace FS via Capabilities
+
+Filesystem operations in userspace are architecturally supported through the Capability model (see `ipc-capabilities.md`). A userspace process can serve as a filesystem driver by receiving Node capabilities, handling `read()`/`write()`/`lookup()` via Endpoint IPC, and exposing results through the VFS layer. This enables FUSE-like functionality natively through the capability system. **Phase: pending — not yet implemented.**
+
+## Event Notification
+
+Two event notification subsystems coexist in FKernel:
+
+### KQueue (BSD-style)
+
+Full `kqueue()` implementation with the following event filters:
+
+| Filter | Trigger |
+|--------|---------|
+| `EVFILT_READ` | Data available on fd |
+| `EVFILT_WRITE` | Space available on fd |
+| `EVFILT_PROC` | Process lifecycle events (exit, fork, exec) |
+| `EVFILT_SIGNAL` | Signal delivery |
+| `EVFILT_TIMER` | Timer expiration |
+
+### Epoll (Linux-compatible)
+
+Full `epoll_create()`/`epoll_ctl()`/`epoll_wait()` implementation backed by `EpollNode`, supporting `EPOLLIN`, `EPOLLOUT`, `EPOLLERR`, `EPOLLET` (edge-triggered), and `EPOLLONESHOT`.
 
 ## AutoMounter and Fstab
 
@@ -148,7 +188,7 @@ flowchart TD
     FSTAB -->|No| SCAN
     SCAN --> TRY
     TRY --> DETECT
-    DETECT -->|FAT12/16/32| MOUNT
+    DETECT -->|Ext2/3/4, FAT12/16/32,<br/>ExFAT, ISO9660, MinixFS| MOUNT
     DETECT -->|Unknown| SKIP_FS
 ```
 

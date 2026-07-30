@@ -55,6 +55,33 @@ The LibC layer (`libc_puts`) cannot depend on Kernel headers. The hook pattern (
 | INFO | `klog()` | Returns | State changes: mount, init, connection |
 | DEBUG | `kdebug()` | Returns | Diagnostic: function entry, buffer contents |
 
+## Compile-Time Log Level Filtering
+
+Log messages are filtered at compile time via the `FKERNEL_LOG_LEVEL` macro:
+
+| Level | Value | Description |
+|-------|-------|-------------|
+| TRACE | 0 | Most verbose — all output |
+| DEBUG | 1 | Debug diagnostics |
+| INFO | 2 | Normal operational messages |
+| WARN | 3 | Warnings only |
+| ERROR | 4 | Errors only |
+| NONE | 5 | No output |
+
+Messages below the configured log level are stripped at compile time, eliminating runtime overhead for disabled levels. Runtime filtering via `get_log_level()` / `set_log_level()` is also available for dynamic control.
+
+## Log Output Bitmask
+
+Log output targets are controlled by a bitmask, allowing independent enable/disable of each channel:
+
+| Bit | Target | Description |
+|-----|--------|-------------|
+| 0 | Serial (COM1) | Always available, works before display init |
+| 1 | Display (VGA/Framebuffer) | Visual feedback via ANSI terminal |
+| 2 | DebugFS (ring buffer) | Persistent buffer accessible via `dmesg` |
+
+The bitmask is configured at boot via `kernel.log_mask` kernel parameter or at runtime via `/debug/log_mask`. Default: all targets enabled.
+
 ## DebugFs Ring Buffers
 
 | Node | Buffer Size | DebugFs Path | Content |

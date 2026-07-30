@@ -107,7 +107,7 @@ auto value = result.value();
 ### Coverage Targets
 - **LibC**: 90% coverage required
 - **LibFK**: 85% coverage required  
-- **Kernel**: 75% coverage required (critical paths)
+- **Kernel**: 0% coverage today — Phase 43 target: 75%+ for critical paths
 
 ### Test Structure
 ```

@@ -13,13 +13,14 @@ flowchart TD
     C --> D["kmain(magic, mb_ptr)<br/>Validate magic, init BootInfo"]
     D --> E["kernel_entry()<br/>Serial + VGA init"]
     E --> F["early_init()<br/>Memory, heap, interrupts"]
-    F --> G["init()<br/>PCI, VFS, drivers, scheduler"]
-    G --> H["schedule()"]
-    H --> I["idle_task_entry()"]
-    I --> J["Create init task (PID 1)"]
-    J --> K["init_task_entry()<br/>ELF load /sbin/init"]
-    K --> L["enter_user_mode()"]
-    L --> M["Userspace (init process)"]
+    F --> G["init()<br/>PCI, VFS, drivers, scheduler, syscalls, IRQs"]
+    G --> H["smp_ap_start()<br/>INIT/STARTUP IPI → per-CPU init"]
+    H --> I["schedule()"]
+    I --> J["idle_task_entry()"]
+    J --> K["Create init task (PID 1)"]
+    K --> L["init_task_entry()<br/>ELF load /sbin/init"]
+    L --> M["enter_user_mode()"]
+    M --> N["Userspace (init process)"]
 ```
 
 ## Boot Flow
@@ -58,9 +59,15 @@ flowchart TD
 - `SchedulerManager::the().initialize()`
 - `SyscallManager::the().initialize()`
 - Enable hardware interrupts (timer, keyboard, clock, mouse, ATA)
+- `SmpManager::the().start_aps()` — INIT/STARTUP IPI sequence, per-CPU data init
 - `SchedulerManager::the().schedule()`
 
-### Stage 6: idle_task → init_task
+### Stage 6: SMP AP startup
+- `smp_ap_start()` sends INIT IPI → STARTUP IPI to each AP
+- APs enter `ap_entry.asm`, set up GDT, load per-CPU data
+- APs initialize local APIC timer and enter idle loop
+
+### Stage 7: idle_task → init_task
 - `idle_task_entry()` creates PID 1 on first invocation
 - `init_task_entry()` loads `/sbin/init` via ELF loader
 - Mounts RamDisk + DevFS, opens `/dev/tty0` for stdio
@@ -111,4 +118,4 @@ flowchart TD
 
 ## Current Status
 
-~95% complete. Multiboot2 boot path is fully functional. UEFI boot is not yet implemented (BootMode enum has placeholder for future expansion). No SMP boot (application processor startup) yet.
+~95% complete. Multiboot2 boot path is fully functional. UEFI boot is not yet implemented (BootMode enum has placeholder for future expansion). SMP AP boot via INIT/STARTUP IPI implemented.

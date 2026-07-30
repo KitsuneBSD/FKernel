@@ -76,7 +76,7 @@ stateDiagram-v2
 - MMIO register access via BAR0
 - RX/TX descriptor rings (128 entries each)
 - MAC address from RAL/RAH registers
-- Interrupt-driven TX completion (scheduler blocks on TX ring availability)
+- Interrupt-driven TX/RX (full duplex)
 - PCI bus mastering enabled for DMA
 
 ### TCP Implementation
@@ -85,12 +85,27 @@ stateDiagram-v2
 - FIN-based connection teardown
 - Per-connection state machine
 - Port-based demultiplexing
+- Retransmission with exponential backoff (RTO_TICKS=5, MAX_RETRANSMITS=5)
+- Checksum validation on receive (pseudo-header + segment)
+
+#### TCP Retransmission
+
+- `arm_retransmit()`: Start/restart retransmit timer with current RTO
+- `cancel_retransmit()`: Cancel pending retransmit on ACK
+- `do_retransmit()`: Timer callback — retransmits head of send buffer, doubles RTO
+- Exponential backoff: RTO doubles on each timeout up to MAX_RETRANSMITS
+- Connection aborted after MAX_RETRANSMITS consecutive timeouts
+
+#### TCP Checksum Validation
+
+- Pseudo-header checksum computed from source/destination IP and protocol number
+- Full TCP segment checksum verified on receive
+- Packets with invalid checksums are dropped silently
+- TX checksum offload not yet implemented (software computation in progress)
 
 **Known Limitations:**
-- No retransmission timer
 - No congestion control
 - No out-of-order buffer
-- TX checksum not computed
 
 ### UDP Implementation
 - Simple send/receive
@@ -111,6 +126,15 @@ stateDiagram-v2
 - Name compression support
 - Multiple retry attempts
 
+### Unix Sockets
+
+Unix domain sockets support both `SOCK_STREAM` and `SOCK_DGRAM`:
+
+- **SCM_RIGHTS**: File descriptor passing via ancillary data (`cmsg(3)`) — transfer of open fds between processes
+- **SCM_CREDENTIALS**: Credential passing — sender PID, UID, GID attached to messages
+- Path-based addressing (`AF_UNIX` with `sun_path`)
+- Connection-oriented (`SOCK_STREAM`) and datagram (`SOCK_DGRAM`) semantics
+
 ## Socket API
 
 | Syscall | Implementation |
@@ -125,7 +149,9 @@ stateDiagram-v2
 ## Known Issues
 
 1. **No IP fragmentation** — packets > MTU dropped
-2. **No TCP/UDP TX checksum** — real stacks may drop packets
-3. **ARP entries never expire** — stale entries accumulate
-4. **No ICMP redirect handling**
-5. **Fixed-size socket arrays** — no dynamic growth
+2. **No TCP congestion control** — no slow start, congestion avoidance, or fast recovery
+3. **No TCP out-of-order buffer** — out-of-order segments dropped
+4. **No TX checksum offload** — software checksum computed on TX
+5. **ARP entries never expire** — stale entries accumulate
+6. **No ICMP redirect handling**
+7. **Fixed-size socket arrays** — no dynamic growth

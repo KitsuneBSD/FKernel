@@ -1,6 +1,6 @@
 # FKernel Design Philosophy
 
-> *"Linux ABI compatibility with BSD-inspired internals, built with modern software engineering practices."*
+> *"Linux ABI-compatible hobby kernel with BSD-inspired internals, built with modern software engineering practices."*
 
 ## Core Identity
 
@@ -8,7 +8,7 @@ FKernel is a **hybrid kernel** that deliberately cherry-picks the best ideas fro
 
 | Aspect | Inspiration | Rationale |
 |--------|-------------|-----------|
-| **Syscall ABI** | Linux x86_64 | Run existing binaries (BusyBox, musl, OpenRC) without modification |
+| **Syscall ABI** | Linux x86_64 | Run validation tooling (BusyBox, musl) without modification |
 | **VFS Architecture** | BSD (vnode/dentry/mount) | Clean layered design, everything-is-a-file, composable |
 | **Process Model** | BSD (session/group/tty) | Job control, terminal management, process groups |
 | **Scheduling** | BSD (priority queues) + Linux (load balancing) | Fairness with performance |
@@ -64,6 +64,7 @@ When adding a new subsystem or feature, use this table to determine which refere
 
 - **Not a Linux kernel**: We implement only the Linux *ABI*, not the internal architecture
 - **Not a microkernel**: Despite seL4-inspired IPC, we run drivers and core services in kernel space for performance
+- **Not an operating system**: FKernel is a kernel, not an OS. MockOS (BusyBox + musl) is a test harness for syscall validation, not a userspace environment
 - **A personal kernel**: Built for a single developer's machine and workflow; not aiming to replace Linux or run arbitrary hardware
 - **Not a BSD kernel**: We don't use BSD syscall numbers or binary compat layers -- the ABI is Linux
 

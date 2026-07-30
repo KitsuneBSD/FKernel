@@ -89,6 +89,20 @@ flowchart TD
 | 0x01 (Mass Storage) | 0x08 (NVMe) | NVMe Controller | Factory |
 | 0x02 (Network) | 0x00 (Ethernet) | E1000 | Factory |
 
+### Driver Implementation Status
+
+| Driver | Status | Notes |
+|--------|--------|-------|
+| ATA | ✅ | PIO and DMA modes (strategy pattern) |
+| AHCI | ✅ | Full HBA, command lists, FIS, PRDT |
+| NVMe | ✅ | Controller/Namespace/Queue/Command decomposition |
+| E1000 | ✅ | Interrupt-driven, full duplex |
+| HPET | ✅ | System timer from ACPI HPET table |
+| PS/2 Keyboard | ✅ | IRQ1, scancode translation |
+| PS/2 Mouse | ✅ | IRQ12, 3-byte packet decoding |
+| VGA Text Mode | ✅ | 80x25, ANSI parser |
+| Framebuffer | ✅ | ANSI parser |
+
 ## Storage Stack
 
 ```mermaid
@@ -164,6 +178,48 @@ sequenceDiagram
     VFS-->>APP: Return to userspace
 ```
 
+### NVMe Controller Decomposition
+
+The NVMe driver is decomposed into four classes:
+
+```mermaid
+classDiagram
+    class NvmeController {
+        +AdminQueuePair m_admin
+        +Vector~IOQueuePair*~ m_io_queues
+        +Vector~Namespace*~ m_namespaces
+        +initialize()
+        +identify_controller()
+    }
+    class IOQueuePair {
+        +SubmissionQueue m_submission
+        +CompletionQueue m_completion
+        +submit_command()
+        +poll_completions()
+    }
+    class Namespace {
+        +u64 m_block_count
+        +u32 m_block_size
+        +StorageDevice interface
+        +read_sectors()
+        +write_sectors()
+    }
+    class AdminCommand {
+        +identify_namespace()
+        +create_io_cq()
+        +create_io_sq()
+    }
+    class NvmCommand {
+        +read()
+        +write()
+        +flush()
+    }
+    NvmeController --> IOQueuePair
+    NvmeController --> Namespace
+    IOQueuePair --> AdminCommand
+    IOQueuePair --> NvmCommand
+```
+
 ## Network Drivers
 
 ### E1000 (Intel Gigabit Ethernet)
@@ -172,7 +228,7 @@ sequenceDiagram
 - RX/TX descriptor rings (128 entries each)
 - MAC address from RAL/RAH registers (EEPROM)
 - PCI bus mastering enabled for DMA
-- Polling-based (interrupt handler not registered)
+- Interrupt-driven TX/RX (full duplex)
 
 ## Input Drivers
 
@@ -234,7 +290,47 @@ flowchart TD
 | MADT | ✅ | IOAPIC, LAPIC from MSR |
 | SRAT | 60% | NUMA topology parsing |
 | DSDT/SSDT | ❌ | AML interpreter pending |
-| DMAR | ❌ | IOMMU/VT-d pending |
+| DMAR | ✅ | DMA remapping supported |
+
+### DMAR (DMA Remapping)
+
+The DMAR (DMA Remapping) table provides IOMMU/VT-d information:
+
+- **DRHD (DMA Remapping Hardware Definition)**: Identifies IOMMU units and their scope
+- **RMRR (Reserved Memory Region Reporting)**: Reserved memory regions requiring identity mapping
+- DMA remapping is supported for device isolation and security
+
+## SMP Boot
+
+The SMP boot path starts Application Processors (APs) via the INIT/STARTUP IPI sequence:
+
+```mermaid
+sequenceDiagram
+    participant BSP as BSP
+    participant AP as AP
+    BSP->>AP: Send INIT IPI
+    BSP->>AP: Wait 10ms
+    BSP->>AP: Send STARTUP IPI (vector = 0x08)
+    AP->>AP: Execute AP trampoline at 0x8000
+    AP->>AP: Enable protected mode + long mode
+    AP->>AP: Set up page tables (clone BSP)
+    AP->>AP: Load GDTR/IDTR from BSP values
+    AP->>AP: Initialize per-CPU data (LAPIC ID, stack)
+    AP->>AP: Enable local APIC
+    AP->>AP: Initialize FPU/SSE
+    AP-->>BSP: Set startup flag
+    BSP->>BSP: Wait for AP to signal ready
+```
+
+### Per-CPU Data
+
+Each CPU has a dedicated per-CPU data structure accessible via `GS_BASE`:
+
+- LAPIC ID
+- Kernel stack pointer
+- Process idling state
+- Scheduler run queue
+- Local timer state
 
 ## Key Design Decisions
 

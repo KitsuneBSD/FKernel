@@ -2,7 +2,7 @@
 
 ## Overview
 
-FKernel implements a domain-driven ELF64 loader supporting static executables, dynamically linked binaries (DT_NEEDED + ld.so), and shared libraries. Features include ASLR (ChaCha20PRNG, 30-bit entropy), NX enforcement, full RELRO, W^X protection, TLS, SMAP-safe user memory access, and cross-object symbol resolution.
+FKernel implements a domain-driven ELF64 loader supporting static executables, dynamically linked binaries (DT_NEEDED + ld.so), and shared libraries. Features include ASLR (ChaCha20PRNG, 30-bit entropy), NX enforcement, full RELRO, W^X protection, TLS, SMAP-safe user memory access, cross-object symbol resolution, endianness validation, and file-size bounds checking.
 
 ## Architecture
 
@@ -142,4 +142,4 @@ All write targets are accessed via `arch_smap_begin()` / `arch_smap_end()` pairs
 
 ## Current Status
 
-~85% complete. ET_EXEC and ET_DYN loading functional. Full dynamic linking: DT_NEEDED shared library loading, cross-object symbol resolution, all 10 X86_64 relocation types. ASLR with ChaCha20PRNG + 30-bit entropy + randomized ld.so base. Full RELRO with correct alignment + interpreter RELRO. W^X enforcement active. SMAP STAC/CLAC in all user-memory write paths. TLS block at 0x7FFFFE000000 with FS_BASE. Init/fini addresses extracted. Remaining: endianness check (EI_DATA), file-size bounds validation on p_offset + p_filesz, symbol versioning (DT_VERSYM/DT_VERNEED). ET_REL not yet supported.
+~85% complete. ET_EXEC and ET_DYN loading functional. Full dynamic linking: DT_NEEDED shared library loading, cross-object symbol resolution, all 10 X86_64 relocation types. ASLR with ChaCha20PRNG + 30-bit entropy + randomized ld.so base. Full RELRO with correct alignment + interpreter RELRO. W^X enforcement active. SMAP STAC/CLAC in all user-memory write paths. TLS block at 0x7FFFFE000000 with FS_BASE. Init/fini addresses extracted. Endianness validation (EI_DATA) and file-size bounds checks on p_offset + p_filesz implemented. Remaining: symbol versioning (DT_VERSYM/DT_VERNEED). ET_REL not yet supported.

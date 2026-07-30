@@ -1,10 +1,14 @@
 # FKernel Development Guide
 
+## Project Identity
+
+FKernel is a **POSIX-compatible x86_64 hobby kernel** with BSD-inspired internals and seL4-style capability IPC. MockOS is a test harness (BusyBox + musl ISO) for validating syscall compatibility — it is NOT an operating system. BusyBox and musl are validation tools, not the project's "userspace."
+
 ## Build Commands
 
 ```bash
 xmake                           # Build kernel
-xmake run                      # Run in QEMU
+xmake run                      # Run in QEMU (MockOS test ISO)
 xmake clean                    # Clean build artifacts
 xmake -bv Test                 # Build tests (verbose)
 xmake run Test                 # Run all tests (no single test target)
@@ -70,13 +74,17 @@ namespace fk::memory { }       // Smart pointers
 namespace fk::core { }         // Result, Error
 namespace fk::algorithms { }   // CRC32, DJB2
 
-// Kernel
-namespace fkernel::boot { }
-namespace fkernel::cpu { }
-namespace fkernel::memory { }
-namespace fkernel::process { }
-namespace fkernel::fs { }
-namespace fkernel::drivers { }
+// Kernel — most types are in global scope or `namespace fkernel { }`
+// without sub-namespace. Only structured sub-namespaces listed below.
+namespace boot { }             // BootInfo
+namespace fkernel { }          // PCI, ACPI, VFS, Loader, Syscall, IOMMU...
+namespace fkernel::io { }      // kernel_puts, serial
+namespace fkernel::ipc { }     // endpoint, capability, cspace
+namespace fkernel::scheduler { } // turnstile, mlfq_queue, qos
+namespace fkernel::net { }     // network_stack
+namespace fkernel::terminal { }// terminal
+namespace fkernel::elf_domains { } // dynamic_domain
+namespace fkernel::vtd { }     // Intel IOMMU (arch/)
 ```
 
 ## Object Calisthenics (Mandatory)
@@ -94,6 +102,11 @@ namespace fkernel::drivers { }
 | No getters/setters | `is_running()` / `block()` not `state()` / `set_state()` |
 
 **SECRET RULE**: One struct/class per file. File name matches class name.
+
+**Nested classes, structs, and enums are FORBIDDEN.** Each type must
+live in its own file. Known tech debt: `task.h` (6+ types in one file,
+including nested `Control`/`Resources`), `dynamic_domain.h` (nested
+`RelaTable`/`SymbolContext`), `boot_timer.h` (nested `Mark`).
 
 ## Subsystem Manager Pattern (Mandatory)
 
@@ -129,6 +142,36 @@ Rules:
 - All managers live in `fkernel::` namespace
 - `initialize()` must guard against double-init and set `m_is_initialized = true` at end
 - Boot flow (`init.cpp`) must assert `is_initialized()` after each `initialize()` call
+
+## Architecture Portability
+
+FKernel uses `extern "C"` functions with the `arch_` prefix as its
+portability layer, declared in `<Kernel/Arch/<arch>/Hardware/Cpu/cpu_ops.h>`.
+
+### Available arch_* Functions
+
+| Function | Purpose |
+|----------|---------|
+| `arch_disable_interrupts()` | CLI — generic code MUST NOT use `asm("cli")` |
+| `arch_enable_interrupts()` | STI — generic code MUST NOT use `asm("sti")` |
+| `arch_save_flags_and_disable()` | PUSHFQ + CLI |
+| `arch_restore_flags(flags)` | POPFQ |
+| `arch_halt_loop()` | HLT loop ([[noreturn]]) |
+| `arch_cpu_relax()` | PAUSE |
+| `arch_cpuid()` | CPUID instruction |
+| `arch_read_msr()` / `arch_write_msr()` | RDMSR / WRMSR |
+| `arch_enable_cpu_features()` | CR0/CR4, NX, SMEP/SMAP, XSAVE, ERMSB |
+| `arch_smap_begin()` / `arch_smap_end()` | STAC / CLAC |
+| `arch_triple_fault()` | LIDT + INT3 panic |
+| `detect_tsc_frequency()` | CPUID 0x15/0x16 TSC calibration |
+| `arch_cpu_idle()` _(Phase 42)_ | TODO: extract `sti; hlt` from scheduler |
+
+### Rules
+
+1. Generic code MUST call `arch_*()` functions, NOT inline `asm()`.
+2. New arch-specific primitives MUST follow `arch_` + `extern "C"` pattern.
+3. Implementations live in `Src/Kernel/Arch/<arch>/<subsystem>/`.
+4. See TODO.md Phase 42 for remaining extractions (scheduler, VMM, init.cpp).
 
 ## Architecture Change Policy (Mandatory)
 
@@ -208,12 +251,13 @@ Full directory tree: `Docs/directory-structure.md`.
 
 - LibC: 90%+ coverage required
 - LibFK: 85%+ coverage required
-- Kernel critical paths: 75%+ coverage
+- Kernel: **0% coverage today** — Phase 43 target: 75%+ for critical paths
 - All public APIs must have tests
 - New LibFK/LibC PRs require test additions
-- Kernel changes MUST include regression tests for the modified subsystem
+- Kernel changes MUST include regression tests for the modified subsystem (when test infrastructure exists)
 - Test for edge cases: null inputs, boundary values, error paths, concurrent access
 - Framework: custom (see `tests/test_framework.h`)
+- MockOS (BusyBox + musl ISO) validates syscall correctness at integration level
 
 ## Algorithm Consolidation
 
@@ -315,6 +359,7 @@ Docs/
 
 ## AI Agent Instructions
 
+- `CLAUDE.md` is a proxy that loads `AGENTS.md` — always read `AGENTS.md` first
 - Read `.ai-docs/` before making changes; update it for significant modifications
 - Layer separation is non-negotiable — never add LibC calls in Kernel code
 - **Architecture changes require justification** — search existing abstractions first (see "Architecture Change Policy")
@@ -322,3 +367,4 @@ Docs/
 - Every struct/class goes in its own file (SECRET RULE)
 - **Always update Docs/** when modifying kernel subsystems — keep documentation in sync
 - **Always write tests** when modifying kernel code — regression tests for the modified subsystem
+- FKernel is a **kernel**, not an operating system. MockOS is a test harness, not "userspace." Do not use OS framing in new documentation.
