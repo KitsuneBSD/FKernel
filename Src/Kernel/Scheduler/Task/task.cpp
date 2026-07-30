@@ -23,27 +23,29 @@ static fkernel::ipc::CapabilityRights fd_flags_to_rights(int flags) {
   return rights;
 }
 
-Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name, void (*entry)(),
-                       bool kernel_task, uint8_t priority, uint64_t cpu_affinity, uint64_t arg1,
-                       uint64_t arg2, fkernel::scheduler::QoSClass qos) {
+void initialize_task(Task* task, fk::ProcessId id, const fk::text::fixed_string<64>& name,
+                     void (*entry)(), bool kernel_task, uint8_t priority,
+                     uint64_t cpu_affinity, uint64_t arg1, uint64_t arg2,
+                     fkernel::scheduler::QoSClass qos) {
+  if (!task) return;
   const size_t STACK_SIZE = 16 * fk::types::KiB;
 
   void* stack_mem = kmalloc(STACK_SIZE);
   if (!stack_mem) {
-    fk::algorithms::kwarn("TASK", "create_a_new_task: stack allocation failed for task %lu", id.value());
-    return Task{};
+    fk::algorithms::kwarn("TASK", "initialize_task: stack allocation failed for task %lu", id.value());
+    return;
   }
   uint64_t stack_top = reinterpret_cast<uint64_t>(stack_mem) + STACK_SIZE;
 
   // Setup initial stack for switch_context
   uint64_t* stack = reinterpret_cast<uint64_t*>(stack_top);
   *(--stack) = reinterpret_cast<uint64_t>(task_trampoline);
-  *(--stack) = 0;                                 // rbx
-  *(--stack) = 0;                                 // rbp
-  *(--stack) = arg1;                              // r12
-  *(--stack) = arg2;                              // r13
-  *(--stack) = reinterpret_cast<uint64_t>(entry); // r14
-  *(--stack) = 0;                                 // r15
+  *(--stack) = 0;                                  // rbx
+  *(--stack) = 0;                                  // rbp
+  *(--stack) = arg1;                               // r12
+  *(--stack) = arg2;                               // r13
+  *(--stack) = reinterpret_cast<uint64_t>(entry);  // r14
+  *(--stack) = 0;                                  // r15
 
   // Initialize IPC CSpace
   auto* cspace = new fkernel::ipc::CSpace();
@@ -54,36 +56,36 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
   // Also register in global manager for sys_kill access
   fkernel::ipc::GlobalEndpointManager::the().register_notification(id.value(), signal_notification);
 
-  Task task;
-  task.magic = Task::MAGIC;
-  task.control.identity = {.id = id, .ppid = fk::ProcessId(), .pgid = id, .sid = id, .name = name};
-  task.control.lifecycle = {.state = TaskState::Ready,
-                            .priority = priority,
-                            .nice = 0,
-                            .cpu_affinity = cpu_affinity,
-                            .time_slice_ticks = 0,
-                            .wake_up_time_ticks = 0,
-                            .is_a_kernel_task = kernel_task,
-                            .terminated = false,
-                            .exit_status = 0,
-                            .clear_child_tid = 0,
-                            .vfork_waiting = false,
-                            .vfork_parent_id = fk::ProcessId(),
-                            .is_vfork_sharing_address_space = false,
-                            .in_wait_queue = false,
-                            .qos = qos,
-                            .policy = fkernel::scheduler::SchedulingPolicy::Normal,
-                            .base_priority = fkernel::scheduler::priority_for_qos(qos).value(),
-                            .mlfq_level = fkernel::scheduler::qos_level(qos).default_mlfq_level.value(),
-                            .cpu_time_consumed = 0,
-                            .allotment_ticks = fkernel::scheduler::allotment_for_qos(qos).value(),
-                            .boosted = false,
-                            .original_qos = qos};
+  task->magic = Task::MAGIC;
+  task->control.identity = {.id = id, .tgid = id, .ppid = fk::ProcessId(), .pgid = id, .sid = id, .name = name};
+  task->control.lifecycle = {.state = TaskState::Ready,
+                             .priority = priority,
+                             .nice = 0,
+                             .cpu_affinity = cpu_affinity,
+                             .time_slice_ticks = 0,
+                             .wake_up_time_ticks = 0,
+                             .is_a_kernel_task = kernel_task,
+                             .terminated = false,
+                             .exit_status = 0,
+                             .clear_child_tid = 0,
+                             .vfork_waiting = false,
+                             .vfork_parent_id = fk::ProcessId(),
+                             .is_vfork_sharing_address_space = false,
+                             .in_wait_queue = false,
+                             .qos = qos,
+                             .policy = fkernel::scheduler::SchedulingPolicy::Normal,
+                             .base_priority = fkernel::scheduler::priority_for_qos(qos).value(),
+                             .mlfq_level = fkernel::scheduler::qos_level(qos).default_mlfq_level.value(),
+                             .cpu_time_consumed = 0,
+                             .allotment_ticks = fkernel::scheduler::allotment_for_qos(qos).value(),
+                             .boosted = false,
+                             .original_qos = qos};
 
-  task.resources.memory = {.cr3 = read_on_cr3()};
-  task.resources.files.cwd = "/";
-  task.resources.ipc.cspace = cspace;
-  task.resources.ipc.signal_notification = signal_notification;
+  task->resources.memory = {};
+  task->resources.memory.cr3 = read_on_cr3();
+  task->resources.files.cwd = "/";
+  task->resources.ipc.cspace = cspace;
+  task->resources.ipc.signal_notification = signal_notification;
   uint8_t* xsave_buf = nullptr;
   if (g_xsave_area_size > 512) {
     size_t alloc_size = g_xsave_area_size + 64;
@@ -93,7 +95,7 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
     }
   }
 
-  task.resources.context = {
+  task->resources.context = {
       .registers = GetContextForNewTask(reinterpret_cast<uint64_t>(stack), kernel_task, arg1, arg2),
       .stack_pointer = reinterpret_cast<uint64_t>(stack),
       .kernel_stack_top = stack_top,
@@ -105,8 +107,13 @@ Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64>& name,
       .xsave_area = xsave_buf,
       .xsave_size = g_xsave_area_size};
 
+  // Pre-initialize fx_state with valid x87/SSE defaults so the first fxrstor is safe.
+  // FCW=0x037F (all exceptions masked), MXCSR=0x1F80 (default rounding, all masked).
+  uint8_t* fx = task->resources.context.fx_state;
+  fx[0] = 0x7F; fx[1] = 0x03; // FCW = 0x037F
+  fx[24] = 0x80; fx[25] = 0x1F; // MXCSR = 0x1F80
+
   fk::algorithms::kdebug("TASK", "Task %lu created (%s)", id.value(), name.c_str());
-  return task;
 }
 
 void Task::destroy() {
@@ -180,26 +187,29 @@ void Task::print_info() const {}
 int Task::add_file_descriptor(fk::RefPtr<FileDescription> description) {
   fk::synchronization::ScopedLockIRQ lock_task(lock);
 
-  if (resources.ipc.cspace) {
-    fkernel::ipc::Capability cap(description.get(), fkernel::ipc::CapabilityType::FileDescription,
-                             fd_flags_to_rights(description->open_flags()));
-    resources.ipc.cspace->install(cap);
-  }
+  uint32_t cap_handle = fkernel::ipc::INVALID_HANDLE;
+  if (resources.ipc.cspace && description)
+    cap_handle = resources.ipc.cspace->install_fd(
+        description.get(), fd_flags_to_rights(description->open_flags()));
 
   for (size_t i = 0; i < resources.files.descriptors.size(); ++i) {
     if (!resources.files.descriptors[i]) {
       resources.files.descriptors[i] = description;
+      resources.files.cap_handles[i]  = cap_handle;
       return static_cast<int>(i);
     }
   }
 
   if (resources.files.descriptors.is_full()) {
     fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", control.identity.id.value());
+    if (cap_handle != fkernel::ipc::INVALID_HANDLE && resources.ipc.cspace)
+      resources.ipc.cspace->revoke_fd(cap_handle);
     return -24;
   }
 
   int fd = static_cast<int>(resources.files.descriptors.size());
   resources.files.descriptors.push_back(description);
+  resources.files.cap_handles.push_back(cap_handle);
   return fd;
 }
 
@@ -223,46 +233,83 @@ void Task::dump_file_descriptors() const {
   }
 }
 
-int Task::dup_file_descriptor(int old_fd, [[maybe_unused]] bool cloexec, int min_fd) {
+int Task::dup_file_descriptor(int old_fd, bool cloexec, int min_fd) {
   fk::synchronization::ScopedLockIRQ lock_task(lock);
   auto description = (old_fd < 0 || old_fd >= static_cast<int>(resources.files.descriptors.size()))
                          ? nullptr
                          : resources.files.descriptors[old_fd];
   if (!description) {
     fk::algorithms::kwarn("TASK", "dup_file_descriptor: Source FD %d not found", old_fd);
-    return -1; // EBADF
+    return -1;
   }
+  if (cloexec) description->set_cloexec(true);
 
   for (int i = min_fd; i < static_cast<int>(resources.files.descriptors.capacity()); ++i) {
     if (i >= static_cast<int>(resources.files.descriptors.size())) {
       while (static_cast<int>(resources.files.descriptors.size()) < i) {
         resources.files.descriptors.push_back({});
+        resources.files.cap_handles.push_back(fkernel::ipc::INVALID_HANDLE);
       }
+      uint32_t cap_handle = fkernel::ipc::INVALID_HANDLE;
+      if (resources.ipc.cspace)
+        cap_handle = resources.ipc.cspace->install_fd(
+            description.get(), fd_flags_to_rights(description->open_flags()));
       resources.files.descriptors.push_back(description);
-      int new_fd = resources.files.descriptors.size() - 1;
-      return new_fd;
+      resources.files.cap_handles.push_back(cap_handle);
+      return static_cast<int>(resources.files.descriptors.size()) - 1;
     }
 
     if (!resources.files.descriptors[i]) {
+      uint32_t cap_handle = fkernel::ipc::INVALID_HANDLE;
+      if (resources.ipc.cspace)
+        cap_handle = resources.ipc.cspace->install_fd(
+            description.get(), fd_flags_to_rights(description->open_flags()));
       resources.files.descriptors[i] = description;
+      resources.files.cap_handles[i]  = cap_handle;
       return i;
     }
   }
 
-  return -1; // EMFILE
+  return -1;
+}
+
+int Task::install_at(int newfd, fk::RefPtr<FileDescription> desc) {
+  fk::synchronization::ScopedLockIRQ lock_task(lock);
+  if (newfd < 0 || newfd >= static_cast<int>(MAX_OPEN_FILES))
+    return -1;
+
+  while (static_cast<int>(resources.files.descriptors.size()) <= newfd) {
+    resources.files.descriptors.push_back({});
+    resources.files.cap_handles.push_back(fkernel::ipc::INVALID_HANDLE);
+  }
+
+  uint32_t old_handle = resources.files.cap_handles[newfd];
+  if (resources.files.descriptors[newfd] && resources.ipc.cspace
+      && old_handle != fkernel::ipc::INVALID_HANDLE)
+    resources.ipc.cspace->revoke_fd(old_handle);
+
+  uint32_t new_handle = fkernel::ipc::INVALID_HANDLE;
+  if (resources.ipc.cspace && desc)
+    new_handle = resources.ipc.cspace->install_fd(
+        desc.get(), fd_flags_to_rights(desc->open_flags()));
+
+  resources.files.descriptors[newfd] = desc;
+  resources.files.cap_handles[newfd]  = new_handle;
+  return newfd;
 }
 
 fk::RefPtr<FileDescription> Task::get_file_descriptor(int fd) {
-  if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size())) {
+  if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size()))
     return {};
-  }
 
   auto desc = resources.files.descriptors[fd];
   if (!desc) return {};
 
-  if (resources.ipc.cspace) {
-    auto cap = resources.ipc.cspace->find_by_object(desc.get());
-    if (!cap.is_valid() || cap.type() != fkernel::ipc::CapabilityType::FileDescription)
+  if (resources.ipc.cspace && fd < static_cast<int>(resources.files.cap_handles.size())) {
+    uint32_t handle = resources.files.cap_handles[fd];
+    if (handle == fkernel::ipc::INVALID_HANDLE)
+      return {};
+    if (!resources.ipc.cspace->lookup_fd(handle))
       return {};
   }
 
@@ -270,16 +317,25 @@ fk::RefPtr<FileDescription> Task::get_file_descriptor(int fd) {
 }
 
 void Task::close_file_descriptor(int fd) {
-  fk::synchronization::ScopedLockIRQ lock_task(lock);
-  if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size())) {
-    return;
+  fk::RefPtr<FileDescription> desc;
+  {
+    fk::synchronization::ScopedLockIRQ lock_task(lock);
+    if (fd < 0 || fd >= static_cast<int>(resources.files.descriptors.size()))
+      return;
+
+    if (resources.ipc.cspace && fd < static_cast<int>(resources.files.cap_handles.size())) {
+      uint32_t handle = resources.files.cap_handles[fd];
+      if (handle != fkernel::ipc::INVALID_HANDLE)
+        resources.ipc.cspace->revoke_fd(handle);
+      resources.files.cap_handles[fd] = fkernel::ipc::INVALID_HANDLE;
+    }
+
+    desc = resources.files.descriptors[fd];
+    resources.files.descriptors[fd] = nullptr;
   }
-
-  auto desc = resources.files.descriptors[fd];
-  if (desc && resources.ipc.cspace)
-    resources.ipc.cspace->remove_by_object(desc.get());
-
-  resources.files.descriptors[fd] = nullptr;
+  // Call on_close() outside the task lock to avoid lock-order inversion.
+  if (desc && desc->node())
+    desc->node()->on_close();
 }
 
 void Task::release_all_file_locks() {

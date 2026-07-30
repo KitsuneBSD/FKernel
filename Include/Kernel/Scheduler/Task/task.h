@@ -3,6 +3,7 @@
 #include <Kernel/Fs/Vfs/file_description.h>
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/mount_namespace.h>
+#include <Kernel/Fs/Vfs/node.h>
 #include <LibFK/Container/intrusive_list.h>
 #include <LibFK/Container/static_vector.h>
 #include <LibFK/Text/fixed_string.h>
@@ -34,6 +35,7 @@ namespace fkernel::scheduler {
  */
 struct TaskIdentity {
     fk::ProcessId id;
+    fk::ProcessId tgid;   // thread group leader PID (== id for single-threaded processes)
     fk::ProcessId ppid;
     fk::ProcessId pgid;
     fk::ProcessId sid;
@@ -50,6 +52,14 @@ struct TaskIdentity {
     uint32_t ngroups{0};
 };
 
+// Tracks file-backed MAP_SHARED mappings for writeback (msync)
+struct FileMmapRecord {
+    uintptr_t vaddr;
+    size_t size;
+    fk::RefPtr<Node> node;
+    uint64_t file_offset;
+};
+
 /**
  * @brief Task Memory regions and address space
  */
@@ -63,6 +73,7 @@ struct TaskMemory {
         uintptr_t mmap_end{0};
         fk::containers::Vector<::fkernel::MemoryRegion> list;
     } regions{};
+    fk::containers::Vector<FileMmapRecord> file_mmaps;
 };
 
 static constexpr size_t MAX_OPEN_FILES = 1024;
@@ -72,10 +83,11 @@ static constexpr size_t MAX_OPEN_FILES = 1024;
  */
 struct TaskFiles {
     fk::text::fixed_string<256> cwd{"/"};
+    fk::text::fixed_string<512> exe_path{};
     fk::RefPtr<fkernel::Dentry> root;
     fk::RefPtr<fkernel::MountNamespace> mount_ns;
     fk::containers::static_vector<fk::RefPtr<FileDescription>, MAX_OPEN_FILES> descriptors;
-    // CSpace cap_handles deferred — heap corruption investigation needed
+    fk::containers::static_vector<uint32_t, MAX_OPEN_FILES> cap_handles;
 };
 
 /**
@@ -84,8 +96,8 @@ struct TaskFiles {
 struct TaskIpc {
     ::fkernel::ipc::CSpace *cspace{nullptr};
     struct {
-        uint32_t pending{0};
-        uint32_t blocked{0};
+        uint64_t pending{0};
+        uint64_t blocked{0};
         sigaction actions[NSIG];
         uintptr_t trampoline{0};
     } signals{};
@@ -97,7 +109,15 @@ struct TaskIpc {
     ::fkernel::ipc::Notification *signal_notification{nullptr};
     ::fkernel::SignalFdNode *signal_fd{nullptr};
     ::fkernel::scheduler::Turnstile *pending_turnstile{nullptr};
+    uint64_t robust_list_head{0};
     ::fkernel::scheduler::Turnstile *active_turnstile{nullptr};
+    // KQueue process event watchers (EVFILT_PROC): attached by kevent() EV_ADD.
+    using KNoteList = fk::containers::IntrusiveList<KNoteHook, &KNoteHook::hook>;
+    KNoteList proc_knotes;
+    mutable fk::synchronization::Spinlock proc_knotes_lock;
+    // KQueue signal event watchers (EVFILT_SIGNAL).
+    KNoteList signal_knotes;
+    mutable fk::synchronization::Spinlock signal_knotes_lock;
 };
 
 /**
@@ -216,10 +236,11 @@ struct Task {
     const TaskIpc& ipc() const { return resources.ipc; }
 
     bool is_a_kernel_task() const { return control.lifecycle.is_a_kernel_task; }
-    bool has_pending_signals() const { return (resources.ipc.signals.pending & ~resources.ipc.signals.blocked) != 0; }
+    bool has_pending_signals() const { return (resources.ipc.signals.pending & ~resources.ipc.signals.blocked) != 0ULL; }
 
     int add_file_descriptor(fk::RefPtr<FileDescription> description);
     int dup_file_descriptor(int old_fd, bool cloexec = false, int min_fd = 0);
+    int install_at(int newfd, fk::RefPtr<FileDescription> desc);
     fk::RefPtr<FileDescription> get_file_descriptor(int fd);
     void close_file_descriptor(int fd);
 
@@ -241,8 +262,9 @@ struct Task {
     void unref() { if (__sync_fetch_and_sub(&m_ref_count, 1u) == 1u) delete this; }
 };
 
-Task create_a_new_task(fk::ProcessId id, const fk::text::fixed_string<64> &name,
-                       void (*entry)(), bool kernel_task, uint8_t priority,
-                       uint64_t cpu_affinity, uint64_t arg1 = 0,
-                       uint64_t arg2 = 0,
-                       fkernel::scheduler::QoSClass qos = fkernel::scheduler::QoSClass::Default);
+// Initialize a pre-allocated Task in-place. Avoids copy/move of non-copyable members.
+void initialize_task(Task* task, fk::ProcessId id, const fk::text::fixed_string<64> &name,
+                     void (*entry)(), bool kernel_task, uint8_t priority,
+                     uint64_t cpu_affinity, uint64_t arg1 = 0,
+                     uint64_t arg2 = 0,
+                     fkernel::scheduler::QoSClass qos = fkernel::scheduler::QoSClass::Default);
