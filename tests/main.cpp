@@ -15,6 +15,10 @@ int run_libfk_stringbuilder_tests();
 int run_libfk_bitmap_unordered_set_tests();
 int run_libfk_algorithm_tests();
 int run_libfk_string_view_tests();
+int run_libfk_fixed_string_tests();
+int run_libfk_byte_checksum_tests();
+int run_libfk_byte_order_tests();
+int run_libfk_crc32_tests();
 
 int main() {
     int failed = 0;
@@ -33,6 +37,10 @@ int main() {
     failed += run_libfk_bitmap_unordered_set_tests();
     failed += run_libfk_algorithm_tests();
     failed += run_libfk_string_view_tests();
+    failed += run_libfk_fixed_string_tests();
+    failed += run_libfk_byte_checksum_tests();
+    failed += run_libfk_byte_order_tests();
+    failed += run_libfk_crc32_tests();
 
     if (failed == 0) {
         TEST_LOG("\n>>> SUMMARY: ALL TEST SUITES PASSED!\n");
