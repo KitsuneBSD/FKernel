@@ -89,8 +89,6 @@ private:
   fk::core::Result<fk::utilities::Pair<fk::RefPtr<Dentry>, fk::text::String>, fk::core::Error>
   resolve_path_to_parent_unlocked(const char* path, int depth = 0);
 
-  void add_directory_entry(fk::containers::Vector<DirectoryEntry>& entries,
-                           const DirectoryEntry& entry);
 };
 
 } // namespace fkernel

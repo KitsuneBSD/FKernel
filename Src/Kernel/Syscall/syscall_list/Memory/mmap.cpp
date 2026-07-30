@@ -14,11 +14,14 @@
 #include <LibFK/Algorithms/log.h>
 #include <LibFK/Utilities/memory.h>
 
-static constexpr uint64_t PROT_WRITE = 0x2;
-static constexpr uint64_t PROT_EXEC  = 0x4;
+static constexpr uint64_t PROT_WRITE    = 0x2;
+static constexpr uint64_t PROT_EXEC     = 0x4;
 static constexpr uint64_t MAP_ANONYMOUS = 0x20;
 static constexpr uint64_t MAP_SHARED    = 0x01;
 static constexpr uint64_t MAP_FIXED     = 0x10;
+// FKernel extension: map a physical address range (e.g., PCI BARs) into userspace.
+// offset parameter = physical base address; fd must be -1; always cache-disabled.
+static constexpr uint64_t MAP_PHYSICAL  = 0x100;
 
 static fk::RefPtr<fkernel::ShmNode> resolve_shm(Task* task, int fd) {
   if (fd < 0) return nullptr;
@@ -118,6 +121,30 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
                   uint64_t fd, uint64_t offset, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
+
+    if (flags & MAP_PHYSICAL) {
+        // Physical MMIO mapping: offset = phys addr, fd must be -1.
+        if (fd != (uint64_t)-1) return fkernel::return_error(fk::core::Error::InvalidParameter);
+        uintptr_t phys = static_cast<uintptr_t>(offset);
+        if (phys & 0xFFF) return fkernel::return_error(fk::core::Error::InvalidParameter);
+
+        bool is_fixed = (flags & MAP_FIXED) != 0;
+        uintptr_t target_addr = reserve_mmap_range(task, addr, len, is_fixed);
+        uint64_t pages = (len + 0xFFF) >> 12;
+        PageFlags pg_flags = prot_to_page_flags(prot) | PageFlags::CacheDisabled;
+
+        for (uint64_t i = 0; i < pages; ++i)
+            VirtualMemoryManager::the().map_page(target_addr + i * 4096,
+                                                  phys + i * 4096, pg_flags);
+
+        fkernel::MemoryRegion region;
+        region.start = target_addr;
+        region.end   = target_addr + ((len + 0xFFF) & ~0xFFFULL);
+        region.flags = pg_flags;
+        region.name  = "phys";
+        task->resources.memory.regions.list.push_back(region);
+        return target_addr;
+    }
 
     if (flags & MAP_ANONYMOUS) {
         bool is_fixed = (flags & MAP_FIXED) != 0;

@@ -180,7 +180,7 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 | Atual | Complexidade | Substituir por | Status |
 |-------|-------------|----------------|--------|
 | Dentry child lookup `find_if(name)` | O(C) | `HashMap<String, Dentry*>` por parent | ✅ Done — `m_child_map` alongside `m_children`; `lookup()` and `add_child()` maintain both |
-| `readdir()` dedup `insert_if_absent` | O(E²) | `HashSet<ino_t>` temporário | Open |
+| `readdir()` dedup `insert_if_absent` | O(E²) | `HashSet<ino_t>` temporário | ✅ Done — both `readdir()` overloads now use `UnorderedSet<String>` for O(1) per-entry dedup; removed `add_directory_entry()` helper |
 | File lock `release_all_for_process` | O(L²) | IntrusiveList + O(1) remove | Open |
 
 ### 39e — Network
@@ -219,7 +219,7 @@ que faltam para delegar hardware a um processo.
 | # | Primitiva | Mecanismo | Arquivos | Days |
 |---|-----------|-----------|----------|------|
 | 1 | Interrupção → Endpoint | `IrqBinding` object: ISR faz `endpoint->signal(bits)` em vez de C-handler. `sys_bind_irq(vector, ep_handle)` + `CapabilityType::Irq` | `irq_binding.h/cpp`, `capability.h`, `endpoint.h`, syscall list | 3 |
-| 2 | mmap físico userspace | Nova flag `MAP_PHYSICAL`: mapeia `(phys_addr, size)` com `PageFlags::User`, `CacheDisabled` para BARs PCI | `mmap.cpp`, `syscall_numbers.h` | 1 |
+| 2 | mmap físico userspace | Nova flag `MAP_PHYSICAL`: mapeia `(phys_addr, size)` com `PageFlags::User`, `CacheDisabled` para BARs PCI | ✅ `mmap.cpp` — MAP_PHYSICAL=0x100; offset=phys_addr, fd=-1; maps N pages with CacheDisabled | 1 |
 | 3 | PCI config space userspace | `ioctl(PIOC_READ_CONFIG/PIOC_WRITE_CONFIG)` em `/dev/pci` ou `/dev/pci/<BDF>` | `pci_node.h/cpp` | 1 |
 | 4 | DMA compartilhável | `DmaShm` estende `SharedMemory` com alocação contígua (`alloc_contiguous`); mapeia no userspace com CacheDisabled | `dma_shm.h/cpp`, `shared_memory.h` | 2–3 |
 

@@ -2,7 +2,8 @@
 #include <Kernel/Fs/Vfs/dentry.h>
 #include <Kernel/Fs/Vfs/file_description.h>
 
-#include <LibFK/Algorithms/container_algorithms.h>
+#include <LibFK/Container/unordered_set.h>
+#include <LibFK/Text/string.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -12,16 +13,20 @@ VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEnt
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   auto dentry_res = resolve_path_unlocked(path);
   if (dentry_res.is_error()) return dentry_res.error();
-  
+
+  fk::containers::UnorderedSet<fk::text::String> seen;
+  auto add = [&](const DirectoryEntry& entry) {
+      if (seen.insert(fk::text::String(entry.name)))
+          entries.push_back(entry);
+  };
+
   auto dentry = dentry_res.value();
   for (auto& node : dentry->nodes()) {
       fk::containers::Vector<DirectoryEntry> layer_entries;
       (void)node->list_dir(layer_entries);
-      for (auto& entry : layer_entries) {
-          add_directory_entry(entries, entry);
-      }
+      for (auto& entry : layer_entries) add(entry);
   }
-  
+
   dentry->for_each_child([&](const fk::RefPtr<Dentry>& child) {
       DirectoryEntry de;
       fk::memory::copy_n(de.name, child->name().c_str(), sizeof(de.name) - 1);
@@ -30,7 +35,7 @@ VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEnt
       else if (top->is_symlink())   de.type = 2;
       else if (top->is_pipe())      de.type = 3;
       else                          de.type = 0;
-      add_directory_entry(entries, de);
+      add(de);
   });
 
   return {};
@@ -42,16 +47,20 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   fk::containers::Vector<DirectoryEntry> entries;
-  DirectoryEntry dot; fk::memory::copy_string(dot.name, "."); dot.type = 1; add_directory_entry(entries, dot);
-  DirectoryEntry dotdot; fk::memory::copy_string(dotdot.name, ".."); dotdot.type = 1; add_directory_entry(entries, dotdot);
+  fk::containers::UnorderedSet<fk::text::String> seen;
+  auto add = [&](const DirectoryEntry& entry) {
+      if (seen.insert(fk::text::String(entry.name)))
+          entries.push_back(entry);
+  };
+
+  DirectoryEntry dot; fk::memory::copy_string(dot.name, "."); dot.type = 1; add(dot);
+  DirectoryEntry dotdot; fk::memory::copy_string(dotdot.name, ".."); dotdot.type = 1; add(dotdot);
 
   auto dentry = description->dentry();
   for (auto& node : dentry->nodes()) {
       fk::containers::Vector<DirectoryEntry> layer_entries;
       (void)node->list_dir(layer_entries);
-      for (auto& entry : layer_entries) {
-          add_directory_entry(entries, entry);
-      }
+      for (auto& entry : layer_entries) add(entry);
   }
 
   dentry->for_each_child([&](const fk::RefPtr<Dentry>& child) {
@@ -62,7 +71,7 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
       else if (top->is_symlink())   de.type = 2;
       else if (top->is_pipe())      de.type = 3;
       else                          de.type = 0;
-      add_directory_entry(entries, de);
+      add(de);
   });
 
   uint64_t bytes_written = 0;
@@ -94,9 +103,5 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
   return bytes_written;
 }
 
-void VirtualFileSystem::add_directory_entry(fk::containers::Vector<DirectoryEntry>& entries, const DirectoryEntry& entry) {
-    fk::algorithms::insert_if_absent(entries, entry,
-        [](const DirectoryEntry& a, const DirectoryEntry& b) { return fk::memory::compare(a.name, b.name) == 0; });
-}
 
 } // namespace fkernel
