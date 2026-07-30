@@ -185,11 +185,11 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 
 ### 39e — Network
 
-| Atual | Complexidade | Substituir por |
-|-------|-------------|----------------|
-| ARP lookup/update/expire | O(E) / O(E²) | `HashMap<IPv4Address, ArpEntry>` |
-| TCP read `dequeue_front` shift left | O(B) | `RingBuffer<u8>` circular |
-| TCP accept `remove_at` left-shift | O(Q) | `IntrusiveList<TcpSocket>` |
+| Atual | Complexidade | Substituir por | Status |
+|-------|-------------|----------------|--------|
+| ARP lookup/update/expire | O(E) / O(E²) | `HashMap<IPv4Address, ArpEntry>` | ✅ Done — `HashMap<uint32_t, ArpEntry>` keyed by `ip.value`; `for_each` added to HashMap for expiration scan |
+| TCP read `dequeue_front` shift left | O(B) | `RingBuffer<u8>` circular | Open |
+| TCP accept `remove_at` left-shift | O(Q) | `IntrusiveList<TcpSocket>` | Open |
 
 ### 39f — KQueue
 

@@ -1,6 +1,6 @@
 #include <Kernel/Net/Arp/arp_table.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Algorithms/container_algorithms.h>
+#include <LibFK/Container/vector.h>
 
 namespace fkernel {
 namespace net {
@@ -14,43 +14,43 @@ ArpTable& ArpTable::the() {
 
 void ArpTable::update(IPv4Address ip, const MACAddress& mac) {
     uint64_t now = TickManager::the().get_ticks();
-    size_t idx = fk::algorithms::find_if(m_entries.begin(), m_entries.size(),
-        [&ip](const auto& e) { return e.ip == ip; });
-    if (idx != m_entries.size()) {
-        m_entries[idx].mac = mac;
-        m_entries[idx].created_at_ticks = now;
+    auto existing = m_table.get(ip.value);
+    if (existing.has_value()) {
+        existing.value().mac = mac;
+        existing.value().created_at_ticks = now;
+        m_table.insert(ip.value, existing.value());
         return;
     }
     expire_old_entries();
-    m_entries.push_back({ip, mac, now});
+    ArpEntry entry;
+    entry.mac = mac;
+    entry.created_at_ticks = now;
+    m_table.insert(ip.value, entry);
 }
 
 void ArpTable::expire_old_entries() {
     uint32_t freq = TickManager::the().get_frequency();
-    uint64_t now = TickManager::the().get_ticks();
+    uint64_t now  = TickManager::the().get_ticks();
     uint64_t ttl_ticks = (freq > 0) ? (ARP_TTL_SECONDS * freq) : UINT64_MAX;
-    for (size_t i = 0; i < m_entries.size(); ) {
-        if (now - m_entries[i].created_at_ticks > ttl_ticks) {
-            m_entries.remove_at(i);
-            continue;
-        }
-        ++i;
-    }
+
+    fk::containers::Vector<uint32_t> to_remove;
+    m_table.for_each([&](const uint32_t& key, const ArpEntry& e) {
+        if (now - e.created_at_ticks > ttl_ticks)
+            to_remove.push_back(key);
+    });
+    for (size_t i = 0; i < to_remove.size(); ++i)
+        m_table.remove(to_remove[i]);
 }
 
 fk::memory::optional<MACAddress> ArpTable::lookup(IPv4Address ip) const {
-    size_t idx = fk::algorithms::find_if(m_entries.begin(), m_entries.size(),
-        [&ip](const auto& e) { return e.ip == ip; });
-    if (idx != m_entries.size())
-        return fk::memory::optional<MACAddress>(m_entries[idx].mac);
+    auto entry = m_table.get(ip.value);
+    if (entry.has_value())
+        return fk::memory::optional<MACAddress>(entry.value().mac);
     return fk::memory::optional<MACAddress>();
 }
 
 void ArpTable::remove(IPv4Address ip) {
-    size_t idx = fk::algorithms::find_if(m_entries.begin(), m_entries.size(),
-        [&ip](const auto& e) { return e.ip == ip; });
-    if (idx != m_entries.size())
-        m_entries.remove_at(idx);
+    m_table.remove(ip.value);
 }
 
 } // namespace net

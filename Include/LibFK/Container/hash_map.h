@@ -24,6 +24,25 @@ public:
   size_t size() const { return m_size; }
   bool is_empty() const { return m_size == 0; }
 
+  // Iterate all occupied entries. Fn receives (const Key&, Value&).
+  // Safe to call remove() on keys seen during iteration (Robin Hood probe
+  // shifting may cause entries to be visited again; callers must tolerate this).
+  template <typename Fn>
+  void for_each(Fn&& fn) {
+    for (size_t i = 0; i < m_buckets.size(); ++i) {
+      if (m_buckets[i].is_occupied())
+        fn(m_buckets[i].key, m_buckets[i].value);
+    }
+  }
+
+  template <typename Fn>
+  void for_each(Fn&& fn) const {
+    for (size_t i = 0; i < m_buckets.size(); ++i) {
+      if (m_buckets[i].is_occupied())
+        fn(m_buckets[i].key, m_buckets[i].value);
+    }
+  }
+
 private:
   static constexpr size_t EMPTY_PSL = (size_t)-1;
 
@@ -59,6 +78,10 @@ template <> struct DefaultHasher<fk::ProcessId> {
   size_t operator()(const fk::ProcessId &id) const {
     return static_cast<size_t>(id.value());
   }
+};
+
+template <> struct DefaultHasher<uint32_t> {
+  size_t operator()(uint32_t v) const { return static_cast<size_t>(v); }
 };
 
 // Implementation ----------------------------------------------------------
