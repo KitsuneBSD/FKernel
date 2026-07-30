@@ -2,6 +2,7 @@
 
 #include <LibFK/Types/types.h>
 #include <LibFK/Container/vector.h>
+#include <LibFK/Text/fixed_string.h>
 
 namespace boot {
 
@@ -96,8 +97,17 @@ private:
   void* m_raw_mb_ptr{nullptr};
   void* m_raw_mmap_ptr{nullptr};
 
+  // Kernel cmdline and parsed boot parameters
+  fk::text::fixed_string<512> m_kernel_cmdline{};
+  fk::text::fixed_string<256> m_init_path{"/sbin/init"};
+  fk::text::fixed_string<256> m_root_device{};
+  fk::text::fixed_string<64>  m_rootfstype{};
+  bool m_quiet{false};
+
   // Internal initialization flags
   bool m_initialized{false};
+
+  void parse_cmdline(const char* cmdline);
 
 public:
   BootInfo() = default;
@@ -155,6 +165,15 @@ public:
    * @brief Check if BootInfo has been initialized
    */
   bool is_initialized() const { return m_initialized; }
+
+  /**
+   * @brief Kernel cmdline access
+   */
+  const char* get_kernel_cmdline() const { return m_kernel_cmdline.c_str(); }
+  const char* get_init_path()      const { return m_init_path.c_str(); }
+  const char* get_root_device()    const { return m_root_device.c_str(); }
+  const char* get_rootfstype()     const { return m_rootfstype.c_str(); }
+  bool        is_quiet()           const { return m_quiet; }
 
   /**
    * @brief Get raw multiboot pointer
