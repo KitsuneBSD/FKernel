@@ -3,7 +3,7 @@
 #include <Kernel/Ipc/notification.h>
 #include <Kernel/Net/Ip/ip_address.h>
 #include <Kernel/Net/Tcp/tcp_header.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/circular_buffer.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -33,7 +33,7 @@ public:
   uint16_t             send_window{65535};
   uint16_t             peer_window{65535};
   uint32_t             send_unacked{0};
-  fk::containers::Vector<uint8_t> recv_buf;
+  fk::containers::CircularBuffer<uint8_t, TCP_RECV_BUFFER_SIZE> recv_buf;
   fkernel::ipc::Notification state_changed;
 
   uint64_t             retransmit_ticks{0};
@@ -42,9 +42,7 @@ public:
   static constexpr uint64_t RTO_TICKS = 1000;
 
   uint16_t recv_window() const {
-    size_t used = recv_buf.size();
-    if (used >= TCP_RECV_BUFFER_SIZE) return 0;
-    size_t avail = TCP_RECV_BUFFER_SIZE - used;
+    size_t avail = recv_buf.space_available();
     return static_cast<uint16_t>(avail > 65535 ? 65535 : avail);
   }
 

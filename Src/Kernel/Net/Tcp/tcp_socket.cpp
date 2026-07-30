@@ -3,7 +3,6 @@
 #include <Kernel/Net/Ip/ipv4_header.h>
 #include <Kernel/Net/NetworkStack/network_stack.h>
 #include <Kernel/Net/byte_order.h>
-#include <LibFK/Algorithms/container_algorithms.h>
 #include <LibFK/Algorithms/internet_checksum.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Utilities/memory.h>
@@ -119,8 +118,7 @@ fk::core::Result<size_t, fk::core::Error> TcpSocket::read(
     auto& rb = m_connection.recv_buf;
     if (rb.is_empty()) return (size_t)0;
     size_t to_copy = size < rb.size() ? size : rb.size();
-    fk::memory::copy(buf, rb.begin(), to_copy);
-    fk::algorithms::dequeue_front(rb, to_copy);
+    rb.pop_range(buf, to_copy);
     return to_copy;
 }
 

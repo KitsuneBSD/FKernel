@@ -106,12 +106,12 @@ All tasks complete: 5 headers + 2 sources in `Fs/Disk/Ufs/`, triple-indirect blo
 
 LVM, RAID, dm-crypt. See `.ai-docs/ROADMAP.md#phase-33` for full spec.
 
-| Sub-phase | Component | Days |
-|-----------|-----------|------|
-| 33a | `StackableBlockDevice` base class | 0.5 |
-| 33b | dm-crypt (AES-XTS + LUKS + PBKDF2) | 2–3 |
-| 33c | RAID 0/1 | 1–2 |
-| 33d | LVM (linear + striped) | 2–3 |
+| Sub-phase | Component | Days | Status |
+|-----------|-----------|------|--------|
+| 33a | `StackableBlockDevice` base class | 0.5 | ✅ Done — `Include/Kernel/Driver/Device/BlockDevice/stackable_block_device.h`; holds `Vector<RefPtr<BlockDevice>> m_children` |
+| 33b | dm-crypt (AES-XTS + LUKS + PBKDF2) | 2–3 | Open |
+| 33c | RAID 0/1 | 1–2 | ✅ Done — `raid_device.h/cpp`; RAID 0 chunk-based stripe mapping + RAID 1 mirror write / round-robin read with degraded mode |
+| 33d | LVM (linear + striped) | 2–3 | ✅ Done — `lvm_device.h/cpp`; `LvmSegment` table with O(S) lookup; linear and round-robin striped segments via `add_segment`/`add_stripe_segments` |
 
 ---
 
@@ -188,7 +188,7 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 | Atual | Complexidade | Substituir por | Status |
 |-------|-------------|----------------|--------|
 | ARP lookup/update/expire | O(E) / O(E²) | `HashMap<IPv4Address, ArpEntry>` | ✅ Done — `HashMap<uint32_t, ArpEntry>` keyed by `ip.value`; `for_each` added to HashMap for expiration scan |
-| TCP read `dequeue_front` shift left | O(B) | `RingBuffer<u8>` circular | Open |
+| TCP read `dequeue_front` shift left | O(B) | `RingBuffer<u8>` circular | ✅ Done — `CircularBuffer<uint8_t, 65536>` replaces `Vector<uint8_t>` in `TcpConnection::recv_buf`; `pop_range`/`push_range`/`discard` added to CircularBuffer; O(1) head/tail ops; no shift |
 | TCP accept `remove_at` left-shift | O(Q) | `IntrusiveList<TcpSocket>` | Open |
 
 ### 39f — KQueue
@@ -477,7 +477,7 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 |---|-----|-------|
 | 21 | `TIOCSCTTY` on PtyMaster | ✅ `pty_master.cpp` |
 | 22 | `TIOCGPGRP`/`TIOCSPGRP` on PtyMaster | ✅ `pty_master.cpp` |
-| 23 | ICANON line editing in PtyLineDiscipline | `pty_line_discipline.cpp` |
+| 23 | ICANON line editing in PtyLineDiscipline | ✅ `pty_line_discipline.cpp` — VERASE/VKILL/VWERASE/VLNEXT/VEOF + ECHOE echo; VWERASE (Ctrl-W) and VLNEXT (Ctrl-V literal-next) added |
 | 24 | OPOST output processing (`\n` → `\r\n`) | ✅ `pty_slave.cpp` — ONLCR applied in slave write |
 | 25 | Userspace terminal emulator | New program |
 

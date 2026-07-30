@@ -24,26 +24,33 @@ void PtyLineDiscipline::process_input(uint8_t byte) {
   m_pending_signal = 0;
   m_raw_ready      = false;
 
-  // Signal characters (ISIG) — handled in all modes
-  if (m_termios.has_lflag(Termios::ISIG)) {
-    if (byte == m_termios.c_cc[Termios::VINTR]) { m_pending_signal = 2; return; }
-    if (byte == m_termios.c_cc[Termios::VQUIT]) { m_pending_signal = 3; return; }
-    if (byte == m_termios.c_cc[Termios::VSUSP]) { m_pending_signal = 20; return; }
+  bool literal = m_lnext;
+  m_lnext = false;
+
+  if (!literal) {
+    if (m_termios.has_lflag(Termios::ISIG)) {
+      if (byte == m_termios.c_cc[Termios::VINTR]) { m_pending_signal = 2; return; }
+      if (byte == m_termios.c_cc[Termios::VQUIT]) { m_pending_signal = 3; return; }
+      if (byte == m_termios.c_cc[Termios::VSUSP]) { m_pending_signal = 20; return; }
+    }
   }
 
   bool do_echo = m_termios.has_lflag(Termios::ECHO);
 
   if (!m_termios.has_lflag(Termios::ICANON)) {
-    // Raw mode: deliver byte immediately
     m_raw_ready = true;
     m_raw_byte  = byte;
     if (do_echo) echo_push(byte);
     return;
   }
 
-  // ICANON mode
-  if (byte == m_termios.c_cc[Termios::VERASE]) {
-    // Backspace: erase last character
+  if (!literal && byte == m_termios.c_cc[Termios::VLNEXT]) {
+    m_lnext = true;
+    if (do_echo) { echo_push('^'); echo_push('V'); }
+    return;
+  }
+
+  if (!literal && byte == m_termios.c_cc[Termios::VERASE]) {
     if (m_linebuf_len > 0) {
       --m_linebuf_len;
       if (do_echo && m_termios.has_lflag(Termios::ECHOE)) {
@@ -54,10 +61,8 @@ void PtyLineDiscipline::process_input(uint8_t byte) {
     return;
   }
 
-  if (byte == m_termios.c_cc[Termios::VKILL]) {
-    // Kill line: erase the whole line
+  if (!literal && byte == m_termios.c_cc[Termios::VKILL]) {
     if (do_echo) {
-      // Erase all buffered characters
       for (size_t i = 0; i < m_linebuf_len; ++i) {
         static const uint8_t bs_sp_bs[3] = {'\b', ' ', '\b'};
         echo_push_str(bs_sp_bs, 3);
@@ -67,8 +72,21 @@ void PtyLineDiscipline::process_input(uint8_t byte) {
     return;
   }
 
-  if (byte == '\n' || byte == m_termios.c_cc[Termios::VEOL]) {
-    // End of line: add newline and mark line as ready
+  if (!literal && byte == m_termios.c_cc[Termios::VWERASE]) {
+    size_t erased = 0;
+    while (m_linebuf_len > 0 && m_linebuf[m_linebuf_len - 1] == ' ')
+      { --m_linebuf_len; ++erased; }
+    while (m_linebuf_len > 0 && m_linebuf[m_linebuf_len - 1] != ' ')
+      { --m_linebuf_len; ++erased; }
+    if (do_echo && m_termios.has_lflag(Termios::ECHOE)) {
+      static const uint8_t bs_sp_bs[3] = {'\b', ' ', '\b'};
+      for (size_t i = 0; i < erased; ++i)
+        echo_push_str(bs_sp_bs, 3);
+    }
+    return;
+  }
+
+  if (!literal && (byte == '\n' || byte == m_termios.c_cc[Termios::VEOL])) {
     if (m_linebuf_len < MAX_CANON)
       m_linebuf[m_linebuf_len++] = byte;
     if (do_echo && m_termios.has_lflag(Termios::ECHONL))
@@ -77,13 +95,11 @@ void PtyLineDiscipline::process_input(uint8_t byte) {
     return;
   }
 
-  if (byte == m_termios.c_cc[Termios::VEOF]) {
-    // EOF (Ctrl-D): deliver current buffer contents without adding newline
+  if (!literal && byte == m_termios.c_cc[Termios::VEOF]) {
     m_line_ready = true;
     return;
   }
 
-  // Regular character: append to buffer
   if (m_linebuf_len < MAX_CANON) {
     m_linebuf[m_linebuf_len++] = byte;
     if (do_echo) echo_push(byte);

@@ -19,15 +19,17 @@ struct Termios {
   static constexpr uint32_t ISIG    = 0x00000001;
   static constexpr uint32_t ECHONL  = 0x00000040;
 
-  static constexpr uint8_t VINTR  = 0;
-  static constexpr uint8_t VQUIT  = 1;
-  static constexpr uint8_t VERASE = 2;
-  static constexpr uint8_t VKILL  = 3;
-  static constexpr uint8_t VEOF   = 4;
-  static constexpr uint8_t VEOL   = 5;
-  static constexpr uint8_t VSUSP  = 10;
-  static constexpr uint8_t VSTART = 11;
-  static constexpr uint8_t VSTOP  = 12;
+  static constexpr uint8_t VINTR   = 0;
+  static constexpr uint8_t VQUIT   = 1;
+  static constexpr uint8_t VERASE  = 2;
+  static constexpr uint8_t VKILL   = 3;
+  static constexpr uint8_t VEOF    = 4;
+  static constexpr uint8_t VEOL    = 5;
+  static constexpr uint8_t VSUSP   = 10;
+  static constexpr uint8_t VSTART  = 11;
+  static constexpr uint8_t VSTOP   = 12;
+  static constexpr uint8_t VWERASE = 14; // Ctrl-W: erase previous word
+  static constexpr uint8_t VLNEXT  = 15; // Ctrl-V: literal next char
 
   void set_defaults() {
     c_iflag = 0x2502;
@@ -35,12 +37,14 @@ struct Termios {
     c_cflag = 0x04cb;
     c_lflag = ICANON | ECHO | ECHOE | ISIG | ECHONL;
     for (size_t i = 0; i < NCCS; ++i) c_cc[i] = 0;
-    c_cc[VINTR]  = 0x03; // ^C
-    c_cc[VQUIT]  = 0x1C; // backslash
-    c_cc[VERASE] = 0x7F; // DEL
-    c_cc[VKILL]  = 0x15; // Ctrl-U
-    c_cc[VEOF]   = 0x04; // ^D
-    c_cc[VSUSP]  = 0x1A; // ^Z
+    c_cc[VINTR]   = 0x03; // ^C
+    c_cc[VQUIT]   = 0x1C; // backslash
+    c_cc[VERASE]  = 0x7F; // DEL
+    c_cc[VKILL]   = 0x15; // Ctrl-U
+    c_cc[VEOF]    = 0x04; // ^D
+    c_cc[VSUSP]   = 0x1A; // ^Z
+    c_cc[VWERASE] = 0x17; // Ctrl-W
+    c_cc[VLNEXT]  = 0x16; // Ctrl-V
   }
 
   bool has_lflag(uint32_t flag) const { return (c_lflag & flag) != 0; }
@@ -100,6 +104,9 @@ private:
   // Raw mode: last processed byte
   bool    m_raw_ready{false};
   uint8_t m_raw_byte{0};
+
+  // VLNEXT: next input char is literal (bypasses special-char processing)
+  bool    m_lnext{false};
 
   void echo_push(uint8_t b);
   void echo_push_str(const uint8_t* s, size_t n);
