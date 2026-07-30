@@ -84,6 +84,10 @@ template <> struct DefaultHasher<uint32_t> {
   size_t operator()(uint32_t v) const { return static_cast<size_t>(v); }
 };
 
+template <> struct DefaultHasher<void*> {
+  size_t operator()(void* p) const { return reinterpret_cast<size_t>(p); }
+};
+
 // Implementation ----------------------------------------------------------
 
 template <typename Key, typename Value>

@@ -172,7 +172,7 @@ Replace O(N) data structures with O(1) or O(N log N) equivalents throughout the 
 | Atual | Complexidade | Substituir por | Status |
 |-------|-------------|----------------|--------|
 | `cap_grant/transfer` via `find_task` | O(N_total) | Resolvido por HashMap em 39b | ✅ Done (transitively fixed by 39b) |
-| `CSpace::find_by_object/remove_by_object` | O(C) | `HashMap<void*, cap_index>` reverso | Open |
+| `CSpace::find_by_object/remove_by_object` | O(C) | `HashMap<void*, cap_index>` reverso | ✅ Done — `m_obj_index HashMap<void*, uint32_t>` maintained in `install()`/`remove()`; `find/remove_by_object` now O(1) |
 | `CSpace::grant_all_to` | O(C) | Iterar slots válidos via free-list | Open |
 
 ### 39d — VFS

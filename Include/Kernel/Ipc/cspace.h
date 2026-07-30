@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Kernel/Ipc/capability.h>
+#include <LibFK/Container/hash_map.h>
 #include <LibFK/Container/vector.h>
 #include <LibFK/Types/types.h>
 
@@ -10,21 +11,26 @@ namespace ipc {
 static constexpr uint32_t INVALID_HANDLE = ~uint32_t(0);
 
 class CSpace {
-  fk::containers::Vector<Capability> m_capabilities;
-  fk::containers::Vector<uint32_t>   m_free_list;
+  fk::containers::Vector<Capability>    m_capabilities;
+  fk::containers::Vector<uint32_t>      m_free_list;
+  // Reverse index: object pointer → slot index (O(1) find/remove by object)
+  fk::containers::HashMap<void*, uint32_t> m_obj_index;
 
 public:
   CSpace() = default;
 
   uint32_t install(Capability cap) {
+    uint32_t idx;
     if (!m_free_list.is_empty()) {
-      uint32_t idx = m_free_list[m_free_list.size() - 1];
+      idx = m_free_list[m_free_list.size() - 1];
       m_free_list.pop_back();
       m_capabilities[idx] = cap;
-      return idx;
+    } else {
+      m_capabilities.push_back(cap);
+      idx = static_cast<uint32_t>(m_capabilities.size() - 1);
     }
-    m_capabilities.push_back(cap);
-    return static_cast<uint32_t>(m_capabilities.size() - 1);
+    if (cap.object()) m_obj_index.insert(cap.object(), idx);
+    return idx;
   }
 
   Capability get(uint32_t handle) const {
@@ -34,8 +40,9 @@ public:
   }
 
   void remove(uint32_t handle) {
-    if (handle >= m_capabilities.size())
-      return;
+    if (handle >= m_capabilities.size()) return;
+    void* obj = m_capabilities[handle].object();
+    if (obj) m_obj_index.remove(obj);
     m_capabilities[handle] = {};
     m_free_list.push_back(handle);
   }
@@ -62,20 +69,14 @@ public:
   size_t size() const { return m_capabilities.size() - m_free_list.size(); }
 
   Capability find_by_object(void* object) const {
-    for (size_t i = 0; i < m_capabilities.size(); ++i) {
-      if (m_capabilities[i].object() == object && m_capabilities[i].is_valid())
-        return m_capabilities[i];
-    }
-    return {};
+    auto idx = m_obj_index.get(object);
+    if (!idx.has_value()) return {};
+    return m_capabilities[idx.value()];
   }
 
   void remove_by_object(void* object) {
-    for (size_t i = 0; i < m_capabilities.size(); ++i) {
-      if (m_capabilities[i].object() == object) {
-        remove(static_cast<uint32_t>(i));
-        return;
-      }
-    }
+    auto idx = m_obj_index.get(object);
+    if (idx.has_value()) remove(idx.value());
   }
 
   uint32_t install_fd(void* desc, CapabilityRights rights) {
