@@ -62,12 +62,15 @@ static PageFlags prot_to_page_flags(uint64_t prot) {
 }
 
 static uint64_t mmap_file(Task* task, uintptr_t addr, uint64_t len, uint64_t prot,
-                           uint64_t fd, uint64_t offset, bool is_fixed) {
+                           uint64_t fd, uint64_t offset, bool is_fixed, bool is_shared) {
     auto file = task->get_file_descriptor(static_cast<int>(fd));
     if (!file) {
         fk::algorithms::kwarn("MMAP", "invalid fd=%lu", fd);
         return fkernel::return_error(fk::core::Error::InvalidParameter);
     }
+
+    auto node = file->node();
+    if (!node) return fkernel::return_error(fk::core::Error::InvalidParameter);
 
     uintptr_t target = reserve_mmap_range(task, addr, len, is_fixed);
     PageFlags flags = prot_to_page_flags(prot);
@@ -82,17 +85,28 @@ static uint64_t mmap_file(Task* task, uintptr_t addr, uint64_t len, uint64_t pro
 
     uint8_t* dest = reinterpret_cast<uint8_t*>(target);
     size_t remaining = static_cast<size_t>(len);
-    uint64_t file_offset = offset;
     size_t done = 0;
 
     while (done < remaining) {
         size_t chunk = remaining - done;
         if (chunk > 4096) chunk = 4096;
-        auto res = file->node()->read(file_offset + done, chunk, dest + done);
+        auto res = node->read(offset + done, chunk, dest + done);
         if (res.is_error()) break;
         size_t read = res.value();
         if (read == 0) break;
         done += read;
+    }
+
+    if (is_shared) {
+        fkernel::MemoryRegion region;
+        region.start          = target;
+        region.end            = target + ((len + 0xFFF) & ~0xFFFULL);
+        region.flags          = flags;
+        region.name           = "file_shared";
+        region.backing_node   = node.get();
+        region.backing_offset = offset;
+        region.is_shared      = true;
+        task->resources.memory.regions.list.push_back(region);
     }
 
     return target;
@@ -133,8 +147,9 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
         }
     }
 
-    bool is_fixed = (flags & MAP_FIXED) != 0;
-    return mmap_file(task, addr, len, prot, fd, offset, is_fixed);
+    bool is_fixed  = (flags & MAP_FIXED)  != 0;
+    bool is_shared = (flags & MAP_SHARED) != 0;
+    return mmap_file(task, addr, len, prot, fd, offset, is_fixed, is_shared);
 }
 
 uint64_t sys_munmap(uint64_t addr, uint64_t length, [[maybe_unused]] uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*) {

@@ -463,10 +463,10 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 
 | # | Gap | Priority |
 |---|-----|----------|
-| 14 | `mmap MAP_SHARED` file-backed | MEDIUM |
+| 14 | `mmap MAP_SHARED` file-backed | ✅ MEDIUM — `mmap_file` tracks `backing_node`/`backing_offset`/`is_shared` in `MemoryRegion`; `msync` writes dirty pages back to the node |
 | 15 | `mmap MAP_FIXED` | ✅ HIGH — Fixed: file-backed and shm paths now respect MAP_FIXED |
 | 16 | File-backed mmap with `PROT_WRITE` | ✅ HIGH — Already worked via prot_to_page_flags |
-| 17 | mmap shared mapping writeback / `msync` | MEDIUM |
+| 17 | mmap shared mapping writeback / `msync` | ✅ MEDIUM — `msync` scans shared regions in task memory list and writes back to backing node |
 | 18 | inotify | LOW |
 | 19 | `/proc/sys/` writable nodes | LOW |
 | 20 | Coredumps | LOW |
