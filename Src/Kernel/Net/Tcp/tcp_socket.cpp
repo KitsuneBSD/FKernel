@@ -85,7 +85,7 @@ fk::core::Result<void, fk::core::Error> TcpSocket::connect(const char* path) {
     }
 
     while (m_connection.state == TcpState::SynSent)
-        m_connection.state_changed.wait();
+        TRY(m_connection.state_changed.wait_interruptible());
 
     if (m_connection.state != TcpState::Established)
         return fk::core::Error::IOError;
@@ -109,7 +109,7 @@ fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> TcpSocket::accept() {
                 return fk::RefPtr<Socket>(child);
             }
         }
-        m_connection.state_changed.wait();
+        TRY(m_connection.state_changed.wait_interruptible());
     }
 }
 

@@ -5,11 +5,25 @@
 
 namespace fkernel { class ACPIManager; }
 
+namespace fkernel {
+
 class FadtManager {
+private:
+  FADT *m_fadt{nullptr};
+  uint32_t m_length{0};
+  bool m_has_x_fields{false};
+  bool m_is_initialized{false};
+
+  FadtManager() = default;
+  FadtManager(const FadtManager &) = delete;
+  FadtManager &operator=(const FadtManager &) = delete;
+
 public:
   static FadtManager &the();
 
-  void initialize(fkernel::ACPIManager *acpi);
+  bool is_initialized() const { return m_is_initialized; }
+  void initialize(ACPIManager *acpi);
+
   FADT *get_fadt() const { return m_fadt; }
   uint32_t get_length() const { return m_length; }
   bool has_x_fields() const { return m_has_x_fields; }
@@ -25,9 +39,7 @@ public:
 
   bool get_reset_register(GenericAddressStructure &out) const;
   bool get_reset_value(uint8_t &out) const;
-
-private:
-  FADT *m_fadt{nullptr};
-  uint32_t m_length{0};
-  bool m_has_x_fields{false};
 };
+
+} // namespace fkernel
+using fkernel::FadtManager;

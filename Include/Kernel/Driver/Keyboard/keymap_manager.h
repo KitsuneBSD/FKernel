@@ -21,6 +21,9 @@ class KeymapManager {
 public:
     static KeymapManager& the();
 
+    bool is_initialized() const { return m_is_initialized; }
+    void initialize();
+
     /**
      * @brief Translates a scancode/keycode to a character.
      * @param keycode The raw keycode from the driver.
@@ -45,6 +48,7 @@ public:
 
 private:
     KeymapManager();
+    bool m_is_initialized{false};
     KeyboardLayout m_current_layout{KeyboardLayout::US_INTL};
 
     uint8_t m_map_normal[128]{0};
@@ -59,6 +63,9 @@ private:
     void load_default_us();
     void load_default_us_intl();
     char resolve_dead_key(char dead, char next) const;
+
+    KeymapManager(const KeymapManager&) = delete;
+    KeymapManager& operator=(const KeymapManager&) = delete;
 };
 
 } // namespace fkernel::drivers

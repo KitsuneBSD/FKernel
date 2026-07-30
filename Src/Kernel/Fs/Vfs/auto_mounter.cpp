@@ -10,6 +10,7 @@
 #include <Kernel/Fs/Disk/Ext3/ext3_fs.h>
 #include <Kernel/Fs/Disk/Ext4/ext4_fs.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_fs.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_fs.h>
 #include <Kernel/Fs/Vfs/virtual_filesystem.h>
 #include <LibFK/Algorithms/log.h>
 
@@ -160,6 +161,18 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
         }
     }
 
+    // Try HFS+ / HFSX (macOS native)
+    auto hfsplus_res = HFSPlusFileSystem::create(device);
+    if (hfsplus_res.is_ok()) {
+        auto mount_res = fkernel::VirtualFileSystem::the().mount(mount_path, hfsplus_res.value(), "hfsplus");
+        if (mount_res.is_ok()) {
+            fk::algorithms::klog("AUTO_MOUNT", "Mounted %s (HFS+) at %s", device->name().c_str(), mount_path);
+            return;
+        } else {
+            fk::algorithms::kwarn("AUTO_MOUNT", "Failed to mount %s as HFS+: error=%d", device->name().c_str(), (int)mount_res.error());
+        }
+    }
+
     fk::algorithms::klog("AUTO_MOUNT", "No supported filesystem found on %s", device->name().c_str());
 }
 
@@ -251,6 +264,14 @@ bool AutoMounter::try_mount_at(fk::RefPtr<StorageDevice> device, const char* tar
     if (ufs_res2.is_ok()) {
         if (VirtualFileSystem::the().mount(target_path, ufs_res2.value(), "ufs").is_ok()) {
             fk::algorithms::klog("AUTO_MOUNT", "Mounted %s (UFS) at %s", device->name().c_str(), target_path);
+            return true;
+        }
+    }
+
+    auto hfsplus_res2 = HFSPlusFileSystem::create(device);
+    if (hfsplus_res2.is_ok()) {
+        if (VirtualFileSystem::the().mount(target_path, hfsplus_res2.value(), "hfsplus").is_ok()) {
+            fk::algorithms::klog("AUTO_MOUNT", "Mounted %s (HFS+) at %s", device->name().c_str(), target_path);
             return true;
         }
     }

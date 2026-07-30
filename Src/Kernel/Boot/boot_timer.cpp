@@ -1,13 +1,8 @@
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Boot/boot_timer.h>
 #include <LibFK/Algorithms/log.h>
 
 static uint64_t g_tsc_freq_hz = 0;
-
-static inline uint64_t rdtsc_with_lfence() {
-  uint32_t lo, hi;
-  asm volatile("lfence; rdtsc" : "=a"(lo), "=d"(hi));
-  return (static_cast<uint64_t>(hi) << 32) | lo;
-}
 
 void BootTimer::set_tsc_frequency(uint64_t freq_hz) {
   g_tsc_freq_hz = freq_hz;
@@ -15,7 +10,7 @@ void BootTimer::set_tsc_frequency(uint64_t freq_hz) {
 
 void BootTimer::mark(const char* name) {
   if (m_count < MAX_MARKS) {
-    m_marks[m_count++] = {name, rdtsc_with_lfence()};
+    m_marks[m_count++] = {name, arch_read_tsc_serialized()};
   }
 }
 

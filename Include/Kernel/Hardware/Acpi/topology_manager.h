@@ -21,8 +21,9 @@ class TopologyManager {
 public:
     static TopologyManager& the();
 
+    bool is_initialized() const { return m_is_initialized; }
     void initialize();
-    
+
     const fk::containers::Vector<NUMANode>& nodes() const { return m_nodes; }
     const fk::containers::Vector<CpuAffinity>& cpu_affinities() const { return m_cpu_affinities; }
 
@@ -31,10 +32,13 @@ public:
 
 private:
     TopologyManager() = default;
-    
+    TopologyManager(const TopologyManager&) = delete;
+    TopologyManager& operator=(const TopologyManager&) = delete;
+
+    bool m_is_initialized{false};
     fk::containers::Vector<NUMANode> m_nodes;
     fk::containers::Vector<CpuAffinity> m_cpu_affinities;
-    
+
     void parse_srat(SRATHeader* srat);
 };
 

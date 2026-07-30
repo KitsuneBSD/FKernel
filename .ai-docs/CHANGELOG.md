@@ -344,3 +344,57 @@ All critical, high, and medium bugs resolved:
 - `byte_order.h`, `io.h`, `syscall_numbers.h` moved to LibFK
 - Algorithm consolidation: case-insensitive compare, RFC 1071 checksum, queue dequeue-N, FAT 8.3 name formatting, dedup-on-insert, binary search (all ✅)
 - DJB2 deduplication, base-N formatting shared helper (all ✅)
+
+---
+
+## Session 20 — 2026-07-30 ✅
+
+### Phase 27 — VFS + Capability Integration
+
+All POSIX FDs routed through CSpace capabilities. `CapabilityType::FileDescriptor`, `CapabilityRights` (Read/Write/Seek/Ioctl), `CSpace::install_fd/lookup_fd/revoke_fd/clone_fd` implemented. `TaskFiles` parallel `cap_handles` vector wired throughout task fd lifecycle. Rights enforced in `FileDescription::read()/write()` via `O_ACCMODE` check. Pipe creates separate `O_RDONLY`/`O_WRONLY` descriptions with correct rights. Fork uses new `CSpace::clone_fd()`. Execve revokes `FD_CLOEXEC` caps. Mmap and socket use validated `get/add_file_descriptor`.
+
+### Phase 29b — CSpace Wiring + Phase 29d — Unified Revocation
+
+All POSIX syscall handlers go through CSpace. `SemNode`/`MqueueNode` already delegated generation to `ipc::Endpoint` — no separate `m_generation` to remove. CSpace revoke called from `close_file_descriptor`.
+
+### Bugs 9, 10, 18, 19, 20 ✅
+
+- Bug 9 (CSPRNG): Already seeded via `arch_read_tsc()` at init.cpp:30–32
+- Bug 10 (`s_global_libraries`): Already guarded by `s_library_lock` (ScopedLockIRQ) at all call sites
+- Bugs 18/19 (Endpoint wait data race): Fixed in prior session (noted in session 19)
+- Bug 20 (signal_with_payload): Fixed in prior session
+
+### P1 Manager Pattern + P1 Arch Portability ✅
+
+All 13 managers converted (session 19). All inline x86_64 asm extracted to `arch_*` functions (session 19).
+
+### Phase 32d — HFS+ / HFSX
+
+7 headers + 6 sources in `Include/Kernel/Fs/Disk/HfsPlus/` and `Src/Kernel/Fs/Disk/HfsPlus/`:
+- `hfsplus_vh.h` — all on-disk structures (Volume Header, B-tree nodes, Catalog records, Extents)
+- `hfsplus_unicode.h/cpp` — UCS-2 BE ↔ UTF-8, 256-entry case-folding table, case-sensitive compare
+- `hfsplus_btree.h/cpp` — `BTreeNode`, `BTreeFile` (fork-backed B-tree I/O), B-tree descent for catalog lookup, catalog list (enumeration by parentID across leaf chain), extents overflow lookup
+- `hfsplus_catalog.h/cpp` — `make_catalog_key()` helper
+- `hfsplus_extents.h/cpp` — `HFSPlusForkReader`: 8 inline extents + overflow B-tree for large files; partial-block reads
+- `hfsplus_fs.h/cpp` — `HFSPlusFileSystem` (VFS Node, `create()` factory, `lookup()`/`list_dir()`, HFSX case-sensitive support)
+- `hfsplus_node.h/cpp` — `HFSPlusNode` (file/dir/symlink VFS Node, reads via `HFSPlusForkReader`)
+- Registered in `AutoMounter::try_mount()` and `try_mount_at()` as `"hfsplus"`
+
+## Session 21 (2026-07-30)
+
+### Phase 44 — Thread Group Signal Delivery
+
+**44a — Signal Delivery to Thread Groups:**
+- `SignalDelivery::deliver_to_group(sig, tgid, info)` added to `signal_delivery.h/cpp`:
+  - Iterates all tasks via `last_pid()` + `find_task()` loop
+  - Picks first thread in group where signal is not blocked
+  - Falls back to tgid leader (thread with `id == tgid`) if all threads block the signal
+- `sys_tgkill` fixed: was finding task by `tgid` value (wrong); now finds by `tid`, verifies `task->tgid == tgid`
+- `sys_kill(pid > 0)`: replaced `find_task(pid)` + `send_signal` with `deliver_to_group(sig, ProcessId(pid))` — correct for multi-threaded processes
+- `scheduler_lifecycle.cpp` SIGCHLD: replaced `send_signal(parent)` with `deliver_to_group(SIGCHLD, parent->tgid)` — delivers to any thread in parent group
+
+**44b — Signal Mask Inheritance:**
+- CLONE_THREAD signal mask inheritance already done (clone.cpp:84 `blocked = parent->blocked`)
+- execve now kills sibling threads (SIGKILL loop before address space switch) — POSIX multi-thread exec semantics
+- `execve.cpp`: removed incorrect `signals.blocked = 0` (POSIX: signal mask preserved across exec); replaced with `signals.pending = 0` (clear pending signals on exec, correct per POSIX)
+- sigsuspend/rt_sigtimedwait already per-task — no changes needed

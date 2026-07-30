@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Types/notification_bits.h>
 #include <LibFK/Types/tick_count.h>
@@ -42,7 +43,11 @@ public:
 
   fk::NotificationBits wait();
 
+  fk::core::Result<fk::NotificationBits, fk::core::Error> wait_interruptible();
+
   fk::NotificationBits wait_timeout(fk::TickCount timeout_ticks);
+
+  fk::core::Result<fk::NotificationBits, fk::core::Error> wait_interruptible_timeout(fk::TickCount timeout_ticks);
 
   fk::NotificationBits poll();
 

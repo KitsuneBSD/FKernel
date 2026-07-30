@@ -139,6 +139,82 @@ fk::NotificationBits Notification::wait_timeout(fk::TickCount timeout_ticks) {
   return fk::NotificationBits(result);
 }
 
+fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_interruptible() {
+  auto& scheduler = SchedulerManager::the();
+  Task* current = scheduler.current();
+
+  if (current && current->has_pending_signals())
+    return fk::core::Error::Interrupted;
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
+      return bits;
+    }
+
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    m_waiting_tasks.append(*current);
+    scheduler.block_current_noqueue();
+  }
+
+  if (current && current->has_pending_signals())
+    return fk::core::Error::Interrupted;
+
+  uint64_t result = current->registers().rax;
+  return fk::NotificationBits(result);
+}
+
+fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_interruptible_timeout(fk::TickCount timeout_ticks) {
+  auto& scheduler = SchedulerManager::the();
+  Task* current = scheduler.current();
+
+  if (current && current->has_pending_signals())
+    return fk::core::Error::Interrupted;
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
+      return bits;
+    }
+
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    m_waiting_tasks.append(*current);
+  }
+
+  scheduler.sleep_current(timeout_ticks);
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    bool still_waiting = current->wait_node.prev != nullptr
+                      || current->wait_node.next != nullptr
+                      || m_waiting_tasks.first() == current;
+    if (still_waiting) {
+      m_waiting_tasks.remove(*current);
+      return fk::NotificationBits(0);
+    }
+  }
+
+  if (current && current->has_pending_signals())
+    return fk::core::Error::Interrupted;
+
+  uint64_t result = current->registers().rax;
+  return fk::NotificationBits(result);
+}
+
 fk::NotificationBits Notification::poll() {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   fk::NotificationBits bits = m_pending_bits;

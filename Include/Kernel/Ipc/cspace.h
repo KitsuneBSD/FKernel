@@ -102,6 +102,16 @@ public:
       dest.install(m_capabilities[i]);
     }
   }
+
+  // Copies one FileDescriptor capability from this CSpace into dest, preserving rights.
+  // Returns the new handle in dest, or INVALID_HANDLE if src_handle is invalid.
+  uint32_t clone_fd(CSpace& dest, uint32_t src_handle) const {
+    if (src_handle == INVALID_HANDLE) return INVALID_HANDLE;
+    auto cap = get(src_handle);
+    if (!cap.is_valid() || cap.type() != CapabilityType::FileDescription)
+      return INVALID_HANDLE;
+    return dest.install(cap);
+  }
 };
 
 }

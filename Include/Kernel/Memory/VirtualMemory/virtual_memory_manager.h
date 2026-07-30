@@ -7,9 +7,11 @@
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 
-extern "C" void write_on_cr3(void *pml4_virt_addr);
-extern "C" uintptr_t read_on_cr3();
-extern "C" int invalid_tlb(uintptr_t addr);
+extern "C" void arch_write_cr3(void *pml4_virt_addr);
+extern "C" uintptr_t arch_read_cr3();
+extern "C" int arch_invlpg(uintptr_t addr);
+
+namespace fkernel {
 
 /**
  * @class VirtualMemoryManager
@@ -21,6 +23,11 @@ private:
   PageTable *m_pml4 = nullptr; ///< Pointer to the active PML4 table.
   uintptr_t m_pml4_phys = 0;   ///< Physical address of the PML4.
   uintptr_t m_kernel_pml4_phys = 0; ///< Physical address of the kernel's PML4 (never freed).
+  bool m_is_initialized{false};
+
+  VirtualMemoryManager();
+  VirtualMemoryManager(const VirtualMemoryManager &) = delete;
+  VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
 
 protected:
   /** @brief Allocates and zeroes a new page table. */
@@ -36,12 +43,6 @@ protected:
   uintptr_t get_table_virtual_address(uint16_t pml4_idx, uint16_t pdpt_idx = 0,
                                       uint16_t pd_idx = 0,
                                       uint16_t pt_idx = 0) const;
-
-  bool m_is_initialized{false};
-
-  VirtualMemoryManager();
-  VirtualMemoryManager(const VirtualMemoryManager &) = delete;
-  VirtualMemoryManager &operator=(const VirtualMemoryManager &) = delete;
 
 public:
   /** @return The singleton instance. */
@@ -109,3 +110,6 @@ private:
   /** @brief Ensures a page table level exists, creating it if necessary. */
   PageTable* ensure_table(PageTable* parent, size_t index, PageFlags flags, bool& changed);
 };
+
+} // namespace fkernel
+using fkernel::VirtualMemoryManager;

@@ -21,7 +21,8 @@ int MqueueNode::send(const void* buf, size_t len, uint32_t prio) {
   m_lock.lock();
   while (m_count >= m_max_msgs) {
     m_lock.unlock();
-    m_endpoint.wait();
+    if (auto r = m_endpoint.wait_interruptible(); r.is_error())
+      return -(int)r.error();
     m_lock.lock();
   }
 
@@ -47,7 +48,8 @@ ssize_t MqueueNode::receive(void* buf, size_t len, uint32_t* prio, bool nonblock
   while (m_count == 0) {
     m_lock.unlock();
     if (nonblock) return -1;
-    m_endpoint.wait();
+    if (auto r = m_endpoint.wait_interruptible(); r.is_error())
+      return -(ssize_t)r.error();
     m_lock.lock();
   }
 

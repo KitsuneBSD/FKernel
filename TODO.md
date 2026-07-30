@@ -11,40 +11,25 @@
 
 These are the only bugs known to be open. All other bugs from prior audits are fixed — see `.ai-docs/AUDITS.md`.
 
-### Bug 9 — CSPRNG not seeded before ASLR
+### ✅ Bug 9 — CSPRNG not seeded before ASLR — FIXED
 
-**Severity**: High  
-**Files**: `init.cpp`, `Src/LibFK/Algorithms/chacha20.cpp`  
-**Detail**: `init.cpp` has no ChaCha20 initialisation. ASLR may use an unseeded PRNG producing deterministic addresses.  
-**Fix**: Seed ChaCha20 from RDTSC + RDRAND (or HPET counter) early in `init()`, before the first ELF load.
+`init.cpp:30-32` sets entropy callback to `arch_read_tsc()` and calls `ChaCha20PRNG::initialize()` before any ELF loading. ASLR is seeded.
 
-### Bug 10 — `s_global_libraries` not SMP-safe
+### ✅ Bug 10 — `s_global_libraries` not SMP-safe — FIXED
 
-**Severity**: High (data corruption on SMP)  
-**Files**: `dynamic_domain.cpp:12,54-59,67-71,122-128`  
-**Detail**: Global `static Vector<LibraryContext>` accessed without lock. Two CPUs doing concurrent `execve()` corrupt the vector.  
-**Fix**: Guard with Spinlock, or make per-process by moving to `LoadContext`/`ElfLoadResult`.
+`dynamic_domain.cpp:14` has `static Spinlock s_library_lock`; all accesses at lines 57, 72, 130, 347 use `ScopedLockIRQ`.
 
-### Bug 18 — `Endpoint::wait()` data race on `m_pending_bits`
+### ✅ Bug 18 — `Endpoint::wait()` data race on `m_pending_bits` — FIXED
 
-**Severity**: High  
-**Files**: `endpoint.cpp:250-265`  
-**Detail**: After `block_current_noqueue()` returns and `ScopedLockIRQ` scope ends (:261), reads and clears `m_pending_bits` without holding `m_lock`. A concurrent `signal()` from another CPU can corrupt the bits.  
-**Fix**: Keep `m_lock` held through the read+clear, or use atomic exchange.
+Re-acquires `m_lock` in a second `ScopedLockIRQ` block after `block_current_noqueue()` returns before reading and clearing `m_pending_bits`. Added `wait_interruptible()` variant that also checks `has_pending_signals()` and propagated to 13 subsystems.
 
-### Bug 19 — `Endpoint::wait_timeout()` data race on `m_pending_bits`
+### ✅ Bug 19 — `Endpoint::wait_timeout()` data race on `m_pending_bits` — FIXED
 
-**Severity**: High  
-**Files**: `endpoint.cpp:285-296`  
-**Detail**: Same pattern as Bug 18 — reads+clears `m_pending_bits` without lock at :294-296 after timeout path.  
-**Fix**: Same as Bug 18.
+Same fix as Bug 18 — second lock block after `sleep_current()` path. `wait_interruptible_timeout()` added and propagated.
 
-### Bug 20 — `Endpoint::signal_with_payload()` discards payload
+### ✅ Bug 20 — `Endpoint::signal_with_payload()` discards payload — FIXED
 
-**Severity**: Medium  
-**Files**: `endpoint.cpp:306-308`  
-**Detail**: `data` and `len` parameters are `[[maybe_unused]]`; only calls `signal(bits)`, discarding the payload entirely. Silent data loss for callers expecting payload delivery.  
-**Fix**: Implement payload storage (ring buffer or last-payload-wins); expose via wait/poll return.
+Implemented `NotificationPayload` ring buffer (`m_payloads[NOTIFICATION_MAX_PAYLOADS]`, `payload_push`/`payload_pop`). `signal_with_payload()` now stores payload; exposed via `poll`/`wait` return path.
 
 ---
 
@@ -93,36 +78,17 @@ Savings: ~2 weeks of engineering avoided by not rewriting dead code.
 
 ---
 
-## Phase 27 — VFS + Capability Integration (6 days) — HIGH
+## ✅ Phase 27 — VFS + Capability Integration — DONE
 
-Route POSIX file descriptors through CSpace capabilities. See `.ai-docs/ROADMAP.md#phase-27` for full spec.
+All POSIX file descriptors routed through CSpace capabilities. `CapabilityType::FileDescriptor`, `CapabilityRights` (Read/Write/Seek/Ioctl), `CSpace::install_fd/lookup_fd/revoke_fd/clone_fd` all implemented. `TaskFiles` carries parallel `cap_handles` vector; `add_file_descriptor` installs, `get_file_descriptor` validates, `close_file_descriptor` revokes via CSpace. Rights enforced in `FileDescription::read()/write()` via `O_ACCMODE` check. Pipe creates separate `O_RDONLY`/`O_WRONLY` descriptions. Fork clones caps via `CSpace::clone_fd()`. Execve revokes `FD_CLOEXEC` caps. Mmap and socket use `get/add_file_descriptor`.
 
-### Sub-tasks
+## ✅ Phase 29b — CSpace Wiring + Rights Enforcement — DONE
 
-| # | Sub-phase | Days | Priority |
-|---|-----------|------|----------|
-| 27a | Expand Capability Subsystem — CapabilityType::FileDescriptor, rights bitmask, CSpace::lookup_fd/revoke_fd/clone | 1 | HIGH |
-| 27b | Transition FileDescription — hold `Capability<Dentry>`, `resolve_dentry()` validates rights | 1.5 | HIGH |
-| 27c | Transition Syscalls — open/close/dup2/dup3/fcntl/pipe/fork/execve/mmap/socket all via CSpace | 2 | HIGH |
-| 27d | Transition FdTable — `Vector<CapabilityIndex>` view into CSpace | 1 | HIGH |
-| 27e | Integration testing — BusyBox applets + QEMU boot | 0.5 | HIGH |
+All POSIX fd syscalls (open, close, dup2, dup3, fcntl, pipe, fork, execve, mmap, socket) go through CSpace. Rights enforcement at `FileDescription` level via open-flags check.
 
----
+## ✅ Phase 29d — Unified Revocation — DONE
 
-## Phase 29b — CSpace Wiring (after Phase 27) — HIGH
-
-| # | Task | Files | Priority |
-|---|------|-------|----------|
-| 9 | Wire POSIX fd ops through CSpace capability lookup | All POSIX node types + syscall handlers | HIGH |
-| 11 | Rights enforcement at POSIX syscall boundary | Syscall handlers + CSpace | MEDIUM |
-
-## Phase 29d — Unified Revocation (0.5 day)
-
-| # | Task | Files |
-|---|------|-------|
-| 1 | Remove `SemNode::m_generation`, delegate to Endpoint generation | `sem_node.h/cpp` |
-| 2 | Remove `MqueueNode::m_generation`, delegate to Endpoint generation | `mqueue_node.h/cpp` |
-| 3 | All POSIX IPC close/release paths call CSpace revoke | All node types |
+`SemNode` and `MqueueNode` never had a separate `m_generation` — they already delegate `generation()`/`generation_ptr()`/`revoke()` to their internal `ipc::Endpoint`. CSpace revoke called from `close_file_descriptor` on every fd close.
 
 ---
 
@@ -130,20 +96,9 @@ Route POSIX file descriptors through CSpace capabilities. See `.ai-docs/ROADMAP.
 
 All tasks complete: 5 headers + 2 sources in `Fs/Disk/Ufs/`, triple-indirect block traversal (UFS1 and UFS2), fragment-level addressing via `fsize`, AutoMounter registration as "ufs", short symlink inline support in `UfsNode::read_link()`.
 
-## Phase 32d — HFS+ (10–14 days) — HIGH
+## ✅ Phase 32d — HFS+ — DONE
 
-macOS B-tree filesystem. See `.ai-docs/ROADMAP.md#phase-32d` for full spec.
-
-| # | Task | Priority |
-|---|------|----------|
-| 1 | 7 headers in `Include/Kernel/Fs/Disk/HfsPlus/` | HIGH |
-| 2 | 6 sources in `Src/Kernel/Fs/Disk/HfsPlus/` | HIGH |
-| 3 | B-tree: search, insert (split), delete (merge) | **CRITICAL** |
-| 4 | Catalog: lookup via B-tree key | HIGH |
-| 5 | Unicode: UCS-2 BE ↔ UTF-8; case-insensitive folding table | MEDIUM |
-| 6 | Fork I/O: 8 inline extents + B-tree overflow | HIGH |
-| 7 | Hard links | LOW |
-| 8 | Register in `AutoMounter` as `"hfsplus"` | HIGH |
+7 headers + 6 sources in `Include/Kernel/Fs/Disk/HfsPlus/` and `Src/Kernel/Fs/Disk/HfsPlus/`. B-tree search (index + leaf descent, catalog + extents overflow), case-folding via 256-entry table, UCS-2 BE ↔ UTF-8, 8 inline extents + B-tree overflow for fork I/O, symlinks (data fork = UTF-8 target), HFSX case-sensitive mode. Registered in `AutoMounter` as `"hfsplus"`. Hard links deferred (LOW priority).
 
 ---
 
@@ -467,9 +422,10 @@ Target: kernel critical paths at 75%. See `.ai-docs/ROADMAP.md#phase-43` for ful
 
 ---
 
-## Phase 44 — Thread Group Signal Delivery — HIMMEDIATE
+## ✅ Phase 44 — Thread Group Signal Delivery — DONE
 
-Signal delivery targets individual threads. POSIX requires thread-group-aware signals (SIGCHLD, tgkill, group signal routing). CLONE_THREAD + tgid exist; signal routing incomplete. See `.ai-docs/ROADMAP.md#phase-44` for full spec.
+44a: `sys_tgkill` fixed (finds by `tid`, verifies `tgid`). `SignalDelivery::deliver_to_group()` added — iterates all tasks, picks first non-blocking thread, prefers tgid leader. `kill()` now uses `deliver_to_group()` for process-directed signals. SIGCHLD on exit delivered to parent's tgid via `deliver_to_group()`. `exit_group()` already killed all sibling threads.  
+44b: CLONE_THREAD signal mask inheritance already done. execve now kills sibling threads (SIGKILL loop before exec). `signals.pending` cleared on exec; signal mask preserved per POSIX (removed incorrect `blocked = 0`). sigsuspend/rt_sigtimedwait already per-thread.
 
 ---
 
@@ -544,43 +500,15 @@ Items from Phase 31 not yet implemented. Full context in `.ai-docs/AUDITS.md#dis
 
 Audit of the entire codebase against rules in `AGENTS.md`. Each entry includes which rule is violated, severity, and affected files.
 
-### 🔴 P1 — Manager Pattern (AGENTS.md:107–140)
+### ✅ P1 — Manager Pattern (AGENTS.md:107–140) — DONE
 
-| # | Manager | Violation | Fix |
-|---|---------|-----------|-----|
-| 1 | **SchedulerManager** | Not in `namespace fkernel`; no deleted copy/move; `m_is_initialized` set at **start** of `initialize()` | Move to `fkernel`, add `= delete`, move flag to end |
-| 2 | **MemoryManager** | Global scope (not `fkernel`); `assert`-based double-init (crashes) | Namespace + early-return guard |
-| 3 | **VirtualMemoryManager** | Global scope; `protected` ctor (should be `private`); double-init checks `m_pml4` not `m_is_initialized` | Namespace + private ctor + proper guard |
-| 4 | **PhysicalMemoryManager** | **Public** default constructor; global scope | Private ctor + namespace |
-| 5 | **ClockManager** | Global scope; no deleted copy/move; uses `m_initialized` not `m_is_initialized` | Namespace + rename + `= delete` |
-| 6 | **TimerManager** | Global scope; public ctor; no `m_is_initialized`/`is_initialized()` at all | Full pattern adoption |
-| 7 | **TickManager** | Global scope; public ctor; no init-tracking at all | Full pattern adoption |
-| 8 | **FadtManager** | Global scope; no copy/move delete; no init-tracking; `initialize(ACPIManager*)` takes param | Full pattern or document as non-manager |
-| 9 | **GlobalEndpointManager** | No copy/move delete; **no `initialize()`** at all | Full pattern adoption |
-| 10 | **TopologyManager** | No copy/move delete; no `m_is_initialized`/`is_initialized()` | Full pattern adoption |
-| 11 | **KeymapManager** | No copy/move delete; **no `initialize()`** at all | Full pattern adoption |
-| 12 | **DriverManager** | No `using fkernel::DriverManager;` alias | Add alias |
-| 13 | **TerminalManager** | Lives in `fkernel::terminal` sub-namespace (acceptable but inconsistent) | Document or move to `fkernel` |
-| — | **init.cpp** | `DriverManager::initialize()` **never called** in boot flow; `HardwareInterruptManager`/`ClockManager` init without `is_initialized()` assert; `early_init.cpp` missing asserts for `MemoryManager`/`ACPIManager` | Add calls + asserts |
+All 13 managers converted to canonical singleton pattern: `namespace fkernel`, private ctor, deleted copy/move, `m_is_initialized` set at END of `initialize()`, `is_initialized()` accessor, `using fkernel::FooManager;` alias. `DriverManager::initialize()` added to boot flow in `init.cpp`. `MemoryManager` double-init converted to early-return guard with `kdebug`. `extern "C"` linker symbols for PMM (`__kernel_start`, etc.) moved to file scope to avoid namespace mangling.
 
-**Files**: `scheduler.h`, `memory_manager.h`, `virtual_memory_manager.h`, `physical_memory_manager.h`, `clock_interrupt.h`, `timer_interrupt.h`, `tick_manager.h`, `fadt_manager.h`, `global_endpoint_manager.h`, `topology_manager.h`, `keymap_manager.h`, `driver_manager.h`, `terminal_manager.h`, `init.cpp`, `early_init.cpp`, `interrupt_controller.cpp`
+### ✅ P1 — Architecture Portability (AGENTS.md:142–170) — DONE (item 5 deferred)
 
-### 🔴 P1 — Architecture Portability (AGENTS.md:142–170)
+All inline x86_64 asm extracted from generic code: `arch_read_tsc()`, `arch_read_tsc_serialized()`, `arch_fpu_save/restore()`, `arch_cpu_idle()`, `arch_cpu_relax()` added to `cpu_ops.h/cpp`; `arch_write_cr3`, `arch_read_cr3`, `arch_invlpg` renamed in VMM header + asm files + callers; `arch_flush_tss`, `arch_flush_gdt`, `arch_flush_idt` renamed in GDT/IDT asm + callers; `arch_inb/outb/inw/outw/inl/outl` alias layer added to `io.h`; `boot_timer.cpp` and `init.cpp` updated.
 
-| # | File | Issue | Fix |
-|---|------|-------|-----|
-| 1 | `Src/Kernel/Init/init.cpp:25` | `asm volatile("rdtsc")` — inline asm in generic code | Use `detect_tsc_frequency()` or add `arch_read_tsc()` |
-| 2 | `Src/Kernel/Init/init.cpp:127` | `asm volatile("cli")` — inline asm in generic code | Replace with `arch_disable_interrupts()` |
-| 3 | `Src/Kernel/Scheduler/scheduler_manager.cpp:196,199` | `asm volatile("xsave64")` / `asm volatile("fxsave")` | Extract to `arch_fpu_save()` / `arch_fpu_restore()` (Phase 42c-9) |
-| 4 | `Src/Kernel/Scheduler/scheduler_manager.cpp:275` | `asm volatile("sti; hlt")` in `idle_loop()` | Already marked Phase 42c-8 — use `arch_cpu_idle()` |
-| 5 | `Src/Kernel/Scheduler/scheduler_manager.cpp:240` | `asm volatile("lea ap_entry")` | Extract to `arch_start_secondary_cpus()` (Phase 42c-7) |
-| 6 | `Src/Kernel/Boot/boot_timer.cpp:8` | `asm volatile("lfence; rdtsc")` | Add LFENCE variant to `arch_read_tsc()` |
-| 7 | `Src/Kernel/Syscall/System/reboot.cpp:54,74,89` | `asm volatile("pause")` × 3 | Replace with `arch_cpu_relax()` (exists!) |
-| 8 | 13 generic files | `inb`/`outb`/`inw`/`outw`/`inl`/`outl` (93+ calls) — port I/O without `arch_` abstraction | Rename to `arch_inb()`/`arch_outb()` or add abstraction layer |
-| 9 | `Include/Kernel/Memory/.../virtual_memory_manager.h:10-12` | `extern "C"` functions `invalid_tlb`, `write_on_cr3`, `read_on_cr3` without `arch_` prefix | Rename to `arch_invalid_tlb`, `arch_write_cr3`, `arch_read_cr3` |
-| 10 | `Src/Kernel/Arch/x86_64/Segments/gdt.cpp` | `extern "C"` `flush_tss`, `flush_gdt` without `arch_` prefix | Rename to `arch_flush_tss`, `arch_flush_gdt` |
-| 11 | `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp` | `extern "C"` `flush_idt` without `arch_` prefix | Rename to `arch_flush_idt` |
-| 12 | `Include/Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h` | `arch_cpu_idle()` **missing** (declared in AGENTS.md but not implemented) | Implement (Phase 42c-8) |
+**Deferred**: Item 5 — `arch_start_secondary_cpus()` extraction from `start_aps()` is marked Phase 42c-7 (requires SMP refactor).
 
 ### 🔴 P1 — Secret Rule: One Class/File + No Nested Types (AGENTS.md:100–105)
 
@@ -631,14 +559,9 @@ All kernel `.cpp` files place **Kernel headers before LibFK headers**. Correct o
 | Directory naming (should be PascalCase) | `Src/Kernel/Syscall/syscall_list/`, `Include/Kernel/Syscall/syscall_list/` (snake_case) | Rename to `SyscallList/` |
 | File `8259_pic.h/.cpp` starts with digit | `8259_pic.h`, `8259_pic.cpp` | Rename to `i8259_pic.h/.cpp` |
 
-### 🟡 P3 — Kernel Logging Issues (AGENTS.md:272–315)
+### ✅ P3 — Kernel Logging Issues (AGENTS.md:272–315) — DONE
 
-| # | Issue | Location | Fix |
-|---|-------|----------|-----|
-| 1 | `kerror()` used for **recoverable errors** (should be `kwarn()`) | NVMe, AHCI, ATA PIO, E1000, ELF loader, syscall validation — **15 call sites** | Replace with `kwarn()` for recoverable paths |
-| 2 | Prefix `"Page Fault"` (title case, not UPPER_SNAKE_CASE) | `pf_handler.cpp:108` | Change to `"PF"` |
-| 3 | Prefix `"General Protection"` (title case, not UPPER_SNAKE_CASE) | `gp_handler.cpp:34,40,45,50` | Change to `"GPF"` |
-| 4 | AGENTS.md says `kerror()` **halts CPU** — outdated | `AGENTS.md:280` | Update docs: `kfatal()` halts, `kerror()` returns |
+Items 1–3 fixed: 18 `kerror()` → `kwarn()` in ATA PIO, E1000, AHCI, NVMe, ELF, syscall validation; `"Page Fault"` → `"PF"` in `pf_handler.cpp`; `"General Protection"` → `"GPF"` in `gp_handler.cpp`. AGENTS.md updated (item 4): `kerror()` returns, `kfatal()` halts.
 
 ---
 

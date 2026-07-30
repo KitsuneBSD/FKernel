@@ -53,6 +53,29 @@ void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info
                        signum, target->control.identity.id.value(), si.si_code);
 }
 
+void SignalDelivery::deliver_to_group(int sig, fk::ProcessId tgid, const siginfo_t* info) {
+  if (sig <= 0 || sig >= NSIG) return;
+
+  fk::RefPtr<Task> candidate;
+  fk::RefPtr<Task> leader;
+
+  uint64_t max_pid = SchedulerManager::the().last_pid().value();
+  for (uint64_t probe = 1; probe <= max_pid; ++probe) {
+    auto task = SchedulerManager::the().find_task(fk::ProcessId(probe));
+    if (!task) continue;
+    if (task->control.identity.tgid != tgid) continue;
+    if (task->control.lifecycle.terminated) continue;
+
+    if (task->control.identity.id == tgid) leader = task;
+
+    if (!candidate && !(task->resources.ipc.signals.blocked & (1ULL << sig)))
+      candidate = task;
+  }
+
+  Task* target = candidate ? candidate.get() : (leader ? leader.get() : nullptr);
+  if (target) send_signal(target, sig, info);
+}
+
 SignalDelivery::DefaultAction SignalDelivery::classify_default(int sig) {
   switch (sig) {
     case SIGCHLD: case SIGURG: case SIGWINCH: return DefaultAction::Ignore;

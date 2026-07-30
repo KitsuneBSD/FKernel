@@ -56,6 +56,7 @@ void FadtManager::initialize(ACPIManager *acpi) {
   }
 
   validate_ports();
+  m_is_initialized = true;
 }
 
 bool FadtManager::validate_ports() const {

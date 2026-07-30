@@ -43,16 +43,19 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
 
   if (keycode == 42 || keycode == 54) { // shift
     shift_pressed = !key_released;
+    fk::algorithms::kdebug("KBD", "Shift %s", shift_pressed ? "PRESS" : "release");
     return;
   }
 
   if (keycode == 56) { // alt
     alt_pressed = !key_released;
+    fk::algorithms::kdebug("KBD", "Alt %s", alt_pressed ? "PRESS" : "release");
     return;
   }
 
   if (keycode == 29) { // ctrl
     ctrl_pressed = !key_released;
+    fk::algorithms::kdebug("KBD", "Ctrl %s", ctrl_pressed ? "PRESS" : "release");
     return;
   }
 
@@ -70,6 +73,7 @@ void PS2Keyboard::handle_scancode(uint8_t scancode) {
   char c = fkernel::drivers::KeymapManager::the().translate(keycode, shift_pressed, alt_pressed, ctrl_pressed);
 
   if (c) {
+    fk::algorithms::kdebug("KBD", "Scancode 0x%02X -> char 0x%02X (ctrl=%d shift=%d alt=%d)", scancode, (unsigned char)c, ctrl_pressed, shift_pressed, alt_pressed);
     fkernel::terminal::TerminalManager::the().handle_input(c);
   }
 }

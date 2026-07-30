@@ -49,7 +49,7 @@ SignalFdNode::read(uint64_t, size_t size, uint8_t* buffer) {
         m_lock.unlock();
         if (m_nonblock)
             return fk::core::Error::WouldBlock;
-        m_endpoint.wait();
+        TRY(m_endpoint.wait_interruptible());
         m_lock.lock();
     }
     SignalfdSiginfo info = m_queue[0];

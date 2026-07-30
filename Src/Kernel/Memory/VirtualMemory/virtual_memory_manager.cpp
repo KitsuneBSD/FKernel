@@ -19,11 +19,11 @@ VirtualMemoryManager& VirtualMemoryManager::the() {
 }
 
 void VirtualMemoryManager::invlpg(uintptr_t addr) {
-  invalid_tlb(addr);
+  arch_invlpg(addr);
 }
 
 void VirtualMemoryManager::flush_tlb() {
-  write_on_cr3(reinterpret_cast<void*>(read_on_cr3()));
+  arch_write_cr3(reinterpret_cast<void*>(arch_read_cr3()));
 }
 
 void VirtualMemoryManager::perform_initial_identity_mapping() {
@@ -75,7 +75,7 @@ void VirtualMemoryManager::initialize() {
                          (void*)end);
   }
 
-  write_on_cr3(static_cast<void*>(m_pml4));
+  arch_write_cr3(static_cast<void*>(m_pml4));
 
   fk::algorithms::klog("VIRT_MEM", "Initialize done: cr3=%p", m_pml4);
   m_is_initialized = true;
@@ -322,7 +322,7 @@ void VirtualMemoryManager::switch_address_space(uintptr_t cr3) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   m_pml4_phys = cr3;
   m_pml4 = reinterpret_cast<PageTable*>(cr3);
-  write_on_cr3(reinterpret_cast<void*>(cr3));
+  arch_write_cr3(reinterpret_cast<void*>(cr3));
 }
 
 void VirtualMemoryManager::free_address_space(uintptr_t cr3) {

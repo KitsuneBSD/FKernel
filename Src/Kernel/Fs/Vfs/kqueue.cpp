@@ -298,7 +298,7 @@ fk::core::Result<int, fk::core::Error> KQueueNode::kevent(const struct kevent* c
             wait_ticks = (wait_until > now) ? (wait_until - now) : 1;
         }
 
-        m_notification.wait_timeout(fk::TickCount(wait_ticks));
+        TRY(m_notification.wait_interruptible_timeout(fk::TickCount(wait_ticks)));
     }
 }
 

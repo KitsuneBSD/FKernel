@@ -57,7 +57,11 @@ public:
 
   fk::NotificationBits wait();
 
+  fk::core::Result<fk::NotificationBits, fk::core::Error> wait_interruptible();
+
   fk::NotificationBits wait_timeout(fk::TickCount timeout_ticks);
+
+  fk::core::Result<fk::NotificationBits, fk::core::Error> wait_interruptible_timeout(fk::TickCount timeout_ticks);
 
   fk::NotificationBits poll();
 

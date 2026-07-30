@@ -10,6 +10,8 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #endif
 
+namespace fkernel {
+
 /**
  * @class PhysicalMemoryManager
  * @brief Singleton class that manages all physical memory zones in the system.
@@ -47,10 +49,11 @@ private:
   uintptr_t alloc_contiguous_internal(size_t order, ZoneType preferred,
                                       uint32_t preferred_node);
 
-public:
   PhysicalMemoryManager() = default;
   PhysicalMemoryManager(const PhysicalMemoryManager &) = delete;
   PhysicalMemoryManager &operator=(const PhysicalMemoryManager &) = delete;
+
+public:
 
   /** @return The singleton instance. */
   static PhysicalMemoryManager &the() {
@@ -123,3 +126,6 @@ public:
   /** @return Total free RAM in bytes. */
   size_t free_memory() const { return m_free_memory; }
 };
+
+} // namespace fkernel
+using fkernel::PhysicalMemoryManager;

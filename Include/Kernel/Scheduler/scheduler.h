@@ -14,9 +14,13 @@
 #include <Kernel/Scheduler/qos.h>
 #include <Kernel/Hardware/Cpu/processor.h>
 
+namespace fkernel {
+
 class SchedulerManager {
 private:
     SchedulerManager();
+    SchedulerManager(const SchedulerManager&) = delete;
+    SchedulerManager& operator=(const SchedulerManager&) = delete;
 
     fk::synchronization::Spinlock m_lock;
     fkernel::Processor m_processors[32];
@@ -84,3 +88,6 @@ public:
     void idle_loop();
     fk::CpuCount processor_count() const { return m_processor_count; }
 };
+
+} // namespace fkernel
+using fkernel::SchedulerManager;

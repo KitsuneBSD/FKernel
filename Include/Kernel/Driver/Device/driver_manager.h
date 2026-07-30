@@ -43,3 +43,4 @@ public:
 };
 
 } // namespace fkernel
+using fkernel::DriverManager;

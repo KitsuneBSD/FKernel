@@ -20,20 +20,17 @@ uint64_t sys_kill(uint64_t pid, uint64_t sig, uint64_t, uint64_t, uint64_t, uint
         return 0;
     }
 
-    auto target = SchedulerManager::the().find_task(fk::ProcessId(static_cast<uint64_t>(kpid)));
-    if (!target) {
-      fk::algorithms::kwarn("SIGNAL", "kill: target PID %ld not found", (int64_t)pid);
-      return -3;
-    }
-
-    fk::algorithms::kdebug("SIGNAL", "kill: sending signal %d to PID %ld", (int)sig, (int64_t)pid);
+    fk::algorithms::kdebug("SIGNAL", "kill: sending signal %d to TGID %ld", (int)sig, (int64_t)kpid);
 
     siginfo_t info{};
     info.si_signo = (int)sig;
     info.si_code  = SI_USER;
     info.si_pid   = SchedulerManager::the().current()->control.identity.id.value();
     info.si_uid   = SchedulerManager::the().current()->control.identity.uid;
-    fkernel::ipc::SignalDelivery::send_signal(target.get(), (int)sig, &info);
+    // Deliver to the thread group (any non-blocking thread, prefer leader)
+    fkernel::ipc::SignalDelivery::deliver_to_group((int)sig,
+                                                    fk::ProcessId(static_cast<uint64_t>(kpid)),
+                                                    &info);
     return 0;
 }
 

@@ -9,6 +9,13 @@
 #include <LibFK/Memory/new.h>
 #include <LibFK/Utilities/memory.h>
 
+extern "C" uint8_t __kernel_start[];
+extern "C" uint8_t __kernel_end[];
+extern "C" uint8_t __heap_start[];
+extern "C" uint8_t __heap_end[];
+extern "C" uint64_t __pmm_bitmap_start[];
+extern "C" uint64_t __pmm_bitmap_end[];
+
 PhysicalZone* PhysicalMemoryManager::create_zone(uintptr_t base, size_t length, ZoneType type,
                                                  uint64_t* bitmap_storage, size_t bitmap_bits) {
   assert(m_zone_count < MAX_PHYSICAL_ZONES);
@@ -87,12 +94,6 @@ void PhysicalMemoryManager::initialize() {
   // Initialize TopologyManager to discover NUMA layout
   fkernel::acpi::TopologyManager::the().initialize();
 
-  extern uint8_t __kernel_start[];
-  extern uint8_t __kernel_end[];
-  extern uint8_t __heap_start[];
-  extern uint8_t __heap_end[];
-  extern uint64_t __pmm_bitmap_start[];
-  extern uint64_t __pmm_bitmap_end[];
 
   uint64_t* bitmap_cursor = __pmm_bitmap_start;
   size_t bitmap_words_total = (__pmm_bitmap_end - __pmm_bitmap_start);

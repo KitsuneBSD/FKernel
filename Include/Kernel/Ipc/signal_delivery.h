@@ -10,6 +10,7 @@ namespace ipc {
 class SignalDelivery {
 public:
     static void send_signal(Task* target, int signum, const siginfo_t* info = nullptr);
+    static void deliver_to_group(int sig, fk::ProcessId tgid, const siginfo_t* info = nullptr);
     static void handle_pending_signals(Task* task, PtRegs* regs = nullptr,
                                        uint64_t orig_syscall = 0);
 

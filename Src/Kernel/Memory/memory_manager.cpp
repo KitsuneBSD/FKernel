@@ -23,8 +23,12 @@ extern "C" uint8_t __heap_start[];
 extern "C" uint8_t __heap_end[];
 
 void MemoryManager::initialize() {
-  assert(!m_is_initialized && "MemoryManager: Double initialization attempted!");
-  assert(boot::BootInfo::the().is_initialized() && "MemoryManager: BootInfo not initialized!");
+  if (m_is_initialized) {
+    fk::algorithms::kdebug("MEMORY", "MemoryManager::initialize() called twice — skipping");
+    return;
+  }
+  if (!boot::BootInfo::the().is_initialized())
+    fk::algorithms::kfatal("MEMORY", "BootInfo not initialized before MemoryManager");
 
   PhysicalMemoryManager::the().initialize();
   VirtualMemoryManager::the().initialize();

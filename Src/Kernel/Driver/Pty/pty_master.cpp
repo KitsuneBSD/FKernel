@@ -34,7 +34,7 @@ fk::core::Result<size_t, fk::core::Error>
 PtyMaster::read(uint64_t, size_t size, uint8_t* buf) {
   if (!buf || size == 0) return fk::core::Error::InvalidParameter;
   while (m_from_slave->is_empty())
-    m_from_slave->data_ready().wait();
+    TRY(m_from_slave->data_ready().wait_interruptible());
   return m_from_slave->read(buf, size);
 }
 

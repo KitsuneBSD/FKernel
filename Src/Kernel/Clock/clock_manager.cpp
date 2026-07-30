@@ -5,7 +5,7 @@
 
 void ClockManager::initialize() {
   select_and_configure_clock();
-  m_initialized = true;
+  m_is_initialized = true;
   fk::algorithms::klog("CLOCK_MANAGER", "Clock manager initialized.");
 }
 

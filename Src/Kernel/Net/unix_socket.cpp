@@ -105,7 +105,7 @@ fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> UnixSocket::accept() {
         return fk::RefPtr<Socket>(client.get());
       }
     }
-    m_accept_endpoint.wait();
+    TRY(m_accept_endpoint.wait_interruptible());
   }
 }
 

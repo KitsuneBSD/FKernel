@@ -7,11 +7,14 @@
 
 extern "C" {
 
-uint64_t sys_tgkill(uint64_t tgid, [[maybe_unused]] uint64_t tid, uint64_t sig,
+uint64_t sys_tgkill(uint64_t tgid, uint64_t tid, uint64_t sig,
                     uint64_t, uint64_t, uint64_t, [[maybe_unused]] PtRegs* regs) {
-  auto task = SchedulerManager::the().find_task(fk::ProcessId((uint64_t)tgid));
+  // tgkill(tgid, tid, sig): signal thread tid, verify it belongs to tgid
+  auto task = SchedulerManager::the().find_task(fk::ProcessId(tid));
   if (!task) return fkernel::return_error(fk::core::Error::NotFound);
-  if (sig > 0 && sig < 64) {
+  if (task->control.identity.tgid.value() != tgid)
+    return fkernel::return_error(fk::core::Error::NotFound);
+  if (sig > 0 && sig < NSIG) {
     siginfo_t info{};
     info.si_signo = (int)sig;
     info.si_code  = SI_TKILL;

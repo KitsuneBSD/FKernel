@@ -36,25 +36,34 @@ void VGATerminal::on_char(char c) {
   bool is_active = (TerminalManager::the().active_terminal() == this);
 
   // Control character signal delivery (ISIG)
-  if (!m_state.raw_mode && m_state.foreground_pgid > 0) {
+  if (m_state.isig_enabled && m_state.foreground_pgid > 0) {
     if (c == '\x03') { // Ctrl+C → SIGINT
+      fk::algorithms::kdebug("TTY", "SIGINT to pgrp %d (active=%d)", m_state.foreground_pgid, is_active);
       SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGINT);
       return;
     }
     if (c == '\x1C') { // Ctrl+\ → SIGQUIT
+      fk::algorithms::kdebug("TTY", "SIGQUIT to pgrp %d", m_state.foreground_pgid);
       SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGQUIT);
       return;
     }
     if (c == '\x1A') { // Ctrl+Z → SIGTSTP
+      fk::algorithms::kdebug("TTY", "SIGTSTP to pgrp %d", m_state.foreground_pgid);
       SchedulerManager::the().send_signal_to_pgrp(m_state.foreground_pgid, SIGTSTP);
       return;
     }
+  }
+
+  // Log ISIG miss: char 0x03 received but not delivered
+  if (c == '\x03' && m_state.isig_enabled && m_state.foreground_pgid <= 0) {
+    fk::algorithms::kdebug("TTY", "SIGINT dropped: no foreground_pgid (isig=%d pgid=%d)", m_state.isig_enabled, m_state.foreground_pgid);
   }
 
   // Ctrl+D (EOF): in canonical mode with empty line buffer, signal EOF to reader
   if (c == '\x04' && !m_state.raw_mode) {
     if (m_input_queue.is_empty()) {
       m_state.eof_pending = true;
+      m_read_endpoint.signal(fk::NotificationBits(1));
     }
     return;
   }
@@ -79,6 +88,7 @@ void VGATerminal::on_char(char c) {
       Display::the().flush();
     }
     m_input_queue.enqueue(c);
+    m_read_endpoint.signal(fk::NotificationBits(1));
     return;
   }
 
@@ -108,27 +118,36 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::read(uint64_t, size_t siz
   }
 
   if (m_state.raw_mode) {
-    while (m_input_queue.is_empty())
-      m_read_endpoint.wait();
-    buffer[0] = static_cast<uint8_t>(m_input_queue.dequeue());
-    return 1;
+    while (true) {
+      {
+        fk::synchronization::ScopedLockIRQ lock(m_lock);
+        if (!m_input_queue.is_empty()) {
+          buffer[0] = static_cast<uint8_t>(m_input_queue.dequeue());
+          return 1;
+        }
+      }
+      TRY(m_read_endpoint.wait_interruptible());
+    }
   }
 
   // Canonical mode: wait for full line
   while (true) {
-    if (m_state.eof_pending && m_input_queue.is_empty()) {
-      m_state.eof_pending = false;
-      return 0;
-    }
-    for (size_t i = 0; i < m_input_queue.size(); ++i) {
-      if (m_input_queue[i] == '\n') {
-        size_t to_copy = (i + 1 < size) ? (i + 1) : size;
-        for (size_t j = 0; j < to_copy; ++j)
-          buffer[j] = m_input_queue.dequeue();
-        return to_copy;
+    {
+      fk::synchronization::ScopedLockIRQ lock(m_lock);
+      if (m_state.eof_pending && m_input_queue.is_empty()) {
+        m_state.eof_pending = false;
+        return 0;
+      }
+      for (size_t i = 0; i < m_input_queue.size(); ++i) {
+        if (m_input_queue[i] == '\n') {
+          size_t to_copy = (i + 1 < size) ? (i + 1) : size;
+          for (size_t j = 0; j < to_copy; ++j)
+            buffer[j] = m_input_queue.dequeue();
+          return to_copy;
+        }
       }
     }
-    m_read_endpoint.wait();
+    TRY(m_read_endpoint.wait_interruptible());
   }
 }
 
@@ -148,7 +167,7 @@ fk::core::Result<size_t, fk::core::Error> VGATerminal::write(uint64_t, size_t si
     }
   }
 
-  fk::synchronization::ScopedLock lock(m_lock);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
   if (TerminalManager::the().active_terminal() != this) {
     fk::algorithms::kwarn("VGATERM", "write to inactive terminal tty%d (%zu bytes discarded)",
                           m_index, size);
@@ -289,7 +308,7 @@ void VGATerminal::set_line_drawing_mode(bool e) {
 }
 
 fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint64_t arg) {
-  fk::synchronization::ScopedLock lock(m_lock);
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   // Linux struct termios (x86_64 ABI: 4x uint32 + cc_t[19])
   struct linux_termios {
@@ -308,7 +327,7 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
     kt.c_cflag = 0xBF;  // B9600 | CS8
     if (m_state.echo_enabled) kt.c_lflag |= ECHO;
     if (!m_state.raw_mode)    kt.c_lflag |= ICANON;
-    kt.c_lflag |= ISIG;
+    if (m_state.isig_enabled) kt.c_lflag |= ISIG;
     kt.c_cc[4] = 1;  // VMIN
     kt.c_cc[5] = 0;  // VTIME
     if (fkernel::memory::copy_to_user(reinterpret_cast<void*>(arg), &kt, sizeof(kt)).is_error())
@@ -322,6 +341,7 @@ fk::core::Result<int, fk::core::Error> VGATerminal::ioctl(uint64_t request, uint
       return fk::core::Error::InvalidParameter;
     m_state.echo_enabled = (kt.c_lflag & ECHO)   != 0;
     m_state.raw_mode     = (kt.c_lflag & ICANON) == 0;
+    m_state.isig_enabled = (kt.c_lflag & ISIG)   != 0;
     return 0;
   }
   if (request == 0x5413 /* TIOCGWINSZ */) {

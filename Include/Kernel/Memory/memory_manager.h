@@ -10,6 +10,8 @@
 
 namespace fkernel { class IOMMU; }
 
+namespace fkernel {
+
 /**
  * @class MemoryManager
  * @brief Singleton class that coordinates virtual and physical memory managers.
@@ -124,3 +126,6 @@ public:
    */
   void heap_stats(size_t& total_out, size_t& free_out) const;
 };
+
+} // namespace fkernel
+using fkernel::MemoryManager;

@@ -23,7 +23,7 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64
         if (m_read_nonblock) {
             return fk::core::Error::WouldBlock;
         }
-        m_endpoint.wait();
+        TRY(m_endpoint.wait_interruptible());
         m_lock.lock();
     }
 
@@ -68,7 +68,8 @@ fk::core::Result<size_t, fk::core::Error> PipeNode::write([[maybe_unused]] uint6
             if (m_write_nonblock) {
                 return total_written > 0 ? fk::core::Result<size_t, fk::core::Error>(total_written) : fk::core::Error::WouldBlock;
             }
-            m_endpoint.wait();
+            auto r = m_endpoint.wait_interruptible();
+            if (r.is_error()) return r.error();
             m_lock.lock();
             continue;
         }

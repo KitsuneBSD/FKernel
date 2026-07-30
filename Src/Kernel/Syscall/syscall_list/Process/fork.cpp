@@ -99,21 +99,16 @@ uint64_t sys_fork([[maybe_unused]] uint64_t arg1, [[maybe_unused]] uint64_t arg2
   child->resources.context.fs_base = CPU::the().read_msr(MSR_FS_BASE);
   child->resources.context.gs_base = CPU::the().read_msr(MSR_KERNEL_GS_BASE);
 
-  // 3. Clone File Descriptors — install independent caps in child CSpace
+  // 3. Clone File Descriptors — independent caps in child CSpace, same rights as parent
   for (size_t i = 0; i < parent->resources.files.descriptors.size(); ++i) {
     auto desc = parent->resources.files.descriptors[i];
     child->resources.files.descriptors.push_back(desc);
     uint32_t child_handle = fkernel::ipc::INVALID_HANDLE;
-    if (desc && child->resources.ipc.cspace) {
-      fkernel::ipc::CapabilityRights rights = fkernel::ipc::CapabilityRights::All;
-      if (parent->resources.ipc.cspace && i < parent->resources.files.cap_handles.size()) {
-        uint32_t ph = parent->resources.files.cap_handles[i];
-        if (ph != fkernel::ipc::INVALID_HANDLE) {
-          auto pcap = parent->resources.ipc.cspace->get(ph);
-          if (pcap.is_valid()) rights = pcap.rights();
-        }
-      }
-      child_handle = child->resources.ipc.cspace->install_fd(desc.get(), rights);
+    if (desc && parent->resources.ipc.cspace && child->resources.ipc.cspace) {
+      uint32_t ph = (i < parent->resources.files.cap_handles.size())
+                       ? parent->resources.files.cap_handles[i]
+                       : fkernel::ipc::INVALID_HANDLE;
+      child_handle = parent->resources.ipc.cspace->clone_fd(*child->resources.ipc.cspace, ph);
     }
     child->resources.files.cap_handles.push_back(child_handle);
   }

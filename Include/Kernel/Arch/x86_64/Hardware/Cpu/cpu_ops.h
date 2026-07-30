@@ -21,7 +21,14 @@ void arch_enable_cpu_features(bool has_smep, bool has_smap, bool has_nx,
 
 [[noreturn]] void arch_halt_loop();
 
+void arch_cpu_idle();
 void arch_cpu_relax();
+
+uint64_t arch_read_tsc();
+uint64_t arch_read_tsc_serialized();
+
+void arch_fpu_save(void* area);
+void arch_fpu_restore(const void* area);
 
 void arch_disable_interrupts();
 void arch_enable_interrupts();

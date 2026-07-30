@@ -14,16 +14,14 @@
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
-#include <Kernel/Arch/x86_64/rdtsc.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <LibFK/Algorithms/chacha20.h>
 #include <LibFK/Algorithms/log.h>
 
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
 static uint64_t rdtsc_entropy_source() {
-  uint32_t lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return (static_cast<uint64_t>(hi) << 32) | lo;
+  return arch_read_tsc();
 }
 
 void init() {
@@ -74,6 +72,11 @@ void init() {
   }
 
   // Initialize Driver Framework
+  fk::algorithms::klog("INIT", "Initializing driver manager...");
+  fkernel::DriverManager::the().initialize();
+  if (!fkernel::DriverManager::the().is_initialized())
+    fk::algorithms::kfatal("INIT", "Driver manager failed to initialize");
+
   fk::algorithms::klog("INIT", "Probing all drivers...");
   auto& driver_manager = fkernel::DriverManager::the();
 

@@ -16,6 +16,7 @@ void TopologyManager::initialize() {
     } else {
         fk::algorithms::klog("TOPOLOGY", "SRAT table not found, system is UMA (Uniform Memory Access)");
     }
+    m_is_initialized = true;
 }
 
 void TopologyManager::parse_srat(SRATHeader* srat) {

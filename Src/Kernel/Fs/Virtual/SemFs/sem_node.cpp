@@ -29,7 +29,8 @@ int SemNode::wait() {
   m_lock.lock();
   while (m_count == 0) {
     m_lock.unlock();
-    m_endpoint.wait();
+    if (auto r = m_endpoint.wait_interruptible(); r.is_error())
+      return -EINTR;
     m_lock.lock();
   }
   --m_count;

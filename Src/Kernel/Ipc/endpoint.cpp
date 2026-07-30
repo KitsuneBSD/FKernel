@@ -270,6 +270,45 @@ fk::NotificationBits Endpoint::wait() {
   }
 }
 
+fk::core::Result<fk::NotificationBits, fk::core::Error> Endpoint::wait_interruptible() {
+  auto& scheduler = SchedulerManager::the();
+  Task* current = scheduler.current();
+
+  if (current && current->has_pending_signals())
+    return fk::core::Error::Interrupted;
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
+      return bits;
+    }
+
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    m_async_waiters.append(*current);
+    unboost_current_if_boosted();
+    scheduler.block_current_noqueue();
+  }
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
+      return bits;
+    }
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+    return fk::NotificationBits(0);
+  }
+}
+
 fk::NotificationBits Endpoint::wait_timeout(fk::TickCount timeout_ticks) {
   auto& scheduler = SchedulerManager::the();
   Task* current = scheduler.current();
@@ -298,6 +337,50 @@ fk::NotificationBits Endpoint::wait_timeout(fk::TickCount timeout_ticks) {
     fk::NotificationBits bits = m_pending_bits;
     m_pending_bits.clear_all();
     return bits;
+  }
+}
+
+fk::core::Result<fk::NotificationBits, fk::core::Error> Endpoint::wait_interruptible_timeout(fk::TickCount timeout_ticks) {
+  auto& scheduler = SchedulerManager::the();
+  Task* current = scheduler.current();
+
+  if (current && current->has_pending_signals())
+    return fk::core::Error::Interrupted;
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
+      return bits;
+    }
+
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+
+    m_async_waiters.append(*current);
+  }
+
+  scheduler.sleep_current(timeout_ticks);
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+    bool still_waiting = is_on_list(*current, &Task::wait_node) || m_async_waiters.first() == current;
+    if (still_waiting) {
+      m_async_waiters.remove(*current);
+      return fk::NotificationBits(0);
+    }
+    if (!m_pending_bits.is_empty()) {
+      fk::NotificationBits bits = m_pending_bits;
+      m_pending_bits.clear_all();
+      return bits;
+    }
+    if (current && current->has_pending_signals())
+      return fk::core::Error::Interrupted;
+    return fk::NotificationBits(0);
   }
 }
 

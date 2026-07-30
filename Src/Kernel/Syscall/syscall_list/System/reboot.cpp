@@ -51,7 +51,7 @@ static bool acpi_reboot() {
                        reset_reg.address, reset_value);
   write_acpi_register(reset_reg, reset_value);
 
-  for (uint32_t i = 0; i < 100000; ++i) asm volatile("pause" ::: "memory");
+  for (uint32_t i = 0; i < 100000; ++i) arch_cpu_relax();
   return false;
 }
 
@@ -71,7 +71,7 @@ static bool acpi_poweroff() {
       outw(static_cast<uint16_t>(pm1b_port), pm1_cnt);
     }
 
-    for (uint32_t i = 0; i < 100000; ++i) asm volatile("pause" ::: "memory");
+    for (uint32_t i = 0; i < 100000; ++i) arch_cpu_relax();
   }
   return false;
 }
@@ -86,7 +86,7 @@ static void do_poweroff() {
     FadtManager::the().get_reset_value(reset_value);
     fk::algorithms::klog("REBOOT", "Poweroff fallback: ACPI reset");
     write_acpi_register(reset_reg, reset_value);
-    for (uint32_t i = 0; i < 100000; ++i) asm volatile("pause" ::: "memory");
+    for (uint32_t i = 0; i < 100000; ++i) arch_cpu_relax();
   }
 
   fk::algorithms::klog("REBOOT", "Poweroff fallback: QEMU ISA debug port");

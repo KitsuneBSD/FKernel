@@ -159,16 +159,18 @@ void SchedulerManager::terminate_current(int status) {
       if (parent->control.lifecycle.vfork_waiting &&
           curr->control.lifecycle.vfork_parent_id == parent->control.identity.id) {
         parent->control.lifecycle.vfork_waiting = false;
+        wake_task(parent.get());
       }
 
       siginfo_t si{};
-      si.si_signo = SIGCHLD;
-      si.si_code  = 1;
-      si.si_pid   = curr->control.identity.id.value();
-      si.si_uid   = curr->control.identity.uid;
+      si.si_signo  = SIGCHLD;
+      si.si_code   = 1;
+      si.si_pid    = curr->control.identity.id.value();
+      si.si_uid    = curr->control.identity.uid;
       si.si_status = status;
-      fkernel::ipc::SignalDelivery::send_signal(parent.get(), SIGCHLD, &si);
-      wake_task(parent.get());
+      // Deliver SIGCHLD to the parent's thread group (not just the spawning thread)
+      fkernel::ipc::SignalDelivery::deliver_to_group(
+          SIGCHLD, parent->control.identity.tgid, &si);
     }
   }
 

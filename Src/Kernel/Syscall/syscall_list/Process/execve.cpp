@@ -1,6 +1,7 @@
 #include "Kernel/Hardware/Cpu/cpu_block.h"
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Ipc/cspace.h>
+#include <Kernel/Ipc/signal_delivery.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
@@ -119,6 +120,20 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
     node = sh_res.value()->node();
   }
 
+  // execve in a multi-threaded process: terminate all sibling threads first
+  {
+    auto self_tgid = task->control.identity.tgid;
+    auto self_pid  = task->control.identity.id;
+    uint64_t max_pid = SchedulerManager::the().last_pid().value();
+    for (uint64_t probe = 1; probe <= max_pid; ++probe) {
+      if (fk::ProcessId(probe) == self_pid) continue;
+      auto sibling = SchedulerManager::the().find_task(fk::ProcessId(probe));
+      if (!sibling) continue;
+      if (sibling->control.identity.tgid != self_tgid) continue;
+      fkernel::ipc::SignalDelivery::send_signal(sibling.get(), SIGKILL);
+    }
+  }
+
   // 2. Load the new binary into a fresh address space
   uintptr_t old_cr3 = task->resources.memory.cr3;
   uintptr_t new_cr3 = VirtualMemoryManager::the().create_address_space();
@@ -157,15 +172,15 @@ uint64_t sys_execve(uint64_t path_ptr, uint64_t argv_ptr, uint64_t envp_ptr, uin
   task->set_heap_regions(elf_res.highest_load_end, elf_res.highest_load_end);
   task->set_mmap_regions(0x40000000, 0x40000000);
 
-  // 2.4 POSIX: Reset caught signal handlers to SIG_DFL across exec.
-  //     SIG_IGN handlers are preserved per POSIX. SIG_DFL (0) stays as-is.
+  // POSIX: Reset caught signal handlers to SIG_DFL across exec.
+  //        SIG_IGN handlers are preserved. Signal mask is preserved (not cleared).
   for (int i = 1; i < NSIG; ++i) {
     if (task->resources.ipc.signals.actions[i].sa_handler != SIG_IGN) {
       fk::memory::set(&task->resources.ipc.signals.actions[i], 0,
                        sizeof(struct sigaction));
     }
   }
-  task->resources.ipc.signals.blocked = 0;
+  task->resources.ipc.signals.pending = 0;
 
   // 2.5 Setup TLS if PT_TLS is present (x86-64 variant II)
   uint64_t tls_fs_base = 0;

@@ -14,6 +14,7 @@ namespace terminal {
 struct TerminalState {
     bool raw_mode{false};
     bool echo_enabled{true};
+    bool isig_enabled{true};
     bool line_drawing_mode{false};
     bool eof_pending{false};
     size_t line_chars{0};

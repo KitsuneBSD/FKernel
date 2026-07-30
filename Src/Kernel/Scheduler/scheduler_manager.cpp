@@ -10,6 +10,7 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Driver/Vga/display.h>
 #include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
@@ -24,8 +25,6 @@
 using namespace fkernel::scheduler;
 
 extern "C" void switch_context(uint64_t* prev_stack_ptr, uint64_t next_stack_ptr);
-extern "C" uint8_t g_use_xsave;
-extern "C" size_t g_xsave_area_size;
 extern "C" void trampoline_start();
 extern "C" void trampoline_end();
 extern "C" uint64_t stack_bottom;
@@ -37,8 +36,6 @@ SchedulerManager::SchedulerManager() {
 }
 
 void SchedulerManager::initialize() {
-  m_is_initialized = true;
-
   if (ACPIManager::the().is_initialized()) {
     uint32_t detected = ACPIManager::the().cpu_count();
     m_processor_count = fk::CpuCount((detected > 0) ? detected : 1);
@@ -57,6 +54,7 @@ void SchedulerManager::initialize() {
   m_next_pid = 2;
   fk::algorithms::klog("SCHEDULER", "MLFQ Scheduler initialized (%d levels, %d CPUs)",
                        MLFQ_LEVELS, m_processor_count.value());
+  m_is_initialized = true;
 }
 
 Task* SchedulerManager::steal_task(fk::CpuCount stealing_cpu) {
@@ -191,13 +189,7 @@ void SchedulerManager::schedule() {
   // Lazy FPU: save outgoing task's FPU state if it currently owns the FPU registers.
   if (prev_task && prev_task == current_processor().last_fpu_task) {
     void* area = get_fpu_save_area(prev_task->resources.context);
-    if (g_use_xsave) {
-      uint32_t mask_lo = 0xFFFFFFFFu, mask_hi = 0xFFFFFFFFu;
-      asm volatile("xsave64 %0" : "=m"(*static_cast<uint8_t*>(area))
-                   : "a"(mask_lo), "d"(mask_hi) : "memory");
-    } else {
-      asm volatile("fxsave %0" : "=m"(*static_cast<uint8_t*>(area)) :: "memory");
-    }
+    arch_fpu_save(area);
   }
 
   if (prev_task) {
@@ -272,7 +264,7 @@ void SchedulerManager::start_aps() {
 
 void SchedulerManager::idle_loop() {
   for (;;) {
-    asm volatile("sti; hlt");
+    arch_cpu_idle();
     schedule();
   }
 }

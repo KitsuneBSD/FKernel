@@ -102,3 +102,11 @@ static inline uint32_t inl(uint16_t port) {
 static inline void invlpg(uintptr_t virt) {
     asm volatile("invlpg (%0)" :: "r"(virt) : "memory");
 }
+
+// arch_* aliases for port I/O — use these in portable generic code
+static inline uint8_t  arch_inb(uint16_t port)  { return inb(port); }
+static inline void     arch_outb(uint16_t port, uint8_t v)  { outb(port, v); }
+static inline uint16_t arch_inw(uint16_t port)  { return inw(port); }
+static inline void     arch_outw(uint16_t port, uint16_t v) { outw(port, v); }
+static inline uint32_t arch_inl(uint16_t port)  { return inl(port); }
+static inline void     arch_outl(uint16_t port, uint32_t v) { outl(port, v); }

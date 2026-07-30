@@ -7,12 +7,16 @@
 #include <Kernel/Clock/Types/datetime.h>
 #include <Kernel/Clock/Types/clock.h>
 
+namespace fkernel {
+
 class ClockManager {
 private:
   Clock *m_clock = nullptr;
-  bool m_initialized = false;
+  bool m_is_initialized = false;
 
   ClockManager() = default;
+  ClockManager(const ClockManager &) = delete;
+  ClockManager &operator=(const ClockManager &) = delete;
 
 public:
   static ClockManager &the() {
@@ -20,7 +24,7 @@ public:
     return inst;
   }
 
-  bool is_initialized() const { return m_initialized; }
+  bool is_initialized() const { return m_is_initialized; }
 
   void initialize();
 
@@ -28,11 +32,12 @@ public:
   DateTime datetime();
 
   void set_memory_manager(bool has_memory_manager) {
-    // Currently no clocks depend on memory manager, but this is for future
-    // proofing
     (void)has_memory_manager;
   }
 
 private:
   void select_and_configure_clock();
 };
+
+} // namespace fkernel
+using fkernel::ClockManager;

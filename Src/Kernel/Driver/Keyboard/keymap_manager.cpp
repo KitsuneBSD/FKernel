@@ -22,6 +22,11 @@ KeymapManager& KeymapManager::the() {
     return instance;
 }
 
+void KeymapManager::initialize() {
+    m_is_initialized = true;
+    fk::algorithms::klog("KEYMAP", "KeymapManager initialized (layout=%d)", (int)m_current_layout);
+}
+
 void KeymapManager::set_layout(KeyboardLayout layout) {
     m_current_layout = layout;
     m_dead_key = 0;
@@ -238,10 +243,10 @@ char KeymapManager::translate(uint8_t keycode, bool shift, bool alt, bool ctrl) 
 
     // Ctrl modifier: produce control characters for letters and special keys
     if (ctrl) {
-        // Ctrl+A through Ctrl+Z → \x01 through \x1A (scancodes 0x1E..0x39)
-        if (keycode >= 0x1E && keycode <= 0x39) {
-            return static_cast<char>(keycode - 0x1E + 1);
-        }
+        uint8_t raw = m_map_normal[keycode];
+        // Ctrl+A through Ctrl+Z → \x01 through \x1A
+        if ((raw >= 'a' && raw <= 'z') || (raw >= 'A' && raw <= 'Z'))
+            return static_cast<char>(raw & 0x1F);
         // Ctrl+[ → \x1B (ESC), Ctrl+\ → \x1C, Ctrl+] → \x1D
         if (keycode == 0x1A) return '\x1B';
         if (keycode == 0x2B) return '\x1C';
