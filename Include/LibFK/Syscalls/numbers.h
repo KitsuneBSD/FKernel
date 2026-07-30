@@ -156,6 +156,7 @@ enum SyscallNumber : uint64_t {
   SYS_PIPE2 = 293,
   SYS_DUP3 = 292,
   SYS_CHROOT = 161,
+  SYS_PIVOT_ROOT = 155,
   SYS_OPENAT = 257,
   SYS_MKDIRAT = 258,
   SYS_MKNODAT = 259,
@@ -200,6 +201,7 @@ enum SyscallNumber : uint64_t {
   SYS_TIMERFD_GETTIME = 287,
   SYS_SIGNALFD4 = 289,
   SYS_EVENTFD2 = 290,
+  SYS_UTIMENSAT = 280,
   SYS_ACCEPT4 = 288,
   SYS_MAX = 512
 };

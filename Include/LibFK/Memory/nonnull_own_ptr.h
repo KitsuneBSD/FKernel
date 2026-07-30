@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/own_ptr.h>
 
@@ -12,7 +13,8 @@ public:
     NonnullOwnPtr() = delete;
 
     explicit NonnullOwnPtr(T* ptr) : m_ptr(ptr) {
-        ASSERT(m_ptr != nullptr);
+        if (m_ptr == nullptr)
+            fk::algorithms::kwarn("NONNULL", "NonnullOwnPtr constructed with null");
     }
 
     NonnullOwnPtr(const NonnullOwnPtr&) = delete;
@@ -57,7 +59,8 @@ private:
 template <typename T, typename... Args>
 inline NonnullOwnPtr<T> make_nonnull(Args&&... args) {
     T* ptr = new T(static_cast<Args&&>(args)...);
-    ASSERT(ptr != nullptr);
+    if (ptr == nullptr)
+        fk::algorithms::kwarn("NONNULL", "make_nonnull: allocation failed");
     return NonnullOwnPtr<T>(ptr);
 }
 

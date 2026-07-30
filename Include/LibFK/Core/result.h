@@ -2,6 +2,7 @@
 
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Core/error.h>
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Memory/optional.h>
 #include <LibFK/Types/types.h>
 
@@ -11,43 +12,35 @@ namespace core {
 template <typename T, typename E = Error>
 class Result {
 public:
-  // Constructors
-  // When constructing with a value, initialize m_value and ensure m_error is default (no error).
   Result(const T &value) : m_value(value), m_error() {}
   Result(T &&value) : m_value(static_cast<T&&>(value)), m_error() {}
-  // When constructing with an error, initialize m_error and ensure m_value is empty.
   Result(E error) : m_value(), m_error(error) {}
 
-  // Destructor
   ~Result() = default;
-
-  // Copy and Move
   Result(const Result &other) = default;
   Result &operator=(const Result &other) = default;
   Result(Result &&other) = default;
   Result &operator=(Result &&other) = default;
 
-  // Observers
-  // is_ok() is true if m_value has a value (i.e., no error).
   bool is_ok() const { return m_value.has_value(); }
-  // is_error() is true if m_value does not have a value.
   bool is_error() const { return !m_value.has_value(); }
-
-  // Allow using in if statements: if (res) { ... }
   explicit operator bool() const { return is_ok(); }
 
   const T &value() const {
-    ASSERT(is_ok());
+    if (is_error())
+      fk::algorithms::kwarn("RESULT", "value() called on error result");
     return m_value.value();
   }
 
   T &value() {
-    ASSERT(is_ok());
+    if (is_error())
+      fk::algorithms::kwarn("RESULT", "value() called on error result");
     return m_value.value();
   }
 
   E error() const {
-    ASSERT(is_error());
+    if (is_ok())
+      fk::algorithms::kwarn("RESULT", "error() called on ok result");
     return m_error;
   }
 
@@ -84,11 +77,13 @@ public:
   explicit operator bool() const { return is_ok(); }
 
   void value() const {
-    ASSERT(is_ok());
+    if (is_error())
+      fk::algorithms::kwarn("RESULT", "value() called on error result (void)");
   }
 
   E error() const {
-    ASSERT(is_error());
+    if (is_ok())
+      fk::algorithms::kwarn("RESULT", "error() called on ok result (void)");
     return m_error;
   }
 

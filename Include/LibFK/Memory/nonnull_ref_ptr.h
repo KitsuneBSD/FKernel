@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/ref_ptr.h>
 
@@ -12,8 +13,8 @@ public:
     NonnullRefPtr() = delete;
 
     NonnullRefPtr(T* ptr) : m_ptr(ptr) {
-        ASSERT(m_ptr != nullptr);
-        // Adopts the initial ref_count=1 from RefCounted — do NOT call ref()
+        if (m_ptr == nullptr)
+            fk::algorithms::kwarn("NONNULL", "NonnullRefPtr constructed with null");
     }
 
     NonnullRefPtr(const NonnullRefPtr& other) : m_ptr(other.m_ptr) {

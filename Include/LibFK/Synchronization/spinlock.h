@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Algorithms/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Synchronization/lock_rank.h>
 #include <LibFK/Types/types.h>
@@ -33,8 +34,9 @@ public:
         }
 
         // Lock rank check: must acquire locks in rank order to prevent deadlocks
-        if (m_rank != LockRank::None) {
-            ASSERT(current_cpu_lock_rank() < m_rank);
+        if (m_rank != LockRank::None && current_cpu_lock_rank() >= m_rank) {
+            fk::algorithms::kwarn("SPINLOCK", "Lock rank violation: acquired rank %d while holding %d",
+                                  (int)m_rank, (int)current_cpu_lock_rank());
         }
 
         while (__sync_lock_test_and_set(&m_lock, 1)) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
+#include <LibFK/Utilities/memory.h>
 
 namespace fk {
 namespace algorithms {
@@ -16,7 +17,7 @@ static inline size_t gather_copy(const IoVec* iov, size_t iovcnt, uint8_t* out) 
   size_t offset = 0;
   for (size_t i = 0; i < iovcnt; ++i) {
     if (!iov[i].base || iov[i].len == 0) continue;
-    __builtin_memcpy(out + offset, iov[i].base, iov[i].len);
+    fk::memory::copy(out + offset, iov[i].base, iov[i].len);
     offset += iov[i].len;
   }
   return offset;
