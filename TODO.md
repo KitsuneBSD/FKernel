@@ -220,7 +220,7 @@ que faltam para delegar hardware a um processo.
 |---|-----------|-----------|----------|------|
 | 1 | Interrupção → Endpoint | `IrqBinding` object: ISR faz `endpoint->signal(bits)` em vez de C-handler. `sys_bind_irq(vector, ep_handle)` + `CapabilityType::Irq` | `irq_binding.h/cpp`, `capability.h`, `endpoint.h`, syscall list | 3 |
 | 2 | mmap físico userspace | Nova flag `MAP_PHYSICAL`: mapeia `(phys_addr, size)` com `PageFlags::User`, `CacheDisabled` para BARs PCI | ✅ `mmap.cpp` — MAP_PHYSICAL=0x100; offset=phys_addr, fd=-1; maps N pages with CacheDisabled | 1 |
-| 3 | PCI config space userspace | `ioctl(PIOC_READ_CONFIG/PIOC_WRITE_CONFIG)` em `/dev/pci` ou `/dev/pci/<BDF>` | `pci_node.h/cpp` | 1 |
+| 3 | PCI config space userspace | `ioctl(PIOC_READ_CONFIG/PIOC_WRITE_CONFIG)` em `/dev/pci` ou `/dev/pci/<BDF>` | `pci_node.h/cpp` | ✅ Done — `PIOC_READ_CONFIG=0x5001`, `PIOC_WRITE_CONFIG=0x5002`; `PiocConfigOp{bus,dev,fn,width,offset,value}` via `copy_from/to_user`; 1/2/4-byte widths, offset 0–255 |
 | 4 | DMA compartilhável | `DmaShm` estende `SharedMemory` com alocação contígua (`alloc_contiguous`); mapeia no userspace com CacheDisabled | `dma_shm.h/cpp`, `shared_memory.h` | 2–3 |
 
 ### 40b — Userspace Driver Protocol (3–5 days) — MEDIUM
