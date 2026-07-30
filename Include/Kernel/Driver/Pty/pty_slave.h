@@ -2,6 +2,7 @@
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Pty/pty_buffer.h>
+#include <Kernel/Driver/Pty/pty_line_discipline.h>
 #include <LibFK/Memory/ref_ptr.h>
 
 namespace fkernel {
@@ -12,7 +13,7 @@ namespace fkernel {
 class PtySlave final : public CharacterDevice {
 public:
   PtySlave(fk::RefPtr<PtyBuffer> from_master, fk::RefPtr<PtyBuffer> to_master,
-           uint32_t index);
+           uint32_t index, PtyLineDiscipline* ldisc = nullptr);
   virtual ~PtySlave() override = default;
 
   fk::core::Result<size_t, fk::core::Error>
@@ -33,6 +34,7 @@ public:
 private:
   fk::RefPtr<PtyBuffer> m_from_master;
   fk::RefPtr<PtyBuffer> m_to_master;
+  PtyLineDiscipline* m_ldisc{nullptr};
 };
 
 } // namespace fkernel

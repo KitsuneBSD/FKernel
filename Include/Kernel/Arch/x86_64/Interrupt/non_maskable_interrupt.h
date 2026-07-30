@@ -19,7 +19,7 @@ public:
    * Logs a message indicating that NMIs are enabled.
    */
   static void enable_nmi() {
-    arch_outb(0x70, arch_inb(0x70) & 0x7F);
+    outb(0x70, inb(0x70) & 0x7F);
     fk::algorithms::klog("NMI", "Non maskable interrupt enabled");
   }
 
@@ -32,8 +32,8 @@ public:
    * Logs a message indicating that NMIs are disabled.
    */
   static void disable_nmi() {
-    arch_outb(0x70, arch_inb(0x70) | 0x80);
-    arch_inb(0x71); // Flush CMOS
+    outb(0x70, inb(0x70) | 0x80);
+    inb(0x71); // Flush CMOS
     fk::algorithms::klog("NMI", "Non maskable interrupt disabled");
   }
 };

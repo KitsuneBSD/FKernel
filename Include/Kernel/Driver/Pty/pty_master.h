@@ -32,12 +32,16 @@ public:
     return r;
   }
 
+  int foreground_pgid() const { return m_foreground_pgid; }
+  void set_foreground_pgid(int pgid) { m_foreground_pgid = pgid; }
+
 private:
   fk::RefPtr<PtyBuffer> m_to_slave;
   fk::RefPtr<PtyBuffer> m_from_slave;
   PtyLineDiscipline m_ldisc;
   uint16_t m_rows{24};
   uint16_t m_cols{80};
+  int m_foreground_pgid{0};
 };
 
 }

@@ -36,26 +36,4 @@ void arch_smap_end();
 
 void detect_tsc_frequency();
 
-uint64_t arch_read_tsc();
-uint64_t arch_read_tsc_serialized(); // LFENCE + RDTSC
-
-// CPU idle (sti + hlt — re-enables interrupts and halts until next interrupt)
-void arch_cpu_idle();
-
-// FPU context save/restore (uses XSAVE or FXSAVE depending on g_use_xsave)
-void arch_fpu_save(void* area);
-void arch_fpu_restore(const void* area);
-
-// Memory — CR3 and TLB
-void arch_write_cr3(void* pml4_virt_addr);
-uintptr_t arch_read_cr3();
-int arch_invlpg(uintptr_t addr);
-
-// Segments — GDT and TSS
-void arch_flush_gdt(void* gdtr);
-void arch_flush_tss(uint16_t tss_selector);
-
-// Interrupt — IDT
-void arch_flush_idt(void* idtr);
-
 } // extern "C"
