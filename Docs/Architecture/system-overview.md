@@ -51,8 +51,8 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 ## Project Status
 
 **Kernel Completion**: ~70% — POSIX-compatible x86_64 hobby kernel, boots to MockOS test harness with BusyBox 1.36.1 (~60 applets, ~40 fully functional)
-**POSIX Compliance**: ~60% (199/450+ syscalls, ELF dynamic linking, real-time scheduling, all major FS families)
-**Immediate Priority**: IPC Capability Integration (Phase 27 — route POSIX mechanisms through CSpace/Endpoint)
+**POSIX Compliance**: ~60% (207 implemented syscall handlers, ELF dynamic linking, real-time scheduling, major FS families)
+**Immediate Priority**: Kernel test coverage (Phase 43 — 10 kernel test files so far, target 75% of critical paths)
 **Long-term Goal**: Full POSIX compliance for a well-designed hobby kernel
 
 > **Note**: FKernel is a **kernel**, not an operating system. MockOS is a test harness for validating POSIX syscall compatibility, not a userspace OS. BusyBox, musl, and OpenRC are validation tools, not the project's "userspace."
@@ -78,7 +78,7 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 ### 4. Hardware Compatibility
 - ACPI-driven discovery (HPET, MCFG/ECAM, MADT)
 - PCI driver matching (class/subclass based)
-- Supports real hardware, not just QEMU
+- Supports real hardware, not just QEMU — with caveats: ATA DMA, E1000, PS/2 verified on real hardware; **NVMe limited to 4 KiB transfers (no PRP2)**, **AHCI async DMA stalled**, **VBE real-mode bridge is a placeholder** (framebuffer via Multiboot2 only). IOMMU VT-d parses DMAR but does not translate (3/3 methods `NotImplemented`).
 
 ## Key Domains
 
@@ -88,7 +88,7 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 - **Hardware**: CPU, ACPI, PCI, APIC/IOAPIC, MSI-X
 - **Filesystem**: VFS (BSD-style dentry/vnode/mount), Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS, TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd
 - **Drivers**: Storage (ATA/AHCI/NVMe), Network (E1000), PS/2 mouse, Serial, PTY, USB (headers)
-- **Syscalls**: POSIX-compatible Linux x86_64 interface (199 registered syscalls)
+- **Syscalls**: POSIX-compatible Linux x86_64 interface (207 registered syscalls)
 
 ### Networking (Full Stack)
 - **E1000**: MMIO, RX/TX rings, MAC
@@ -97,11 +97,13 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 - **Advanced**: TCP sliding window, retransmit with exponential backoff, routing table, DHCP client, DNS resolver
 
 ### Security & Isolation
-- **Capabilities**: seL4-style fine-grained rights (send/receive/manage) via CSpace + generation-based revocation. Used by raw `sys_ipc_*` syscalls. POSIX mechanisms use `Notification` directly — capability integration (Phase 27) pending.
+- **Capabilities**: seL4-style fine-grained rights (send/receive/manage) via CSpace + generation-based revocation. Used by raw `sys_ipc_*` syscalls. Phase 27 implemented: POSIX FDs install as CSpace capabilities (`Task::add_file_descriptor` → `CSpace::install_fd`, per-FD rights derived from open flags; revoke on close/dup2).
 - **IPC**: Endpoint (synchronous rendezvous), Notification (async bitmask + payload queue), SharedMemory (page-level). SCM_RIGHTS and SCM_CREDENTIALS via sendmsg/recvmsg. PipeNode, EventFd, Semaphore, Mqueue, Epoll/KQueue, SignalFd all use Notification embedded members.
 - **Kernel Events**: EVFILT_PROC, EVFILT_SIGNAL, EVFILT_TIMER in kqueue.
-- **ELF Security**: ASLR (ChaCha20PRNG, 30-bit), NX, SMEP, SMAP, W^X enforcement, RELRO (all segments), TLS, dynamic linking.
+- **ELF Security**: ASLR (ChaCha20 CSPRNG, 30-bit), NX, SMEP, SMAP, W^X enforcement, RELRO (all segments), TLS, dynamic linking.
 - **Memory**: NX pages, user/kernel isolation, SMAP/SMEP enabled, CoW fork (`clone_table_recursive`), demand paging (`handle_demand_paging`).
+
+> **Known security gaps**: KPTI (Meltdown mitigation) not implemented; IOMMU (VT-d) parses DMAR but does not translate DMA; ASLR entropy comes from the CSPRNG (seeded via RDTSC) — no RDRAND/other hardware entropy sources yet.
 
 ## Design Patterns
 

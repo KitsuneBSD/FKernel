@@ -4,10 +4,168 @@
 
 ---
 
+## Status sync + ASLR entropy fix ✅ (session 23)
+
+- `Src/Kernel/Loader/Domains/parser_domain.cpp`: `aslr_random_base()` agora usa `ChaCha20PRNG` (CSPRNG seeded em `init.cpp`) em vez de `TickManager::get_ticks()`. Corrige também bug de entropia: `(seed & 0x0FFFF000)` limitava o range efetivo do ASLR a 1 MiB (~14 bits) em vez de 1.5 GiB. Removido include arch-específico `tick_manager.h` do loader genérico (portabilidade Phase 42).
+- Docs sincronizados com a realidade do código (verificado por grep/read em 2026-07-31):
+  - TODO.md: syscalls → **207 registrados** (214 definidos na enumeração `SyscallNumber`); Phase 27 (fd→CSpace) DONE; UDP `sendto`/`recvfrom` reais (não stub); LVM/RAID implementados mas órfãos; alguns `.cpp` NVMe documentados como scaffolding.
+  - system-overview.md: 199 → 207 syscalls; Phase 27 pending → done; notas honestas sobre NVMe PRP2 / AHCI async / KPTI / IOMMU.
+  - ROADMAP.md: Phase 27 marcado como concluído (referência histórica mantida).
+
+---
+
+## Syscall handlers split — one handler per file ✅ (session 22)
+
+- `Src/Kernel/Syscall/syscall_list/`: refactored so each file defines **at most one** `sys_*` handler; file name = handler name minus the `sys_` prefix (shared support files with zero handlers are allowed, e.g. `Time/posix_timer.cpp`). ~50+ per-handler files added across the 11 domain directories.
+- `Meta/x86_64-tools/check_one_syscall_per_file.lua` (NEW): enforces the one-handler-per-file rule; wired as `xmake check-syscalls`.
+- `Include/Kernel/Syscall/posix_timer.h` (NEW): unified `PosixTimer` struct replacing the scheduler's private `PosixTimerEntry`; single definition in `Src/Kernel/Syscall/syscall_list/Time/posix_timer.cpp`. `scheduler_lifecycle.cpp` now includes `<Kernel/Syscall/posix_timer.h>`.
+- `Src/Kernel/Syscall/syscall.cpp`: newly registered `sys_utimes` (SYS_UTIMES=235) and `sys_futimesat` (SYS_FUTIMESAT=261); `sys_newfstatat` registration now uses the `SYS_NEWFSTATAT` constant (=262) instead of the raw number.
+
+---
+
+## Boot crash fix — BuddyState::remove() HHDM guard ✅ (session 21)
+
+- **`Src/Kernel/Memory/PhysicalMemory/Buddy/buddy_state.cpp`**: `BuddyState::remove()` now checks `m_free_lists[idx] == nullptr` before dereferencing `KERNEL_VIRT_BASE + phys`.
+
+Root cause: `alloc_page_internal()` → `buddy.invalidate_page()` → `BuddyState::remove()` is called during VMM initialization (before `extend_direct_map()` maps the HHDM). At that point all buddy lists are `nullptr` (populated only by `reconcile_buddies()` which runs after `extend_direct_map()`). The HHDM access caused a Not Present page fault at `0xffff800001000000`. The null-list guard makes `remove()` return `false` immediately without HHDM access when the buddy is empty, which is always semantically correct — an empty list cannot contain the block.
+
+---
+
+## x86_64 Audit Bugs 21–36 ✅ (session 21)
+
+### 🔴 Critical
+
+- **Bug 21** (`x2apic.h/cpp`, `ap_entry.cpp`): Added `X2APIC::initialize_on_ap()` — sets `IA32_APIC_BASE[10:11]` and enables SVR per SDM §10.12.5.1. `ap_entry` now calls it before any x2APIC MSR access.
+- **Bug 22** (`bss.asm`): Expanded per-CPU stack BSS from 64 KiB (4 slots) to 512 KiB (32 slots × 16 KiB). AP≥4 no longer overflows into heap.
+- **Bug 23** (`tss_stacks.h`, `gdt.cpp`): IST array reshaped to `[MAX_CPUS][7][IST_STACK_SIZE]`; `fill_tss_impl` now indexes as `ist_stacks[cpu_index][i]`. `set_kernel_stack` reads `get_current_cpu_id()` to update the correct CPU's TSS `rsp0`.
+- **Bug 24** (`syscall_stub.asm`): Moved `swapgs` + user-context save + kernel RSP load to **before** the `cmp rax,512` bounds check. `invalid_syscall_handler` now runs entirely on the kernel stack.
+
+### 🟠 High
+
+- **Bug 25** (`ap_entry.cpp`): `CPU::the().initialize_features()` called on every AP before timer init — enables SMEP/SMAP/NX/OSXSAVE/XSAVE on all cores.
+- **Bug 26** (`pit.h/cpp`, `tick_manager.cpp`): Added `PITTimer::pit_wait_ms(ms)` that polls PIT channel 2 (no IRQ, no busy-count guess). Pre-scheduler `TickManager::sleep` now delegates to it instead of `loops_per_ms=200000`.
+- **Bug 27** (`pit.h/cpp`, `timer_interrupt.cpp`): Added `PITTimer::disable()` — puts channel 0 in one-shot mode with count=0, silencing periodic IRQ0. Called automatically by `TimerManager` when switching away from PIT.
+
+### 🟡 Medium
+
+- **Bug 28** (`syscall_init.cpp`): SFMASK corrected from `0x4700` to `0x47700` — now also clears AC (bit 18), preventing user-controlled SMAP bypass.
+- **Bug 29** (`pf_handler.cpp`, `vesa.cpp`): `kerror()` → `kwarn()` in recoverable paths; user-mode PF now calls `terminate_current` without halting the kernel; VESA mode-set failure returns `IOError` without panic.
+- **Bug 30** (`x2apic.cpp`): `wait_ipi_delivery` now polls ICR bit 12 (Delivery Status) per SDM §10.6.1 instead of a single `pause`.
+- **Bug 31** (`msi_helpers.cpp`): MSI vector pool start raised from `0x40` to `0x60` — leaves 0x20–0x5F for up to 64 IOAPIC GSIs without collision.
+
+### ⚪ Low
+
+- **Bug 32** (`tick_manager.cpp`): `increment_ticks` uses `__sync_add_and_fetch` — now SMP-safe.
+- **Bug 33** (`write_on_cr3.asm`): Removed unconditional `cli/sti` around CR3 write — CR3 is atomic; `sti` was breaking callers with IF=0.
+- **Bug 34** (`setup_page_tables.asm`): `enable_paging` now sets `EFER.NXE` (bit 11) alongside `EFER.LME` — NX protection active from the first kernel page table.
+- **Bug 36** (`syscall_stub.asm`, `syscall_init.cpp`): Removed dead BSS symbols `syscall_user_rsp` / `syscall_kernel_stack`; removed the `extern` reference and sync write from `syscall_init.cpp`.
+
+---
+
+## Phase 43b (partial) — Dentry cache tests ✅ (session 20)
+
+- `tests/Kernel/test_dentry.cpp` (NEW): 9 tests covering `Dentry::create()`, `get_path()`, `lookup(".", "..")`, `add_child()` + cache hit, missing entry returns `NotFound`
+- `tests/Kernel/stubs/vfs_stubs.cpp` (NEW): `current_mount_namespace() → nullptr` + linker stubs for `MountNamespace::get_stack/ensure_stack` (unreachable branches in dentry.cpp)
+- `tests/test_mock.cpp` (NEW): C++ stubs for `fk::memory::allocate/reallocate/free` that forward to `kmalloc/krealloc/kfree` from `test_mock.c`; enables `fk::make_ref<Dentry>` in host builds
+- `Include/LibC/string.h`: moved `strncat` outside the `__STDC_HOSTED__` guard (it has no const-returning C++ overload so cannot conflict)
+- `xmake.lua`: added `test_dentry.cpp`, `dentry.cpp`, `dentry_node_stack.cpp`, `node.cpp`, `djb2.cpp`, `vfs_stubs.cpp`, `test_mock.cpp` to Test target
+
+---
+
+## Phase 43e (partial) — Scheduler QoS tests ✅ (session 20)
+
+- `tests/Kernel/test_qos.cpp` (NEW): 14 tests for `qos_level()`, `priority_for_qos()` (including clamping), `allotment_for_qos()`, `quantum_for_level()` (including overflow clamp), `nice_to_priority_offset()`, `qos_from_linux_policy()`, `linux_policy_from_qos()` — all pure computation, no Task/scheduler state needed
+- `xmake.lua`: added `test_qos.cpp` and `Src/Kernel/Scheduler/Qos/qos.cpp` to Test target
+
+---
+
+## Phase 39a — Bitmap alloc hint ✅ (session 19)
+
+- `Include/LibFK/Container/bitmap.h`:
+  - Added `m_alloc_hint{0}` (word index to start scan from)
+  - `alloc()` now two-pass: starts at `m_alloc_hint`, wraps to word 0 if needed — O(1) amortized
+  - `set(idx, false)` regresses hint when freeing a word before current hint
+  - `clear_all()` resets hint to 0
+- `tests/LibFK/test_bitmap_unordered_set.cpp`: 3 new tests — `hint_cross_word`, `hint_regresses_on_free`, `hint_wraparound`
+
+---
+
+## Phase 39f — KQueue O(R) → O(1) ✅ (session 19)
+
+- `Include/Kernel/Fs/Vfs/Events/kqueue.h`:
+  - Added `#include <LibFK/Container/hash_map.h>`
+  - Added `HashMap<uint64_t, size_t> m_event_index` — keyed by packed (ident, filter) 64-bit composite
+  - Added `uint64_t m_nearest_timer_deadline{0}` — cached min EVFILT_TIMER deadline (0 = dirty/none)
+  - Added `min_timer_deadline()` private method declaration
+- `Src/Kernel/Fs/Vfs/Events/kqueue.cpp`:
+  - `event_key(ident, filter)`: packs `(ident & 0x0000FFFFFFFFFFFF) | (uint16_t)filter<<48` into a unique 64-bit key for practical fd/pid/signal idents
+  - `process_changelist`: EV_ADD updates existing if (ident,filter) in index; EV_DELETE O(1) via index + index-consistent swap-erase; EV_ENABLE/DISABLE O(1) via index; timer min maintained on every add/remove/enable/disable
+  - `scan_ready_events`: EV_ONESHOT removal now updates `m_event_index`; timer delivery sets `m_nearest_timer_deadline = 0` (dirty)
+  - `min_timer_deadline()`: O(1) when clean, O(T) rescan on dirty; replaces old static O(R) scan on every wait iteration
+  - Static `nearest_timer_deadline` function removed; `kevent()` now calls `min_timer_deadline()`
+
+---
+
+## Phase 40a #1 — IrqBinding: IRQ → Endpoint ✅ (session 19)
+
+- `Include/Kernel/Ipc/Capabilities/capability_type.h`: added `CapabilityType::Irq`
+- `Include/LibFK/Syscalls/numbers.h`: added `SYS_BIND_IRQ = 406`, `SYS_UNBIND_IRQ = 407`
+- `Include/Kernel/Ipc/Notifications/irq_binding.h` (NEW): `IrqBinding` class — static `Endpoint* s_endpoints[256]` table (BSS-zeroed); `install(vector, ep)` registers ISR and stores endpoint; `remove(vector)` unregisters; `on_irq(vector, frame)` sends EOI then signals endpoint
+- `Src/Kernel/Ipc/Notifications/irq_binding.cpp` (NEW): implementation; `install` validates vector ≥ 32, returns `AlreadyExists` if already bound; calls `InterruptController::the().register_interrupt(on_irq, vector)`; `on_irq` calls `HardwareInterruptManager::the().send_eoi(vector)` then `ep->signal(NotificationBits(1))`
+- `Src/Kernel/Syscall/syscall_list/Ipc/sys_bind_irq.cpp` (NEW): `sys_bind_irq(vector, ep_handle)` — validates vector [32,255], resolves `CapabilityType::Endpoint` from CSpace, calls `IrqBinding::install()`, installs `CapabilityType::Irq` in caller's CSpace; `sys_unbind_irq(vector)` removes binding
+- `Src/Kernel/Syscall/syscall.cpp`: extern declarations + `register_syscall(SYS_BIND_IRQ/SYS_UNBIND_IRQ, ...)`
+- Also done this session: `DmaShm` (`Include/Kernel/Ipc/SharedMemory/dma_shm.h` + `Src/Kernel/Ipc/SharedMemory/dma_shm.cpp`) — contiguous physical allocation via `alloc_contiguous(order)`; mapped with `PageFlags::CacheDisabled | Writable | User`; exposes `phys_base()` for DMA address
+
+---
+
+## Phase 39c — CSpace::grant_all_to early-exit ✅ (session 19)
+
+- `Include/Kernel/Ipc/Capabilities/cspace.h`: `grant_all_to()` now uses `size()` countdown — exits when all valid caps found; skips trailing free holes; O(V + holes_before_last_valid) vs prior O(C_total)
+
+---
+
+## Phase 39a — BuddyState::remove() O(L)→O(1) ✅ (session 19)
+
+- `Include/Kernel/Memory/PhysicalMemory/Buddy/free_blocks.h`: added `FreeBlock* prev` — doubly-linked free list
+- `Src/Kernel/Memory/PhysicalMemory/Buddy/buddy_state.cpp`:
+  - `push()`: sets `prev = nullptr` on new block, updates old head's `prev`
+  - `pop()`: clears `next->prev` on new head
+  - `remove(idx, phys)`: computes `block = (FreeBlock*)(KERNEL_VIRT_BASE + phys)` directly (no scan), splices via `prev/next` — O(1) vs prior O(L); all 10 coalesce-step removals per `free()` are now O(1)
+
+---
+
+## Phase 39e — TCP Accept Queue O(Q)→O(1) ✅ (session 19)
+
+- `Include/Kernel/Net/Tcp/tcp_socket.h`: replaced single `m_accept_queue` with two vectors: `m_pending` (SynReceived children) and `m_accept_queue` (Established, ready for `accept()`)
+- `Src/Kernel/Net/Tcp/tcp_socket.cpp`:
+  - `process_handshake`: child pushed to `m_pending` (not accept queue) at SynReceived state
+  - `process_ack` (Listen path): scans `m_pending` for matching ACK sequence, transitions child to Established, swap-removes from `m_pending` O(1), pushes to `m_accept_queue`
+  - `accept()`: `m_accept_queue` always contains only Established sockets; `pop_back()` is O(1) — no per-call scan, no left-shift
+
+---
+
+## Phase 43c — Memory Tests: BuddyState + Zone ✅ (session 20)
+
+### BuddyState (8 tests) — `tests/Kernel/test_buddy_state.cpp`
+- Host-testable via "fake phys" trick: `fake_phys = ptr - KERNEL_VIRT_BASE` wraps unsigned 64-bit so `KERNEL_VIRT_BASE + fake_phys == ptr`; buffer slots serve as simulated physical frames
+- Compiled `Src/Kernel/Memory/PhysicalMemory/Buddy/buddy_state.cpp` into Test target
+- Tests: `reset_clears_lists`, `push_pop_single`, `push_pop_lifo`, `remove_head`, `remove_tail`, `remove_middle`, `remove_unpushed_false`, `different_orders_independent`
+
+### Zone + classify_zone (12 tests) — `tests/Kernel/test_zone_allocator.cpp`
+- Tests `classify_zone()` at DMA/NORMAL/HIGH boundaries; `zone_limit()` for all three types
+- Tests `Zone` default (uninitialized → accessors return 0), `populate_zone()`, constructor, frame_count math
+- **Bug fixed**: `Zone(base, length, type)` constructor did not set `m_initialized = true` — accessors returned 0 despite valid data. Fixed by adding `m_initialized(true)` to constructor initializer list in `Include/Kernel/Memory/ObjectMemory/Zone/zone_allocator.h`
+
+### List<T> new methods + fix (3 tests added to existing suite)
+- `List<T>` (`Include/LibFK/Container/list.h`) gained `insert_before()`, `insert_sorted()`, and double-remove guard in `remove()` (matching `IntrusiveList` semantics)
+- `tests/LibFK/test_stack_queue_staticvec.cpp`: 3 new tests — `test_list_insert_before`, `test_list_insert_sorted`, `test_list_double_remove_guard`
+
+---
+
 ## Phase 40a #3 — PCI Config Space ioctl ✅ (session 18)
 
-- `Include/Kernel/Hardware/Pci/pci_node.h`: Added `PIOC_READ_CONFIG = 0x5001`, `PIOC_WRITE_CONFIG = 0x5002` constants; `PiocConfigOp` struct `{bus, dev, fn, width, offset, value}`; `ioctl()` override declaration
-- `Src/Kernel/Hardware/Pci/pci_node.cpp`: `PCIDeviceNode::ioctl()` — copies `PiocConfigOp` from userspace via `fkernel::memory::copy_from_user`, validates width (1/2/4) and offset (0–255), dispatches to `PciManager::read/write_config_{byte,word,dword}`, writes result back for reads; non-PCI requests return `NotImplemented`
+- `Include/Kernel/Hardware/Buses/Pci/pci_node.h`: Added `PIOC_READ_CONFIG = 0x5001`, `PIOC_WRITE_CONFIG = 0x5002` constants; `PiocConfigOp` struct `{bus, dev, fn, width, offset, value}`; `ioctl()` override declaration
+- `Src/Kernel/Hardware/Buses/Pci/pci_node.cpp`: `PCIDeviceNode::ioctl()` — copies `PiocConfigOp` from userspace via `fkernel::memory::copy_from_user`, validates width (1/2/4) and offset (0–255), dispatches to `PciManager::read/write_config_{byte,word,dword}`, writes result back for reads; non-PCI requests return `NotImplemented`
 - Userspace interface: open `/dev/pci`, call `ioctl(fd, PIOC_READ_CONFIG, &op)` with BDF + offset to read any config register; `PIOC_WRITE_CONFIG` to modify
 
 ---
@@ -26,7 +184,7 @@
   - `remove()` now guards against double-remove: `if (prev==null && next==null && head!=obj) return;` — prevents head/tail corruption and m_size underflow on duplicate remove (pre-existing bug fixed)
   - `insert_before(T* position, T* obj)` added — O(1) splice before a known node
   - `insert_sorted(T* obj, Cmp&& cmp)` template method added — walks list once to find sorted position, then calls `insert_before`
-- `Src/Kernel/Scheduler/scheduler_lifecycle.cpp`:
+- `Src/Kernel/Scheduler/Core/scheduler_lifecycle.cpp`:
   - `sleep_current()` uses `insert_sorted` with `wake_up_time_ticks` comparator — sleep queue now always sorted earliest-first
   - `on_tick()` sleep scan changed from full iteration to front-check loop: stops at the first task not yet due, making average cost O(1) per tick (was O(S))
   - Old O(S) per-tick worst case replaced by O(W) where W = tasks waking up this tick (usually 0)

@@ -64,7 +64,7 @@ flowchart TD
 
 ### Stage 6: SMP AP startup
 - `smp_ap_start()` sends INIT IPI → STARTUP IPI to each AP
-- APs enter `ap_entry.asm`, set up GDT, load per-CPU data
+- APs enter `ap_entry.cpp` (under `Arch/x86_64/Smp`), set up GDT, load per-CPU data
 - APs initialize local APIC timer and enter idle loop
 
 ### Stage 7: idle_task → init_task
@@ -81,12 +81,12 @@ flowchart TD
 | `Src/Kernel/Arch/x86_64/Boot/long_mode_start.asm` | Assembly entry: GDT, paging, long mode |
 | `Src/Kernel/Arch/x86_64/Boot/setup_page_tables.asm` | Initial page table setup |
 | `Src/Kernel/Boot/Multiboot/kmain.cpp` | Multiboot2 entry point, magic validation |
-| `Src/Kernel/Boot/kernel_entry.cpp` | Early HW init, serial/VGA, calls `early_init()` |
-| `Src/Kernel/Boot/boot_info.cpp` | Multiboot2 tag parser (memory map, framebuffer, modules) |
-| `Src/Kernel/Boot/Stages/early_init.cpp` | Physical/virtual memory, heap, interrupts |
+| `Src/Kernel/Boot/Core/kernel_entry.cpp` | Early HW init, serial/VGA, calls `early_init()` |
+| `Src/Kernel/Boot/Core/boot_info.cpp` | Multiboot2 tag parser (memory map, framebuffer, modules) |
+| `Src/Kernel/Arch/x86_64/Init/early_init.cpp` | Physical/virtual memory, heap, interrupts |
 | `Src/Kernel/Init/init.cpp` | PCI, VFS, drivers, scheduler, interrupts |
-| `Src/Kernel/Scheduler/init_task.cpp` | PID 1 bootstrap (ELF load, user stack, auxv) |
-| `Src/Kernel/Scheduler/idle_task.cpp` | Idle task entry, spawns init on first run |
+| `Src/Kernel/Scheduler/Task/init_task.cpp` | PID 1 bootstrap (ELF load, user stack, auxv) |
+| `Src/Kernel/Scheduler/Task/idle_task.cpp` | Idle task entry, spawns init on first run |
 
 ## Multiboot2 Tags Parsed
 

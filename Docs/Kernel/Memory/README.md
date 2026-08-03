@@ -169,7 +169,7 @@ SMAP-aware memory copy between kernel and userspace:
 3. **VirtualMemoryManager::extend_direct_map()** — maps all physical RAM at KERNEL_VIRT_BASE with 2MB huge pages
 4. **PhysicalMemoryManager::reconcile_buddies()** — syncs buddy state from bitmap (requires direct map)
 5. **SlabAllocator::initialize()** — sets up 10 object caches (16B through 8KB)
-6. **IntelIOMMU::initialize()** — probes VT-d hardware, enables DMA remapping
+6. **IntelIOMMU::initialize()** — probes VT-d hardware, parses DMAR (DMA translation not yet enabled)
 7. **MemoryManager::initialize_heap()** — sets up linked-list heap, wires LibFK allocator backend
 
 ## Key Files
@@ -201,4 +201,4 @@ SMAP-aware memory copy between kernel and userspace:
 
 ## Current Status
 
-~90% complete. Physical buddy + bitmap + zones functional. Virtual memory with 4-level paging, CoW fork, demand paging for anonymous memory. Slab allocator with 10 caches (16B–8KB). Kernel heap operational. Direct map with 2MB huge pages. CoW refcount arrays per zone. UserAccess with SMAP support. IOMMU with Intel VT-d DMA remapping enabled. ASLR, W^X, and RELRO enforced via page permissions. No swap support. No transparent huge pages beyond the kernel direct map.
+~90% complete. Physical buddy + bitmap + zones functional. Virtual memory with 4-level paging, CoW fork, demand paging for anonymous memory. Slab allocator with 10 caches (16B–8KB). Kernel heap operational. Direct map with 2MB huge pages. CoW refcount arrays per zone. UserAccess with SMAP support. IOMMU (Intel VT-d) parses DMAR but does not yet translate DMA. ASLR, W^X, and RELRO enforced via page permissions. No swap support. No transparent huge pages beyond the kernel direct map.

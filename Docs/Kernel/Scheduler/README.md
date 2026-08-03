@@ -178,19 +178,19 @@ Assembly: `Src/Kernel/Arch/x86_64/Scheduler/context_switch.asm`.
 
 | File | Purpose |
 |------|---------|
-| `Src/Kernel/Scheduler/scheduler_manager.cpp` | Core: pick_next (MLFQ), schedule, steal_task, SMP AP startup, context switch |
-| `Src/Kernel/Scheduler/scheduler_lifecycle.cpp` | Lifecycle: add, block, sleep, zombify, wake, on_tick (demotion + boost) |
-| `Src/Kernel/Scheduler/qos.cpp` | QoS↔priority/quantum/allotment mappings, nice↔offset, Linux policy conversion |
-| `Src/Kernel/Scheduler/turnstile.cpp` | Turnstile create/destroy/boost/unboost/reprioritize |
-| `Src/Kernel/Scheduler/scheduler_introspection.cpp` | Debug: print_all_tasks, find_task |
-| `Src/Kernel/Scheduler/idle_task.cpp` | Idle task entry, spawns init on first run |
-| `Src/Kernel/Scheduler/init_task.cpp` | PID 1 bootstrap, ELF loading, user stack setup |
-| `Src/Kernel/Scheduler/start_user_task.cpp` | User task entry, signal delivery |
+| `Src/Kernel/Scheduler/Core/scheduler_manager.cpp` | Core: pick_next (MLFQ), schedule, steal_task, SMP AP startup, context switch |
+| `Src/Kernel/Scheduler/Core/scheduler_lifecycle.cpp` | Lifecycle: add, block, sleep, zombify, wake, on_tick (demotion + boost) |
+| `Src/Kernel/Scheduler/Qos/qos.cpp` | QoS↔priority/quantum/allotment mappings, nice↔offset, Linux policy conversion |
+| `Src/Kernel/Scheduler/Sync/turnstile.cpp` | Turnstile create/destroy/boost/unboost/reprioritize |
+| `Src/Kernel/Scheduler/Core/scheduler_introspection.cpp` | Debug: print_all_tasks, find_task |
+| `Src/Kernel/Scheduler/Task/idle_task.cpp` | Idle task entry, spawns init on first run |
+| `Src/Kernel/Scheduler/Task/init_task.cpp` | PID 1 bootstrap, ELF loading, user stack setup |
+| `Src/Kernel/Scheduler/Task/start_user_task.cpp` | User task entry, signal delivery |
 | `Src/Kernel/Scheduler/Task/task.cpp` | Task structure methods (FD management, memory regions) |
 | `Src/Kernel/Arch/x86_64/Scheduler/context_switch.asm` | Assembly context switch |
 | `Src/Kernel/Arch/x86_64/Scheduler/enter_user_mode.asm` | Ring 3 transition |
-| `Include/Kernel/Scheduler/qos.h` | QoSClass, SchedulingPolicy enums, QoSLevel struct |
-| `Include/Kernel/Scheduler/mlfq_queue.h` | MLFQQueue struct (IntrusiveList + quantum + allotment) |
+| `Include/Kernel/Scheduler/Qos/qos.h` | QoSClass, SchedulingPolicy enums, QoSLevel struct |
+| `Include/Kernel/Scheduler/Qos/mlfq_queue.h` | MLFQQueue struct (IntrusiveList + quantum + allotment) |
 
 ## Current Status
 

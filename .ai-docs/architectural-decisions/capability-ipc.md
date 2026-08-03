@@ -52,14 +52,14 @@ bool is_valid() const {
 
 | File | Role |
 |------|------|
-| `Include/Kernel/Ipc/capability.h` | Capability struct with rights and revocation |
-| `Include/Kernel/Ipc/cspace.h` | Per-process capability space |
-| `Include/Kernel/Ipc/endpoint.h` | Synchronous IPC endpoint |
-| `Include/Kernel/Ipc/notification.h` | Asynchronous notification |
-| `Include/Kernel/Ipc/badge.h` | Badge values for endpoint differentiation |
-| `Include/Kernel/Ipc/message_info.h` | IPC message metadata |
-| `Include/Kernel/Ipc/global_endpoint_manager.h` | System-wide endpoint registry |
-| `Include/Kernel/Ipc/signal_delivery.h` | Signal delivery via capabilities |
+| `Include/Kernel/Ipc/Capabilities/capability.h` | Capability struct with rights and revocation |
+| `Include/Kernel/Ipc/Capabilities/cspace.h` | Per-process capability space |
+| `Include/Kernel/Ipc/Endpoints/endpoint.h` | Synchronous IPC endpoint |
+| `Include/Kernel/Ipc/Notifications/notification.h` | Asynchronous notification |
+| `Include/Kernel/Ipc/Endpoints/badge.h` | Badge values for endpoint differentiation |
+| `Include/Kernel/Ipc/Endpoints/message_info.h` | IPC message metadata |
+| `Include/Kernel/Ipc/Endpoints/global_endpoint_manager.h` | System-wide endpoint registry |
+| `Include/Kernel/Ipc/Signals/signal_delivery.h` | Signal delivery via capabilities |
 
 ## Syscall Interface
 

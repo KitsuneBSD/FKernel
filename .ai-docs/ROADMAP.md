@@ -15,17 +15,17 @@
 
 ---
 
-## Phase 27 — VFS + Capability Integration (6 days) — HIGH
+## Phase 27 — VFS + Capability Integration — ✅ COMPLETED (2026-07-31)
 
-Route POSIX file descriptors through the CSpace capability model. Every open FD becomes a `Capability<FileDescription>` with revocable, rights-checked access. Zero changes to VFS internals (Dentry, Node, filesystem implementations).
+> **Implementado**: `CSpace::install_fd`/`revoke_fd` + `Task::add_file_descriptor`/`get_file_descriptor` com `fd_flags_to_rights()` em `Src/Kernel/Scheduler/Task/task.cpp`. FDs POSIX viram capabilities com rights por-FD; revoke em close/dup2; `cap_handles` rastreados na FdTable. Sub-fases 27a–27e concluídas. Detalhes em `.ai-docs/CHANGELOG.md`.
 
-**Prerequisite**: Can begin independently; Phase 29b depends on this.
+> O conteúdo abaixo (27a–27e, Key Design Decisions) é mantido como referência histórica do escopo original.
 
 ### 27a — Expand Capability Subsystem (1 day)
 
 | # | Task | Files |
 |---|------|-------|
-| 1 | Add `CapabilityType::FileDescriptor` variant | `Include/Kernel/Ipc/capability.h` |
+| 1 | Add `CapabilityType::FileDescriptor` variant | `Include/Kernel/Ipc/Capabilities/capability.h` |
 | 2 | Add rights bitmask: `cap_rights_t` with `CAP_READ`, `CAP_WRITE`, `CAP_SEEK`, `CAP_MMAP`, `CAP_IOCTL` | `capability.h` |
 | 3 | `Capability<FileDescription>` with generation counter | `capability.h` |
 | 4 | `CSpace::lookup_fd(cap_index)` → validates type + generation | `cspace.h`, `cspace.cpp` |

@@ -7,15 +7,16 @@
 4. Initialize the subsystem in `Src/Kernel/Init/init.cpp`.
 
 ## Adding a System Call
-1. Add the number to `Include/Kernel/Syscall/syscall_numbers.h`.
-2. Implement the handler in `Src/Kernel/Syscall/SyscallList/`.
-3. Register it in `Src/Kernel/Syscall/Syscall.cpp`.
+1. Add the number to `Include/LibFK/Syscalls/numbers.h`.
+2. Implement the handler in `Src/Kernel/Syscall/syscall_list/<Domain>/` — one `sys_*` handler per file, file name = handler name minus the `sys_` prefix (shared support files with zero handlers are allowed).
+3. Register it in `Src/Kernel/Syscall/syscall.cpp`.
+4. Run `xmake check-syscalls` to verify the one-handler-per-file rule.
 
 ## Modifying Architecture Specific Code
 Architecture specific code resides in `Src/Kernel/Arch/x86_64/`. When updating these:
 - Maintain SystemV ABI compatibility.
 - Ensure any assembly changes are matched with C++ declarations.
-- Update documentation in `Docs/Kernel/Architecture/` if changes affect the memory layout or task switching.
+- Update documentation in `Docs/Architecture/` if changes affect the memory layout or task switching.
 
 ## Testing Against Validation Tooling (BusyBox, musl)
 To validate syscall compatibility:

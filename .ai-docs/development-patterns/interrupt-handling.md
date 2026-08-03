@@ -84,7 +84,7 @@ fkernel::Processor& SchedulerManager::current_processor() {
 | `Src/Kernel/Arch/x86_64/Interrupt/interrupt_dispatch.cpp` | Central dispatch (phase-guarded) |
 | `Src/Kernel/Arch/x86_64/Interrupt/interrupt_stub.asm` | ISR stubs (256 vectors) |
 | `Src/Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.cpp` | PIC/IOAPIC management, unmask tracking |
-| `Src/Kernel/Scheduler/SchedulerManager.cpp` | current_processor() with phase guard |
+| `Src/Kernel/Scheduler/Core/scheduler_manager.cpp` | current_processor() with phase guard |
 | `Include/Kernel/Arch/x86_64/Interrupt/Handler/interrupt_frame.h` | CPU frame layout |
 | `Include/Kernel/Arch/x86_64/Interrupt/Handler/exception_macros.h` | Exception handler macros |
 
@@ -112,5 +112,5 @@ All other vectors get a dummy 0 error code pushed by the ISR stub.
 - `enable_interrupt()` is called ONLY at the end of init(), after scheduler
 - `kerror()` halts (cli;hlt) -- never call from interrupt context unless fatal
 - `kexception()` does NOT halt -- used for exception logging before halt_forever()
-- Panic handler (`Panic.cpp`) is allowed to include LibC directly (exception file)
+- Panic handler (`panic.cpp`) is allowed to include LibC directly (exception file)
 - `kernel_puts.cpp` is allowed to include LibC directly (exception file)

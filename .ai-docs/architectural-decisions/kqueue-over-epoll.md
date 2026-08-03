@@ -32,13 +32,13 @@ This is transparent to userspace.
 
 | File | Role |
 |------|------|
-| `Include/Kernel/Fs/Vfs/kqueue.h` | kqueue implementation |
-| `Src/Kernel/Fs/Vfs/kqueue.cpp` | kqueue operations |
-| `Src/Kernel/Syscall/SyscallList/FileSystem/epoll.cpp` | epoll→kqueue shim |
-| `Src/Kernel/Syscall/SyscallList/FileSystem/kqueue.cpp` | Native kqueue syscall |
-| `Src/Kernel/Syscall/SyscallList/FileSystem/kevent.cpp` | kevent syscall |
-| `Src/Kernel/Syscall/SyscallList/FileSystem/poll.cpp` | poll→kqueue shim |
-| `Src/Kernel/Syscall/SyscallList/FileSystem/select.cpp` | select→kqueue shim |
+| `Include/Kernel/Fs/Vfs/Events/kqueue.h` | kqueue implementation |
+| `Src/Kernel/Fs/Vfs/Events/kqueue.cpp` | kqueue operations |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/EventOps/epoll.cpp` | epoll→kqueue shim |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/EventOps/kqueue.cpp` | Native kqueue syscall |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/EventOps/kevent.cpp` | kevent syscall |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/EventOps/poll.cpp` | poll→kqueue shim |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/EventOps/select.cpp` | select→kqueue shim |
 
 ## When Modifying
 

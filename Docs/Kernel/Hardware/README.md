@@ -38,19 +38,19 @@ flowchart TD
 
 | File | Purpose |
 |------|---------|
-| `Src/Kernel/Hardware/Acpi/acpi.cpp` | RSDP scan, RSDT/XSDT parsing, table lookup by signature |
-| `Src/Kernel/Hardware/Acpi/topology_manager.cpp` | NUMA node and CPU affinity mapping from SRAT |
-| `Src/Kernel/Hardware/Madt/madt.cpp` | MADT entry parsing (LAPIC, IOAPIC, overrides, local APIC address) |
-| `Src/Kernel/Hardware/Fadt/fadt_manager.cpp` | FADT power management configuration |
-| `Src/Kernel/Hardware/Pci/pci.cpp` | PCI config space read/write (ECAM + legacy), bus scanning, driver matching |
-| `Src/Kernel/Hardware/Pci/pci_node.cpp` | VFS node for `/sys/pci/` |
+| `Src/Kernel/Hardware/Firmware/Acpi/acpi.cpp` | RSDP scan, RSDT/XSDT parsing, table lookup by signature |
+| `Src/Kernel/Hardware/Firmware/Acpi/topology_manager.cpp` | NUMA node and CPU affinity mapping from SRAT |
+| `Src/Kernel/Hardware/Firmware/Madt/madt.cpp` | MADT entry parsing (LAPIC, IOAPIC, overrides, local APIC address) |
+| `Src/Kernel/Hardware/Firmware/Fadt/fadt_manager.cpp` | FADT power management configuration |
+| `Src/Kernel/Hardware/Buses/Pci/pci.cpp` | PCI config space read/write (ECAM + legacy), bus scanning, driver matching |
+| `Src/Kernel/Hardware/Buses/Pci/pci_node.cpp` | VFS node for `/sys/pci/` |
 | `Src/Kernel/Hardware/Cpu/cpu.cpp` | CPUID vendor/brand, feature detection (SMEP, SMAP, NX, APIC) |
 | `Src/Kernel/Hardware/Cpu/cpu_register.cpp` | Register abstraction (CR0, CR3, EFER, etc.) |
 | `Src/Kernel/Hardware/Cpu/cpu_context.cpp` | Context save/restore (FPU/SSE state) |
-| `Src/Kernel/Drivers/Storage/Ahci/ahci_controller.cpp` | AHCI SATA controller |
-| `Src/Kernel/Drivers/Storage/Nvme/nvme_controller.cpp` | NVMe SSD controller |
-| `Src/Kernel/Drivers/Storage/Ata/ata_controller.cpp` | Legacy ATA PIO/DMA |
-| `Src/Kernel/Drivers/Network/E1000/e1000.cpp` | Intel E1000 NIC (interrupt-driven) |
+| `Src/Kernel/Driver/Storage/Controllers/Ahci/ahci_controller.cpp` | AHCI SATA controller |
+| `Src/Kernel/Driver/Storage/Controllers/Nvme/nvme_controller.cpp` | NVMe SSD controller |
+| `Src/Kernel/Driver/Storage/Controllers/Ata/ata_controller.cpp` | Legacy ATA PIO/DMA |
+| `Src/Kernel/Driver/Network/E1000/e1000.cpp` | Intel E1000 NIC (interrupt-driven) |
 
 ## Key Data Structures
 
@@ -76,7 +76,7 @@ flowchart TD
 | MCFG | PCI Express Memory-Mapped Configuration (ECAM) | Active |
 | SRAT | System Resource Affinity Table (NUMA topology) | Active (via TopologyManager) |
 | HPET | High Precision Event Timer | Detected via CPUID + table lookup |
-| DMAR | DMA Remapping Table (IOMMU) | Active — DMA remapping enabled |
+| DMAR | DMA Remapping Table (IOMMU) | Parsed — DMA translation not yet enabled |
 
 ## PCI Enumeration
 
@@ -107,4 +107,4 @@ CPUID-based detection at construction:
 
 ## Current Status
 
-~90% complete. ACPI table parsing is functional (RSDP, RSDT/XSDT, MADT, FADT, MCFG, SRAT, DMAR, HPET). PCI enumeration works via both ECAM and legacy paths. CPU feature detection covers SMEP, SMAP, NX, APIC, x2APIC, xSAVE. DMAR DMA remapping enabled via IOMMU. SMP support with per-CPU Processor data and INIT/STARTUP IPI boot. Storage: AHCI, NVMe, and legacy ATA drivers. Networking: Intel E1000 interrupt-driven NIC. HPET detected and configured. No IOAPIC rebalancing. No CPU hotplug.
+~90% complete. ACPI table parsing is functional (RSDP, RSDT/XSDT, MADT, FADT, MCFG, SRAT, DMAR, HPET). PCI enumeration works via both ECAM and legacy paths. CPU feature detection covers SMEP, SMAP, NX, APIC, x2APIC, xSAVE. IOMMU parses DMAR but does not translate DMA. SMP support with per-CPU Processor data and INIT/STARTUP IPI boot. Storage: AHCI, NVMe, and legacy ATA drivers. Networking: Intel E1000 interrupt-driven NIC. HPET detected and configured. No IOAPIC rebalancing. No CPU hotplug.

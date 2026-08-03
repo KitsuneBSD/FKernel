@@ -45,12 +45,12 @@ graph TD
     BG -->|"nice ±8"| BG_OFF["adjusted priority"]
     MN -->|"nice ±8"| MN_OFF["adjusted priority"]
 
-    UI_OFF --> Q0["MLFQ Level 0<br/>quantum=2, allotment=8"]
+    UI_OFF --> Q0["MLFQ Level 0<br/>quantum=2"]
     UN_OFF --> Q0
-    DF_OFF --> Q1["MLFQ Level 1<br/>quantum=8, allotment=32"]
-    UT_OFF --> Q2["MLFQ Level 2<br/>quantum=16, allotment=64"]
+    DF_OFF --> Q1["MLFQ Level 1<br/>quantum=4"]
+    UT_OFF --> Q2["MLFQ Level 2<br/>quantum=8"]
     BG_OFF --> Q2
-    MN_OFF --> Q3["MLFQ Level 3<br/>quantum=64, allotment=256"]
+    MN_OFF --> Q3["MLFQ Level 3<br/>quantum=16"]
 ```
 
 ### QoS Inheritance
@@ -71,11 +71,11 @@ flowchart TD
     PICK["pick_next()"] --> L0{"Level 0<br/>non-empty?"}
     L0 -->|"Yes"| DEQ0["dequeue & run<br/>quantum=2"]
     L0 -->|"No"| L1{"Level 1<br/>non-empty?"}
-    L1 -->|"Yes"| DEQ1["dequeue & run<br/>quantum=8"]
+    L1 -->|"Yes"| DEQ1["dequeue & run<br/>quantum=4"]
     L1 -->|"No"| L2{"Level 2<br/>non-empty?"}
-    L2 -->|"Yes"| DEQ2["dequeue & run<br/>quantum=16"]
+    L2 -->|"Yes"| DEQ2["dequeue & run<br/>quantum=8"]
     L2 -->|"No"| L3{"Level 3<br/>non-empty?"}
-    L3 -->|"Yes"| DEQ3["dequeue & run<br/>quantum=64"]
+    L3 -->|"Yes"| DEQ3["dequeue & run<br/>quantum=16"]
     L3 -->|"No"| STEAL["steal_task()"]
     STEAL -->|"found"| RUN["run stolen task"]
     STEAL -->|"not found"| IDLE["run idle task"]
@@ -102,9 +102,9 @@ Quantum per level:
 | Level | Quantum (ticks) |
 |-------|----------------|
 | 0 | 2 |
-| 1 | 8 |
-| 2 | 16 |
-| 3 | 64 |
+| 1 | 4 |
+| 2 | 8 |
+| 3 | 16 |
 
 ### Priority Boost (Aging)
 
@@ -394,16 +394,18 @@ flowchart LR
 
 | File | Purpose |
 |------|---------|
-| `Include/Kernel/Scheduler/qos.h` | QoSClass enum, SchedulingPolicy, mapping table, helper declarations |
-| `Include/Kernel/Scheduler/mlfq_queue.h` | MLFQQueue struct (IntrusiveList + quantum + allotment) |
-| `Include/Kernel/Scheduler/turnstile.h` | Turnstile struct and boost/unboost function declarations |
-| `Src/Kernel/Scheduler/qos.cpp` | QoS→priority/quantum/allotment mappings, nice→offset, Linux policy conversion |
-| `Src/Kernel/Scheduler/turnstile.cpp` | Turnstile create/destroy/boost/unboost/reprioritize |
-| `Src/Kernel/Scheduler/scheduler_manager.cpp` | Scheduler init, pick_next (MLFQ), steal_task, context switch |
-| `Src/Kernel/Scheduler/scheduler_lifecycle.cpp` | add_task, wake_task, yield, on_tick (demotion), priority_boost_all |
+| `Include/Kernel/Scheduler/Qos/qos.h` | QoSClass enum, SchedulingPolicy, mapping table, helper declarations |
+| `Include/Kernel/Scheduler/Qos/mlfq_queue.h` | MLFQQueue struct (IntrusiveList + quantum + allotment) |
+| `Include/Kernel/Scheduler/Sync/turnstile.h` | Turnstile struct and boost/unboost function declarations |
+| `Src/Kernel/Scheduler/Qos/qos.cpp` | QoS→priority/quantum/allotment mappings, nice→offset, Linux policy conversion |
+| `Src/Kernel/Scheduler/Sync/turnstile.cpp` | Turnstile create/destroy/boost/unboost/reprioritize |
+| `Src/Kernel/Scheduler/Core/scheduler_manager.cpp` | Scheduler init, pick_next (MLFQ), steal_task, context switch |
+| `Src/Kernel/Scheduler/Core/scheduler_lifecycle.cpp` | add_task, wake_task, yield, on_tick (demotion), priority_boost_all |
 | `Include/Kernel/Scheduler/Task/task.h` | TaskLifecycle (QoS/MLFQ fields), TaskIpc (turnstile pointers) |
-| `Src/Kernel/Ipc/endpoint.cpp` | Turnstile boost/unboost in send()/receive() |
-| `Src/Kernel/Syscall/syscall_list/Process/thread_qos.cpp` | SYS_THREAD_SET/GET_QOS_CLASS handlers |
+| `Src/Kernel/Ipc/Endpoints/endpoint.cpp` | Turnstile boost/unboost in send()/receive() |
+| `Src/Kernel/Syscall/syscall_list/Process/thread_get_qos_class.cpp` | SYS_THREAD_GET_QOS_CLASS handler |
+| `Src/Kernel/Syscall/syscall_list/Process/thread_set_qos_class.cpp` | SYS_THREAD_SET_QOS_CLASS handler |
 | `Src/Kernel/Syscall/syscall_list/Process/nice.cpp` | QoS-aware nice/getpriority/setpriority |
-| `Src/Kernel/Syscall/syscall_list/Process/sched.cpp` | Real sched_* with SchedulingPolicy mapping |
+| `Src/Kernel/Syscall/syscall_list/Process/sched_setscheduler.cpp` | Real-time scheduling policy setter |
+| `Src/Kernel/Syscall/syscall_list/Process/sched_getparam.cpp` | sched_getparam/sched_setparam handlers |
 | `Include/LibFK/Syscalls/numbers.h` | SYS_THREAD_SET_QOS_CLASS=504, SYS_THREAD_GET_QOS_CLASS=505 |

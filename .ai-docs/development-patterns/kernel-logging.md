@@ -23,7 +23,7 @@ kernel_puts_impl()  (fan-out to up to 3 targets based on bitmask)
 
 ### Layer 1: `klog/kwarn/kerror/kdebug/kexception` (LibFK)
 
-Public API entry points defined in `Include/LibFK/Algorithms/log.h`. Each function accepts a compile-time prefix string and variadic format arguments. The function selects the appropriate log level tag (`[INFO]`, `[WARN]`, `[ERROR]`, `[DEBUG]`, `[EXCEPTION]`), prepends it along with the subsystem prefix, and forwards to `kprintf()` for formatting. `kerror()` additionally triggers a `cli;hlt` after output.
+Public API entry points defined in `Include/LibFK/Algorithms/Logging/log.h`. Each function accepts a compile-time prefix string and variadic format arguments. The function selects the appropriate log level tag (`[INFO]`, `[WARN]`, `[ERROR]`, `[DEBUG]`, `[EXCEPTION]`), prepends it along with the subsystem prefix, and forwards to `kprintf()` for formatting. `kerror()` additionally triggers a `cli;hlt` after output.
 
 ### Layer 2: `kprintf` (LibC)
 
@@ -58,7 +58,7 @@ Default bitmask at boot is `0x7` (all targets), adjusted at each boot stage as h
 
 ## Color Support
 
-`klog_color()` (defined in `Include/LibFK/Algorithms/log.h`) accepts ANSI escape sequences embedded in the log message. It forwards the raw string through the standard pipeline.
+`klog_color()` (defined in `Include/LibFK/Algorithms/Logging/log.h`) accepts ANSI escape sequences embedded in the log message. It forwards the raw string through the standard pipeline.
 
 The Display target (`vga::the().write_ansi()`) interprets ANSI escape sequences and renders colored text to the VGA/framebuffer terminal. The Serial and DebugFS targets receive the raw string including escape codes; serial terminal emulators (e.g., minicom, picocom) may interpret them, while DebugFS stores them as-is.
 
@@ -72,19 +72,19 @@ The Display target (`vga::the().write_ansi()`) interprets ANSI escape sequences 
 
 | File | Role |
 |------|------|
-| `Include/LibFK/Algorithms/log.h` | Log level functions (klog, kwarn, kerror, kdebug, kexception, klog_color) |
+| `Include/LibFK/Algorithms/Logging/log.h` | Log level functions (klog, kwarn, kerror, kdebug, kexception, klog_color) |
 | `Src/LibC/stdio/kprintf.c` | Printf implementation, 512-byte stack buffer |
 | `Src/LibC/stdio/_impl/libc_putc.cpp` | Central dispatch: hook registration, log target bitmask, SpinlockIRQ |
 | `Src/Kernel/Io/kernel_puts.cpp` | Fan-out router: serial + VGA + DebugLogNode |
 | `Include/Kernel/Io/kernel_puts.h` | Declares set_log_target_bits (NOT IMPLEMENTED) |
 | `Src/Kernel/Fs/Virtual/DebugFs/debug_fs.cpp` | DebugLogNode + SyscallLogNode ring buffers (with ScopedLockIRQ) |
-| `Src/Kernel/Ipc/ipc_log_node.cpp` | IpcLogNode ring buffer (with ScopedLockIRQ) |
-| `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` | Panic output (bypasses logging system) |
+| `Src/Kernel/Ipc/Endpoints/ipc_log_node.cpp` | IpcLogNode ring buffer (with ScopedLockIRQ) |
+| `Src/Kernel/Arch/x86_64/Panic/panic.cpp` | Panic output (bypasses logging system) |
 
 ## Known Issues
 
 1. **No log-level filtering** — all levels always compiled in; 20 `kdebug()` calls commented out waiting for LogLevel feature
-2. **Panic bypasses logging** — `Panic.cpp` uses raw `kprintf()`, messages never reach dmesg ring buffer
+2. **Panic bypasses logging** — `panic.cpp` uses raw `kprintf()`, messages never reach dmesg ring buffer
 3. **`kerror()` halts on every call** — no distinction between fatal and non-fatal errors; should split into `kfatal()` (halt) and `kerror()` (non-halting)
 4. **Inconsistent prefix naming** — ALL_CAPS, mixed case, lowercase, hyphenated all used across codebase
 5. **Dead code** — StdoutLogNode/StderrLogNode headers exist but are never instantiated

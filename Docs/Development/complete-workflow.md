@@ -64,19 +64,19 @@ Src/Kernel/
 
 ### Naming Conventions
 - **Directories**: PascalCase (domains)
-- **Files**: camelCase with single concept
+- **Files**: snake_case (matches class name)
 - **Classes**: PascalCase matching file name
 
 ### Examples
 ```
-Include/Kernel/Driver/Storage/
+Include/Kernel/Driver/Storage/Controllers/
 ├── Ata/
-│   ├── ataController.h     // class AtaController
-│   ├── ataDevice.h         // class AtaDevice  
-│   └── pioStrategy.h      // class PioStrategy
+│   ├── ata_controller.h     // class AtaController
+│   ├── ata_device.h         // class AtaDevice
+│   └── pio_strategy.h       // class PioStrategy
 └── Ahci/
-    ├── ahciController.h    // class AhciController
-    └── ahciPort.h         // class AhciPort
+    ├── ahci_controller.h    // class AhciController
+    └── ahci_port.h          // class AhciPort
 ```
 
 ## Object Calisthenics Quick Reference

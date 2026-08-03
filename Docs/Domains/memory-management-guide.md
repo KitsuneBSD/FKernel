@@ -149,6 +149,21 @@ flowchart TD
 
 **Embedded FreeBlock**: Buddy metadata (`FreeBlock` node) is stored IN the free pages themselves, accessed via the `KERNEL_VIRT_BASE` direct map. This saves ~1MB of BSS compared to a static pool. A 16384-entry static pool is also available for bootstrap before the direct map is ready.
 
+### Buddy Orders (M1 — absolute orders)
+
+Buddy orders are **absolute** (MIN_ORDER = 12 → 4KiB, MAX_ORDER = 21 → 2MiB), NOT `log2(page_count)`:
+
+- `order_to_size(order)` = `1 << order` bytes
+- `size_to_order(size)` rounds a byte count up to the smallest order that fits
+
+Every caller must convert byte counts / page counts with `size_to_order()` before calling `alloc()`/`alloc_contiguous()`. Passing a raw page count (e.g. `(size + 4095) / 4096`) under-allocates for blocks > 4KiB and over-allocates for single pages. This was fixed in the DMA path (`dma_buffer.cpp`, `interrupt_driven_nvme.cpp`) and in `grow_slab()`.
+
+### Buddy ↔ Bitmap Reconcile (M3)
+
+- `alloc_page()` splits a buddy block when the bitmap hands out an interior page: `invalidate_page()` finds the maximal free block containing the page, splits it down to isolate the page, and re-inserts the sibling halves as free blocks — so the bitmap and buddy stay consistent and no page is ever double-allocated.
+- `FreeBlock.list_idx` records which free-list a node belongs to; `remove()` rejects stale lookups so a page that is free at order N can never be unlinked from order M > N.
+- `free()` re-merges through the XOR-buddy chain, restoring the original block when the full set of siblings is released.
+
 ### Buddy Math
 
 $$\text{buddy}(ptr, order) = ptr \oplus (2^{order})$$
@@ -299,6 +314,8 @@ Implemented in Phase 30b:
 
 The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤8192 bytes, falling back to the linked-list heap only when the slab cache is exhausted.
 
+Multi-page slabs (4096B/8192B caches) allocate their backing pages via `size_to_order(slab_size)` (absolute buddy order, M1). Slab-backed objects have **no `BlockHeader`**, so `MemoryManager::reallocate()` first checks `SlabAllocator::is_slab_allocation(ptr)` and routes growing/frees through `SlabAllocator::reallocate()` — this prevents a growing LibFK `Vector`/`String` from tripping the heap `0xC0FFEE` magic check (M4).
+
 ## Kernel Heap
 
 Simple first-fit linked-list allocator:
@@ -307,6 +324,7 @@ Simple first-fit linked-list allocator:
 - Block splitting: if free block is large enough, carve out exactly needed size + split remainder
 - Free coalescing: merges both forward and backward with adjacent free blocks
 - Magic number `0xC0FFEE` checked on every operation for corruption detection
+- `reallocate()` routes slab-backed pointers through `SlabAllocator::reallocate()` first (M4) — only heap-allocated blocks carry a `BlockHeader`
 - Interrupt-safe: saves/restores RFLAGS, acquires `m_heap_lock` spinlock
 - LibFK integration via `AllocatorBackend` callback structure
 

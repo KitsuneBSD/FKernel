@@ -76,8 +76,8 @@ Log output targets are controlled by a bitmask, allowing independent enable/disa
 
 | Bit | Target | Description |
 |-----|--------|-------------|
-| 0 | Serial (COM1) | Always available, works before display init |
-| 1 | Display (VGA/Framebuffer) | Visual feedback via ANSI terminal |
+| 0 | Display (VGA/Framebuffer) | Visual feedback via ANSI terminal |
+| 1 | Serial (COM1) | Always available, works before display init |
 | 2 | DebugFS (ring buffer) | Persistent buffer accessible via `dmesg` |
 
 The bitmask is configured at boot via `kernel.log_mask` kernel parameter or at runtime via `/debug/log_mask`. Default: all targets enabled.

@@ -18,7 +18,7 @@ Result<Page*, Error> allocate_page();
 auto page = TRY(allocate_page());  // Propagates error on failure
 ```
 
-Key files: `Include/LibFK/Core/Result.h`, `Include/LibFK/Memory/optional.h`
+Key files: `Include/LibFK/Core/result.h`, `Include/LibFK/Memory/optional.h`
 
 ## 2. seL4-Style Capability-Based IPC in a Hybrid Kernel
 
@@ -31,7 +31,7 @@ Most hybrid kernels use traditional Unix IPC (pipes, shared memory, signals). FK
 
 This provides fine-grained access control properties uncommon in traditional Unix IPC, even though it runs in a hybrid (not microkernel) architecture.
 
-Key files: `Include/Kernel/Ipc/capability.h`, `Include/Kernel/Ipc/cspace.h`, `Include/Kernel/Ipc/endpoint.h`
+Key files: `Include/Kernel/Ipc/Capabilities/capability.h`, `Include/Kernel/Ipc/Capabilities/cspace.h`, `Include/Kernel/Ipc/Endpoints/endpoint.h`
 
 ## 3. Object Calisthenics Enforcement
 
@@ -50,7 +50,7 @@ This is non-negotiable and enforced by automated validators.
 
 ## 4. NVMe Hyper-Decomposition (One-Class-Per-File Extreme)
 
-The NVMe driver is the most extreme application of the "one struct/class per file" rule: **19 header files and 14 source files** for a single storage controller.
+The NVMe driver is the most extreme application of the "one struct/class per file" rule: **21 header files and 14 source files** for a single storage controller.
 
 Each concept gets its own class:
 - `NvmeCommandIdManager` — tracks command IDs
@@ -65,14 +65,14 @@ Each concept gets its own class:
 
 Each class is small (50-150 lines), single-responsibility, and independently testable.
 
-Key files: `Include/Kernel/Driver/Storage/Nvme/` (all 19 headers)
+Key files: `Include/Kernel/Driver/Storage/Controllers/Nvme/` (all 21 headers)
 
 ## 5. Allocator Backend Injection Pattern
 
 LibFK (the STL-like library) must remain independent of the Kernel. But it needs dynamic memory allocation. The solution: a callback-based allocator backend.
 
 ```cpp
-// Include/LibFK/Memory/allocator_backend.h
+// Include/LibFK/Memory/Allocators/allocator_backend.h
 struct AllocatorBackend {
   void *(*allocate)(size_t size);
   void *(*reallocate)(void *ptr, size_t size);
@@ -87,7 +87,7 @@ fk::memory::set_allocator_backend(&kernel_allocator);
 
 LibFK containers and smart pointers call through the backend interface, never including Kernel headers. This maintains strict layer separation (LibC → LibFK → Kernel).
 
-**Known violation**: `Src/LibFK/Memory/heap_malloc.cpp` directly includes Kernel headers, breaking this pattern. Tracked in TODO.md.
+**Known violation**: `Src/LibFK/Memory/Allocators/heap_malloc.cpp` directly includes Kernel headers, breaking this pattern. Tracked in TODO.md.
 
 ## 6. Domain-Driven ELF Loader
 
@@ -135,7 +135,7 @@ Despite using Linux syscall ABI, the kernel implements BSD kqueue instead of Lin
 
 The trade-off: musl/BusyBox expect epoll. A compatibility shim maps epoll syscalls to kqueue internally.
 
-Key files: `Include/Kernel/Fs/Vfs/kqueue.h`, `Src/Kernel/Fs/Vfs/kqueue.cpp`
+Key files: `Include/Kernel/Fs/Vfs/Events/kqueue.h`, `Src/Kernel/Fs/Vfs/Events/kqueue.cpp`
 
 ## 10. IntrusiveList for Zero-Overhead Scheduler Queues
 
@@ -216,4 +216,4 @@ Each file is self-contained with a single handler function.
 
 LibC is predominantly `.c` files but has one `.cpp` file: `Src/LibC/stdio/_impl/libc_putc.cpp`. This file bridges LibC output to LibFK's logging system. It's a deliberate exception to the "LibC is pure C" rule, allowed because it's the only way to route printf output without duplicating the logging infrastructure.
 
-Similarly, `Src/Kernel/Io/kernel_puts.cpp` and `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` are the only two Kernel files allowed to include LibC directly.
+Similarly, `Src/Kernel/Io/kernel_puts.cpp` and `Src/Kernel/Arch/x86_64/Panic/panic.cpp` are the only two Kernel files allowed to include LibC directly.

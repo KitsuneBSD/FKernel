@@ -135,21 +135,21 @@ FPU/SSE state (512 bytes per task) is saved and restored lazily. On context swit
 | File | Purpose |
 |------|---------|
 | `Src/Kernel/Scheduler/Task/task.cpp` | Task creation, destruction, FD management |
-| `Src/Kernel/Scheduler/scheduler_manager.cpp` | Core scheduler: pick_next, schedule, steal_task, PID generation |
-| `Src/Kernel/Scheduler/scheduler_lifecycle.cpp` | Task lifecycle: add, block, sleep, zombify, wake, on_tick, terminate_current |
-| `Src/Kernel/Scheduler/scheduler_introspection.cpp` | Debug: print_all_tasks, find_task |
-| `Src/Kernel/Scheduler/idle_task.cpp` | Idle task entry, spawns init on first run |
-| `Src/Kernel/Scheduler/init_task.cpp` | PID 1 bootstrap, ELF loading, user stack + TLS setup |
-| `Src/Kernel/Scheduler/start_user_task.cpp` | User task entry, signal delivery before iret |
-| `Src/Kernel/Scheduler/qos.cpp` | QoS↔priority/quantum/allotment mappings |
-| `Src/Kernel/Scheduler/turnstile.cpp` | Turnstile create/destroy/boost/unboost |
-| `Src/Kernel/Ipc/signal_delivery.cpp` | Signal delivery, default actions (Stop/Continue/Terminate) |
-| `Src/Kernel/Syscall/SyscallList/Process/fork.cpp` | fork() — CoW clone |
-| `Src/Kernel/Syscall/SyscallList/Process/vfork.cpp` | vfork() — shared address space |
-| `Src/Kernel/Syscall/SyscallList/Process/clone.cpp` | clone() — with flags |
-| `Src/Kernel/Syscall/SyscallList/Process/execve.cpp` | execve() — ELF load + address space swap |
-| `Src/Kernel/Syscall/SyscallList/Process/exit.cpp` | exit/exit_group |
-| `Src/Kernel/Syscall/SyscallList/Process/wait4.cpp` | wait4() — zombie reaping |
+| `Src/Kernel/Scheduler/Core/scheduler_manager.cpp` | Core scheduler: pick_next, schedule, steal_task, PID generation |
+| `Src/Kernel/Scheduler/Core/scheduler_lifecycle.cpp` | Task lifecycle: add, block, sleep, zombify, wake, on_tick, terminate_current |
+| `Src/Kernel/Scheduler/Core/scheduler_introspection.cpp` | Debug: print_all_tasks, find_task |
+| `Src/Kernel/Scheduler/Task/idle_task.cpp` | Idle task entry, spawns init on first run |
+| `Src/Kernel/Scheduler/Task/init_task.cpp` | PID 1 bootstrap, ELF loading, user stack + TLS setup |
+| `Src/Kernel/Scheduler/Task/start_user_task.cpp` | User task entry, signal delivery before iret |
+| `Src/Kernel/Scheduler/Qos/qos.cpp` | QoS↔priority/quantum/allotment mappings |
+| `Src/Kernel/Scheduler/Sync/turnstile.cpp` | Turnstile create/destroy/boost/unboost |
+| `Src/Kernel/Ipc/Signals/signal_delivery.cpp` | Signal delivery, default actions (Stop/Continue/Terminate) |
+| `Src/Kernel/Syscall/syscall_list/Process/fork.cpp` | fork() — CoW clone |
+| `Src/Kernel/Syscall/syscall_list/Process/vfork.cpp` | vfork() — shared address space |
+| `Src/Kernel/Syscall/syscall_list/Process/clone.cpp` | clone() — with flags |
+| `Src/Kernel/Syscall/syscall_list/Process/execve.cpp` | execve() — ELF load + address space swap |
+| `Src/Kernel/Syscall/syscall_list/Process/exit.cpp` | exit/exit_group |
+| `Src/Kernel/Syscall/syscall_list/Process/wait4.cpp` | wait4() — zombie reaping |
 
 ## Key Syscalls
 

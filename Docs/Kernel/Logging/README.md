@@ -19,14 +19,14 @@ graph TD
 
 | File | Path | Role |
 |------|------|------|
-| Log functions | `Include/LibFK/Algorithms/log.h` | `klog`, `kwarn`, `kerror`, `kdebug`, `kexception`, `klog_color` |
+| Log functions | `Include/LibFK/Algorithms/Logging/log.h` | `klog`, `kwarn`, `kerror`, `kdebug`, `kexception`, `klog_color` |
 | kprintf | `Src/LibC/stdio/kprintf.c` | Printf implementation, 512-byte stack buffer |
 | libc_puts dispatch | `Src/LibC/stdio/_impl/libc_putc.cpp` | Hook registration, target bitmask, SpinlockIRQ |
 | Kernel fan-out | `Src/Kernel/Io/kernel_puts.cpp` | Routes to serial + VGA + DebugLogNode |
 | DebugLogNode | `Src/Kernel/Fs/Virtual/DebugFs/debug_fs.cpp` | 64 KB ring buffer for dmesg |
 | SyscallLogNode | `Src/Kernel/Fs/Virtual/DebugFs/debug_fs.cpp` | 128 KB ring buffer for syscall tracing |
-| IpcLogNode | `Src/Kernel/Ipc/ipc_log_node.cpp` | 64 KB ring buffer for IPC tracing |
-| Panic | `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` | Panic output (currently bypasses logging) |
+| IpcLogNode | `Src/Kernel/Ipc/Endpoints/ipc_log_node.cpp` | 64 KB ring buffer for IPC tracing |
+| Panic | `Src/Kernel/Arch/x86_64/Panic/panic.cpp` | Panic output (currently bypasses logging) |
 
 ## Log Levels
 
@@ -65,7 +65,7 @@ enum LogTarget : uint32_t {
 ## Usage
 
 ```cpp
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 // Standard logging
 fk::algorithms::klog("VFS", "Mounted %s at %s", fstype, path);

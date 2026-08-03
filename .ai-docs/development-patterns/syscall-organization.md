@@ -4,10 +4,10 @@
 
 ## Structure
 
-Syscalls are organized by domain in `Src/Kernel/Syscall/SyscallList/`:
+Syscalls are organized by domain in `Src/Kernel/Syscall/syscall_list/`:
 
 ```
-SyscallList/
+syscall_list/
 ├── FileSystem/    (52 files — open, read, write, mount, epoll, kqueue, ...)
 ├── Process/       (35 files — fork, execve, clone, wait4, setpgid, ...)
 ├── Networking/    (16 files — socket, bind, connect, sendmsg, ...)
@@ -25,7 +25,7 @@ SyscallList/
 ## Adding a New Syscall
 
 1. Choose the correct domain directory
-2. Create `Src/Kernel/Syscall/SyscallList/<Domain>/<name>.cpp`
+2. Create `Src/Kernel/Syscall/syscall_list/<Domain>/<name>.cpp`
 3. Implement the handler function
 4. Register in `Src/Kernel/Syscall/syscall.cpp` dispatch table
 5. Add number to `Include/Kernel/Syscall/syscall_numbers.h` (must match Linux x86_64)
@@ -36,7 +36,7 @@ Every handler follows this pattern:
 
 ```cpp
 #include <Kernel/Syscall/syscall_utils.h>
-#include <LibFK/Core/Result.h>
+#include <LibFK/Core/result.h>
 
 // Handler function signature
 SyscallResult sys_<name>(uint64_t arg1, uint64_t arg2, uint64_t arg3,

@@ -2,7 +2,7 @@
 
 ## Overview
 
-FKernel implements a Linux x86_64 ABI-compatible syscall interface with 199 registered handlers. The syscall stub (assembly) transitions from ring 3 to ring 0, saves registers, and calls the dispatcher. The dispatcher logs to DebugFS, looks up the handler in a dispatch table, and handles pending signals before returning to userspace.
+FKernel implements a Linux x86_64 ABI-compatible syscall interface with 207 registered handlers. The syscall stub (assembly) transitions from ring 3 to ring 0, saves registers, and calls the dispatcher. The dispatcher logs to DebugFS, looks up the handler in a dispatch table, and handles pending signals before returning to userspace.
 
 ## Architecture
 
@@ -21,9 +21,9 @@ flowchart TD
     J --> K
 ```
 
-## Syscall Domains (199 handlers)
+## Syscall Domains (207 handlers)
 
-Organized into 11 domain directories under `Src/Kernel/Syscall/SyscallList/`:
+Organized into 11 domain directories under `Src/Kernel/Syscall/syscall_list/`. Each file defines at most one `sys_*` handler (file name = handler name minus the `sys_` prefix); shared support files with zero handlers are allowed (e.g. `Time/posix_timer.cpp`). Verified by `xmake check-syscalls`:
 
 | Domain | Count | Key Syscalls |
 |--------|-------|-------------|
@@ -59,18 +59,18 @@ SMAP validation is performed by `syscall_stub_validation.cpp` for user-space poi
 |------|---------|
 | `Src/Kernel/Syscall/syscall.cpp` | Dispatcher, registration, signal handling, dmesg logging |
 | `Src/Kernel/Arch/x86_64/Syscall/syscall_stub.asm` | Assembly entry/exit for syscalls |
-| `Src/Kernel/Syscall/syscall_stub_validation.cpp` | SMAP-aware user pointer validation |
-| `Src/Kernel/Syscall/SyscallList/FileSystem/*.cpp` | FS syscall handlers (~40 files) |
-| `Src/Kernel/Syscall/SyscallList/Process/*.cpp` | Process syscall handlers (~30 files) |
-| `Src/Kernel/Syscall/SyscallList/Memory/*.cpp` | Memory syscall handlers |
-| `Src/Kernel/Syscall/SyscallList/Time/*.cpp` | Timer syscall handlers |
-| `Src/Kernel/Syscall/SyscallList/Signals/*.cpp` | Signal syscall handlers |
-| `Src/Kernel/Syscall/SyscallList/Networking/*.cpp` | Socket syscall handlers |
-| `Src/Kernel/Syscall/SyscallList/Ipc/*.cpp` | IPC + capability syscall handlers |
-| `Src/Kernel/Syscall/SyscallList/System/*.cpp` | System syscall handlers |
-| `Src/Kernel/Syscall/SyscallList/Terminal/*.cpp` | TTY management handlers |
-| `Src/Kernel/Syscall/SyscallList/Posix/*.cpp` | POSIX misc (futex, openpty, signal) |
-| `Src/Kernel/Syscall/SyscallList/KQueue/*.cpp` | KQueue event notification syscalls |
+| `Src/Kernel/Arch/x86_64/Syscall/syscall_stub_validation.cpp` | SMAP-aware user pointer validation |
+| `Src/Kernel/Syscall/syscall_list/FileSystem/*.cpp` | FS syscall handlers (77 files) |
+| `Src/Kernel/Syscall/syscall_list/Process/*.cpp` | Process syscall handlers (50 files) |
+| `Src/Kernel/Syscall/syscall_list/Memory/*.cpp` | Memory syscall handlers (11 files) |
+| `Src/Kernel/Syscall/syscall_list/Time/*.cpp` | Timer syscall handlers (13 files) |
+| `Src/Kernel/Syscall/syscall_list/Signals/*.cpp` | Signal syscall handlers (6 files) |
+| `Src/Kernel/Syscall/syscall_list/Networking/*.cpp` | Socket syscall handlers (16 files) |
+| `Src/Kernel/Syscall/syscall_list/Ipc/*.cpp` | IPC + capability syscall handlers (19 files) |
+| `Src/Kernel/Syscall/syscall_list/System/*.cpp` | System syscall handlers (4 files) |
+| `Src/Kernel/Syscall/syscall_list/Terminal/*.cpp` | TTY management handlers (3 files) |
+| `Src/Kernel/Syscall/syscall_list/Posix/*.cpp` | POSIX misc (futex, openpty, signal) (6 files) |
+| `Src/Kernel/Syscall/syscall_list/Sync/*.cpp` | Robust-list sync handlers (2 files) |
 
 ## Syscall Logging
 
@@ -90,4 +90,4 @@ Every syscall entry and exit is logged to the `SyscallLogNode` (128KB ring buffe
 
 ## Current Status
 
-~80% complete. 199 syscalls registered across 11 domains. Core FS, process, memory, and time syscalls functional. Networking syscalls with TCP/UDP socket implementations. IPC syscalls integrated with capability system (SCM_RIGHTS, SCM_CREDENTIALS). KQueue syscalls (kqueue, kevent) with EVFILT_PROC/SIGNAL/TIMER. Signal delivery working with frame installation. No seccomp or ptrace yet.
+~80% complete. 207 syscalls registered across 11 domains. Core FS, process, memory, and time syscalls functional. Networking syscalls with TCP/UDP socket implementations. IPC syscalls integrated with capability system (SCM_RIGHTS, SCM_CREDENTIALS). KQueue syscalls (kqueue, kevent) with EVFILT_PROC/SIGNAL/TIMER. Signal delivery working with frame installation. No seccomp or ptrace yet.

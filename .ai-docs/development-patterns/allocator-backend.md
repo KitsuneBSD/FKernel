@@ -8,7 +8,7 @@ LibFK (STL-like library) must remain independent of the Kernel. But LibFK contai
 
 ## The Solution: Callback Injection
 
-`LibFK/Memory/allocator_backend.h` defines a C-style callback interface:
+`LibFK/Memory/Allocators/allocator_backend.h` defines a C-style callback interface:
 
 ```cpp
 struct AllocatorBackend {
@@ -42,15 +42,15 @@ LibC (std types) → LibFK (uses allocator_backend callbacks) → Kernel (provid
 
 ## Current Violations
 
-`Src/LibFK/Memory/heap_malloc.cpp` directly includes Kernel headers. This is a known violation tracked in TODO.md. The fix is to route all heap allocation through the backend pattern.
+`Src/LibFK/Memory/Allocators/heap_malloc.cpp` directly includes Kernel headers. This is a known violation tracked in TODO.md. The fix is to route all heap allocation through the backend pattern.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `Include/LibFK/Memory/allocator_backend.h` | Backend interface definition |
-| `Include/LibFK/Memory/heap_malloc.h` | Heap malloc header |
-| `Src/LibFK/Memory/heap_malloc.cpp` | Implementation (has layer violation) |
+| `Include/LibFK/Memory/Allocators/allocator_backend.h` | Backend interface definition |
+| `Include/LibFK/Memory/Allocators/heap_malloc.h` | Heap malloc header |
+| `Src/LibFK/Memory/Allocators/heap_malloc.cpp` | Implementation (has layer violation) |
 | `Src/Kernel/Memory/memory_manager.cpp` | Kernel-side backend registration |
 
 ## When Modifying

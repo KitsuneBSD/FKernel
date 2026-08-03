@@ -89,7 +89,7 @@ Full `pivot_root(new_root, put_old)` implementation:
 |----|-------------|------|-------|
 | TmpFs | `/` | In-memory | Root filesystem, directory + file nodes |
 | DevFs | `/dev` | Dynamic | Device nodes (null, zero, urandom, ptmx, tty, serial, console) |
-| ProcFs | `/proc` | Virtual | Process info (19 node types: stat, meminfo, uptime, version, mounts, pid/, self→ symlink) |
+| ProcFs | `/proc` | Virtual | Process info (27 node types: stat, meminfo, uptime, version, mounts, pid/, self→ symlink) |
 | DebugFs | `/debug` | Virtual | Kernel debug ring buffers (debug_log, syscall_log, ipc_log) |
 | PtsFs | `/dev/pts` | Virtual | Pseudo-terminal slave devices |
 | SemFs | `/dev/sem` | Virtual | POSIX semaphores |
@@ -156,7 +156,7 @@ Node (RefCounted)
 ├── DevFs: NullDevice, ZeroDevice, UrandomDevice, PtmxDevice, SerialNode, ConsoleNode
 ├── PipeNode, EventFdNode, TimerFdNode, SignalFdNode
 ├── EpollNode, KQueueNode
-├── ProcFsNode → 19 /proc/* node types
+├── ProcFsNode → 27 /proc/* node types
 ├── PtsDirNode, SemDirNode, MqueueDirNode, ShmDirNode
 └── PTY: PtyMaster, PtySlave
 ```
@@ -165,16 +165,16 @@ Node (RefCounted)
 
 | File | Purpose |
 |------|---------|
-| `Src/Kernel/Fs/Vfs/virtual_filesystem.cpp` | VFS init, mount/unmount/pivot_root, mount namespaces, dev_id |
-| `Src/Kernel/Fs/Vfs/vfs_operations.cpp` | open, mkdir, mkfifo, symlink, rmdir, unlink, link, rename, stat, truncate, chmod, chown |
-| `Src/Kernel/Fs/Vfs/dentry.cpp` | Dentry cache, child lookup/add, node stack |
-| `Src/Kernel/Fs/Vfs/path_resolver.cpp` | Path component traversal, mount crossing, symlink resolution |
-| `Src/Kernel/Fs/Vfs/file_description.cpp` | Read/write/ioctl with atomic offset, seek, FileLock |
-| `Src/Kernel/Fs/Vfs/kqueue.cpp` | KQueue backend: event registration, kevent, KNoteHook |
-| `Src/Kernel/Fs/Vfs/mount_namespace.cpp` | Per-process mount isolation |
-| `Src/Kernel/Fs/Vfs/auto_mounter.cpp` | FAT type detection and auto-mount |
-| `Include/Kernel/Fs/Vfs/node.h` | Abstract Node interface (read, write, ioctl, lookup, mkdir, etc.) |
-| `Include/Kernel/Fs/Vfs/dentry.h` | Dentry with node stack, mount namespace stack |
+| `Src/Kernel/Fs/Vfs/Core/virtual_filesystem.cpp` | VFS init, mount/unmount/pivot_root, mount namespaces, dev_id |
+| `Src/Kernel/Fs/Vfs/Core/vfs_operations.cpp` | open, mkdir, mkfifo, symlink, rmdir, unlink, link, rename, stat, truncate, chmod, chown |
+| `Src/Kernel/Fs/Vfs/Core/dentry.cpp` | Dentry cache, child lookup/add, node stack |
+| `Src/Kernel/Fs/Vfs/Core/path_resolver.cpp` | Path component traversal, mount crossing, symlink resolution |
+| `Src/Kernel/Fs/Vfs/Core/file_description.cpp` | Read/write/ioctl with atomic offset, seek, FileLock |
+| `Src/Kernel/Fs/Vfs/Events/kqueue.cpp` | KQueue backend: event registration, kevent, KNoteHook |
+| `Src/Kernel/Fs/Vfs/Mount/mount_namespace.cpp` | Per-process mount isolation |
+| `Src/Kernel/Fs/Vfs/Mount/auto_mounter.cpp` | FAT type detection and auto-mount |
+| `Include/Kernel/Fs/Vfs/Core/node.h` | Abstract Node interface (read, write, ioctl, lookup, mkdir, etc.) |
+| `Include/Kernel/Fs/Vfs/Core/dentry.h` | Dentry with node stack, mount namespace stack |
 
 ## Notable Design Decisions
 
@@ -188,4 +188,4 @@ Node (RefCounted)
 
 ## Current Status
 
-~85% complete. Full VFS operations: open (with O_CREAT), mkdir, mkfifo, symlink, rmdir, unlink, link, rename, mount, unmount, pivot_root, stat, truncate, chmod, chown, fsync. Mount namespaces for per-process isolation. KQueue as unified event backend for epoll/poll/select. 10 on-disk filesystems: Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS. 13 virtual filesystems: TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd. DevFs with all standard device nodes. ProcFs with 19 node types. TmpFs for root. DebugFs ring buffers. No page cache. No extended attributes (xattr). No ACLs.
+~85% complete. Full VFS operations: open (with O_CREAT), mkdir, mkfifo, symlink, rmdir, unlink, link, rename, mount, unmount, pivot_root, stat, truncate, chmod, chown, fsync. Mount namespaces for per-process isolation. KQueue as unified event backend for epoll/poll/select. 10 on-disk filesystems: Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS. 13 virtual filesystems: TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd. DevFs with all standard device nodes. ProcFs with 27 node types. TmpFs for root. DebugFs ring buffers. No page cache. No extended attributes (xattr). No ACLs.

@@ -57,7 +57,7 @@ if (task.has_value()) {
 
 ## Error Enum
 
-The `Error` enum (`Include/LibFK/Core/Error.h`) contains domain-agnostic codes:
+The `Error` enum (`Include/LibFK/Core/error.h`) contains domain-agnostic codes:
 - `None`, `NotFound`, `PermissionDenied`, `InvalidArgument`, `NotImplemented`
 - `OutOfMemory`, `Busy`, `Timeout`, `WouldBlock`, `Interrupted`
 - `NotADirectory`, `NotASymlink`, `AlreadyExists`, `NotEmpty`
@@ -68,7 +68,7 @@ For domain-specific errors, extend the pattern with custom error types.
 
 | File | Role |
 |------|------|
-| `Include/LibFK/Core/Result.h` | Result<T, E> + TRY macro |
-| `Include/LibFK/Core/Error.h` | Error enum |
+| `Include/LibFK/Core/result.h` | Result<T, E> + TRY macro |
+| `Include/LibFK/Core/error.h` | Error enum |
 | `Include/LibFK/Memory/optional.h` | Optional<T> |
-| `Include/LibFK/Core/Assertions.h` | ASSERT for debug checks |
+| `Include/LibFK/Core/assertions.h` | ASSERT for debug checks |

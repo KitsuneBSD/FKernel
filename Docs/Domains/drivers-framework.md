@@ -290,7 +290,7 @@ flowchart TD
 | MADT | ✅ | IOAPIC, LAPIC from MSR |
 | SRAT | 60% | NUMA topology parsing |
 | DSDT/SSDT | ❌ | AML interpreter pending |
-| DMAR | ✅ | DMA remapping supported |
+| DMAR | ✅ | DMAR parsed; DMA translation not yet enabled |
 
 ### DMAR (DMA Remapping)
 
@@ -298,7 +298,7 @@ The DMAR (DMA Remapping) table provides IOMMU/VT-d information:
 
 - **DRHD (DMA Remapping Hardware Definition)**: Identifies IOMMU units and their scope
 - **RMRR (Reserved Memory Region Reporting)**: Reserved memory regions requiring identity mapping
-- DMA remapping is supported for device isolation and security
+- The IOMMU parses the DMAR table but **does not translate DMA** (translation methods are `NotImplemented`); no DMA remapping is enforced yet
 
 ## SMP Boot
 

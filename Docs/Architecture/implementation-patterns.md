@@ -20,7 +20,7 @@ Result<void, Error> initialize() {
 - `kerror()` halts the system — never use for recoverable errors
 - `kwarn()` logs a warning and continues
 
-Key files: `Include/LibFK/Core/Result.h`
+Key files: `Include/LibFK/Core/result.h`
 
 ## 2. VFS Node Hierarchy
 
@@ -38,14 +38,14 @@ Node (RefCounted)
 ├── SemFsNode, MqueueFsNode, ShmFsNode (POSIX IPC virtual FS)
 ├── PipeNode, EventFdNode, TimerFdNode, SignalFdNode
 ├── EpollNode, KqueueNode
-├── ProcFsNode → ProcStatNode, ProcMemInfoNode, ... (19 /proc nodes)
+├── ProcFsNode → ProcStatNode, ProcMemInfoNode, ... (27 /proc node headers)
 ├── SerialNode, KeyboardNode          (device nodes)
 └── PTY: PtyMaster, PtySlave
 ```
 
 Key pattern: `Node` uses `Result<T, Error>` for ALL operations (read, write, lookup, mkdir, etc.). Default implementations return `Error::NotImplemented` or `Error::NotADirectory`.
 
-Key files: `Include/Kernel/Fs/Vfs/node.h`
+Key files: `Include/Kernel/Fs/Vfs/Core/node.h`
 
 ## 3. Driver Registration Flow
 
@@ -66,7 +66,7 @@ sequenceDiagram
 
 Drivers register via class/subclass matching (Newbus-inspired). The driver registry maps PCI class codes to factory functions. During probe, the driver checks hardware presence and registers itself as a VFS node.
 
-Key files: `Include/Kernel/Driver/driver_registry.h`, `Include/Kernel/Driver/Device/driver_manager.h`
+Key files: `Include/Kernel/Driver/Registry/driver_registry.h`, `Include/Kernel/Driver/Device/driver_manager.h`
 
 ## 4. Interrupt Lifecycle
 
@@ -115,7 +115,7 @@ stateDiagram-v2
 - `SchedulerManager` maintains per-CPU current task pointers
 - PID generation uses `__sync_fetch_and_add` for atomic increment
 
-Key files: `Include/Kernel/Scheduler/Task/task.h`, `Include/Kernel/Scheduler/scheduler.h`
+Key files: `Include/Kernel/Scheduler/Task/task.h`, `Include/Kernel/Scheduler/Core/scheduler.h`
 
 ## 6. Capability Lifecycle
 
@@ -138,7 +138,7 @@ sequenceDiagram
 
 Key pattern: Capabilities carry a `revoke_counter` pointer and `issued_generation`. When the IPC object is destroyed, its generation increments, and all outstanding capabilities are automatically invalidated without needing to遍历 CSpace.
 
-Key files: `Include/Kernel/Ipc/capability.h`, `Include/Kernel/Ipc/cspace.h`
+Key files: `Include/Kernel/Ipc/Capabilities/capability.h`, `Include/Kernel/Ipc/Capabilities/cspace.h`
 
 ## 7. Storage Stack Layering
 
@@ -163,7 +163,7 @@ flowchart TD
 - **StorageDevice**: Abstract block device interface (read_sectors/write_sectors)
 - **Driver**: Concrete hardware driver (AHCI, NVMe, ATA PIO/DMA)
 
-Key files: `Include/Kernel/Driver/Storage/storage_cache.h`, `Include/Kernel/Driver/Storage/Partitions/partition_manager.h`
+Key files: `Include/Kernel/Driver/Storage/Interfaces/storage_cache.h`, `Include/Kernel/Driver/Storage/Partitions/partition_manager.h`
 
 ## 8. ELF Loading Pipeline
 
@@ -263,7 +263,7 @@ proc/
 
 Each node implements `read()` returning formatted text on demand. No data is cached — it's generated fresh on each read (Linux-compatible behavior).
 
-Key files: `Include/Kernel/Fs/Virtual/ProcFs/` (18 headers)
+Key files: `Include/Kernel/Fs/Virtual/ProcFs/` (27 node headers)
 
 ## 12. Non-standard Syscalls
 
