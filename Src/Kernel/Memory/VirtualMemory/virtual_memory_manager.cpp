@@ -1,11 +1,11 @@
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/RegionSplitter/region_splitter.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 VirtualMemoryManager::VirtualMemoryManager() : m_pml4(nullptr), m_pml4_phys(0) {
   /*TODO: Apply this log when we work with LogLevel
@@ -200,10 +200,6 @@ void VirtualMemoryManager::protect_page(uintptr_t virt, PageFlags flags) {
 }
 
 uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
-  if ((virt % PAGE_SIZE) != 0) {
-    fk::algorithms::kwarn("VMM", "translate: unaligned addr %p", (void*)virt);
-    return 0;
-  }
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
   size_t pml4_idx = (virt >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK;
@@ -217,24 +213,35 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
 
   PageTable* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & PHYSICAL_ADDRESS_MASK);
 
-  if (!(pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present)) {
+  uint64_t pdpte = pdpt->entries[pdpt_idx];
+  if (!(pdpte & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  PageTable* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & PHYSICAL_ADDRESS_MASK);
+  // 1 GiB huge page
+  if (pdpte & (uint64_t)PageFlags::HugePage) {
+    return (pdpte & PAGE_ADDRESS_MASK_1G) + (virt & 0x3FFFFFFFULL);
+  }
 
-  if (!(pd->entries[pd_idx] & (uint64_t)PageFlags::Present)) {
+  PageTable* pd = reinterpret_cast<PageTable*>(pdpte & PHYSICAL_ADDRESS_MASK);
+
+  uint64_t pde = pd->entries[pd_idx];
+  if (!(pde & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  PageTable* pt = reinterpret_cast<PageTable*>(pd->entries[pd_idx] & PHYSICAL_ADDRESS_MASK);
+  // 2 MiB huge page
+  if (pde & (uint64_t)PageFlags::HugePage) {
+    return (pde & PAGE_ADDRESS_MASK_2M) + (virt & 0x1FFFFFULL);
+  }
+
+  PageTable* pt = reinterpret_cast<PageTable*>(pde & PHYSICAL_ADDRESS_MASK);
 
   if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present)) {
     return 0;
   }
 
-  uintptr_t phys = (pt->entries[pt_idx] & PHYSICAL_ADDRESS_MASK) + (virt & 0xFFF);
-  return phys;
+  return (pt->entries[pt_idx] & PHYSICAL_ADDRESS_MASK) + (virt & 0xFFF);
 }
 
 fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flags(uintptr_t virt) {
@@ -256,7 +263,12 @@ fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flag
   if (!(pt->entries[pt_idx] & (uint64_t)PageFlags::Present))
     return fk::core::Error::NotFound;
 
-  return static_cast<PageFlags>(pt->entries[pt_idx] & ~PHYSICAL_ADDRESS_MASK);
+  uint64_t raw = pt->entries[pt_idx];
+  uint64_t flags = raw & ~PHYSICAL_ADDRESS_MASK;
+  flags &= ~static_cast<uint64_t>(PageFlags::Accessed);
+  flags &= ~static_cast<uint64_t>(PageFlags::Dirty);
+
+  return static_cast<PageFlags>(flags);
 }
 
 uintptr_t clone_table_recursive(uintptr_t old_phys, int level, bool deep_copy) {
@@ -344,12 +356,31 @@ void VirtualMemoryManager::free_address_space(uintptr_t cr3) {
       uint64_t pdpte = pdpt->entries[pdpt_i];
       if (!(pdpte & 1) || !(pdpte & 4)) continue;
 
+      // 1 GiB huge page: release all frames in the region.
+      if (pdpte & (uint64_t)PageFlags::HugePage) {
+        uintptr_t base = pdpte & PAGE_ADDRESS_MASK_1G;
+        for (size_t i = 0; i < PT_ENTRIES * PT_ENTRIES; ++i) {
+          PhysicalMemoryManager::the().free_page(base + i * PAGE_SIZE);
+        }
+        continue;
+      }
+
       uintptr_t pd_phys = pdpte & PHYSICAL_ADDRESS_MASK;
       auto* pd = reinterpret_cast<PageTable*>(pd_phys);
 
       for (int pd_i = 0; pd_i < 512; ++pd_i) {
         uint64_t pde = pd->entries[pd_i];
         if (!(pde & 1) || !(pde & 4)) continue;
+
+        // 2 MiB huge page: release all frames in the region instead of
+        // misreading the PDE as a page-table pointer (M9).
+        if (pde & (uint64_t)PageFlags::HugePage) {
+          uintptr_t base = pde & PAGE_ADDRESS_MASK_2M;
+          for (size_t i = 0; i < PT_ENTRIES; ++i) {
+            PhysicalMemoryManager::the().free_page(base + i * PAGE_SIZE);
+          }
+          continue;
+        }
 
         uintptr_t pt_phys = pde & PHYSICAL_ADDRESS_MASK;
         auto* pt = reinterpret_cast<PageTable*>(pt_phys);
@@ -407,6 +438,34 @@ static bool is_table_empty(PageTable* pt) {
 
 void VirtualMemoryManager::unmap_page_range(uintptr_t start, uintptr_t end) {
   for (uintptr_t addr = start; addr < end; addr += PAGE_SIZE) {
+    size_t pml4_idx = (addr >> PML4_INDEX_SHIFT) & TABLE_INDEX_MASK;
+    size_t pdpt_idx = (addr >> PDPT_INDEX_SHIFT) & TABLE_INDEX_MASK;
+    size_t pd_idx   = (addr >> PD_INDEX_SHIFT) & TABLE_INDEX_MASK;
+
+    // 2 MiB huge page at the PD level: unmap the whole region.  Reading the
+    // PDE as a page-table pointer would walk unmapped memory (M9).
+    if ((m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::Present) &&
+        (m_pml4->entries[pml4_idx] & (uint64_t)PageFlags::User)) {
+      auto* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & PHYSICAL_ADDRESS_MASK);
+      if ((pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::Present) &&
+          (pdpt->entries[pdpt_idx] & (uint64_t)PageFlags::User)) {
+        auto* pd = reinterpret_cast<PageTable*>(pdpt->entries[pdpt_idx] & PHYSICAL_ADDRESS_MASK);
+        uint64_t pde = pd->entries[pd_idx];
+        if ((pde & (uint64_t)PageFlags::Present) && (pde & (uint64_t)PageFlags::HugePage)) {
+          if (pde & (uint64_t)PageFlags::User) {
+            uintptr_t base = pde & PAGE_ADDRESS_MASK_2M;
+            for (size_t i = 0; i < PT_ENTRIES; ++i) {
+              PhysicalMemoryManager::the().free_page(base + i * PAGE_SIZE);
+            }
+          }
+          pd->entries[pd_idx] = 0;
+          flush_tlb();
+          addr += PAGE_SIZE_2M - PAGE_SIZE;
+          continue;
+        }
+      }
+    }
+
     uint64_t* pte_ptr = get_pte(addr);
     if (!pte_ptr) continue;
     if (!(*pte_ptr & static_cast<uint64_t>(PageFlags::Present))) continue;
@@ -419,10 +478,6 @@ void VirtualMemoryManager::unmap_page_range(uintptr_t start, uintptr_t end) {
     invlpg(addr);
 
     // Free empty intermediate tables
-    size_t pml4_idx = (addr >> 39) & 0x1FF;
-    size_t pdpt_idx = (addr >> 30) & 0x1FF;
-    size_t pd_idx   = (addr >> 21) & 0x1FF;
-
     if (!(m_pml4->entries[pml4_idx] & 1)) continue;
     auto* pdpt = reinterpret_cast<PageTable*>(m_pml4->entries[pml4_idx] & PHYSICAL_ADDRESS_MASK);
 
@@ -486,10 +541,11 @@ void VirtualMemoryManager::map_range(uintptr_t start, uintptr_t size, PageFlags 
 void VirtualMemoryManager::extend_direct_map() {
   fk::algorithms::klog("VMM", "Extending direct map at %p", (void*)KERNEL_VIRT_BASE);
 
-  size_t total_memory = PhysicalMemoryManager::the().total_memory();
-  size_t aligned_total = (total_memory + PAGE_SIZE_2M - 1) & ~(PAGE_SIZE_2M - 1);
+  size_t highest_phys = PhysicalMemoryManager::the().highest_physical_address();
+  size_t aligned_total = (highest_phys + PAGE_SIZE_2M - 1) & ~(PAGE_SIZE_2M - 1);
 
-  fk::algorithms::klog("VMM", "Direct map: %zu MB physical memory", total_memory / (1024 * 1024));
+  fk::algorithms::klog("VMM", "Direct map: %zu MB physical memory",
+                       highest_phys / (1024 * 1024));
 
   fk::synchronization::ScopedLockIRQ lock(m_lock);
 
@@ -532,9 +588,11 @@ void VirtualMemoryManager::extend_direct_map() {
       pd = reinterpret_cast<PageTable*>(pdpte & PHYSICAL_ADDRESS_MASK);
     }
 
+    // Data-only direct map: NX keeps it W^X-compliant (M12).
     pd->entries[pd_idx] = offset | static_cast<uint64_t>(PageFlags::Present)
                                  | static_cast<uint64_t>(PageFlags::Writable)
-                                 | static_cast<uint64_t>(PageFlags::HugePage);
+                                 | static_cast<uint64_t>(PageFlags::HugePage)
+                                 | static_cast<uint64_t>(PageFlags::ExecuteDisable);
   }
 
   flush_tlb();

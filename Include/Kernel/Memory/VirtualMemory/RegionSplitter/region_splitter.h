@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 namespace fkernel {
 

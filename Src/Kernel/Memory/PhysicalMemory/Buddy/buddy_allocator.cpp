@@ -1,5 +1,5 @@
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/aligner.h>
 
 BuddyAllocator::BuddyAllocator()
@@ -247,8 +247,29 @@ void BuddyAllocator::free(void* ptr, size_t order) {
 }
 
 void BuddyAllocator::invalidate_page(uintptr_t phys) {
-    for (size_t order = MIN_ORDER; order <= MAX_ORDER; order++) {
-        size_t idx = order_to_index(order);
-        m_state.remove(idx, phys);
+    // The page being invalidated may sit inside a larger free block.  Find the
+    // maximal free block that contains phys and split it down until the page
+    // is isolated; the sibling halves are re-inserted as free blocks so the
+    // buddy and the bitmap stay consistent (no double-allocation).
+    for (size_t order = MAX_ORDER; ; --order) {
+        size_t size = order_to_size(order);
+        uintptr_t block_base = phys & ~(size - 1);
+
+        if (m_state.remove(order_to_index(order), block_base)) {
+            while (order > MIN_ORDER) {
+                --order;
+                uintptr_t buddy = block_base + order_to_size(order);
+                if (phys < buddy) {
+                    push_free_block(order, buddy);
+                } else {
+                    push_free_block(order, block_base);
+                    block_base = buddy;
+                }
+            }
+            return;
+        }
+
+        if (order == MIN_ORDER)
+            return;
     }
 }

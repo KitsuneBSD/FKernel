@@ -5,10 +5,10 @@
 #include <Kernel/Memory/ObjectMemory/slab_allocator.h>
 #include <Kernel/Memory/iommu.h>
 #include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
-#include <Kernel/Boot/boot_info.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Boot/Core/boot_info.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/allocator_backend.h>
+#include <LibFK/Memory/Allocators/allocator_backend.h>
 #include <LibFK/Utilities/memory.h>
 
 #ifdef __x86_64__
@@ -153,6 +153,14 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     if (size == 0) {
         free(ptr);
         return nullptr;
+    }
+
+    // Slab-backed objects have no BlockHeader; route them through the slab
+    // allocator so growing a LibFK Vector/String no longer trips the heap
+    // magic check (M4).
+    if (SlabAllocator::the().is_initialized() &&
+        SlabAllocator::the().is_slab_allocation(ptr)) {
+        return SlabAllocator::the().reallocate(ptr, size);
     }
 
     uint64_t flags = save_and_disable_interrupts();

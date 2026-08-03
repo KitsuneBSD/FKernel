@@ -1,9 +1,10 @@
 #include <Kernel/Memory/ObjectMemory/slab_allocator.h>
 #include <Kernel/Memory/ObjectMemory/slab.h>
 #include <Kernel/Memory/ObjectMemory/slab_cache.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Utilities/memory.h>
 
@@ -52,7 +53,8 @@ static Slab *grow_slab(SlabCache *cache) {
   if (cache->pages_order == 0) {
     phys = PhysicalMemoryManager::the().alloc_page();
   } else {
-    phys = PhysicalMemoryManager::the().alloc_contiguous(cache->pages_order);
+    size_t slab_size = SLAB_PAGE_SIZE << cache->pages_order;
+    phys = PhysicalMemoryManager::the().alloc_contiguous(size_to_order(slab_size));
   }
   if (!phys) {
     fk::algorithms::kwarn("SLAB", "grow_slab: out of memory for size %zu", cache->object_size);
@@ -84,6 +86,7 @@ static SlabCache *find_cache_for_size(size_t size) {
 } // anonymous namespace
 
 void SlabAllocator::initialize() {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
   if (m_is_initialized) return;
 
   size_t header_sz = slab_header_size();
@@ -118,6 +121,11 @@ void SlabAllocator::initialize() {
 }
 
 void *SlabAllocator::allocate(size_t size) {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  return allocate_locked(size);
+}
+
+void *SlabAllocator::allocate_locked(size_t size) {
   if (!m_is_initialized || size == 0) return nullptr;
 
   SlabCache *cache = find_cache_for_size(size);
@@ -144,17 +152,59 @@ void *SlabAllocator::allocate(size_t size) {
   return obj;
 }
 
-bool SlabAllocator::deallocate(void *ptr) {
+bool SlabAllocator::is_slab_allocation(void *ptr) const {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  return is_slab_allocation_locked(ptr);
+}
+
+bool SlabAllocator::is_slab_allocation_locked(void *ptr) const {
   if (!m_is_initialized || !ptr) return false;
 
   Slab *slab = ptr_to_slab(ptr);
   SlabCache *cache = slab->cache;
+  return cache >= s_caches && cache < s_caches + CACHE_COUNT;
+}
 
-  if (!cache || cache < s_caches || cache >= s_caches + CACHE_COUNT)
-    return false;
+void *SlabAllocator::reallocate(void *ptr, size_t size) {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  return reallocate_locked(ptr, size);
+}
+
+void *SlabAllocator::reallocate_locked(void *ptr, size_t size) {
+  if (!m_is_initialized || !ptr) return nullptr;
+
+  Slab *slab = ptr_to_slab(ptr);
+  SlabCache *cache = slab->cache;
+  if (cache < s_caches || cache >= s_caches + CACHE_COUNT)
+    return nullptr;
+
+  size_t old_size = cache->object_size;
+  if (size <= old_size)
+    return ptr;
+
+  void *new_obj = allocate_locked(size);
+  if (!new_obj)
+    return nullptr;
+
+  fk::memory::copy(new_obj, ptr, old_size);
+  deallocate_locked(ptr);
+  return new_obj;
+}
+
+bool SlabAllocator::deallocate(void *ptr) {
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  return deallocate_locked(ptr);
+}
+
+bool SlabAllocator::deallocate_locked(void *ptr) {
+  if (!m_is_initialized || !ptr) return false;
+  if (!is_slab_allocation_locked(ptr)) return false;
+
+  Slab *slab = ptr_to_slab(ptr);
+  SlabCache *cache = slab->cache;
 
   uintptr_t first_obj = reinterpret_cast<uintptr_t>(slab) + slab_header_size();
-  uintptr_t slab_end = reinterpret_cast<uintptr_t>(slab) + SLAB_PAGE_SIZE;
+  uintptr_t slab_end = reinterpret_cast<uintptr_t>(slab) + (SLAB_PAGE_SIZE << cache->pages_order);
   if (reinterpret_cast<uintptr_t>(ptr) < first_obj ||
       reinterpret_cast<uintptr_t>(ptr) >= slab_end)
     return false;

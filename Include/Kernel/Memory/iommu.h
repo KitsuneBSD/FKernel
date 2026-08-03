@@ -3,7 +3,7 @@
 #include <LibFK/Core/result.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Types/types.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
 
 namespace fkernel {
 

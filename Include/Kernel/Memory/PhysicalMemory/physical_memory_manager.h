@@ -35,8 +35,15 @@ private:
   /** @brief Finds the zone containing a specific physical address. */
   PhysicalZone *find_zone_for_paddr(uintptr_t phys);
 
-  /** @brief Selects a zone based on type preference and availability. */
-  PhysicalZone *select_zone(ZoneType preferred, uint32_t preferred_node = 0);
+  /**
+   * @brief Fills @p out with candidate zones in priority order
+   * (preferred type + node, preferred node, preferred type, NORMAL, any).
+   * Duplicates are skipped.  Callers try each zone in order until one
+   * succeeds, giving a fallback when a zone is full (M8).
+   * @return Number of zones written.
+   */
+  size_t candidate_zones(ZoneType preferred, uint32_t preferred_node, PhysicalZone **out,
+                         size_t capacity);
 
   /** @brief Processes a raw memory range into one or more zones. */
   void process_range(uintptr_t base, uintptr_t end, uint64_t *&bitmap_cursor,
@@ -122,6 +129,13 @@ public:
 
   /** @return Total system RAM in bytes. */
   size_t total_memory() const { return m_total_memory; }
+
+  /**
+   * @return Highest physical address covered by any zone (in bytes).
+   * Used to size the direct map so it covers the whole of physical memory,
+   * including holes that `total_memory()` (a sum of usable lengths) omits.
+   */
+  size_t highest_physical_address() const;
 
   /** @return Total free RAM in bytes. */
   size_t free_memory() const { return m_free_memory; }

@@ -1,9 +1,10 @@
 #include <Kernel/Memory/Dma/dma_buffer.h>
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace {
@@ -19,13 +20,9 @@ static size_t s_free_count = 0;
 static uintptr_t s_next_vaddr = DMA_REGION_BASE;
 
 static size_t to_buddy_order(size_t page_count) {
-  size_t order = 0;
-  size_t block = 1;
-  while (block < page_count) {
-    block <<= 1;
-    order++;
-  }
-  return order;
+  // Buddy orders are absolute (MIN_ORDER = 12 -> 4 KiB); convert a page count
+  // to the smallest order that can hold it.
+  return size_to_order(page_count * PAGE_SIZE);
 }
 
 static uintptr_t alloc_dma_vaddr(size_t pages) {
@@ -80,7 +77,7 @@ fk::core::Result<DmaBuffer, fk::core::Error> dma_alloc_buffer(size_t size) {
 
   size_t page_count = (size + PAGE_SIZE - 1) / PAGE_SIZE;
   size_t order = to_buddy_order(page_count);
-  size_t alloc_pages = static_cast<size_t>(1) << order;
+  size_t alloc_pages = order_to_size(order) / PAGE_SIZE;
 
   uintptr_t phys = PhysicalMemoryManager::the().alloc_contiguous(order);
   if (phys == 0) {

@@ -6,8 +6,8 @@
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_state.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/free_blocks.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/bitmap.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Container/Adapters/bitmap.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Utilities/aligner.h>

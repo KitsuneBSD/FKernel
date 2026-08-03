@@ -2,7 +2,7 @@
 
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
 #include <Kernel/Memory/ObjectMemory/Zone/zone_allocator.h>
-#include <LibFK/Container/bitmap.h>
+#include <LibFK/Container/Adapters/bitmap.h>
 
 /**
  * @brief Represents a physical memory zone in the system.
