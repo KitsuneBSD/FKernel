@@ -33,6 +33,10 @@ enum class Error {
   BrokenPipe = 32,                  // EPIPE
   WouldBlock = 11,                  // EAGAIN
   NotConnected = 107,               // ENOTCONN
+  ReadOnly = 30,                    // EROFS
+  NotSupported = 95,                // EOPNOTSUPP
+  ProtocolNotSupported = 92,        // ENOPROTOOPT
+  NoDevice = 19,                    // ENODEV
 };
 
 } // namespace core

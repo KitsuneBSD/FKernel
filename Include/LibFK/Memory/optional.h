@@ -2,8 +2,8 @@
 
 #include <LibC/stddef.h>
 #include <LibC/string.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/new.h>
 
 namespace fk {
 namespace memory {

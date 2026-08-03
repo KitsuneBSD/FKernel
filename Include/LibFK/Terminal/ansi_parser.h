@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 namespace fk::terminal {
 

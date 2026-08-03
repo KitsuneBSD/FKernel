@@ -2,7 +2,7 @@
 
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Core/error.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/optional.h>
 #include <LibFK/Types/types.h>
 

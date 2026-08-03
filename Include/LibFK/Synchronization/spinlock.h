@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Synchronization/lock_rank.h>
 #include <LibFK/Types/types.h>

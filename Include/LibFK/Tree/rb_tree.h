@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibFK/Algorithms/log.h> // For kerror
+#include <LibFK/Algorithms/Logging/log.h> // For kerror
 #include <LibFK/Core/result.h>    // Include Result for return types
 #include <LibFK/Utilities/pair.h> // Include Pair definition
 

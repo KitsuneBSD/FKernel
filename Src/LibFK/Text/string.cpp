@@ -1,7 +1,7 @@
 #include <LibC/ctype.h>
 #include <LibC/string.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 

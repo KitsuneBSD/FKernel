@@ -1,9 +1,9 @@
 #pragma once
 
-#include <LibFK/Algorithms/djb2.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Crypto/djb2.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #ifdef __x86_64__
-#include <LibFK/Algorithms/crc32.h>
+#include <LibFK/Algorithms/Crypto/crc32.h>
 #endif
 
 namespace fk {

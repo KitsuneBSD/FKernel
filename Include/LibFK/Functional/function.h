@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibFK/Memory/own_ptr.h>
+#include <LibFK/Memory/Pointers/own_ptr.h>
 #include <LibFK/Types/types.h>
 
 namespace fk {

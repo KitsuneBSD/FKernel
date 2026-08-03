@@ -5,7 +5,7 @@
 namespace fk {
 namespace utilities {
 
-// min/max/clamp consolidated in LibFK/Algorithms/math.h (fk::algorithms namespace)
+// min/max/clamp consolidated in LibFK/Algorithms/Generic/math.h (fk::algorithms namespace)
 
 }
 }  // namespace fk
