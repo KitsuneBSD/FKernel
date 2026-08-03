@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Virtual/TimerFd/timer_fd_node.h>
 #include <Kernel/Fs/Virtual/TimerFd/timer_fd_registry.h>
-#include <Kernel/Fs/Vfs/kqueue.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
 

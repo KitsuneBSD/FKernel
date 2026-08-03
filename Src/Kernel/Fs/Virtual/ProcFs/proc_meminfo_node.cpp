@@ -1,7 +1,7 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_meminfo_node.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fk::core;
 

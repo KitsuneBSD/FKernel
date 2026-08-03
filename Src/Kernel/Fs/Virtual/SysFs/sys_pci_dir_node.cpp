@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/SysFs/sys_pci_dir_node.h>
 #include <Kernel/Fs/Virtual/SysFs/sys_pci_dev_dir_node.h>
-#include <Kernel/Hardware/Pci/pci.h>
+#include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <LibFK/Utilities/memory.h>
 
 // BDF format: "0000:00:1f.0" (domain:bus:device.function)

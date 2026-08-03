@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/SemFs/sem_dir_node.h>
 #include <Kernel/Fs/Virtual/SemFs/sem_node.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

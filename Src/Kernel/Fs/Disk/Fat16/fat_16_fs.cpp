@@ -2,10 +2,10 @@
 #include <Kernel/Fs/Disk/Fat16/fat_16_node.h>
 #include <Kernel/Fs/Disk/Fat16/bpb.h>
 #include <Kernel/Fs/Disk/Fat16/directory_entry.h>
-#include <LibFK/Algorithms/fat_name.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Algorithms/string_algorithms.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Algorithms/Generic/fat_name.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Algorithms/Generic/string_algorithms.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -187,6 +187,119 @@ Fat16FileSystem::lookup(const char* name) {
         }
     }
     return fk::core::Error::NotFound;
+}
+
+fk::core::Result<void, fk::core::Error>
+Fat16FileSystem::write_fat_entry(uint32_t cluster, uint16_t value) {
+    uint32_t fat_offset = cluster * 2;
+    uint32_t sector_offset = fat_offset / 512;
+    uint32_t byte_in_sector = fat_offset % 512;
+    uint8_t sector_buf[512];
+    auto rres = m_device->read((m_fat_sector + sector_offset) * 512, 512, sector_buf);
+    if (rres.is_error()) return fk::core::Error::IOError;
+    fk::memory::copy(sector_buf + byte_in_sector, &value, 2);
+    auto wres = m_device->write((m_fat_sector + sector_offset) * 512, 512, sector_buf);
+    if (wres.is_error()) return fk::core::Error::IOError;
+    return {};
+}
+
+fk::core::Result<uint32_t, fk::core::Error>
+Fat16FileSystem::allocate_cluster(uint32_t prev_cluster) {
+    uint8_t sector_buf[512];
+    uint32_t current_sector = ~0u;
+    for (uint32_t cluster = 2; cluster < 0xFFF4; ++cluster) {
+        uint32_t fat_byte = cluster * 2;
+        uint32_t sector_idx = fat_byte / 512;
+        uint32_t byte_in_sector = fat_byte % 512;
+
+        if (sector_idx != current_sector) {
+            auto res = m_device->read((m_fat_sector + sector_idx) * 512, 512, sector_buf);
+            if (res.is_error()) return fk::core::Error::IOError;
+            current_sector = sector_idx;
+        }
+
+        uint16_t val;
+        fk::memory::copy(&val, sector_buf + byte_in_sector, 2);
+        if (val != 0) continue;
+
+        // Mark new cluster as end-of-chain
+        TRY(write_fat_entry(cluster, 0xFFFF));
+
+        // Link previous cluster to the new one
+        if (prev_cluster >= 2 && prev_cluster < 0xFFF8) {
+            TRY(write_fat_entry(prev_cluster, static_cast<uint16_t>(cluster)));
+        }
+        return cluster;
+    }
+    return fk::core::Error::OutOfMemory;
+}
+
+fk::core::Result<size_t, fk::core::Error>
+Fat16FileSystem::write_to_cluster_chain(uint32_t& first_cluster, uint64_t offset,
+                                         size_t size, const uint8_t* buf,
+                                         size_t& file_size_inout) {
+    if (size == 0) return (size_t)0;
+    uint32_t cluster_size = m_sectors_per_cluster * 512;
+
+    // Allocate first cluster if the file is empty
+    if (first_cluster < 2) {
+        auto res = allocate_cluster(0);
+        if (res.is_error()) return res.error();
+        first_cluster = res.value();
+    }
+
+    // Walk to the cluster containing `offset`, allocating as needed
+    uint64_t clusters_to_skip = offset / cluster_size;
+    uint32_t current_cluster = first_cluster;
+    for (uint64_t i = 0; i < clusters_to_skip; ++i) {
+        uint32_t next = get_next_cluster(current_cluster);
+        if (next >= 0xFFF8) {
+            auto res = allocate_cluster(current_cluster);
+            if (res.is_error()) return res.error();
+            next = res.value();
+        }
+        current_cluster = next;
+    }
+
+    uint64_t cluster_offset = offset % cluster_size;
+    size_t bytes_written = 0;
+    uint8_t* cluster_buf = static_cast<uint8_t*>(kmalloc(cluster_size));
+    if (!cluster_buf) return fk::core::Error::OutOfMemory;
+
+    while (bytes_written < size) {
+        uint32_t sector = cluster_to_sector(current_cluster);
+        if (m_device->read(sector * 512, cluster_size, cluster_buf).is_error()) {
+            kfree(cluster_buf);
+            return fk::core::Error::IOError;
+        }
+        size_t to_write = size - bytes_written;
+        if (to_write > (size_t)(cluster_size - cluster_offset))
+            to_write = (size_t)(cluster_size - cluster_offset);
+        fk::memory::copy(cluster_buf + cluster_offset, buf + bytes_written, to_write);
+        if (m_device->write(sector * 512, cluster_size, cluster_buf).is_error()) {
+            kfree(cluster_buf);
+            return fk::core::Error::IOError;
+        }
+
+        bytes_written += to_write;
+        cluster_offset = 0;
+
+        if (bytes_written < size) {
+            uint32_t next = get_next_cluster(current_cluster);
+            if (next >= 0xFFF8) {
+                auto res = allocate_cluster(current_cluster);
+                if (res.is_error()) { kfree(cluster_buf); return res.error(); }
+                next = res.value();
+            }
+            current_cluster = next;
+        }
+    }
+
+    kfree(cluster_buf);
+
+    uint64_t end = offset + bytes_written;
+    if (end > file_size_inout) file_size_inout = (size_t)end;
+    return bytes_written;
 }
 
 }

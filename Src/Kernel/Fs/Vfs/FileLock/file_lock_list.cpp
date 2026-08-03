@@ -1,5 +1,5 @@
 #include <Kernel/Fs/Vfs/FileLock/file_lock_list.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 

@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Disk/RamDisk/ram_disk.h>
 
-#include <LibFK/Algorithms/container_algorithms.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

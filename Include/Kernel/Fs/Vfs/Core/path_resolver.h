@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/definitions.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/definitions.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>

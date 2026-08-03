@@ -1,17 +1,12 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/kqueue.h>
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Fs/Virtual/Epoll/epoll_entry.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
-
-struct EpollEntry {
-    int      fd;
-    uint32_t events;
-    uint64_t data_u64;
-};
 
 class EpollNode : public Node {
     fk::containers::Vector<EpollEntry> m_entries;

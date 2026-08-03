@@ -1,4 +1,4 @@
-#include <Kernel/Fs/Vfs/dentry_node_stack.h>
+#include <Kernel/Fs/Vfs/Core/dentry_node_stack.h>
 
 namespace fkernel {
 

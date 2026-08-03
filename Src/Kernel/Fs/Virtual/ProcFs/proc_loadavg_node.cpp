@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_loadavg_node.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Scheduler/Task/task_state.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;

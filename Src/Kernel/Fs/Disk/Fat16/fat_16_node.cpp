@@ -14,8 +14,9 @@ Fat16Node::read(uint64_t offset, size_t size, uint8_t* buffer) {
 }
 
 fk::core::Result<size_t, fk::core::Error>
-Fat16Node::write(uint64_t, size_t, const uint8_t*) {
-    return fk::core::Error::NotImplemented;
+Fat16Node::write(uint64_t offset, size_t size, const uint8_t* buffer) {
+    if (m_is_dir) return fk::core::Error::IsDirectory;
+    return m_fs->write_to_cluster_chain(m_first_cluster, offset, size, buffer, m_size);
 }
 
 }

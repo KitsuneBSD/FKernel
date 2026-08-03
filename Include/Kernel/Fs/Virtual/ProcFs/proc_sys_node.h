@@ -1,6 +1,6 @@
 #pragma once
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 extern char g_proc_hostname[64];
 extern char g_proc_domainname[64];

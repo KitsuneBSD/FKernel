@@ -27,7 +27,7 @@ Iso9660Node::read(uint64_t offset, size_t size, uint8_t* buffer) {
 
 fk::core::Result<size_t, Error>
 Iso9660Node::write(uint64_t /*offset*/, size_t /*size*/, const uint8_t* /*buffer*/) {
-    return Error::NotImplemented;
+    return Error::ReadOnly;
 }
 
 fk::core::Result<fk::RefPtr<Node>, Error>

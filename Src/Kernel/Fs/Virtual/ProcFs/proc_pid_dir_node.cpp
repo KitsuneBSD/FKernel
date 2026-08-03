@@ -6,7 +6,7 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_sched_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_stat_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_process_node.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;

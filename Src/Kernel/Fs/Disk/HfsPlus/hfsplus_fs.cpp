@@ -2,8 +2,8 @@
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_node.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

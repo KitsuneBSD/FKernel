@@ -20,7 +20,6 @@ MinixNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
 fk::core::Result<size_t, Error>
 MinixNode::write(uint64_t offset, size_t size, const uint8_t* buffer) {
     if (is_directory()) return Error::IsDirectory;
-    if (offset + size > m_inode.i_size) return Error::NotImplemented;
 
     uint32_t zsize          = m_fs->zone_size();
     size_t total            = 0;
@@ -33,7 +32,12 @@ MinixNode::write(uint64_t offset, size_t size, const uint8_t* buffer) {
         if (chunk > size - total) chunk = size - total;
 
         uint16_t zone = TRY(m_fs->get_data_zone(m_inode, zone_idx));
-        if (zone == 0) return Error::IOError;
+        if (zone == 0) {
+            // Allocate a new zone; only direct zones are supported for extension.
+            if (zone_idx >= MINIX_DIRECT_ZONES) return Error::NotSupported;
+            zone = TRY(m_fs->allocate_zone_num());
+            m_inode.i_zone[zone_idx] = zone;
+        }
 
         uint8_t zbuf[MINIX_BLOCK_SIZE];
         TRY(m_fs->read_block(zone, zbuf));
@@ -43,6 +47,11 @@ MinixNode::write(uint64_t offset, size_t size, const uint8_t* buffer) {
         total += chunk;
         cur   += chunk;
     }
+
+    if (cur > m_inode.i_size) {
+        m_inode.i_size = static_cast<uint32_t>(cur);
+    }
+    TRY(m_fs->write_inode(m_ino, m_inode));
     return total;
 }
 

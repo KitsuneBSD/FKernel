@@ -2,9 +2,9 @@
 #include <Kernel/Fs/Disk/Ufs/ufs_node.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_dir.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_endian.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 

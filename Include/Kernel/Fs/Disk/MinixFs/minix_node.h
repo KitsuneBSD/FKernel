@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Fs/Disk/MinixFs/minix_super.h>
 
 namespace fkernel {

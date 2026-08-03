@@ -1,17 +1,21 @@
 #pragma once
 
-#include <LibFK/Container/intrusive_list.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/intrusive_list.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
-#include <LibFK/Types/process_id.h>
+#include <LibFK/Types/Process/process_id.h>
 
-#include <Kernel/Fs/Vfs/definitions.h>
-#include <LibFK/Memory/ref_counted.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <Kernel/Fs/Vfs/Core/definitions.h>
+#include <Kernel/Fs/Vfs/Core/directory_entry.h>
+#include <Kernel/Fs/Vfs/Core/timespec.h>
+#include <Kernel/Fs/Vfs/Events/knote_hook.h>
+#include <Kernel/Fs/Vfs/Events/node_knote_list.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
     class KQueueNode;
@@ -21,24 +25,11 @@ namespace fkernel {
     class FileLockList;
 }
 
-struct KNoteHook {
-    fk::containers::IntrusiveListNode<KNoteHook> hook;
-    fkernel::KQueueNode* kq{nullptr};
-    uint64_t ident{0};
-    int16_t filter{0};
-    // Pending event flags for EVFILT_PROC (NOTE_EXIT/FORK/EXEC) and EVFILT_SIGNAL (signum).
-    uint32_t pending_fflags{0};
-};
-
-struct DirectoryEntry {
-  char name[256];
-  uint32_t type; // 1 = DIR, 2 = SYM, 0 = REG
-};
+using fkernel::DirectoryEntry;
+using fkernel::KNoteHook;
 
 class Node : public fk::memory::RefCounted<Node> {
 public:
-  using KNoteList = fk::containers::IntrusiveList<KNoteHook, &KNoteHook::hook>;
-
   virtual ~Node() override;
 
   virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t offset, size_t size,
@@ -47,10 +38,8 @@ public:
                                                           const uint8_t* buffer) = 0;
   virtual size_t size() const = 0;
 
-  // Called on each open(); device nodes override to do lazy hardware init.
   virtual fk::core::Result<void, fk::core::Error> on_open() { return {}; }
 
-  // Called when the last FileDescription referencing this node is destroyed.
   virtual void on_close() {}
 
   virtual fk::core::Result<fk::RefPtr<Node>, fk::core::Error> lookup(const char* /*name*/) {
@@ -91,7 +80,7 @@ public:
   }
 
   virtual fk::core::Result<void, fk::core::Error>
-  list_dir([[maybe_unused]] fk::containers::Vector<DirectoryEntry>& entries) {
+  list_dir([[maybe_unused]] fk::containers::Vector<fkernel::DirectoryEntry>& entries) {
     return fk::core::Error::NotADirectory;
   }
 
@@ -171,19 +160,32 @@ public:
     m_gid = gid;
   }
 
-  void attach_knote(KNoteHook* knote) {
+  void attach_knote(fkernel::KNoteHook* knote) {
     fk::synchronization::ScopedLockIRQ lock(m_knotes_lock);
     m_knotes.push_back(knote);
   }
 
-  void detach_knote(KNoteHook* knote) {
+  void detach_knote(fkernel::KNoteHook* knote) {
     fk::synchronization::ScopedLockIRQ lock(m_knotes_lock);
     m_knotes.remove(knote);
   }
 
-  const KNoteList& knotes() const { return m_knotes; }
-  KNoteList& knotes() { return m_knotes; }
+  const fkernel::KNoteList& knotes() const { return m_knotes; }
+  fkernel::KNoteList& knotes() { return m_knotes; }
   fk::synchronization::Spinlock& knotes_lock() const { return m_knotes_lock; }
+
+  // In-memory timestamp support. FS drivers may override set_times() to persist.
+  virtual fk::core::Result<void, fk::core::Error> set_times(const fkernel::timespec& atime,
+                                                             const fkernel::timespec& mtime) {
+    m_atime = atime;
+    m_mtime = mtime;
+    m_ctime = mtime;
+    return {};
+  }
+
+  const fkernel::timespec& atime() const { return m_atime; }
+  const fkernel::timespec& mtime() const { return m_mtime; }
+  const fkernel::timespec& ctime() const { return m_ctime; }
 
   // POSIX advisory file lock operations
   bool try_acquire_lock(fk::ProcessId pid, short l_type, int64_t start, int64_t end,
@@ -200,8 +202,12 @@ protected:
   uint32_t m_uid{0};
   uint32_t m_gid{0};
 
+  fkernel::timespec m_atime{};
+  fkernel::timespec m_mtime{};
+  fkernel::timespec m_ctime{};
+
   mutable fk::synchronization::Spinlock m_knotes_lock;
-  KNoteList m_knotes;
+  fkernel::KNoteList m_knotes;
   fkernel::FileLockList* m_lock_list{nullptr};
 
 private:

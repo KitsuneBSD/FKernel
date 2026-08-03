@@ -1,5 +1,5 @@
-#include <Kernel/Fs/Vfs/fstab.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Mount/fstab.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/error.h>
 
 namespace fkernel {

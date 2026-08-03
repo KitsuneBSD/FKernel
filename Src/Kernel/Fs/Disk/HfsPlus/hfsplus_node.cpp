@@ -2,8 +2,8 @@
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -88,7 +88,7 @@ HFSPlusNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries)
 fk::core::Result<fk::text::String, fk::core::Error>
 HFSPlusNode::read_link()
 {
-    if (!m_is_symlink) return fk::core::Error::NotImplemented;
+    if (!m_is_symlink) return fk::core::Error::NotASymlink;
 
     // Symlink target is stored in the data fork as a plain UTF-8 string
     fk::containers::Vector<uint8_t> buf;

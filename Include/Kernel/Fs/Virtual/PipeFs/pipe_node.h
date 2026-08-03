@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/endpoint.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {

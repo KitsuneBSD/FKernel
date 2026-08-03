@@ -1,5 +1,5 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_filesystems_node.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <LibFK/Text/string.h>
 
 using namespace fk::core;

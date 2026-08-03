@@ -1,6 +1,6 @@
 #pragma once
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Types/process_id.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Types/Process/process_id.h>
 
 class ProcPidCmdlineNode : public Node {
 public:

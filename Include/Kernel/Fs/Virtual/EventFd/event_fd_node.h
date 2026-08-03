@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/endpoint.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 

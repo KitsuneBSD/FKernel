@@ -1,9 +1,10 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/dentry_node_stack.h>
-#include <LibFK/Container/hash_map.h>
-#include <LibFK/Memory/ref_counted.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <Kernel/Fs/Vfs/Core/dentry_node_stack.h>
+#include <Kernel/Fs/Vfs/Mount/mount_record.h>
+#include <LibFK/Container/Associative/hash_map.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
@@ -12,13 +13,6 @@ class Dentry;
 
 class MountNamespace : public fk::memory::RefCounted<MountNamespace> {
 public:
-  struct MountRecord {
-    char path[128];
-    char fstype[16];
-    uint32_t dev_id;
-    Dentry* dentry_ptr;
-  };
-
   static fk::RefPtr<MountNamespace> create(fk::RefPtr<Dentry> root_dentry);
   ~MountNamespace();
 

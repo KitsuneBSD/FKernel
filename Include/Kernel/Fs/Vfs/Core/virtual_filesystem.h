@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/file_description.h>
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Fs/Vfs/path_resolver.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Fs/Vfs/Core/path_resolver.h>
 #include <LibFK/Core/result.h>
 
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Utilities/pair.h>
 

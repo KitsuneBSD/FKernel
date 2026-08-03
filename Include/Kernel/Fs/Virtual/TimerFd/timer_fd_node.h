@@ -1,25 +1,18 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/endpoint.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Types/types.h>
+
+#include "kernel_timespec.h"
+#include "kernel_itimerspec.h"
 
 namespace fkernel {
 
 class TimerFdNode final : public Node {
 public:
-    struct KernelTimespec {
-        int64_t tv_sec;
-        int64_t tv_nsec;
-    };
-
-    struct KernelItimerspec {
-        KernelTimespec it_interval;
-        KernelTimespec it_value;
-    };
-
     static fk::core::Result<fk::RefPtr<TimerFdNode>, fk::core::Error> create(int clock_id);
 
     explicit TimerFdNode(int clock_id);

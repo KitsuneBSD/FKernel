@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_partitions_node.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Text/string.h>
 

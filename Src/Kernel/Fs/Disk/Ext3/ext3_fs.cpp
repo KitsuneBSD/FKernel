@@ -1,9 +1,9 @@
 #include <Kernel/Fs/Disk/Ext3/ext3_fs.h>
 #include <Kernel/Fs/Disk/Ext3/ext3_super.h>
 #include <Kernel/Fs/Disk/Ext2/ext2_super.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 

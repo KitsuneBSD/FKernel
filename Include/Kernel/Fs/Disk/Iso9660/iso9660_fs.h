@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Fs/Disk/Iso9660/iso9660_vd.h>
-#include <Kernel/Driver/Storage/storage_device.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 #include <LibFK/Text/string.h>
 
 namespace fkernel {
@@ -38,13 +38,13 @@ public:
 
     // Write ops always fail (read-only)
     fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-    create_child(const char* name, int mode) override { (void)name;(void)mode; return fk::core::Error::NotImplemented; }
+    create_child(const char* name, int mode) override { (void)name;(void)mode; return fk::core::Error::ReadOnly; }
     fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
-    mkdir(const char* name, int mode) override { (void)name;(void)mode; return fk::core::Error::NotImplemented; }
+    mkdir(const char* name, int mode) override { (void)name;(void)mode; return fk::core::Error::ReadOnly; }
     fk::core::Result<void, fk::core::Error>
-    unlink(const char* name) override { (void)name; return fk::core::Error::NotImplemented; }
+    unlink(const char* name) override { (void)name; return fk::core::Error::ReadOnly; }
     fk::core::Result<void, fk::core::Error>
-    rmdir(const char* name) override { (void)name; return fk::core::Error::NotImplemented; }
+    rmdir(const char* name) override { (void)name; return fk::core::Error::ReadOnly; }
 
     // Helpers used by Iso9660Node
     fk::core::Result<void, fk::core::Error>

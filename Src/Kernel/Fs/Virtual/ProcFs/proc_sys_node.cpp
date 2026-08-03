@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_sys_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_sys_kernel_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_sys_string_node.h>
-#include <LibFK/Memory/new.h>
-#include <LibFK/Algorithms/string_algorithms.h>
+#include <LibFK/Memory/Allocators/new.h>
+#include <LibFK/Algorithms/Generic/string_algorithms.h>
 #include <LibFK/Utilities/memory.h>
 
 char g_proc_hostname[64]   = "fkernel";

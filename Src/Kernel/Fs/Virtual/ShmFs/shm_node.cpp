@@ -1,7 +1,7 @@
 #include <Kernel/Fs/Virtual/ShmFs/shm_node.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

@@ -1,9 +1,9 @@
-#include <Kernel/Fs/Vfs/file_description.h>
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 FileDescription::FileDescription(fk::RefPtr<fkernel::Dentry> dentry, int flags)
     : m_dentry(dentry), m_flags(flags) {}

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Fs/Disk/Ext2/ext2_fs.h>
-#include <Kernel/Driver/Storage/storage_device.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 
 namespace fkernel {
 

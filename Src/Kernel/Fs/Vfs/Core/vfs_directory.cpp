@@ -1,8 +1,8 @@
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/file_description.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
 
-#include <LibFK/Container/unordered_set.h>
+#include <LibFK/Container/Associative/unordered_set.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Utilities/memory.h>
 

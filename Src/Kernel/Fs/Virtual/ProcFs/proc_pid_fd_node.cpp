@@ -1,7 +1,7 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_fd_node.h>
-#include <Kernel/Fs/Vfs/file_description.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/format.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/format.h>
 #include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;

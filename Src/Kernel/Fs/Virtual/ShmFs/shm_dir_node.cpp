@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/ShmFs/shm_dir_node.h>
 #include <Kernel/Fs/Virtual/ShmFs/shm_node.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

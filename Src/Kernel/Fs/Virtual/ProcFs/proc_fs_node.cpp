@@ -13,8 +13,8 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_cpuinfo_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_filesystems_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_dir_node.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;

@@ -1,7 +1,7 @@
-#include <Kernel/Fs/Vfs/path_resolver.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Fs/Vfs/Core/path_resolver.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

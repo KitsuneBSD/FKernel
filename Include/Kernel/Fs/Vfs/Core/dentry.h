@@ -1,12 +1,12 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Fs/Vfs/dentry_node_stack.h>
-#include <Kernel/Fs/Vfs/mount_namespace.h>
-#include <LibFK/Container/hash_map.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Memory/ref_counted.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Fs/Vfs/Core/dentry_node_stack.h>
+#include <Kernel/Fs/Vfs/Mount/mount_namespace.h>
+#include <LibFK/Container/Associative/hash_map.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Text/string.h>
 
 #include <LibFK/Synchronization/spinlock.h>

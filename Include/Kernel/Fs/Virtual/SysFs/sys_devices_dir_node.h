@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 
 // /sys/devices/ — contains pci/ subdirectory.
 class SysDevicesDirNode : public Node {

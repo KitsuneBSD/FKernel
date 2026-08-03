@@ -2,8 +2,8 @@
 
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_vh.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
-#include <Kernel/Driver/Storage/storage_device.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Types/types.h>
 

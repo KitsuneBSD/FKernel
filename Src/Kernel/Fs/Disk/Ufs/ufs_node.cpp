@@ -1,6 +1,7 @@
 #include <Kernel/Fs/Disk/Ufs/ufs_node.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_fs.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_super.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -16,8 +17,43 @@ UfsNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
 }
 
 fk::core::Result<size_t, Error>
-UfsNode::write(uint64_t, size_t, const uint8_t*) {
-    return Error::NotImplemented;
+UfsNode::write(uint64_t offset, size_t size, const uint8_t* buffer) {
+    if (offset + size > m_size) return Error::NotSupported; // block allocation not implemented
+
+    size_t total = 0;
+    uint64_t cur = offset;
+
+    while (total < size) {
+        uint32_t lblock  = static_cast<uint32_t>(cur / m_fs->m_info.bsize);
+        uint32_t blk_off = static_cast<uint32_t>(cur % m_fs->m_info.bsize);
+        size_t   chunk   = m_fs->m_info.bsize - blk_off;
+        if (chunk > size - total) chunk = size - total;
+
+        uint64_t phys_byte;
+        if (m_fs->m_info.is_ufs2) {
+            phys_byte = TRY(m_fs->get_block_frag2(m_ino, lblock));
+        } else {
+            phys_byte = TRY(m_fs->get_block_frag(m_ino, lblock));
+        }
+        if (phys_byte == 0) return Error::IOError;
+
+        uint8_t* blkbuf = static_cast<uint8_t*>(kmalloc(m_fs->m_info.bsize));
+        if (!blkbuf) return Error::OutOfMemory;
+        if (m_fs->m_device->read(phys_byte, m_fs->m_info.bsize, blkbuf).is_error()) {
+            kfree(blkbuf);
+            return Error::IOError;
+        }
+        fk::memory::copy(blkbuf + blk_off, buffer + total, chunk);
+        if (m_fs->m_device->write(phys_byte, m_fs->m_info.bsize, blkbuf).is_error()) {
+            kfree(blkbuf);
+            return Error::IOError;
+        }
+        kfree(blkbuf);
+
+        total += chunk;
+        cur   += chunk;
+    }
+    return total;
 }
 
 fk::core::Result<fk::RefPtr<Node>, Error>

@@ -2,7 +2,7 @@
 #include <Kernel/Fs/Disk/Ext2/ext2_fs.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Text/string.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 

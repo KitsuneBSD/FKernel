@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Fs/Disk/Ext2/ext2_super.h>
 
 namespace fkernel {

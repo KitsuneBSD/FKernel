@@ -1,7 +1,7 @@
 #pragma once
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Types/process_id.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Types/Process/process_id.h>
 
 class ProcPidSchedNode : public Node {
 public:

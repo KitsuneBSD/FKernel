@@ -1,5 +1,5 @@
 #include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
-#include <Kernel/Fs/Vfs/kqueue.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

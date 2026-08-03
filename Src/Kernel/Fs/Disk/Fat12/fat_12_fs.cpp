@@ -2,9 +2,9 @@
 #include <Kernel/Fs/Disk/Fat12/fat_12_node.h>
 #include <Kernel/Fs/Disk/Fat12/bpb.h>
 #include <Kernel/Fs/Disk/Fat12/directory_entry.h>
-#include <LibFK/Algorithms/fat_name.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Algorithms/Generic/fat_name.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

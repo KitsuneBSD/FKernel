@@ -1,9 +1,9 @@
 #pragma once
 
 #include <Kernel/Fs/Vfs/FileLock/file_lock.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Types/process_id.h>
+#include <LibFK/Types/Process/process_id.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {

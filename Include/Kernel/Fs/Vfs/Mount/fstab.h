@@ -1,19 +1,11 @@
 #pragma once
 
-#include <LibFK/Container/vector.h>
+#include <Kernel/Fs/Vfs/Mount/fstab_entry.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Text/string.h>
 
 namespace fkernel {
 namespace fs {
-
-struct FstabEntry {
-  fk::text::String device;
-  fk::text::String mountpoint;
-  fk::text::String type;
-  fk::text::String options;
-  int dump;
-  int pass;
-};
 
 class Fstab {
 public:

@@ -1,7 +1,7 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_maps_node.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 fk::core::Result<size_t, fk::core::Error> ProcPidMapsNode::read(uint64_t offset, size_t size, uint8_t* buffer) {

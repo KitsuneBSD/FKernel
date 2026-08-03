@@ -1,9 +1,14 @@
-#include <Kernel/Fs/Vfs/kqueue.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/container_algorithms.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
 
 namespace fkernel {
+
+// Composite key: packs (ident < 2^48, filter in [-7..-1]) into 64 bits.
+static uint64_t event_key(uint64_t ident, int16_t filter) {
+    return (ident & 0x0000FFFFFFFFFFFFULL) | (static_cast<uint64_t>(static_cast<uint16_t>(filter)) << 48);
+}
 
 fk::core::Result<fk::RefPtr<KQueueNode>, fk::core::Error> KQueueNode::create() {
     auto res = fk::make_ref<KQueueNode>();
@@ -11,7 +16,7 @@ fk::core::Result<fk::RefPtr<KQueueNode>, fk::core::Error> KQueueNode::create() {
     return res.value();
 }
 
-static void detach_reg(KQueueNode::RegisteredEvent* reg, Task* current) {
+static void detach_reg(RegisteredEvent* reg, Task* current) {
     if (reg->event.filter == EVFILT_PROC) {
         auto target = SchedulerManager::the().find_task(fk::ProcessId(reg->event.ident));
         if (target) {
@@ -66,8 +71,22 @@ void KQueueNode::process_changelist(const struct kevent* changelist, int nchange
 
     for (int i = 0; i < nchanges; ++i) {
         const auto& change = changelist[i];
+        uint64_t key = event_key(change.ident, change.filter);
 
         if (change.flags & EV_ADD) {
+            // Update existing event if (ident, filter) already registered.
+            auto existing = m_event_index.get(key);
+            if (existing.has_value()) {
+                auto* reg = m_registered_events[existing.value()];
+                reg->event = change;
+                reg->enabled = !(change.flags & EV_DISABLE);
+                if (change.filter == EVFILT_TIMER) {
+                    reg->timer_deadline_ticks = compute_timer_deadline(change);
+                    m_nearest_timer_deadline = 0; // dirty
+                }
+                continue;
+            }
+
             auto* reg = new RegisteredEvent();
             reg->event = change;
             reg->enabled = !(change.flags & EV_DISABLE);
@@ -89,6 +108,10 @@ void KQueueNode::process_changelist(const struct kevent* changelist, int nchange
                 }
             } else if (change.filter == EVFILT_TIMER) {
                 reg->timer_deadline_ticks = compute_timer_deadline(change);
+                if (reg->enabled) {
+                    if (m_nearest_timer_deadline == 0 || reg->timer_deadline_ticks < m_nearest_timer_deadline)
+                        m_nearest_timer_deadline = reg->timer_deadline_ticks;
+                }
             } else {
                 int fd = static_cast<int>(change.ident);
                 if (current && fd >= 0 && static_cast<size_t>(fd) < current->resources.files.descriptors.size()) {
@@ -100,39 +123,55 @@ void KQueueNode::process_changelist(const struct kevent* changelist, int nchange
                 }
             }
 
+            size_t new_idx = m_registered_events.size();
             m_registered_events.push_back(reg);
+            m_event_index.insert(key, new_idx);
             continue;
         }
 
         if (change.flags & EV_DELETE) {
-            size_t idx = fk::algorithms::find_if(m_registered_events.begin(), m_registered_events.size(),
-                [&change](const auto* r) { return r->event.ident == change.ident && r->event.filter == change.filter; });
-            if (idx == m_registered_events.size()) continue;
+            auto opt = m_event_index.get(key);
+            if (!opt.has_value()) continue;
+            size_t idx = opt.value();
             auto* reg = m_registered_events[idx];
+            // Dirty timer min if we're removing the current min.
+            if (reg->event.filter == EVFILT_TIMER && reg->timer_deadline_ticks == m_nearest_timer_deadline)
+                m_nearest_timer_deadline = 0;
             detach_reg(reg, current);
             delete reg;
-            m_registered_events[idx] = m_registered_events[m_registered_events.size() - 1];
+            m_event_index.remove(key);
+            size_t last = m_registered_events.size() - 1;
+            if (idx != last) {
+                m_registered_events[idx] = m_registered_events[last];
+                uint64_t moved_key = event_key(m_registered_events[idx]->event.ident, m_registered_events[idx]->event.filter);
+                m_event_index.insert(moved_key, idx);
+            }
             m_registered_events.pop_back();
             continue;
         }
 
         if (change.flags & EV_ENABLE) {
-            for (auto* reg : m_registered_events) {
-                if (reg->event.ident == change.ident && reg->event.filter == change.filter)
-                    reg->enabled = true;
-            }
+            auto opt = m_event_index.get(key);
+            if (!opt.has_value()) continue;
+            auto* reg = m_registered_events[opt.value()];
+            reg->enabled = true;
+            if (reg->event.filter == EVFILT_TIMER)
+                if (m_nearest_timer_deadline == 0 || reg->timer_deadline_ticks < m_nearest_timer_deadline)
+                    m_nearest_timer_deadline = reg->timer_deadline_ticks;
         }
 
         if (change.flags & EV_DISABLE) {
-            for (auto* reg : m_registered_events) {
-                if (reg->event.ident == change.ident && reg->event.filter == change.filter)
-                    reg->enabled = false;
-            }
+            auto opt = m_event_index.get(key);
+            if (!opt.has_value()) continue;
+            auto* reg = m_registered_events[opt.value()];
+            reg->enabled = false;
+            if (reg->event.filter == EVFILT_TIMER && reg->timer_deadline_ticks == m_nearest_timer_deadline)
+                m_nearest_timer_deadline = 0;
         }
     }
 }
 
-static bool deliver_event(KQueueNode::RegisteredEvent* reg, kevent* out, Task* current) {
+static bool deliver_event(RegisteredEvent* reg, kevent* out, Task* current) {
     auto& ev = reg->event;
 
     if (ev.filter == EVFILT_PROC) {
@@ -224,11 +263,21 @@ int KQueueNode::scan_ready_events(struct kevent* eventlist, int nevents) {
 
         if (!deliver_event(reg, &eventlist[triggered], current)) { ++i; continue; }
         triggered++;
+        // Timer deadline was reloaded inside deliver_event — dirty the cached min.
+        if (reg->event.filter == EVFILT_TIMER)
+            m_nearest_timer_deadline = 0;
 
         if (reg->event.flags & EV_ONESHOT) {
+            uint64_t del_key = event_key(reg->event.ident, reg->event.filter);
+            m_event_index.remove(del_key);
             detach_reg(reg, current);
             delete reg;
-            m_registered_events[i] = m_registered_events[m_registered_events.size() - 1];
+            size_t last = m_registered_events.size() - 1;
+            if (i != last) {
+                m_registered_events[i] = m_registered_events[last];
+                uint64_t moved_key = event_key(m_registered_events[i]->event.ident, m_registered_events[i]->event.filter);
+                m_event_index.insert(moved_key, i);
+            }
             m_registered_events.pop_back();
             continue;
         }
@@ -238,15 +287,15 @@ int KQueueNode::scan_ready_events(struct kevent* eventlist, int nevents) {
     return triggered;
 }
 
-// Returns the nearest EVFILT_TIMER deadline in ticks, or 0 if none registered.
-static uint64_t nearest_timer_deadline(const fk::containers::Vector<KQueueNode::RegisteredEvent*>& events) {
-    uint64_t nearest = 0;
-    for (auto* reg : events) {
-        if (!reg->enabled || reg->event.filter != EVFILT_TIMER) continue;
-        if (nearest == 0 || reg->timer_deadline_ticks < nearest)
-            nearest = reg->timer_deadline_ticks;
+// O(1) when clean; O(T) rescan when dirty (timer added/removed/fired).
+uint64_t KQueueNode::min_timer_deadline() noexcept {
+    if (m_nearest_timer_deadline != 0) return m_nearest_timer_deadline;
+    for (auto* reg : m_registered_events) {
+        if (!reg || !reg->enabled || reg->event.filter != EVFILT_TIMER) continue;
+        if (m_nearest_timer_deadline == 0 || reg->timer_deadline_ticks < m_nearest_timer_deadline)
+            m_nearest_timer_deadline = reg->timer_deadline_ticks;
     }
-    return nearest;
+    return m_nearest_timer_deadline;
 }
 
 fk::core::Result<int, fk::core::Error> KQueueNode::kevent(const struct kevent* changelist, int nchanges,
@@ -283,7 +332,7 @@ fk::core::Result<int, fk::core::Error> KQueueNode::kevent(const struct kevent* c
         uint64_t wait_until = infinite ? 0 : user_deadline;
         {
             fk::synchronization::ScopedLockIRQ lock(m_lock);
-            uint64_t timer_dl = nearest_timer_deadline(m_registered_events);
+            uint64_t timer_dl = min_timer_deadline();
             if (timer_dl > 0) {
                 if (wait_until == 0 || timer_dl < wait_until) wait_until = timer_dl;
             }

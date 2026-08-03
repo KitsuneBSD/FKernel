@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Memory/Allocators/new.h>
 
 namespace fkernel {
 

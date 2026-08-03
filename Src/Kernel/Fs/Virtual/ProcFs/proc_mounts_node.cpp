@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_mounts_node.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Text/string.h>
 

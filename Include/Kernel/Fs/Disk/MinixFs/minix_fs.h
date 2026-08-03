@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Fs/Disk/MinixFs/minix_super.h>
-#include <Kernel/Driver/Storage/storage_device.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 
 namespace fkernel {
 

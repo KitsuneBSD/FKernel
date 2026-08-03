@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
-#include <LibFK/Algorithms/container_algorithms.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Utilities/memory.h>
 

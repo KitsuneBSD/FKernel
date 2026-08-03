@@ -1,12 +1,12 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Text/string.h>
 
 #include <Kernel/Fs/Virtual/DebugFs/Node/debug_log_node.h>
 #include <Kernel/Fs/Virtual/DebugFs/Node/syscall_log_node.h>
-#include <Kernel/Ipc/ipc_log_node.h>
+#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
 
 namespace fkernel {
 

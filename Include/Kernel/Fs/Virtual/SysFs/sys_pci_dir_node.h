@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 
 // /sys/devices/pci/ — enumerates PCI devices as <BDF>/ subdirectories.
 class SysPciDirNode : public Node {

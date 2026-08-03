@@ -1,9 +1,9 @@
 #pragma once
 
 #include "LibFK/Core/result.h"
-#include <Kernel/Fs/Vfs/definitions.h>
-#include <LibFK/Memory/ref_counted.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <Kernel/Fs/Vfs/Core/definitions.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 class Node;

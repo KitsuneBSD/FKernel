@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 
 // /sys/block/ — enumerates all registered block devices from DriverManager.
 class SysBlockDirNode : public Node {

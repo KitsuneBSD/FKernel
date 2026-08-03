@@ -1,5 +1,5 @@
 #pragma once
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 
 // Read-only node: pass static string literal.
 // Read-write node: pass writable 64-byte global buffer as both value and writable_buf.

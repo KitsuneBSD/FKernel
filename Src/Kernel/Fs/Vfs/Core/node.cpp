@@ -1,4 +1,4 @@
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Fs/Vfs/FileLock/file_lock_list.h>
 
 Node::~Node() {

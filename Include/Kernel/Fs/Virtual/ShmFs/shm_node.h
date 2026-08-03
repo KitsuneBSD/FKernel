@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
-#include <Kernel/Ipc/shared_memory.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Ipc/SharedMemory/shared_memory.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>

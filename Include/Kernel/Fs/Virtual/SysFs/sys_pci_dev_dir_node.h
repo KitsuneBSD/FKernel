@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <LibFK/Text/fixed_string.h>
 
 // /sys/devices/pci/<BDF>/ — per-PCI-device directory with vendor/device/class.

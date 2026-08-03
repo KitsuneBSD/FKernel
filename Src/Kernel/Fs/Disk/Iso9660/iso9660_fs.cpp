@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Disk/Iso9660/iso9660_fs.h>
 #include <Kernel/Fs/Disk/Iso9660/iso9660_node.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 

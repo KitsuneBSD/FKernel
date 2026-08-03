@@ -1,10 +1,11 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/file_description.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
+#include <Kernel/Posix/sys/time.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 static constexpr size_t BLOCK_SECTOR_SIZE = 512;
@@ -235,7 +236,15 @@ fk::core::Result<void, fk::core::Error> VirtualFileSystem::stat(const char* path
   buf->st_uid = node->node_uid();
   buf->st_gid = node->node_gid();
   buf->st_mode = node->node_mode();
-  buf->st_atime = buf->st_mtime = buf->st_ctime = TickManager::the().get_ticks();
+  buf->st_atime = (node->atime().tv_sec != 0 || node->atime().tv_nsec != 0)
+                      ? node->atime().tv_sec
+                      : static_cast<time_t>(TickManager::the().get_ticks());
+  buf->st_mtime = (node->mtime().tv_sec != 0 || node->mtime().tv_nsec != 0)
+                      ? node->mtime().tv_sec
+                      : static_cast<time_t>(TickManager::the().get_ticks());
+  buf->st_ctime = (node->ctime().tv_sec != 0 || node->ctime().tv_nsec != 0)
+                      ? node->ctime().tv_sec
+                      : static_cast<time_t>(TickManager::the().get_ticks());
 
   if (node->is_directory()) {
     buf->st_nlink = 2;

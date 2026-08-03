@@ -1,11 +1,11 @@
 #include <Kernel/Fs/Disk/Fat32/fat_32_fs.h>
 #include <Kernel/Fs/Disk/Fat32/bpb.h>
 #include <Kernel/Fs/Disk/Fat32/directory_entry.h>
-#include <LibFK/Algorithms/fat_name.h>
-#include <LibFK/Algorithms/string_algorithms.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Algorithms/Generic/fat_name.h>
+#include <LibFK/Algorithms/Generic/string_algorithms.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/math.h>
+#include <LibFK/Algorithms/Generic/math.h>
 
 #include <Kernel/Fs/Disk/Fat32/fat_32_node.h>
 

@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_self_node.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fk::core;
 

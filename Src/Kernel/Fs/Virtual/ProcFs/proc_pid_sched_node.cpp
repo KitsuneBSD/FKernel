@@ -1,7 +1,7 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_sched_node.h>
-#include <Kernel/Scheduler/qos.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Qos/qos.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fkernel::scheduler;
 

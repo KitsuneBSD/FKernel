@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Driver/Storage/storage_device.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 
 namespace fkernel {
 

@@ -1,6 +1,6 @@
 #pragma once
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 class ProcFilesystemsNode : public Node {
 public:

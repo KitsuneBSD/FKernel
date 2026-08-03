@@ -1,8 +1,8 @@
 #include <Kernel/Fs/Disk/Exfat/exfat_fs.h>
 #include <Kernel/Fs/Disk/Exfat/exfat_node.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 
@@ -291,9 +291,10 @@ static ExfatDirSet parse_entry_set(const uint8_t* fe, const uint8_t* se, const u
 // Walks one cluster chain's directory entries, calling callback for each complete set.
 // Returns the ExfatDirSet for the matching name (for lookup) or all entries (for list).
 
+enum class DirWalkResultKind { LIST, FOUND, NOT_FOUND, IO_ERROR };
+
 struct DirWalkResult {
-    enum Kind { LIST, FOUND, NOT_FOUND, IO_ERROR };
-    Kind kind{NOT_FOUND};
+    DirWalkResultKind kind{DirWalkResultKind::NOT_FOUND};
     ExfatDirSet found_set;
 };
 
@@ -304,10 +305,10 @@ static DirWalkResult walk_dir_cluster(ExfatFileSystem* fs, uint32_t first_cluste
                                        const char* lookup_name,
                                        fk::containers::Vector<DirectoryEntry>* out_list) {
     DirWalkResult result;
-    result.kind = DirWalkResult::NOT_FOUND;
+    result.kind = DirWalkResultKind::NOT_FOUND;
 
     uint8_t* cbuf = static_cast<uint8_t*>(kmalloc(fs->m_bytes_per_cluster));
-    if (!cbuf) { result.kind = DirWalkResult::IO_ERROR; return result; }
+    if (!cbuf) { result.kind = DirWalkResultKind::IO_ERROR; return result; }
 
     // Secondary entries buffer: up to EXFAT_MAX_SECONDARY × 32 bytes
     uint8_t sec_buf[EXFAT_MAX_SECONDARY * 32] = {};
@@ -319,7 +320,7 @@ static DirWalkResult walk_dir_cluster(ExfatFileSystem* fs, uint32_t first_cluste
     while (cluster >= EXFAT_CLUSTER_FIRST && cluster < EXFAT_CLUSTER_EOC
            && entry_count < EXFAT_MAX_DIR_ENTRIES) {
         if (fs->read_cluster(cluster, cbuf).is_error()) {
-            result.kind = DirWalkResult::IO_ERROR;
+            result.kind = DirWalkResultKind::IO_ERROR;
             break;
         }
 
@@ -357,7 +358,7 @@ static DirWalkResult walk_dir_cluster(ExfatFileSystem* fs, uint32_t first_cluste
 
                 if (lookup_name) {
                     if (exfat_name_equal(ds.name, lookup_name)) {
-                        result.kind = DirWalkResult::FOUND;
+                        result.kind = DirWalkResultKind::FOUND;
                         result.found_set = ds;
                         goto done;
                     }
@@ -392,15 +393,15 @@ Result<void, Error>
 ExfatFileSystem::list_dir_cluster(uint32_t first_cluster,
                                    fk::containers::Vector<DirectoryEntry>& entries) {
     auto r = walk_dir_cluster(this, first_cluster, nullptr, &entries);
-    if (r.kind == DirWalkResult::IO_ERROR) return Error::IOError;
+    if (r.kind == DirWalkResultKind::IO_ERROR) return Error::IOError;
     return {};
 }
 
 Result<fk::RefPtr<Node>, Error>
 ExfatFileSystem::lookup_cluster(uint32_t first_cluster, const char* name) {
     auto r = walk_dir_cluster(this, first_cluster, name, nullptr);
-    if (r.kind == DirWalkResult::IO_ERROR) return Error::IOError;
-    if (r.kind != DirWalkResult::FOUND) return Error::NotFound;
+    if (r.kind == DirWalkResultKind::IO_ERROR) return Error::IOError;
+    if (r.kind != DirWalkResultKind::FOUND) return Error::NotFound;
 
     auto& ds = r.found_set;
     auto node = fk::adopt_ref(new ExfatNode(
@@ -528,8 +529,8 @@ found_slot:
 
 Result<void, Error> ExfatFileSystem::delete_entry(uint32_t dir_cluster, const char* name) {
     auto r = walk_dir_cluster(this, dir_cluster, name, nullptr);
-    if (r.kind == DirWalkResult::IO_ERROR) return Error::IOError;
-    if (r.kind != DirWalkResult::FOUND) return Error::NotFound;
+    if (r.kind == DirWalkResultKind::IO_ERROR) return Error::IOError;
+    if (r.kind != DirWalkResultKind::FOUND) return Error::NotFound;
 
     auto& ds = r.found_set;
 

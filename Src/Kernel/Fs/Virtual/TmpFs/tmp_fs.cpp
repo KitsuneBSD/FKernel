@@ -1,9 +1,9 @@
 #include <Kernel/Fs/Virtual/TmpFs/tmp_fs.h>
-#include <LibFK/Algorithms/container_algorithms.h>
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/error.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Memory/Allocators/new.h>
 
 fk::RefPtr<Node> ChildList::find_by_name(const char* name) {
   size_t idx = fk::algorithms::find_if(m_entries.begin(), m_entries.size(),

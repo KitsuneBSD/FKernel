@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Virtual/MqueueFs/mqueue_node.h>
-#include <LibFK/Memory/heap_malloc.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

@@ -1,5 +1,5 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_exe_node.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 
 fk::core::Result<fk::text::String, fk::core::Error> ProcPidExeNode::read_link() {
   auto t = SchedulerManager::the().find_task(m_pid);

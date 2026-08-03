@@ -1,5 +1,5 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_cmdline_node.h>
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <LibFK/Utilities/memory.h>
 
 static const char* get_cmdline() {

@@ -1,4 +1,4 @@
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 
 namespace fkernel {
 

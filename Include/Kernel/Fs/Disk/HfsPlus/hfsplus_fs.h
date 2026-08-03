@@ -2,10 +2,10 @@
 
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_vh.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
-#include <Kernel/Driver/Storage/storage_device.h>
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {

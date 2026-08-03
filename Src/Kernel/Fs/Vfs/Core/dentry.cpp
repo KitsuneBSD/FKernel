@@ -1,6 +1,6 @@
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/mount_namespace.h>
-#include <LibFK/Memory/new.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Mount/mount_namespace.h>
+#include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
 
 #include <LibFK/Synchronization/spinlock.h>

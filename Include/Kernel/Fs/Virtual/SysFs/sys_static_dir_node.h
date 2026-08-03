@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 
 // Empty static sysfs directory (used for /sys/class/, /sys/fs/).
 class SysStaticDirNode : public Node {

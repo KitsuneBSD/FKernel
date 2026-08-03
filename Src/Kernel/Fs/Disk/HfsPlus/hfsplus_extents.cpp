@@ -1,6 +1,6 @@
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 
