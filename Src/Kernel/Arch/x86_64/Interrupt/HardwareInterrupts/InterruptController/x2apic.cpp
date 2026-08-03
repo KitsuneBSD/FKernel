@@ -3,8 +3,8 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 void X2APIC::initialize() {
   if (m_is_initialized) {
@@ -44,6 +44,13 @@ void X2APIC::mask_interrupt(uint8_t irq) {
 void X2APIC::unmask_interrupt(uint8_t irq) {
   fk::algorithms::kdebug(
       "X2APIC", "Unmask requested for IRQ %u (not supported on x2APIC)", irq);
+}
+
+void X2APIC::initialize_on_ap() {
+  uint64_t apic_msr = CPU::the().read_msr(APIC_BASE_MSR);
+  apic_msr |= APIC_MSR_ENABLE | APIC_MSR_X2APIC_MODE;
+  CPU::the().write_msr(APIC_BASE_MSR, apic_msr);
+  CPU::the().write_msr(X2APIC_SPURIOUS_MSR, APIC_SPURIOUS_VECTOR | APIC_SVR_ENABLE);
 }
 
 void X2APIC::calibrate_timer() {
@@ -97,5 +104,12 @@ void X2APIC::send_ipi(uint8_t lapic_id, uint8_t vector, uint32_t delivery_mode) 
 }
 
 void X2APIC::wait_ipi_delivery() {
-  asm volatile("pause");
+  // Poll ICR bit 12 (delivery status) until clear — SDM Vol.3A §10.6.1.
+  // In x2APIC mode the ICR is a 64-bit MSR; bit 12 is the Delivery Status bit.
+  for (int i = 0; i < 1000; ++i) {
+    uint64_t icr = CPU::the().read_msr(X2APIC_ICR_MSR);
+    if (!(icr & (1ULL << 12)))
+      return;
+    asm volatile("pause");
+  }
 }

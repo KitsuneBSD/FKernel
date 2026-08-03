@@ -1,10 +1,10 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Boot/Stages/early_init.h>
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Driver/Serial/serial_port.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <Kernel/Io/kernel_puts.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
 
 extern char __heap_start[];

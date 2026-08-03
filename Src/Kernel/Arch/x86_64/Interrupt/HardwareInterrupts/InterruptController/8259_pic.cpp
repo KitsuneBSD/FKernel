@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 // PIC ports
 static constexpr uint8_t PIC1_CMD = 0x20;

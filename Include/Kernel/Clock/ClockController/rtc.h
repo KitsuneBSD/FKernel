@@ -2,7 +2,7 @@
 
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Clock/clock_interrupt.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Types/types.h>
 
 /**

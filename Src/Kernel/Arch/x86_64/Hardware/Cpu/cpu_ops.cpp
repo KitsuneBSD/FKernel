@@ -1,8 +1,8 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Boot/boot_timer.h>
+#include <Kernel/Boot/Core/boot_timer.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 size_t g_xsave_area_size = 512;  // default: FXSAVE size, updated in arch_enable_cpu_features
 uint8_t g_use_xsave = 0;         // 1 when XSAVE/XRSTOR should be used in context switch

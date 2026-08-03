@@ -1,15 +1,10 @@
 #pragma once
 
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
-
-class Timer {
-public:
-  virtual void initialize(uint32_t frequency) = 0;
-  virtual ~Timer() = default;
-};
 
 class TimerManager {
 private:

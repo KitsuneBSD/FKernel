@@ -3,11 +3,10 @@
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" void syscall_stub();
 extern "C" uint64_t stack_top;
-extern "C" uint64_t syscall_kernel_stack;
 
 #define MSR_KERNEL_GS_BASE 0xC0000102
 
@@ -25,10 +24,6 @@ void init_syscalls(size_t cpu_index) {
   CPU::the().write_msr(MSR_GS_BASE, (uint64_t)&block);
   CPU::the().write_msr(MSR_KERNEL_GS_BASE, 0);
 
-  // Keep legacy variable in sync for BSP (AP stacks are set at context-switch time).
-  if (cpu_index == 0)
-    syscall_kernel_stack = block.kernel_stack;
-
   uint64_t efer = CPU::the().read_msr(MSR_EFER);
   if (!(efer & EFER_SCE)) {
     CPU::the().write_msr(MSR_EFER, efer | EFER_SCE);
@@ -39,8 +34,8 @@ void init_syscalls(size_t cpu_index) {
 
   CPU::the().write_msr(MSR_LSTAR, (uint64_t)syscall_stub);
 
-  // Clear IF(9)+TF(8)+DF(10)+AC(18)+NT(14) on syscall entry — Linux convention 0x4700
-  CPU::the().write_msr(MSR_SFMASK, (uint64_t)0x4700);
+  // Clear TF(8)+IF(9)+DF(10)+NT(14)+AC(18) on syscall entry — matches Linux 0x47700
+  CPU::the().write_msr(MSR_SFMASK, (uint64_t)0x47700);
 
   fk::algorithms::klog("SYSCALL", "CPU %zu: SYSCALL/SYSRET MSRs and GS Base initialized", cpu_index);
 }

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <LibFK/Text/string.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt.h>
+#include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 
 // I/O APIC Registers
@@ -12,15 +13,6 @@ constexpr uint32_t IOAPIC_REG_TABLE_BASE = 0x10;
 constexpr uintptr_t IOAPIC_ADDRESS = 0xFEC00000;
 
 static constexpr uint32_t MAX_IOAPIC_CONTROLLERS = 8;
-
-struct IoApicController {
-  uintptr_t base = 0;
-  uint32_t gsi_base = 0;
-  uint32_t max_entries = 0;
-
-  uint32_t read(uint32_t reg) const;
-  void write(uint32_t reg, uint32_t value) const;
-};
 
 /**
  * @brief I/O APIC controller implementing HardwareInterrupt interface

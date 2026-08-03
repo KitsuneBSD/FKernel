@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Driver/Vga/vesa.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel::drivers::vesa {
@@ -86,7 +86,7 @@ fk::core::Result<void, fk::core::Error> VESADriver::set_mode(uint16_t mode) {
                          target_mode, new_info.width, new_info.height, new_info.bpp);
 
     if (!bios_int10h_vesa_set_mode(target_mode)) {
-        fk::algorithms::kerror("VESA", "Failed to set video mode 0x%x", target_mode);
+        fk::algorithms::kwarn("VESA", "Failed to set video mode 0x%x", target_mode);
         return fk::core::Error::IOError;
     }
 

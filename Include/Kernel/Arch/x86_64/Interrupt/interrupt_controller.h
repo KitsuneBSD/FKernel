@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/Interrupt/gate_type.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/array.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Container/Sequence/array.h>
 
 /**
  * @brief x86_64 Interrupt Controller
@@ -11,11 +12,6 @@
  * including setting gates, registering handlers, and enabling/disabling
  * CPU interrupts.
  */
-
-enum class GateType : uint8_t {
-  InterruptGate = 0x8E, ///< 64-bit Interrupt Gate
-  TrapGate = 0x8F       ///< 64-bit Trap Gate
-};
 
 class InterruptController {
 private:

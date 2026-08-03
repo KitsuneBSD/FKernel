@@ -1,5 +1,5 @@
 #include <Kernel/Arch/x86_64/Driver/Vga/bios_service.h>
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Boot/Multiboot/multiboot_interpreter.h>
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <LibFK/Utilities/memory.h>

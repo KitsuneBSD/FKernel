@@ -1,6 +1,6 @@
 #include <LibC/stdio.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" {
 
@@ -43,6 +43,29 @@ void __kernel_assert_fail(const char *expr, const char *file, int line,
   
   print_stack_trace();
   
+  fk::algorithms::kfatal("PANIC", "System Halted.");
+}
+
+void __kernel_assert_fail_fmt(const char *expr, const char *file, int line,
+                              const char *func, const char *fmt, ...) {
+  char buf[512];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  uint32_t cpu_id = APIC::the().get_id();
+
+  fk::algorithms::kexception("PANIC", "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  fk::algorithms::kexception("PANIC", "!!!          KERNEL PANIC                !!!");
+  fk::algorithms::kexception("PANIC", "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  fk::algorithms::kexception("PANIC", "CPU ID: %u", cpu_id);
+  fk::algorithms::kexception("PANIC", "Reason: Assertion Failed: %s", expr);
+  fk::algorithms::kexception("PANIC", "Source: %s:%d (%s)", file, line, func);
+  fk::algorithms::kexception("PANIC", "Context: %s", buf);
+
+  print_stack_trace();
+
   fk::algorithms::kfatal("PANIC", "System Halted.");
 }
 

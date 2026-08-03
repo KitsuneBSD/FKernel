@@ -2,7 +2,9 @@
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Hardware/Cpu/cpu_block.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Types/types.h>
 
 extern "C" uint64_t stack_top;
@@ -37,9 +39,8 @@ static void fill_tss_impl(TSS64& tss, uint32_t cpu_index) {
   uint64_t *ist_targets[7] = {&tss.ist1, &tss.ist2, &tss.ist3, &tss.ist4,
                                &tss.ist5, &tss.ist6, &tss.ist7};
   for (size_t i = 0; i < 7; ++i) {
-    uint64_t top = reinterpret_cast<uint64_t>(
-        &ist_stacks[i][IST_STACK_SIZE]) + cpu_index * IST_STACK_SIZE * 7;
-    *ist_targets[i] = top;
+    *ist_targets[i] = reinterpret_cast<uint64_t>(&ist_stacks[cpu_index][i][IST_STACK_OFFSET])
+                    + IST_STACK_SIZE;
   }
 
   tss.io_map_base = sizeof(TSS64);
@@ -113,5 +114,20 @@ void GDTController::load_per_cpu(uint32_t cpu_index) {
 }
 
 void GDTController::set_kernel_stack(uint64_t stack_addr) {
-  m_tss_per_cpu[0].rsp0 = stack_addr;
+  uint32_t cpu = static_cast<uint32_t>(get_current_cpu_id());
+  if (cpu >= MAX_CPUS) cpu = 0;
+  m_tss_per_cpu[cpu].rsp0 = stack_addr;
+}
+
+void GDTController::install_ist_guard_pages() {
+  for (uint32_t cpu = 0; cpu < MAX_CPUS; ++cpu) {
+    for (size_t i = 0; i < 7; ++i) {
+      uintptr_t guard = reinterpret_cast<uintptr_t>(&ist_stacks[cpu][i][0]);
+      if ((guard % PAGE_SIZE) != 0) {
+        fk::algorithms::kfatal("GDT", "IST guard page unaligned at %p", (void*)guard);
+      }
+      VirtualMemoryManager::the().unmap_page(guard);
+    }
+  }
+  fk::algorithms::klog("GDT", "Installed %zu IST guard pages", MAX_CPUS * 7ULL);
 }

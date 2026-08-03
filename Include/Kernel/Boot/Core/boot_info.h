@@ -1,76 +1,17 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Text/fixed_string.h>
 
+#include <Kernel/Boot/Core/boot_mode.h>
+#include <Kernel/Boot/Info/acpi_table_info.h>
+#include <Kernel/Boot/Info/boot_framebuffer_info.h>
+#include <Kernel/Boot/Info/memory_map_entry.h>
+#include <Kernel/Boot/Info/memory_map_iterator.h>
+#include <Kernel/Boot/Info/module_info.h>
+
 namespace boot {
-
-/**
- * @brief Boot module information
- */
-struct ModuleInfo {
-  uint64_t start;
-  uint64_t end;
-  const char* cmdline;
-};
-
-/**
- * @brief Boot mode detection
- */
-enum class BootMode : uint32_t {
-  Unknown = 0,
-  Multiboot2 = 1,  ///< Legacy BIOS boot (via Multiboot2)
-};
-
-/**
- * @brief Unified memory map entry
- * Abstracts differences between Multiboot2 and EFI memory maps
- */
-struct MemoryMapEntry {
-  uint64_t base_addr;  ///< Base address of memory region
-  uint64_t length;     ///< Length of memory region
-  uint32_t type;        ///< Memory type (unified)
-  bool is_available;   ///< Whether this memory is available for use
-};
-
-/**
- * @brief Unified framebuffer information
- * Works with both GOP and Multiboot2 framebuffer
- */
-struct FramebufferInfo {
-  uint64_t addr{0};      ///< Physical address of framebuffer
-  uint32_t pitch{0};     ///< Bytes per row
-  uint32_t width{0};     ///< Width in pixels
-  uint32_t height{0};    ///< Height in pixels
-  uint8_t bpp{0};        ///< Bits per pixel
-  uint8_t red_pos{0};    ///< Red field position
-  uint8_t red_mask{0};   ///< Red mask size
-  uint8_t green_pos{0};  ///< Green field position
-  uint8_t green_mask{0}; ///< Green mask size
-  uint8_t blue_pos{0};   ///< Blue field position
-  uint8_t blue_mask{0};  ///< Blue mask size
-};
-
-/**
- * @brief ACPI table information
- */
-struct AcpiTableInfo {
-  void *rsdp{nullptr};  ///< RSDP pointer (if available)
-  void *rsdt{nullptr};  ///< RSDT pointer (if available)
-  void *xsdt{nullptr};  ///< XSDT pointer (if available)
-};
-
-/**
- * @brief Memory map iterator interface
- */
-class MemoryMapIterator {
-public:
-  virtual ~MemoryMapIterator() = default;
-  virtual bool has_next() const = 0;
-  virtual MemoryMapEntry next() = 0;
-  virtual void reset() = 0;
-};
 
 /**
  * @brief Boot information structure

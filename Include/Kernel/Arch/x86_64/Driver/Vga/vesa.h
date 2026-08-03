@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Driver/Vga/vbe_types.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Core/error.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <Kernel/Driver/Vga/Types/framebuffer_info.h>
 
 namespace fkernel::drivers::vesa {

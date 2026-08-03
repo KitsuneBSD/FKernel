@@ -123,6 +123,16 @@ static constexpr size_t PT_INDEX_SHIFT   = 12;
 static constexpr uintptr_t PHYSICAL_ADDRESS_MASK = 0x000FFFFFFFFFF000ULL;
 
 /**
+ * @brief Physical address mask for 2 MiB pages (bits 21–51)
+ */
+static constexpr uintptr_t PAGE_ADDRESS_MASK_2M = 0x000FFFFFFFE00000ULL;
+
+/**
+ * @brief Physical address mask for 1 GiB pages (bits 30–51)
+ */
+static constexpr uintptr_t PAGE_ADDRESS_MASK_1G = 0x000FFFFFC0000000ULL;
+
+/**
  * @brief Page flags mask (lower 12 bits of a PTE)
  */
 static constexpr uintptr_t PAGE_FLAGS_MASK = 0xFFFULL;

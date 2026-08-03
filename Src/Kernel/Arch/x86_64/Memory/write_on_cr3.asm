@@ -7,9 +7,8 @@ global arch_write_cr3
 
 ; Replace the current PML4 / PDPT table by writing to CR3
 ; rdi = pointer to new table (must be 4KiB aligned)
+; Note: cli/sti removed — CR3 write is atomic; unconditional sti breaks IF=0 callers.
 arch_write_cr3:
-    cli                     ; disable interrupts
-
     ; verify 4KiB alignment
     test rdi, 0xFFF
     jnz .alignment_error
@@ -19,8 +18,6 @@ arch_write_cr3:
 
     ; load CR3
     mov cr3, rdi
-
-    sti                     ; re-enable interrupts
     ret
 
 .alignment_error:

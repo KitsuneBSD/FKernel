@@ -30,9 +30,15 @@ public:
 
   fk::text::String get_name() override { return m_name; }
   /**
-   * @brief Initialize and enable the local x2APIC
+   * @brief Initialize and enable the local x2APIC (BSP only)
    */
   void initialize() override;
+
+  /**
+   * @brief Enable x2APIC mode on an AP (no singleton guard).
+   * Per SDM Vol.3A §10.12.5.1: set IA32_APIC_BASE[10:11] then enable SVR.
+   */
+  void initialize_on_ap();
 
   /**
    * @brief Send an End-of-Interrupt (EOI)

@@ -1,10 +1,10 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/exception_macros.h>
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
-#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Posix/signal_defs.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 void general_protection_handler(uint8_t vector, InterruptFrame* frame) {
     if (!frame) halt_forever();
@@ -27,7 +27,7 @@ void general_protection_handler(uint8_t vector, InterruptFrame* frame) {
         si.si_signo = SIGILL;
         si.si_code  = ILL_PRVOPC;
         si.si_addr  = frame->rip;
-        fkernel::ipc::SignalDelivery::send_signal(task, SIGILL, &si);
+        fkernel::ipc::SignalDelivery::send_signal(task, SIGILL, &si, /*force=*/true);
         return;
     }
 

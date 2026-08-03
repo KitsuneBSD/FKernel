@@ -3,11 +3,11 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
-#include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 uint32_t IoApicController::read(uint32_t reg) const {
   *reinterpret_cast<volatile uint32_t *>(base) = reg;

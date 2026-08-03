@@ -2,7 +2,7 @@
 
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Types/types.h>
 
 /**
@@ -35,4 +35,12 @@ private:
 public:
   void initialize(uint32_t frequency) override;
   void set_frequency(uint32_t frequency);
+
+  // Mask PIT IRQ0 output by switching to one-shot mode with count=0.
+  // Call after APIC/HPET timer is active to stop double-tick on vector 0x20.
+  static void disable();
+
+  // Blocking busy-wait of exactly ms milliseconds using PIT channel 2.
+  // Safe before scheduler and APIC calibration; does not rely on tick count.
+  static void pit_wait_ms(uint32_t ms);
 };

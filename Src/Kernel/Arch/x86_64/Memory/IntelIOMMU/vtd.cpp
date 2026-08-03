@@ -1,9 +1,9 @@
 #include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
-#include <Kernel/Hardware/Acpi/acpi.h>
-#include <Kernel/Hardware/Acpi/dmar.h>
+#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
+#include <Kernel/Hardware/Firmware/Acpi/dmar.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel::vtd {

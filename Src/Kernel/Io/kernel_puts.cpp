@@ -4,7 +4,7 @@
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <LibC/stdio.h>
 #include <LibC/string.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 static void kernel_puts_impl(const char *c) {
     uint32_t targets = fk::algorithms::get_log_targets();

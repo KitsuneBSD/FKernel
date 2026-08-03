@@ -41,10 +41,10 @@ enable_paging:
 	or eax, 1 << 5
 	mov cr4, eax
 
-	; enable long mode
+	; enable long mode and NX (No-Execute) in EFER
 	mov ecx, 0xC0000080
 	rdmsr
-	or eax, 1 << 8
+	or eax, (1 << 8) | (1 << 11) ; LME | NXE
 	wrmsr
 
 	; enable paging

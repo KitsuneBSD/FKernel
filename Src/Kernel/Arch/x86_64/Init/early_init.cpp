@@ -2,20 +2,20 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
-#include <Kernel/Hardware/Acpi/acpi.h>
+#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 
 #include <Kernel/Boot/Stages/early_init.h>
 #include <Kernel/Boot/Stages/init.h>
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 
 #include <Kernel/Driver/Vga/display_framebuffer.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 void early_init() {
   assert(boot::BootInfo::the().is_initialized() &&
@@ -44,6 +44,9 @@ void early_init() {
   // Physical + Virtual memory managers
   fk::algorithms::klog("EARLY_INIT", "Initializing memory manager...");
   MemoryManager::the().initialize();
+
+  // IST guard pages must be unmapped only after the VMM owns the active page tables.
+  GDTController::the().install_ist_guard_pages();
 
   auto &pmm = PhysicalMemoryManager::the();
   size_t total_mib = pmm.total_memory() / (1024 * 1024);

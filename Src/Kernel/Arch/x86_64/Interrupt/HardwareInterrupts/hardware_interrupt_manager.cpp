@@ -5,7 +5,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 void HardwareInterruptManager::select_and_configure_controller() {
   static PIC8259 pic_controller_instance;
@@ -97,7 +97,7 @@ fk::core::Result<uint8_t, fk::core::Error>
 HardwareInterruptManager::allocate_msi_vector(const PciDevice& device) {
   if (!m_controller) {
     fk::algorithms::kerror("HW_INTERRUPT", "allocate_msi_vector: no controller available");
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::NoDevice;
   }
   return m_controller->allocate_msi_vector(device);
 }
@@ -105,7 +105,7 @@ HardwareInterruptManager::allocate_msi_vector(const PciDevice& device) {
 fk::core::Result<uint8_t, fk::core::Error>
 HardwareInterruptManager::allocate_msix_vector(const PciDevice& device, uint16_t entry) {
   if (!m_controller)
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::NoDevice;
   return m_controller->allocate_msix_vector(device, entry);
 }
 

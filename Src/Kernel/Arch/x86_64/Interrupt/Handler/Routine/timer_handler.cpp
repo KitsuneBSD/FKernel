@@ -4,8 +4,8 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Vga/display.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 void timer_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
   (void)frame;

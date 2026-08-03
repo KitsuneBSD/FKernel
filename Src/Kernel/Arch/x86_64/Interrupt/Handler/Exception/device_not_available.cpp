@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/Handler/exception_macros.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" uint8_t g_use_xsave;
 

@@ -1,22 +1,22 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/Stages/init.h>
-#include <Kernel/Boot/boot_info.h>
-#include <Kernel/Boot/boot_timer.h>
+#include <Kernel/Boot/Core/boot_info.h>
+#include <Kernel/Boot/Core/boot_timer.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Driver/Mouse/ps2_mouse.h>
-#include <Kernel/Driver/Storage/Ata/ata_controller.h>
+#include <Kernel/Driver/Storage/Controllers/Ata/ata_controller.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Vga/display_framebuffer.h>
-#include <Kernel/Driver/driver_registry.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Hardware/Pci/pci.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Driver/Registry/driver_registry.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Hardware/Buses/Pci/pci.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
-#include <LibFK/Algorithms/chacha20.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Crypto/chacha20.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
@@ -101,19 +101,20 @@ void init() {
   // 3. Register mouse device — hardware init deferred to first /dev/mouse open
   driver_manager.register_device(fk::RefPtr<Node>(&PS2Mouse::the()));
 
-  fk::algorithms::klog("INIT", "Initializing scheduler...");
-  SchedulerManager::the().initialize();
-  if (!SchedulerManager::the().is_initialized())
-    fk::algorithms::kfatal("INIT", "Scheduler manager failed to initialize");
-
-  // init_syscalls(0) must run before start_aps(): the timer interrupt fires during AP
-  // startup and calls schedule() → load_next_task_context() → current_cpu_block() →
-  // get_current_cpu_id() (gs:32). Without MSR_GS_BASE pointing to g_cpu_blocks[0] first,
-  // that read returns garbage and the resulting non-canonical write faults (GPF vector 13).
+  // init_syscalls(0) must run before SchedulerManager::initialize(): once the scheduler
+  // sets m_is_initialized=true any call to schedule()/load_next_task_context() reads
+  // gs:32 for cpu_id. Without MSR_GS_BASE pointing to g_cpu_blocks[0] first that read
+  // returns garbage from physical address 0x20 (BIOS IVT), producing a non-canonical
+  // address that faults with GPF vector 13.
   fk::algorithms::klog("INIT", "Initializing syscall manager...");
   SyscallManager::the().initialize();
   if (!SyscallManager::the().is_initialized())
     fk::algorithms::kfatal("INIT", "Syscall manager failed to initialize");
+
+  fk::algorithms::klog("INIT", "Initializing scheduler...");
+  SchedulerManager::the().initialize();
+  if (!SchedulerManager::the().is_initialized())
+    fk::algorithms::kfatal("INIT", "Scheduler manager failed to initialize");
   BootTimer::the().mark("scheduler_init");
 
   fk::algorithms::klog("INIT", "Starting application processors...");

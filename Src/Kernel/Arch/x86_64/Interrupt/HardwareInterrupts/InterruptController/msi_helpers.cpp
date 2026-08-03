@@ -1,10 +1,12 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
-static uint32_t g_next_msi_vector = 0x40;
+// IOAPIC uses vectors 0x20..0x5F (32 base + up to 64 GSIs).
+// MSI pool starts at 0x60 to avoid collision with IOAPIC/LVT vectors.
+static uint32_t g_next_msi_vector = 0x60;
 
 uint32_t msi::lapic_phys_address() {
   return static_cast<uint32_t>(CPU::the().read_msr(APIC_BASE_MSR) & 0xFFFFF000ULL);
@@ -29,7 +31,7 @@ msi::write_msi_config(const PciDevice& device, uint32_t msi_addr) {
     fk::algorithms::kwarn("MSI", "Device %02x:%02x.%d does not support MSI",
                           device.address().bus(), device.address().device(),
                           device.address().function());
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::NotSupported;
   }
 
   auto vector_result = msi::allocate_vector();

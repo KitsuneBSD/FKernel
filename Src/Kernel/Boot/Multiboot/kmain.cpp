@@ -1,7 +1,7 @@
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <Kernel/Boot/Multiboot/multiboot_interpreter.h>
-#include <Kernel/Boot/boot_info.h>
-#include <Kernel/Boot/kernel_entry.h>
+#include <Kernel/Boot/Core/boot_info.h>
+#include <Kernel/Boot/Core/kernel_entry.h>
 #include <LibFK/Core/assertions.h>
 
 // kmain is the very first C function called by the bootloader.

@@ -1,7 +1,7 @@
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <Kernel/Boot/Multiboot/multiboot_interpreter.h>
-#include <Kernel/Boot/boot_info.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Boot/Core/boot_info.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
 
 namespace boot {

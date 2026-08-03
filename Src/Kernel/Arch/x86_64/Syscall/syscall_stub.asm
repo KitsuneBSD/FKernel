@@ -14,17 +14,16 @@ syscall_stub:
 
     swapgs ; Switch to kernel GS
 
+    ; Save user context and switch to kernel stack BEFORE any bounds check.
+    ; The invalid_syscall_handler must also run on the kernel stack (Bug 24).
+    mov [gs:8], rsp    ; user_rsp
+    mov [gs:16], rcx   ; saved_rip
+    mov [gs:24], r11   ; saved_rflags
+    mov rsp, [gs:0]    ; switch to kernel stack
+
     ; Validation: Check if syscall number is within bounds
     cmp rax, 512
     jae invalid_syscall_handler
-
-    ; Save user context to per-cpu data
-    mov [gs:8], rsp   ; user_rsp
-    mov [gs:16], rcx  ; saved_rip
-    mov [gs:24], r11  ; saved_rflags
-
-    ; Load kernel stack
-    mov rsp, [gs:0]
 
     ; Push context for potential context switch/interruption handling
     push qword [gs:8]  ; User RSP
@@ -167,18 +166,5 @@ syscall_stub_post_dispatch:
     
         o64 sysret
     
-    
-    
-    section .bss
-    
-        global syscall_user_rsp
-    
-        syscall_user_rsp: resq 1
-    
-        
-    
-        global syscall_kernel_stack
-    
-        syscall_kernel_stack: resq 1
     
     

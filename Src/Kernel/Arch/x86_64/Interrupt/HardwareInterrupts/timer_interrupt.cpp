@@ -33,6 +33,7 @@ void TimerManager::select_and_configure_timer(uint32_t freq) {
   }
 
   if (new_timer != m_timer) {
+    bool was_pit = (m_timer == &pit_timer_instance);
     set_timer(new_timer);
     TickManager::the().set_frequency(freq);
     if (m_timer) {
@@ -40,6 +41,11 @@ void TimerManager::select_and_configure_timer(uint32_t freq) {
       fk::algorithms::klog("TIMER", "Timer controller set to: %s",
                            timer_name.c_str());
     }
+    // Bug 27: Stop PIT channel 0 after switching to APIC/HPET.
+    // PITTimer::disable() puts channel 0 in one-shot mode with count=0,
+    // stopping periodic IRQ0 output without needing IOAPIC cooperation.
+    if (was_pit && new_timer != &pit_timer_instance)
+      PITTimer::disable();
   }
 }
 

@@ -4,9 +4,9 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 APIC* g_apic_ptr = nullptr;
 
@@ -117,7 +117,7 @@ APIC::allocate_msix_vector(const PciDevice& device, uint16_t entry) {
   constexpr uint8_t MSIX_CAP_ID = 0x11;
   uint8_t cap_ptr = device.find_capability(MSIX_CAP_ID);
   if (cap_ptr == 0)
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::NotSupported;
 
   uint16_t ctrl = device.read_config_word(cap_ptr + 2);
   uint16_t table_size = (ctrl & 0x7FF) + 1;

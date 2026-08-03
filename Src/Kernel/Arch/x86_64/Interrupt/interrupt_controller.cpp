@@ -11,7 +11,7 @@
 
 #include <Kernel/Clock/clock_interrupt.h>
 
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" void arch_flush_idt(void *idtr);
 

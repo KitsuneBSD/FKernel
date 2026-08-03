@@ -1,4 +1,4 @@
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" void syscall_validation_log(uint64_t syscall_num) {
     fk::algorithms::kerror("SYSCALL", "Invalid syscall number: %lu (Max: 512)", syscall_num);
