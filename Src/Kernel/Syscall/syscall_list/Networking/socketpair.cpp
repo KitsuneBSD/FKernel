@@ -1,10 +1,10 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/file_description.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <Kernel/Net/socket.h>
-#include <Kernel/Net/unix_socket.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Net/Sockets/socket.h>
+#include <Kernel/Net/Sockets/unix_socket.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Core/error.h>
 

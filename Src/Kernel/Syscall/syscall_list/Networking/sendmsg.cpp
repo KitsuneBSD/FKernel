@@ -1,13 +1,13 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Fs/Vfs/file_description.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <Kernel/Net/socket.h>
-#include <Kernel/Net/unix_socket.h>
+#include <Kernel/Net/Sockets/socket.h>
+#include <Kernel/Net/Sockets/unix_socket.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Utilities/memory.h>
 

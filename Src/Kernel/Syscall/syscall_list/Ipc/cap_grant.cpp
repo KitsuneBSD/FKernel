@@ -1,9 +1,9 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Ipc/capability.h>
-#include <Kernel/Ipc/cspace.h>
-#include <Kernel/Ipc/endpoint.h>
-#include <Kernel/Ipc/notification.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Ipc/Capabilities/capability.h>
+#include <Kernel/Ipc/Capabilities/cspace.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
+#include <Kernel/Ipc/Notifications/notification.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 
 extern "C" uint64_t sys_cap_grant(uint64_t target_pid, uint64_t handle,

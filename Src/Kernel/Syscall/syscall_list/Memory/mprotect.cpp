@@ -1,7 +1,7 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall_utils.h>
 
 extern "C" uint64_t sys_mprotect(uint64_t addr, uint64_t len, uint64_t prot,

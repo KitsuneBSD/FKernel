@@ -1,11 +1,11 @@
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
-#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #endif
@@ -125,6 +125,8 @@ uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t
 uint64_t sys_cap_revoke(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_cap_transfer(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_cap_grant(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_bind_irq(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_unbind_irq(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_openpty(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_getdents(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_newfstatat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -240,6 +242,8 @@ uint64_t sys_rt_sigtimedwait(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, u
 uint64_t sys_reboot(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_accept4(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_utimensat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_utimes(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_futimesat(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_personality(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_prctl(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_set_robust_list(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -264,7 +268,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_RENAME, sys_rename);
   SyscallManager::the().register_syscall(SYS_GETDENTS, sys_getdents);
   SyscallManager::the().register_syscall(SYS_GETDENTS64, sys_getdents64);
-  SyscallManager::the().register_syscall(262, sys_newfstatat); // SYS_NEWFSTATAT
+  SyscallManager::the().register_syscall(SYS_NEWFSTATAT, sys_newfstatat);
   SyscallManager::the().register_syscall(SYS_CHDIR, sys_chdir);
   SyscallManager::the().register_syscall(SYS_CLONE, sys_clone);
   SyscallManager::the().register_syscall(SYS_FORK, sys_fork);
@@ -334,6 +338,8 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_CAP_REVOKE, sys_cap_revoke);
   SyscallManager::the().register_syscall(SYS_CAP_TRANSFER, sys_cap_transfer);
   SyscallManager::the().register_syscall(SYS_CAP_GRANT, sys_cap_grant);
+  SyscallManager::the().register_syscall(SYS_BIND_IRQ, sys_bind_irq);
+  SyscallManager::the().register_syscall(SYS_UNBIND_IRQ, sys_unbind_irq);
   SyscallManager::the().register_syscall(SYS_MOUNT, sys_mount);
   SyscallManager::the().register_syscall(SYS_UMOUNT2, sys_umount2);
   SyscallManager::the().register_syscall(SYS_PIVOT_ROOT, sys_pivot_root);
@@ -445,6 +451,8 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_RT_SIGTIMEDWAIT, sys_rt_sigtimedwait);
   SyscallManager::the().register_syscall(SYS_REBOOT, sys_reboot);
   SyscallManager::the().register_syscall(SYS_UTIMENSAT, sys_utimensat);
+  SyscallManager::the().register_syscall(SYS_UTIMES, sys_utimes);
+  SyscallManager::the().register_syscall(SYS_FUTIMESAT, sys_futimesat);
   SyscallManager::the().register_syscall(SYS_PERSONALITY, sys_personality);
   SyscallManager::the().register_syscall(SYS_PRCTL, sys_prctl);
   SyscallManager::the().register_syscall(SYS_SET_ROBUST_LIST, sys_set_robust_list);

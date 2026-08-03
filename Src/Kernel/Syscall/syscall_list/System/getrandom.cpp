@@ -2,7 +2,7 @@
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <LibFK/Algorithms/chacha20.h>
+#include <LibFK/Algorithms/Crypto/chacha20.h>
 
 extern "C" uint64_t sys_getrandom(uint64_t buf_ptr, uint64_t count, uint64_t flags,
                                    uint64_t, uint64_t, uint64_t,

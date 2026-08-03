@@ -2,8 +2,8 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" {
 

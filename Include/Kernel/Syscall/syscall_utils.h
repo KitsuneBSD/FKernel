@@ -33,6 +33,38 @@ inline int error_to_errno(fk::core::Error error) {
     return 25; // ENOTTY
   case fk::core::Error::EndOfFile:
     return 0; // Usually not an error in POSIX read, but 0 return
+  case fk::core::Error::DeviceError:
+    return 6;  // ENXIO
+  case fk::core::Error::InvalidHandle:
+    return 9;  // EBADF
+  case fk::core::Error::WouldBlock:
+    return 11; // EAGAIN
+  case fk::core::Error::DeviceBusy:
+    return 16; // EBUSY
+  case fk::core::Error::AlreadyExists:
+    return 17; // EEXIST
+  case fk::core::Error::NoDevice:
+    return 19; // ENODEV
+  case fk::core::Error::NoSpaceLeftOnDevice:
+    return 28; // ENOSPC
+  case fk::core::Error::ReadOnly:
+    return 30; // EROFS
+  case fk::core::Error::BrokenPipe:
+    return 32; // EPIPE
+  case fk::core::Error::DirectoryNotEmpty:
+    return 39; // ENOTEMPTY
+  case fk::core::Error::IsASymlink:
+    return 40; // ELOOP
+  case fk::core::Error::ProtocolNotSupported:
+    return 92; // ENOPROTOOPT
+  case fk::core::Error::NotSupported:
+    return 95; // EOPNOTSUPP
+  case fk::core::Error::NotASymlink:
+    return 101; // fk-specific
+  case fk::core::Error::NotConnected:
+    return 107; // ENOTCONN
+  case fk::core::Error::Timeout:
+    return 110; // ETIMEDOUT
   default:
     return 22; // EINVAL
   }

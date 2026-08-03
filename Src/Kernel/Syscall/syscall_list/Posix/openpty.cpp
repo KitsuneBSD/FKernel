@@ -3,10 +3,10 @@
 #include <Kernel/Driver/Pty/pty_slave.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Fs/Virtual/PtsFs/pts_dir_node.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 using namespace fkernel;
 

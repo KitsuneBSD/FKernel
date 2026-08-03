@@ -2,16 +2,15 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Syscall/syscall.h>
-#include <Kernel/Syscall/syscall_utils.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Fs/Virtual/ShmFs/shm_node.h>
-#include <Kernel/Fs/Vfs/file_description.h>
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 static constexpr uint64_t PROT_WRITE    = 0x2;
@@ -115,9 +114,8 @@ static uint64_t mmap_file(Task* task, uintptr_t addr, uint64_t len, uint64_t pro
     return target;
 }
 
-extern "C" {
-
-uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
+// sys_mmap(...) → 0 or -errno
+extern "C" uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
                   uint64_t fd, uint64_t offset, [[maybe_unused]] PtRegs* regs) {
     auto* task = SchedulerManager::the().current();
     if (!task) return fkernel::return_error(fk::core::Error::PermissionDenied);
@@ -151,6 +149,14 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
         uintptr_t target_addr = reserve_mmap_range(task, addr, len, is_fixed);
         PageFlags pg_flags = prot_to_page_flags(prot);
         uint64_t page_aligned_len = (len + 0xFFF) & ~0xFFFULL;
+        uint64_t pages = page_aligned_len >> 12;
+
+        for (uint64_t i = 0; i < pages; ++i) {
+            uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
+            if (!phys) return fkernel::return_error(fk::core::Error::OutOfMemory);
+            fk::memory::set(reinterpret_cast<void*>(phys + KERNEL_VIRT_BASE), 0, 4096);
+            VirtualMemoryManager::the().map_page(target_addr + i * 4096, phys, pg_flags);
+        }
 
         fkernel::MemoryRegion region;
         region.start = target_addr;
@@ -177,40 +183,4 @@ uint64_t sys_mmap(uint64_t addr, uint64_t len, uint64_t prot, uint64_t flags,
     bool is_fixed  = (flags & MAP_FIXED)  != 0;
     bool is_shared = (flags & MAP_SHARED) != 0;
     return mmap_file(task, addr, len, prot, fd, offset, is_fixed, is_shared);
-}
-
-uint64_t sys_munmap(uint64_t addr, uint64_t length, [[maybe_unused]] uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*) {
-    auto result = VirtualMemoryManager::the().munmap(addr, length);
-    if (result.is_error()) {
-        return fkernel::return_error(result.error());
-    }
-    return 0;
-}
-
-uint64_t sys_mremap(uint64_t old_addr, uint64_t old_size, uint64_t new_size,
-                    uint64_t flags, uint64_t new_addr_hint, uint64_t,
-                    [[maybe_unused]] PtRegs* regs) {
-    if (new_size == 0) return (uint64_t)-12;  // ENOMEM
-    if (new_size <= old_size) return old_addr; // shrink in place
-
-    auto* task = SchedulerManager::the().current();
-    if (!task) return (uint64_t)-12;
-
-    (void)flags; (void)new_addr_hint;
-    uintptr_t new_region = reserve_mmap_range(task, 0, new_size, false);
-    uint64_t new_pages = (new_size + 0xFFF) >> 12;
-    for (uint64_t i = 0; i < new_pages; ++i) {
-        uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
-        if (!phys) return (uint64_t)-12;
-        VirtualMemoryManager::the().map_page(new_region + i * 4096, phys,
-            PageFlags::Present | PageFlags::Writable | PageFlags::User);
-        fk::memory::set(reinterpret_cast<void*>(new_region + i * 4096), 0, 4096);
-    }
-    fk::memory::copy(reinterpret_cast<void*>(new_region),
-           reinterpret_cast<const void*>(old_addr),
-           static_cast<size_t>(old_size));
-    VirtualMemoryManager::the().munmap(old_addr, old_size);
-    return new_region;
-}
-
 }

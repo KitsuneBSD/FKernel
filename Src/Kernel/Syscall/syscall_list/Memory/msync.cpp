@@ -1,11 +1,11 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 
 extern "C" uint64_t sys_msync(uint64_t addr, uint64_t len, [[maybe_unused]] uint64_t flags, uint64_t, uint64_t, uint64_t,

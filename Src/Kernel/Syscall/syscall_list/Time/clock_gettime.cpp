@@ -3,7 +3,7 @@
 #include <Kernel/Clock/clock_interrupt.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 struct timespec {
   int64_t tv_sec;

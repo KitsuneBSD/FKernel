@@ -1,10 +1,10 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <Kernel/Hardware/Fadt/fadt_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Hardware/Firmware/Fadt/fadt_manager.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 // Linux reboot magic constants
 static constexpr uint32_t REBOOT_MAGIC1 = 0xFEE1DEAD;

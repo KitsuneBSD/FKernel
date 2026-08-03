@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Net/socket.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Net/Sockets/socket.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <LibFK/Core/error.h>
 

@@ -1,8 +1,8 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Posix/signal_defs.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall_utils.h>
 
 extern "C" {

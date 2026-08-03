@@ -1,8 +1,8 @@
 #include <Kernel/Driver/Terminal/terminal_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_numbers.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fkernel;
 using namespace fkernel::terminal;

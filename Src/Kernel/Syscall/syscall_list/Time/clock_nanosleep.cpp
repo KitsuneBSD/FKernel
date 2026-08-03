@@ -1,6 +1,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
 
