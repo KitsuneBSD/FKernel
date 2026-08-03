@@ -20,6 +20,11 @@ int run_libfk_fixed_string_tests();
 int run_libfk_byte_checksum_tests();
 int run_libfk_byte_order_tests();
 int run_libfk_crc32_tests();
+int run_libfk_scatter_io_tests();
+int run_libfk_indirect_blocks_tests();
+int run_libfk_bitmap_tests();
+int run_libfk_path_tests();
+int run_libfk_time_math_tests();
 
 // Kernel subsystem tests (host-side, mocked hardware)
 int run_kernel_file_lock_tests();
@@ -55,6 +60,11 @@ int main() {
     failed += run_libfk_byte_checksum_tests();
     failed += run_libfk_byte_order_tests();
     failed += run_libfk_crc32_tests();
+    failed += run_libfk_scatter_io_tests();
+    failed += run_libfk_indirect_blocks_tests();
+    failed += run_libfk_bitmap_tests();
+    failed += run_libfk_path_tests();
+    failed += run_libfk_time_math_tests();
 
     // Kernel subsystem tests
     failed += run_kernel_file_lock_tests();

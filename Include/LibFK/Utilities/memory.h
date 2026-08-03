@@ -54,5 +54,26 @@ inline char* concatenate_n(char* dest, const char* src, size_t n) {
     return strncat(dest, src, n);
 }
 
+// Last occurrence of `c` in `s`, scanning at most `maxlen` bytes and stopping
+// at the NUL terminator. Returns nullptr when not found. LibFK equivalent of
+// LibC's strrnchr — Kernel code must use this, not the LibC function.
+inline const char* find_last(const char* s, int c, size_t maxlen) {
+    const char* last = nullptr;
+    unsigned char target = static_cast<unsigned char>(c);
+    for (size_t i = 0; i < maxlen; ++i) {
+        if (s[i] == '\0') break;
+        if (static_cast<unsigned char>(s[i]) == target) last = &s[i];
+    }
+    if (target == '\0') {
+        size_t len = strnlen(s, maxlen);
+        if (len < maxlen) return &s[len];
+    }
+    return last;
+}
+
+inline char* find_last(char* s, int c, size_t maxlen) {
+    return const_cast<char*>(find_last(static_cast<const char*>(s), c, maxlen));
+}
+
 } // namespace memory
 } // namespace fk
