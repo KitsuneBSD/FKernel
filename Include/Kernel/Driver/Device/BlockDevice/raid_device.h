@@ -1,13 +1,9 @@
 #pragma once
 
+#include <Kernel/Driver/Device/BlockDevice/raid_mode.h>
 #include <Kernel/Driver/Device/BlockDevice/stackable_block_device.h>
 
 namespace fkernel {
-
-enum class RaidMode : uint8_t {
-  Stripe = 0, // RAID 0: stripe across all children
-  Mirror = 1, // RAID 1: mirror to all, read round-robin
-};
 
 class RaidDevice : public StackableBlockDevice {
   RaidMode m_mode;

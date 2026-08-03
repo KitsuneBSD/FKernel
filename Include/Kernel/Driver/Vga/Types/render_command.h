@@ -1,10 +1,11 @@
 #pragma once
 
 #include <Kernel/Driver/Vga/Types/color.h>
+#include <Kernel/Driver/Vga/Types/render_command_type.h>
 #include <LibFK/Types/types.h>
 
 struct RenderCommand {
-  enum class Type { PutChar, Scroll, Clear, SetColor, Flush } type;
+  RenderCommandType type;
 
   union {
     struct {

@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Vga/display.h>
+#include <Kernel/Driver/Vga/display_text.h>
 #include <LibFK/Utilities/memory.h>
 
 #ifdef __x86_64

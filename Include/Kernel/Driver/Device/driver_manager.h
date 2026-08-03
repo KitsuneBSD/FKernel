@@ -1,21 +1,15 @@
 #pragma once
 
 #include <Kernel/Driver/Device/device_id.h>
-#include <Kernel/Fs/Vfs/node.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Container/hash_map.h>
+#include <Kernel/Driver/Device/driver.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Container/Associative/hash_map.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/ref_ptr.h>
-#include <LibFK/Memory/own_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+#include <LibFK/Memory/Pointers/own_ptr.h>
 
 namespace fkernel {
-
-class Driver {
-public:
-    virtual ~Driver() = default;
-    virtual const char* name() const = 0;
-    virtual void probe() = 0;
-};
 
 class DriverManager {
   bool m_is_initialized{false};

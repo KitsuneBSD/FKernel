@@ -1,6 +1,6 @@
 #pragma once
 #include <Kernel/Driver/Network/E1000/e1000.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
 
 namespace fkernel {
 

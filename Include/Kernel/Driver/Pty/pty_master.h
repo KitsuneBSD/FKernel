@@ -3,7 +3,7 @@
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
 #include <Kernel/Driver/Pty/pty_buffer.h>
 #include <Kernel/Driver/Pty/pty_line_discipline.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
 

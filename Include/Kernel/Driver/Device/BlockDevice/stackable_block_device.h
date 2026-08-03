@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Kernel/Driver/Device/BlockDevice/block_device.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
 

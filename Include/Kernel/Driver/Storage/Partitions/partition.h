@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Driver/Storage/storage_device.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 
 class Partition : public StorageDevice {
   fk::RefPtr<StorageDevice> m_parent_device;

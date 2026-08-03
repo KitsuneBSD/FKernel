@@ -1,11 +1,11 @@
 #include <Kernel/Driver/Storage/Partitions/Gpt/gpt.h>
 #include <Kernel/Driver/Storage/Partitions/partition.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
-#include <Kernel/Driver/Storage/storage_device_name.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device_name.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Algorithms/crc32.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Algorithms/Crypto/crc32.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 fk::core::Result<void, fk::core::Error>
 GPTParser::parse(fk::RefPtr<StorageDevice> device) {

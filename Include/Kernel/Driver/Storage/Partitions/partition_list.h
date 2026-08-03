@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Driver/Storage/Partitions/partition.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 class PartitionList {
   fk::containers::Vector<fk::RefPtr<Partition>> m_partitions;

@@ -1,7 +1,7 @@
 #include <Kernel/Driver/Keyboard/keymap_manager.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Fs/Vfs/definitions.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/definitions.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Utilities/memory.h>
 

@@ -1,6 +1,6 @@
 #include <Kernel/Driver/Mouse/ps2_mouse.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 static constexpr uint16_t PS2_DATA_PORT   = 0x60;

@@ -4,11 +4,11 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Memory/Dma/dma_buffer.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <Kernel/Hardware/Pci/pci.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Hardware/Buses/Pci/pci.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
 

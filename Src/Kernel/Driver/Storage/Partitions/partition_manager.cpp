@@ -2,10 +2,10 @@
 #include <Kernel/Driver/Storage/Partitions/Mbr/mbr.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Device/driver_manager.h>
-#include <Kernel/Driver/Storage/storage_device.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 PartitionManager &PartitionManager::the() {
   static PartitionManager instance;
@@ -17,7 +17,7 @@ void PartitionManager::initialize() {
   m_is_initialized = true;
 }
 
-#include <Kernel/Fs/Vfs/auto_mounter.h>
+#include <Kernel/Fs/Vfs/Mount/auto_mounter.h>
 
 void PartitionManager::add_partition(
     fk::RefPtr<Partition> partition) {

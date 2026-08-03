@@ -1,58 +1,9 @@
 #pragma once
 
+#include <Kernel/Driver/Pty/termios.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
-
-static constexpr size_t NCCS = 32;
-
-struct Termios {
-  uint32_t c_iflag;
-  uint32_t c_oflag;
-  uint32_t c_cflag;
-  uint32_t c_lflag;
-  uint8_t  c_cc[NCCS];
-
-  static constexpr uint32_t ICANON  = 0x00000002;
-  static constexpr uint32_t ECHO    = 0x00000008;
-  static constexpr uint32_t ECHOE   = 0x00000010;
-  static constexpr uint32_t ISIG    = 0x00000001;
-  static constexpr uint32_t ECHONL  = 0x00000040;
-
-  static constexpr uint8_t VINTR   = 0;
-  static constexpr uint8_t VQUIT   = 1;
-  static constexpr uint8_t VERASE  = 2;
-  static constexpr uint8_t VKILL   = 3;
-  static constexpr uint8_t VEOF    = 4;
-  static constexpr uint8_t VEOL    = 5;
-  static constexpr uint8_t VSUSP   = 10;
-  static constexpr uint8_t VSTART  = 11;
-  static constexpr uint8_t VSTOP   = 12;
-  static constexpr uint8_t VWERASE = 14; // Ctrl-W: erase previous word
-  static constexpr uint8_t VLNEXT  = 15; // Ctrl-V: literal next char
-
-  void set_defaults() {
-    c_iflag = 0x2502;
-    c_oflag = 0x0005;
-    c_cflag = 0x04cb;
-    c_lflag = ICANON | ECHO | ECHOE | ISIG | ECHONL;
-    for (size_t i = 0; i < NCCS; ++i) c_cc[i] = 0;
-    c_cc[VINTR]   = 0x03; // ^C
-    c_cc[VQUIT]   = 0x1C; // backslash
-    c_cc[VERASE]  = 0x7F; // DEL
-    c_cc[VKILL]   = 0x15; // Ctrl-U
-    c_cc[VEOF]    = 0x04; // ^D
-    c_cc[VSUSP]   = 0x1A; // ^Z
-    c_cc[VWERASE] = 0x17; // Ctrl-W
-    c_cc[VLNEXT]  = 0x16; // Ctrl-V
-  }
-
-  bool has_lflag(uint32_t flag) const { return (c_lflag & flag) != 0; }
-  bool has_oflag(uint32_t flag) const { return (c_oflag & flag) != 0; }
-
-  static constexpr uint32_t OPOST = 0x00000001;
-  static constexpr uint32_t ONLCR = 0x00000004; // map NL to CR-NL on output
-};
 
 static constexpr size_t MAX_CANON = 1024;
 
@@ -113,3 +64,4 @@ private:
 };
 
 }
+

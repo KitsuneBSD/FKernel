@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Driver/Vga/font.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Core/result.h>
@@ -10,7 +10,7 @@
 #include <Kernel/Driver/Vga/Types/framebuffer_info.h>
 #include <Kernel/Driver/Vga/Types/render_command.h>
 #include <Kernel/Driver/Vga/display.h>
-#include <LibFK/Container/circular_buffer.h>
+#include <LibFK/Container/Sequence/circular_buffer.h>
 
 class DisplayFramebuffer : public Display {
  private:

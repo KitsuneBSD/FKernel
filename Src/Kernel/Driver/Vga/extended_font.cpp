@@ -3,7 +3,7 @@
 
 namespace VgaExtended {
 
-ExtendedFont::Glyph ExtendedFont::extended_glyphs[256];
+Glyph ExtendedFont::extended_glyphs[256];
 
 ExtendedFont::ExtendedFont() {
     initialize_ascii_glyphs();
@@ -23,12 +23,12 @@ void ExtendedFont::initialize_extended_glyphs() {
     fk::memory::set(extended_glyphs, 0, sizeof(extended_glyphs));
 }
 
-const ExtendedFont::Glyph* ExtendedFont::get_ascii_glyph(uint8_t c) const {
+const Glyph* ExtendedFont::get_ascii_glyph(uint8_t c) const {
     if (c < first_ascii_char || c > last_ascii_char) return nullptr;
     return ascii_glyphs[c - first_ascii_char];
 }
 
-const ExtendedFont::Glyph* ExtendedFont::get_utf8_glyph(const uint8_t* data, uint8_t& bytes_used) const {
+const Glyph* ExtendedFont::get_utf8_glyph(const uint8_t* data, uint8_t& bytes_used) const {
     if (!data) return nullptr;
     
     if ((data[0] & 0x80) == 0) { // Standard ASCII

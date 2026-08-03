@@ -1,5 +1,6 @@
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Driver/Vga/display.h>
+#include <Kernel/Driver/Vga/display_text.h>
 #include <Kernel/Driver/Vga/display_framebuffer.h>
 #include <Kernel/Driver/Vga/font.h>
 #include <Kernel/Memory/memory_manager.h>

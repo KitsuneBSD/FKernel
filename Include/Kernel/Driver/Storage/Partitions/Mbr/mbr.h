@@ -2,8 +2,8 @@
 
 #include <Kernel/Driver/Storage/Partitions/Mbr/mbr_header.h>
 #include <Kernel/Driver/Storage/Partitions/Mbr/mbr_partition_entry.h>
-#include <Kernel/Driver/Storage/storage_device.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 class MBRParser {
 public:

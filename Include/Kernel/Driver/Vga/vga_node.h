@@ -6,7 +6,7 @@
 #include <LibFK/Utilities/memory.h>
 
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 
 namespace fkernel {
 

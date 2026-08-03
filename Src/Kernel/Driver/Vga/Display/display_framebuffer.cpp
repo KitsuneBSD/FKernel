@@ -7,7 +7,7 @@
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Types/types.h>

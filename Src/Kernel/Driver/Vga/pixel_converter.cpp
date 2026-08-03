@@ -2,7 +2,7 @@
 
 namespace fkernel {
 
-PixelConverter::RawColor PixelConverter::get_raw_color(Color c) const {
+RawColor PixelConverter::get_raw_color(Color c) const {
     switch (c) {
         case Color::Black: return {0x00, 0x00, 0x00};
         case Color::Blue: return {0x00, 0x00, 0xAA};

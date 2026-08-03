@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Driver/Device/CharacterDevice/character_device.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Types/types.h>
 

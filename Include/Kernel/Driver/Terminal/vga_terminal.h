@@ -2,9 +2,9 @@
 
 #include <Kernel/Driver/Terminal/terminal.h>
 #include <Kernel/Driver/Terminal/terminal_renderer.h>
-#include <Kernel/Ipc/endpoint.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Container/circular_buffer.h>
+#include <LibFK/Container/Sequence/circular_buffer.h>
 #include <LibFK/Terminal/ansi_parser.h>
 #include <LibFK/Synchronization/spinlock.h>
 

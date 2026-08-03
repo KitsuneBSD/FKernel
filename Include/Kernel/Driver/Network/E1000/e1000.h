@@ -1,8 +1,10 @@
 #pragma once
 
 #include <Kernel/Driver/Device/driver_manager.h>
+#include <Kernel/Driver/Network/E1000/e1000_rx_desc.h>
+#include <Kernel/Driver/Network/E1000/e1000_tx_desc.h>
 #include <Kernel/Driver/Network/network_device.h>
-#include <Kernel/Hardware/Pci/pci_device.h>
+#include <Kernel/Hardware/Buses/Pci/pci_device.h>
 #include <Kernel/Memory/Dma/dma_buffer.h>
 #include <LibFK/Types/types.h>
 
@@ -13,7 +15,7 @@ namespace fkernel {
 class E1000Controller : public Driver, public NetworkDevice {
 public:
     static fk::RefPtr<E1000Controller> create(const PciDevice& device);
-    
+
     virtual ~E1000Controller() override;
 
     // Driver interface
@@ -36,30 +38,11 @@ public:
     E1000Controller(const PciDevice& device);
 
 private:
-    struct e1000_rx_desc {
-        uint64_t addr;
-        uint16_t len;
-        uint16_t checksum;
-        uint8_t status;
-        uint8_t errors;
-        uint16_t special;
-    } __attribute__((packed));
-
-    struct e1000_tx_desc {
-        uint64_t addr;
-        uint16_t len;
-        uint8_t lower_setup;
-        uint8_t upper_setup;
-        uint8_t status;
-        uint8_t css;
-        uint16_t special;
-    } __attribute__((packed));
-
     fk::core::Result<void, fk::core::Error> initialize_hardware();
     void write_command(uint16_t addr, uint32_t val);
     uint32_t read_command(uint16_t addr);
     void read_mac_address();
-    
+
     void initialize_rx();
     void initialize_tx();
 

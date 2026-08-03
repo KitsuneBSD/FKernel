@@ -1,15 +1,10 @@
 #pragma once
 
+#include <Kernel/Driver/Keyboard/keyboard_layout.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Core/result.h>
 
 namespace fkernel::drivers {
-
-enum class KeyboardLayout {
-    US,
-    US_INTL,
-    ABNT2
-};
 
 /**
  * @brief Manages keyboard layouts and character translation.

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Ipc/notification.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Memory/ref_counted.h>
+#include <Kernel/Ipc/Notifications/notification.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
 
 namespace fkernel {
 

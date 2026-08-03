@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Kernel/Driver/Storage/storage_device.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Driver/Storage/Interfaces/storage_device.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 struct MBRPartitionEntry {
   uint8_t bootable;

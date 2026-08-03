@@ -1,7 +1,7 @@
 #include <Kernel/Driver/Pty/pty_master.h>
-#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 #include <LibFK/Utilities/memory.h>
 
 struct winsize {
@@ -151,7 +151,7 @@ PtyMaster::ioctl(uint64_t request, uint64_t arg) {
     return 0;
   }
 
-  return fk::core::Error::NotImplemented;
+  return fk::core::Error::InappropriateIoctlForDevice;
 }
 
 }

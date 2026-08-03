@@ -1,17 +1,10 @@
 #pragma once
 
+#include <Kernel/Driver/Device/BlockDevice/lvm_segment.h>
 #include <Kernel/Driver/Device/BlockDevice/stackable_block_device.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 namespace fkernel {
-
-// Maps a contiguous range of LV sectors to a Physical Volume (child index) + offset.
-struct LvmSegment {
-  uint64_t lv_start;  // first LV sector of this segment
-  uint64_t lv_end;    // first LV sector past this segment (exclusive)
-  size_t   pv_index;  // which child (PV) this segment lives on
-  uint64_t pv_start;  // first sector on the PV
-};
 
 // Linear LVM logical volume: segments map LV extents → (PV, PV offset).
 // Striped LVs are modelled by adding multiple single-sector-wide segments
