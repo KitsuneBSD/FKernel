@@ -1,17 +1,17 @@
-#include <Kernel/Net/NetworkStack/network_stack.h>
+#include <Kernel/Net/Core/network_stack.h>
 #include <Kernel/Net/Arp/arp_packet.h>
 #include <Kernel/Net/Arp/arp_table.h>
-#include <Kernel/Net/Eth/ethernet_frame.h>
+#include <Kernel/Net/Core/ethernet_frame.h>
 #include <Kernel/Net/Icmp/icmp_packet.h>
 #include <Kernel/Net/Ip/ipv4_header.h>
-#include <Kernel/Net/Routing/routing_table.h>
+#include <Kernel/Net/Core/routing_table.h>
 #include <Kernel/Net/Tcp/tcp_header.h>
 #include <Kernel/Net/Udp/udp_header.h>
-#include <Kernel/Net/Tcp/tcp_socket.h>
-#include <Kernel/Net/Udp/udp_socket.h>
+#include <Kernel/Net/Sockets/tcp_socket.h>
+#include <Kernel/Net/Sockets/udp_socket.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/internet_checksum.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 namespace net {

@@ -1,9 +1,9 @@
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/kqueue.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Net/unix_socket.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Net/Sockets/unix_socket.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -156,7 +156,7 @@ fk::core::Result<void, fk::core::Error> UnixSocket::getsockopt(
   static constexpr int SOL_SOCKET = 1;
   static constexpr int SO_PEERCRED = 17;
   if (level != SOL_SOCKET || optname != SO_PEERCRED)
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::ProtocolNotSupported;
   if (!optval || !optlen)
     return fk::core::Error::InvalidParameter;
   if (*optlen < sizeof(PeerCredentials))

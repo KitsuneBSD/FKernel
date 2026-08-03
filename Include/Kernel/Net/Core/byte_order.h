@@ -1,7 +1,7 @@
 #pragma once
 
 // Canonical definition in LibFK; import into fkernel::net for compatibility.
-#include <LibFK/Algorithms/byte_order.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 
 namespace fkernel {
 namespace net {

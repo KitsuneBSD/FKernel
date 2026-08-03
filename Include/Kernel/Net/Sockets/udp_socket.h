@@ -1,18 +1,13 @@
 #pragma once
 
 #include <Kernel/Net/Ip/ip_address.h>
-#include <Kernel/Net/socket.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Net/Sockets/socket.h>
+#include <Kernel/Net/Udp/udp_recv_entry.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
 namespace net {
-
-struct UdpRecvEntry {
-    uint32_t src_ip{0};
-    uint16_t src_port{0};
-    fk::containers::Vector<uint8_t> data;
-};
 
 class UdpSocket : public Socket {
   uint16_t    m_local_port;
@@ -68,6 +63,8 @@ public:
 private:
   uint16_t m_remote_port{0};
   bool m_so_reuseaddr{false};
+  bool m_so_broadcast{false};
+  bool m_so_keepalive{false};
   fk::containers::Vector<UdpRecvEntry> m_recv_queue;
   fk::synchronization::Spinlock m_lock;
 };

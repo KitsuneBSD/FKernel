@@ -2,7 +2,7 @@
 
 #include <LibFK/Types/types.h>
 #include <LibFK/Text/string_builder.h>
-#include <Kernel/Net/byte_order.h>
+#include <Kernel/Net/Core/byte_order.h>
 
 namespace fkernel {
 namespace net {

@@ -1,23 +1,19 @@
 #pragma once
 
 #include <Kernel/Driver/Network/network_device.h>
-#include <Kernel/Net/Eth/ethernet_frame.h>
+#include <Kernel/Net/Core/ethernet_frame.h>
 #include <Kernel/Net/Ip/ip_address.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
+#include <Kernel/Net/Core/udp_binding.h>
+#include <Kernel/Net/Core/tcp_binding.h>
 
 namespace fkernel {
 namespace net {
 
-class UdpSocket;
-class TcpSocket;
-
 static constexpr size_t MAX_UDP_BINDINGS = 64;
 static constexpr size_t MAX_TCP_BINDINGS = 64;
-
-struct UdpBinding { uint16_t port{0}; UdpSocket* socket{nullptr}; };
-struct TcpBinding { uint16_t port{0}; TcpSocket* socket{nullptr}; };
 
 class NetworkStack {
   NetworkDevice* m_device;

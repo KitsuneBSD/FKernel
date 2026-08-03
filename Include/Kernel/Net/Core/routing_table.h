@@ -1,18 +1,12 @@
 #pragma once
 
 #include <Kernel/Net/Ip/ip_address.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Net/Core/route_entry.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Memory/optional.h>
 
 namespace fkernel {
 namespace net {
-
-struct RouteEntry {
-    IPv4Address destination;
-    IPv4Address netmask;
-    IPv4Address gateway;
-    bool is_default;
-};
 
 class RoutingTable {
     fk::containers::Vector<RouteEntry> m_routes;

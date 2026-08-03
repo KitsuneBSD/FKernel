@@ -1,11 +1,11 @@
 #include <Kernel/Net/Dhcp/dhcp_client.h>
 #include <Kernel/Net/Dhcp/dhcp_packet.h>
 #include <Kernel/Net/Dns/dns_resolver.h>
-#include <Kernel/Net/Udp/udp_socket.h>
-#include <Kernel/Net/NetworkStack/network_stack.h>
+#include <Kernel/Net/Sockets/udp_socket.h>
+#include <Kernel/Net/Core/network_stack.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

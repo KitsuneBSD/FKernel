@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Net/Ip/ip_address.h>
-#include <Kernel/Net/socket.h>
+#include <Kernel/Net/Sockets/socket.h>
 #include <LibFK/Core/result.h>
 
 namespace fkernel {

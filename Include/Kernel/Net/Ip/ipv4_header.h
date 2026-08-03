@@ -1,8 +1,8 @@
 #pragma once
 
 #include <LibFK/Types/types.h>
-#include <Kernel/Net/byte_order.h>
-#include <LibFK/Algorithms/internet_checksum.h>
+#include <Kernel/Net/Core/byte_order.h>
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
 
 namespace fkernel {
 namespace net {

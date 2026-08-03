@@ -1,11 +1,11 @@
-#include <Kernel/Net/Udp/udp_socket.h>
+#include <Kernel/Net/Sockets/udp_socket.h>
 #include <Kernel/Net/Udp/udp_header.h>
 #include <Kernel/Net/Ip/ipv4_header.h>
-#include <Kernel/Net/NetworkStack/network_stack.h>
-#include <LibFK/Algorithms/container_algorithms.h>
-#include <LibFK/Algorithms/internet_checksum.h>
+#include <Kernel/Net/Core/network_stack.h>
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
 #include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -48,16 +48,38 @@ fk::core::Result<void, fk::core::Error> UdpSocket::bind(const char* path) {
 }
 
 fk::core::Result<void, fk::core::Error> UdpSocket::connect(const char* path) {
-    (void)path;
-    return fk::core::Error::NotImplemented;
+    if (!path) return fk::core::Error::InvalidParameter;
+    // path is sockaddr_in*: sin_family(2) + sin_port(2, BE) + sin_addr(4)
+    uint16_t remote_port = ntohs(*reinterpret_cast<const uint16_t*>(path + 2));
+    uint32_t remote_ip_be = *reinterpret_cast<const uint32_t*>(path + 4);
+
+    {
+        fk::synchronization::ScopedLock lock(m_lock);
+        if (m_local_port == 0) {
+            // Auto-bind an ephemeral port (Linux semantics: UDP connect implies bind).
+            static constexpr uint16_t UDP_EPHEMERAL_START = 49152;
+            static uint16_t s_ephemeral{UDP_EPHEMERAL_START};
+            uint16_t local_port = __sync_fetch_and_add(&s_ephemeral, 1);
+            if (!NetworkStack::the().register_udp_socket(local_port, this))
+                return fk::core::Error::AlreadyExists;
+            m_local_port = local_port;
+        }
+        m_remote_ip = IPv4Address(ntohl(remote_ip_be));
+        m_remote_port = remote_port;
+    }
+    fk::algorithms::kdebug("UDP", "connect(%s:%u)",
+                           IPv4Address(ntohl(remote_ip_be)).to_string().c_str(), remote_port);
+    return {};
 }
 
 fk::core::Result<void, fk::core::Error> UdpSocket::listen() {
-    return fk::core::Error::NotImplemented;
+    // Linux allows listen() on datagram sockets as a no-op (accept() then fails EOPNOTSUPP).
+    fk::algorithms::kdebug("UDP", "listen() (no-op for datagram)");
+    return {};
 }
 
 fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> UdpSocket::accept() {
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::NotSupported; // EOPNOTSUPP
 }
 
 fk::core::Result<size_t, fk::core::Error> UdpSocket::read(
@@ -137,25 +159,61 @@ fk::core::Result<void, fk::core::Error> UdpSocket::getpeername(char* addr, uint3
 
 fk::core::Result<void, fk::core::Error> UdpSocket::setsockopt(
     int level, int optname, const void* optval, uint32_t optlen) {
-    if (level != 1) return fk::core::Error::NotImplemented; // SOL_SOCKET=1
+    if (level != 1) return fk::core::Error::ProtocolNotSupported; // only SOL_SOCKET=1
     if (!optval || optlen < 4) return fk::core::Error::InvalidParameter;
-    if (optname == 2) { // SO_REUSEADDR
-        m_so_reuseaddr = (*reinterpret_cast<const int*>(optval)) != 0;
+    int val = *reinterpret_cast<const int*>(optval);
+    switch (optname) {
+    case 2:  // SO_REUSEADDR
+        m_so_reuseaddr = (val != 0);
         return {};
+    case 6:  // SO_BROADCAST
+        m_so_broadcast = (val != 0);
+        return {};
+    case 9:  // SO_KEEPALIVE
+        m_so_keepalive = (val != 0);
+        return {};
+    case 7:  // SO_SNDBUF
+    case 8:  // SO_RCVBUF
+        // Buffers are fixed-size in FKernel; accept and ignore.
+        return {};
+    default:
+        return fk::core::Error::ProtocolNotSupported; // ENOPROTOOPT
     }
-    return fk::core::Error::NotImplemented;
 }
 
 fk::core::Result<void, fk::core::Error> UdpSocket::getsockopt(
     int level, int optname, void* optval, uint32_t* optlen) {
-    if (level != 1) return fk::core::Error::NotImplemented;
+    if (level != 1) return fk::core::Error::ProtocolNotSupported;
     if (!optval || !optlen || *optlen < 4) return fk::core::Error::InvalidParameter;
-    if (optname == 2) { // SO_REUSEADDR
+    switch (optname) {
+    case 3:  // SO_TYPE
+        *reinterpret_cast<int*>(optval) = 2; // SOCK_DGRAM
+        *optlen = 4;
+        return {};
+    case 4:  // SO_ERROR
+        *reinterpret_cast<int*>(optval) = 0; // no pending error
+        *optlen = 4;
+        return {};
+    case 2:  // SO_REUSEADDR
         *reinterpret_cast<int*>(optval) = m_so_reuseaddr ? 1 : 0;
         *optlen = 4;
         return {};
+    case 6:  // SO_BROADCAST
+        *reinterpret_cast<int*>(optval) = m_so_broadcast ? 1 : 0;
+        *optlen = 4;
+        return {};
+    case 9:  // SO_KEEPALIVE
+        *reinterpret_cast<int*>(optval) = m_so_keepalive ? 1 : 0;
+        *optlen = 4;
+        return {};
+    case 7:  // SO_SNDBUF
+    case 8:  // SO_RCVBUF
+        *reinterpret_cast<int*>(optval) = 65536;
+        *optlen = 4;
+        return {};
+    default:
+        return fk::core::Error::ProtocolNotSupported; // ENOPROTOOPT
     }
-    return fk::core::Error::NotImplemented;
 }
 
 fk::core::Result<size_t, fk::core::Error> UdpSocket::write(

@@ -1,6 +1,6 @@
-#include <Kernel/Net/InetSocket/inet_socket.h>
-#include <Kernel/Net/Udp/udp_socket.h>
-#include <Kernel/Net/Tcp/tcp_socket.h>
+#include <Kernel/Net/Sockets/inet_socket.h>
+#include <Kernel/Net/Sockets/udp_socket.h>
+#include <Kernel/Net/Sockets/tcp_socket.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

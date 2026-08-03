@@ -1,12 +1,12 @@
-#include <Kernel/Net/Tcp/tcp_socket.h>
+#include <Kernel/Net/Sockets/tcp_socket.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Net/Ip/ipv4_header.h>
-#include <Kernel/Net/NetworkStack/network_stack.h>
-#include <Kernel/Net/byte_order.h>
-#include <LibFK/Algorithms/internet_checksum.h>
+#include <Kernel/Net/Core/network_stack.h>
+#include <Kernel/Net/Core/byte_order.h>
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 namespace net {
@@ -101,10 +101,9 @@ fk::core::Result<fk::RefPtr<Socket>, fk::core::Error> TcpSocket::accept() {
     while (true) {
         {
             fk::synchronization::ScopedLock lock(m_lock);
-            for (size_t i = 0; i < m_accept_queue.size(); ++i) {
-                if (m_accept_queue[i]->m_connection.state != TcpState::Established) continue;
-                auto child = m_accept_queue[i];
-                m_accept_queue.remove_at(i);
+            if (!m_accept_queue.is_empty()) {
+                auto child = m_accept_queue[m_accept_queue.size() - 1];
+                m_accept_queue.pop_back();
                 return fk::RefPtr<Socket>(child);
             }
         }
@@ -126,7 +125,7 @@ fk::core::Result<size_t, fk::core::Error> TcpSocket::write(
     [[maybe_unused]] uint64_t offset, size_t size, const uint8_t* buf) {
     fk::synchronization::ScopedLock lock(m_lock);
     if (m_connection.state != TcpState::Established)
-        return fk::core::Error::NotImplemented;
+        return fk::core::Error::NotConnected;
     static constexpr size_t MSS = 1460;
     size_t sent = 0;
     while (sent < size) {
@@ -220,8 +219,8 @@ void TcpSocket::process_handshake(const TcpHeader* hdr, uint8_t flags, uint32_t 
     NetworkStack::the().send_ipv4(m_connection.remote().ip, IP_PROTO_TCP,
                                   synack, TCP_HEADER_SIZE);
 
-    // Parent stays registered; process_ack will complete the handshake via m_accept_queue
-    m_accept_queue.push_back(child);
+    // Parent stays registered; process_ack will complete the handshake via m_pending
+    m_pending.push_back(child);
 }
 
 void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
@@ -229,13 +228,20 @@ void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
     uint32_t ack = ntohl(hdr->ack_num);
 
     if (m_connection.state == TcpState::Listen) {
-        // Complete the 3-way handshake for the matching SynReceived child
-        for (auto& child : m_accept_queue) {
+        // Complete the 3-way handshake for the matching SynReceived child.
+        for (size_t i = 0; i < m_pending.size(); ++i) {
+            auto& child = m_pending[i];
             if (child->m_connection.state != TcpState::SynReceived) continue;
             if (ack != child->m_connection.send_next) continue;
             child->m_connection.state = TcpState::Established;
             child->m_connection.send_unacked = ack;
             child->m_connection.peer_window = ntohs(hdr->window);
+            // Swap-remove from pending O(1), push to ready queue.
+            auto ready = child;
+            if (i != m_pending.size() - 1)
+                m_pending[i] = m_pending[m_pending.size() - 1];
+            m_pending.pop_back();
+            m_accept_queue.push_back(ready);
             m_connection.state_changed.signal(fk::NotificationBits(1));
             return;
         }
@@ -337,13 +343,13 @@ fk::core::Result<void, fk::core::Error> TcpSocket::setsockopt(
     if (level == 1) { // SOL_SOCKET
         if (optname == 2) { m_so_reuseaddr = (val != 0); return {}; } // SO_REUSEADDR
         if (optname == 9) { m_so_keepalive = (val != 0); return {}; }  // SO_KEEPALIVE
-        return fk::core::Error::NotImplemented;
+        return fk::core::Error::ProtocolNotSupported;
     }
     if (level == 6) { // IPPROTO_TCP
         if (optname == 1) { m_tcp_nodelay = (val != 0); return {}; } // TCP_NODELAY
         return {};
     }
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::ProtocolNotSupported;
 }
 
 fk::core::Result<void, fk::core::Error> TcpSocket::getsockopt(
@@ -353,19 +359,19 @@ fk::core::Result<void, fk::core::Error> TcpSocket::getsockopt(
         if (optname == 4) { *reinterpret_cast<int*>(optval) = m_so_error; *optlen = 4; return {}; } // SO_ERROR
         if (optname == 2) { *reinterpret_cast<int*>(optval) = m_so_reuseaddr ? 1 : 0; *optlen = 4; return {}; } // SO_REUSEADDR
         if (optname == 9) { *reinterpret_cast<int*>(optval) = m_so_keepalive ? 1 : 0; *optlen = 4; return {}; } // SO_KEEPALIVE
-        return fk::core::Error::NotImplemented;
+        return fk::core::Error::ProtocolNotSupported;
     }
     if (level == 6) { // IPPROTO_TCP
         if (optname == 1) { *reinterpret_cast<int*>(optval) = m_tcp_nodelay ? 1 : 0; *optlen = 4; return {}; } // TCP_NODELAY
-        return fk::core::Error::NotImplemented;
+        return fk::core::Error::ProtocolNotSupported;
     }
-    return fk::core::Error::NotImplemented;
+    return fk::core::Error::ProtocolNotSupported;
 }
 
 } // namespace net
 } // namespace fkernel
 
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 namespace fkernel {
 namespace net {

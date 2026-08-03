@@ -1,24 +1,15 @@
 #pragma once
 
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/Notifications/notification.h>
 #include <Kernel/Net/Ip/ip_address.h>
+#include <Kernel/Net/Tcp/tcp_state.h>
+#include <Kernel/Net/Tcp/tcp_endpoint.h>
 #include <Kernel/Net/Tcp/tcp_header.h>
-#include <LibFK/Container/circular_buffer.h>
+#include <LibFK/Container/Sequence/circular_buffer.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
 namespace net {
-
-enum class TcpState : uint8_t {
-  Closed, Listen, SynSent, SynReceived,
-  Established, FinWait1, FinWait2,
-  CloseWait, LastAck, TimeWait, Closing,
-};
-
-struct TcpEndpoint {
-  IPv4Address ip;
-  uint16_t    port;
-};
 
 static constexpr size_t TCP_RECV_BUFFER_SIZE = 65536;
 

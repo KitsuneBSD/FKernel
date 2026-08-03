@@ -1,6 +1,6 @@
 #include <Kernel/Net/Arp/arp_table.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 namespace fkernel {
 namespace net {

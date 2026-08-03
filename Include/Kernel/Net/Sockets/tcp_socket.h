@@ -2,8 +2,8 @@
 
 #include <Kernel/Net/Ip/ip_address.h>
 #include <Kernel/Net/Tcp/tcp_connection.h>
-#include <Kernel/Net/socket.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Net/Sockets/socket.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
@@ -12,7 +12,8 @@ namespace net {
 class TcpSocket : public Socket {
   TcpConnection m_connection;
   fk::synchronization::Spinlock m_lock;
-  fk::containers::Vector<fk::RefPtr<TcpSocket>> m_accept_queue;
+  fk::containers::Vector<fk::RefPtr<TcpSocket>> m_pending;       // SynReceived children
+  fk::containers::Vector<fk::RefPtr<TcpSocket>> m_accept_queue;  // Established, ready for accept()
 
   fk::containers::Vector<uint8_t> m_retransmit_buf;
   uint32_t m_retransmit_seq{0};

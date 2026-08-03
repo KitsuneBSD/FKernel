@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/file_description.h>
-#include <Kernel/Ipc/endpoint.h>
-#include <Kernel/Net/socket.h>
-#include <Kernel/Net/unix_socket_buffer.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
+#include <Kernel/Net/Sockets/socket.h>
+#include <Kernel/Net/Sockets/unix_socket_buffer.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Text/fixed_string.h>
 

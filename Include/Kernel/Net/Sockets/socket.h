@@ -1,20 +1,12 @@
 #pragma once
 
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
+#include <Kernel/Net/Sockets/socket_domain.h>
+#include <Kernel/Net/Sockets/socket_type.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
-
-enum class SocketDomain {
-    Unix = 1,
-    Inet = 2,
-};
-
-enum class SocketType {
-    Stream = 1,
-    Datagram = 2,
-};
 
 class Socket : public Node {
 public:
