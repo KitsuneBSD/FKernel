@@ -133,6 +133,7 @@ sys_wait4:
 ; void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 sys_mmap:
     mov rax, SYS_MMAP
+    mov r10, rcx
     syscall
     ret
 

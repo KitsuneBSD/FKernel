@@ -16,11 +16,26 @@ static void setup_mounts(void) {
     sys_mount("tmpfs", "/var/tmp", "tmpfs", 0, 0);
 }
 
+static void run_ktest(void) {
+    int pid = sys_fork();
+    if (pid == 0) {
+        char* argv[] = { "/bin/ktest", 0 };
+        char* envp[] = { "PATH=/bin:/sbin", 0 };
+        sys_execve("/bin/ktest", argv, envp);
+        sys_exit(127);
+    }
+    if (pid > 0) {
+        int status = 0;
+        sys_wait4(pid, &status, 0, 0);
+    }
+}
+
 int main(int argc, char** argv, char** envp) {
     (void)argc; (void)argv; (void)envp;
     fk_puts("\nFKernel init starting...\n");
 
     setup_mounts();
+    run_ktest();
 
     while (1) {
         int pid = sys_fork();

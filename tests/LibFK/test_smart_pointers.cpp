@@ -1,7 +1,7 @@
 #include <tests/test_framework.h>
-#include <LibFK/Memory/own_ptr.h>
-#include <LibFK/Memory/ref_ptr.h>
-#include <LibFK/Memory/ref_counted.h>
+#include <LibFK/Memory/Pointers/own_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
 #include <LibFK/Memory/optional.h>
 
 struct Counted : public fk::memory::RefCounted<Counted> {

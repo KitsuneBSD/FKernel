@@ -1,5 +1,5 @@
 #include <tests/test_framework.h>
-#include <Kernel/Ipc/cspace.h>
+#include <Kernel/Ipc/Capabilities/cspace.h>
 
 using namespace fkernel::ipc;
 

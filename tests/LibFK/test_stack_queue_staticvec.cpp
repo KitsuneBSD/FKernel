@@ -1,10 +1,10 @@
 #include <tests/test_framework.h>
-#include <LibFK/Container/stack.h>
-#include <LibFK/Container/queue.h>
-#include <LibFK/Container/static_vector.h>
-#include <LibFK/Container/list.h>
-#include <LibFK/Container/span.h>
-#include <LibFK/Container/array.h>
+#include <LibFK/Container/Adapters/stack.h>
+#include <LibFK/Container/Adapters/queue.h>
+#include <LibFK/Container/Sequence/static_vector.h>
+#include <LibFK/Container/Sequence/list.h>
+#include <LibFK/Container/Sequence/span.h>
+#include <LibFK/Container/Sequence/array.h>
 
 using namespace fk::containers;
 
@@ -326,6 +326,88 @@ static const char* test_list_nullptr_ops() {
     return NULL;
 }
 
+static const char* test_list_insert_before() {
+    List<TestItem> list;
+    TestItem a(1), b(2), c(3), d(4);
+    list.push_back(&a);
+    list.push_back(&c);
+
+    // insert b before c → [a, b, c]
+    list.insert_before(&c, &b);
+    TEST_ASSERT_EQ(3u, list.size(), "Size should be 3");
+    TEST_ASSERT_EQ(&a, list.front(), "Front should be a");
+    TEST_ASSERT_EQ(&c, list.back(), "Back should be c");
+
+    int expected[] = {1, 2, 3};
+    int i = 0;
+    for (auto& item : list) {
+        TEST_ASSERT_EQ(expected[i], item.value, "Order a,b,c");
+        i++;
+    }
+
+    // insert_before(nullptr) → append [a, b, c, d]
+    list.insert_before(nullptr, &d);
+    TEST_ASSERT_EQ(4u, list.size(), "Size should be 4");
+    TEST_ASSERT_EQ(&d, list.back(), "Back should be d after append");
+
+    // insert e before head
+    TestItem e(0);
+    list.insert_before(&a, &e);
+    TEST_ASSERT_EQ(5u, list.size(), "Size should be 5");
+    TEST_ASSERT_EQ(&e, list.front(), "Front should be e");
+    return NULL;
+}
+
+static const char* test_list_insert_sorted() {
+    List<TestItem> list;
+    TestItem a(10), b(5), c(20), d(1), e(15);
+
+    auto cmp = [](TestItem* lhs, TestItem* rhs) { return lhs->value < rhs->value; };
+
+    list.insert_sorted(&a, cmp); // [10]
+    list.insert_sorted(&b, cmp); // [5, 10]
+    list.insert_sorted(&c, cmp); // [5, 10, 20]
+    list.insert_sorted(&d, cmp); // [1, 5, 10, 20]
+    list.insert_sorted(&e, cmp); // [1, 5, 10, 15, 20]
+
+    TEST_ASSERT_EQ(5u, list.size(), "Size should be 5");
+
+    int expected[] = {1, 5, 10, 15, 20};
+    int i = 0;
+    for (auto& item : list) {
+        TEST_ASSERT_EQ(expected[i], item.value, "Sorted order");
+        i++;
+    }
+    TEST_ASSERT_EQ(5, i, "Iterator visited all 5 items");
+    return NULL;
+}
+
+static const char* test_list_double_remove_guard() {
+    List<TestItem> list;
+    TestItem a(1), b(2), c(3);
+    list.push_back(&a);
+    list.push_back(&b);
+    list.push_back(&c);
+
+    list.remove(&b);
+    TEST_ASSERT_EQ(2u, list.size(), "Size 2 after removing b");
+
+    // Second remove of b must be a no-op — no crash, no size underflow.
+    list.remove(&b);
+    TEST_ASSERT_EQ(2u, list.size(), "Double-remove must not change size");
+    TEST_ASSERT_EQ(&a, list.front(), "Front still a");
+    TEST_ASSERT_EQ(&c, list.back(), "Back still c");
+
+    // Remove sole element then remove again — guard for single-element case.
+    list.remove(&a);
+    list.remove(&c);
+    TEST_ASSERT(list.empty(), "List should be empty");
+    list.remove(&a); // stale pointer double-remove
+    TEST_ASSERT(list.empty(), "Double-remove on empty list must be no-op");
+    TEST_ASSERT_EQ(0u, list.size(), "Size must remain 0");
+    return NULL;
+}
+
 /* ---- span ---- */
 
 static const char* test_span_basic() {
@@ -464,6 +546,9 @@ static test_case_t s_tests[] = {
     {"test_list_clear",                 test_list_clear},
     {"test_list_iterator",              test_list_iterator},
     {"test_list_nullptr_ops",           test_list_nullptr_ops},
+    {"test_list_insert_before",         test_list_insert_before},
+    {"test_list_insert_sorted",         test_list_insert_sorted},
+    {"test_list_double_remove_guard",   test_list_double_remove_guard},
     // span
     {"test_span_basic",                 test_span_basic},
     {"test_span_default_empty",         test_span_default_empty},

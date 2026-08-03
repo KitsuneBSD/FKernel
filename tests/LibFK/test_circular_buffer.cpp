@@ -1,5 +1,5 @@
 #include <tests/test_framework.h>
-#include <LibFK/Container/circular_buffer.h>
+#include <LibFK/Container/Sequence/circular_buffer.h>
 
 using namespace fk::containers;
 

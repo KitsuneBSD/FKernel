@@ -1,5 +1,5 @@
 #include <tests/test_framework.h>
-#include <LibFK/Algorithms/byte_checksum.h>
+#include <LibFK/Algorithms/Crypto/byte_checksum.h>
 
 static const char* test_all_zeros() {
   uint8_t data[16] = {};

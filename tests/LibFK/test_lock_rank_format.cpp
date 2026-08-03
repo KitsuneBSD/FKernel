@@ -1,7 +1,7 @@
 #include <tests/test_framework.h>
 #include <LibFK/Synchronization/lock_rank.h>
 #include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Algorithms/format_checked.h>
+#include <LibFK/Algorithms/Logging/format_checked.h>
 
 using namespace fk::synchronization;
 using namespace fk::algorithms;

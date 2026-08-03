@@ -1,6 +1,6 @@
 #include <tests/test_framework.h>
-#include <LibFK/Container/multi_set.h>
-#include <LibFK/Container/multi_map.h>
+#include <LibFK/Container/Associative/multi_set.h>
+#include <LibFK/Container/Associative/multi_map.h>
 
 using namespace fk::containers;
 

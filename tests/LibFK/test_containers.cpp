@@ -1,10 +1,10 @@
 #include <tests/test_framework.h>
-#include <LibFK/Container/vector.h>
-#include <LibFK/Container/set.h>
-#include <LibFK/Container/map.h>
-#include <LibFK/Container/priority_queue.h>
-#include <LibFK/Container/deque.h>
-#include <LibFK/Container/hash_map.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Container/Associative/set.h>
+#include <LibFK/Container/Associative/map.h>
+#include <LibFK/Container/Adapters/priority_queue.h>
+#include <LibFK/Container/Sequence/deque.h>
+#include <LibFK/Container/Associative/hash_map.h>
 
 using namespace fk::containers;
 

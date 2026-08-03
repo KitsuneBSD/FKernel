@@ -1,9 +1,9 @@
 #include <tests/test_framework.h>
-#include <LibFK/Memory/nonnull_own_ptr.h>
-#include <LibFK/Memory/nonnull_ref_ptr.h>
-#include <LibFK/Memory/ref_counted.h>
-#include <LibFK/Memory/weakable.h>
-#include <LibFK/Memory/bump_allocator.h>
+#include <LibFK/Memory/Pointers/nonnull_own_ptr.h>
+#include <LibFK/Memory/Pointers/nonnull_ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_counted.h>
+#include <LibFK/Memory/Pointers/weakable.h>
+#include <LibFK/Memory/Allocators/bump_allocator.h>
 
 // ---- helpers ---------------------------------------------------------------
 

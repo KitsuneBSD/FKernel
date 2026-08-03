@@ -1,6 +1,6 @@
 #include <tests/test_framework.h>
-#include <LibFK/Container/bitmap.h>
-#include <LibFK/Container/unordered_set.h>
+#include <LibFK/Container/Adapters/bitmap.h>
+#include <LibFK/Container/Associative/unordered_set.h>
 
 using namespace fk::containers;
 
@@ -97,6 +97,38 @@ static const char* test_bitmap_set_false_clears() {
     return NULL;
 }
 
+// Hint optimization: after filling word 0, alloc must find bits in word 1.
+static const char* test_bitmap_hint_cross_word() {
+    uint64_t storage[2] = {};
+    Bitmap<uint64_t> bm(storage, 128);
+    for (int i = 0; i < 64; ++i) bm.alloc(); // fill word 0
+    ssize_t r = bm.alloc(); // must come from word 1, bit 0 → index 64
+    TEST_ASSERT_EQ(64, (int)r, "alloc after full first word must find bit 64");
+    return NULL;
+}
+
+// Hint regression: free a bit before the hint → next alloc finds it.
+static const char* test_bitmap_hint_regresses_on_free() {
+    uint64_t storage[2] = {};
+    Bitmap<uint64_t> bm(storage, 128);
+    for (int i = 0; i < 128; ++i) bm.alloc(); // fill all
+    bm.clear(5);                               // free bit 5 (word 0)
+    ssize_t r = bm.alloc();                    // hint must regress to word 0
+    TEST_ASSERT_EQ(5, (int)r, "alloc after clear(5) on full bitmap must return 5");
+    return NULL;
+}
+
+// Hint wrap-around: fill everything, free a bit before hint, then alloc.
+static const char* test_bitmap_hint_wraparound() {
+    uint64_t storage[2] = {};
+    Bitmap<uint64_t> bm(storage, 128);
+    for (int i = 0; i < 128; ++i) bm.alloc();
+    bm.clear(127);  // free last bit (word 1)
+    ssize_t r = bm.alloc();
+    TEST_ASSERT_EQ(127, (int)r, "alloc after clear(127) must return 127");
+    return NULL;
+}
+
 /* ---- UnorderedSet ---- */
 
 static const char* test_unorderedset_insert_contains() {
@@ -186,6 +218,9 @@ static test_case_t s_tests[] = {
     {"test_bitmap_alloc_skips_used",           test_bitmap_alloc_skips_used},
     {"test_bitmap_alloc_full_returns_minus_one", test_bitmap_alloc_full_returns_minus_one},
     {"test_bitmap_set_false_clears",           test_bitmap_set_false_clears},
+    {"test_bitmap_hint_cross_word",            test_bitmap_hint_cross_word},
+    {"test_bitmap_hint_regresses_on_free",     test_bitmap_hint_regresses_on_free},
+    {"test_bitmap_hint_wraparound",            test_bitmap_hint_wraparound},
     // UnorderedSet
     {"test_unorderedset_insert_contains",      test_unorderedset_insert_contains},
     {"test_unorderedset_duplicate_insert",     test_unorderedset_duplicate_insert},

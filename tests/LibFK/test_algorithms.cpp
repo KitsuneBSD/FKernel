@@ -1,8 +1,8 @@
 #include <tests/test_framework.h>
-#include <LibFK/Algorithms/internet_checksum.h>
-#include <LibFK/Algorithms/binary_search.h>
-#include <LibFK/Algorithms/container_algorithms.h>
-#include <LibFK/Algorithms/gather.h>
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
+#include <LibFK/Algorithms/Generic/binary_search.h>
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Generic/gather.h>
 #include <LibFK/Core/result.h>
 #include <LibFK/Functional/function.h>
 

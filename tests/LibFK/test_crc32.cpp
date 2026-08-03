@@ -1,5 +1,5 @@
 #include <tests/test_framework.h>
-#include <LibFK/Algorithms/crc32.h>
+#include <LibFK/Algorithms/Crypto/crc32.h>
 
 // RFC 3720 / PNG test vector: "123456789" → 0xCBF43926
 static const char* test_known_vector() {

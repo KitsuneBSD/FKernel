@@ -25,6 +25,13 @@ int run_libfk_crc32_tests();
 int run_kernel_file_lock_tests();
 int run_kernel_cspace_tests();
 int run_kernel_elf_header_tests();
+int run_kernel_slab_free_list_tests();
+int run_kernel_buddy_state_tests();
+int run_kernel_zone_allocator_tests();
+int run_kernel_qos_tests();
+int run_kernel_dentry_tests();
+int run_kernel_buddy_allocator_tests();
+int run_kernel_slab_allocator_tests();
 
 int main() {
     int failed = 0;
@@ -53,6 +60,13 @@ int main() {
     failed += run_kernel_file_lock_tests();
     failed += run_kernel_cspace_tests();
     failed += run_kernel_elf_header_tests();
+    failed += run_kernel_slab_free_list_tests();
+    failed += run_kernel_buddy_state_tests();
+    failed += run_kernel_zone_allocator_tests();
+    failed += run_kernel_qos_tests();
+    failed += run_kernel_dentry_tests();
+    failed += run_kernel_buddy_allocator_tests();
+    failed += run_kernel_slab_allocator_tests();
 
     if (failed == 0) {
         TEST_LOG("\n>>> SUMMARY: ALL TEST SUITES PASSED!\n");

@@ -1,5 +1,5 @@
 #include <tests/test_framework.h>
-#include <LibFK/Algorithms/byte_order.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 
 static const char* test_htons_round_trip() {
   uint16_t v = 0x1234;
