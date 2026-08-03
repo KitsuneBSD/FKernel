@@ -16,6 +16,7 @@ xmake setup-hda                # Create disk image
 xmake build-initrd             # Build initrd
 xmake config-initrd            # Configure initrd interactively
 xmake analyze                  # Analyze kernel runtime
+xmake check-syscalls          # Verify one syscall handler per file
 ```
 
 Build outputs: `build/FKernel.bin`, `build/FKernel-MockOS.iso`, `build/FKernel-HDA.qcow2`.
@@ -223,6 +224,7 @@ All source and header files MUST use `snake_case` naming. No exceptions.
 - After renaming, update ALL `#include` directives that reference the old name
 - One struct/class per file. File name matches class name in snake_case
 - Directory cleanup tracked in TODO.md Phase 22
+- One syscall handler per file. Each `Src/Kernel/Syscall/syscall_list/` file defines at most one `sys_*` handler (shared support files with zero handlers are allowed, e.g. `posix_timer.cpp`). File name matches the handler name minus the `sys_` prefix. Verified by `xmake check-syscalls`.
 
 ## Include Order
 

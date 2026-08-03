@@ -1,75 +1,66 @@
--- Meta/Lib/llm_client.lua - LLM interaction and Rate Limiting for Wiggum
+-- Meta/Lib/llm_client.lua
 
-local LLMClient = {
-  models = {
-    ["opencode/trinity-large-preview-free"] = { rpm = 2, priority = 1 },
-    ["opencode/kimi-k2.5-free"] = { rpm = 2, priority = 2, variant = "high" },
-    ["opencode/minimax-m2.1-free"] = { rpm = 2, priority = 3 },
-    ["opencode/glm-4.7-free"] = { rpm = 2, priority = 4 },
-  },
-  usage = {},
-  last_model_index = 0
+local LLM = {
+    _failures = 0,
+    _idx      = 0,
 }
 
-local MODEL_LIST = {
-  "opencode/trinity-large-preview-free",
-  "opencode/kimi-k2.5-free",
-  "opencode/minimax-m2.1-free",
-  "opencode/glm-4.7-free"
+local MODELS = {
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-8",
 }
 
-function LLMClient.get_next_model()
-  LLMClient.last_model_index = (LLMClient.last_model_index % #MODEL_LIST) + 1
-  return MODEL_LIST[LLMClient.last_model_index]
+local MISSION_FILE      = "/tmp/wiggum/mission.txt"
+local EXHAUSTION_LIMIT  = 5   -- consecutive full-model-cycle failures before stopping
+
+-- Round-robin model selection.
+function LLM.next()
+    LLM._idx = (LLM._idx % #MODELS) + 1
+    return MODELS[LLM._idx]
 end
 
-function LLMClient.call(model_id, prompt)
-  local prompt_file = "/tmp/wiggum_prompt.txt"
-  local f = io.open(prompt_file, "w")
-  if f then
-    f:write(prompt)
+-- Write mission to file, ask claude to read and execute it.
+-- Returns true on exit-0, false otherwise.
+function LLM.call(model, mission)
+    os.execute("mkdir -p /tmp/wiggum")
+    local f = io.open(MISSION_FILE, "w")
+    if not f then
+        io.stderr:write("[LLM] Cannot write mission file\n")
+        return false
+    end
+    f:write(mission)
     f:close()
-  end
 
-  local model_cfg = LLMClient.models[model_id] or {}
-  local variant_flag = ""
-  if model_cfg.variant then
-    variant_flag = '--variant ' .. model_cfg.variant
-  end
+    local cmd = string.format(
+        "claude --model %s --dangerously-skip-permissions -p %q",
+        model,
+        "Read /tmp/wiggum/mission.txt then execute every step described there."
+        .. " Use AGENTS.md as your coding style guide."
+    )
 
-  -- Removida a flag -y/--yolo pois não é suportada nesta versão
-  -- A instrução principal é o primeiro argumento posicional
-  local cmd = string.format(
-    'opencode run "Execute the mission in the attached file." -m %s -f %s -f GEMINI.md -f AGENTS.md -f TODO.md %s --log-level WARN',
-    model_id, prompt_file, variant_flag
-  )
+    io.write(string.format("[LLM] %s ...\n", model))
+    io.flush()
+    local ok, why, code = os.execute(cmd)
+    local success = (ok == true) or (ok == 0) or (why == "exit" and code == 0)
 
-  print("\n🚀 Ralph is launching Agent...")
-  local success = os.execute(cmd)
+    if success then
+        LLM._failures = 0
+    else
+        LLM._failures = LLM._failures + 1
+    end
 
-  os.remove(prompt_file)
-  return success
+    return success
 end
 
-function LLMClient.wait_if_needed(model_id)
-  local now = os.time()
-  LLMClient.usage[model_id] = LLMClient.usage[model_id] or { count = 0, last_reset = now }
-
-  if now - LLMClient.usage[model_id].last_reset >= 60 then
-    LLMClient.usage[model_id].count = 0
-    LLMClient.usage[model_id].last_reset = now
-  end
-
-  local config = LLMClient.models[model_id]
-  if config and LLMClient.usage[model_id].count >= (config.rpm or 2) then
-    local wait_time = 65 - (now - LLMClient.usage[model_id].last_reset)
-    print(string.format("⏳ Rate limit for %s. Waiting %ds...", model_id, wait_time))
-    os.execute("sleep " .. wait_time)
-    LLMClient.usage[model_id].count = 0
-    LLMClient.usage[model_id].last_reset = os.time()
-  end
-
-  LLMClient.usage[model_id].count = LLMClient.usage[model_id].count + 1
+-- True when too many consecutive failures have been seen across all models.
+function LLM.exhausted()
+    return LLM._failures >= EXHAUSTION_LIMIT
 end
 
-return LLMClient
+-- Reset the failure counter (call after a cooldown period).
+function LLM.reset()
+    LLM._failures = 0
+end
+
+return LLM
