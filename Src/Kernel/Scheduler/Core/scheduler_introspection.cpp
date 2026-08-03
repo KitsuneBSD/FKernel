@@ -1,7 +1,7 @@
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/qos.h>
-#include <Kernel/Ipc/signal_delivery.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <Kernel/Scheduler/Qos/qos.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 using namespace fkernel::scheduler;
@@ -88,9 +88,18 @@ fk::RefPtr<Task> SchedulerManager::find_any_child(fk::ProcessId ppid) {
       }
     }
   }
-  fk::synchronization::ScopedLock lock(m_lock);
-  for (auto& task : m_wait_queue) if (task.control.identity.ppid == ppid) return &task;
-  for (auto& task : m_zombie_queue) if (task.control.identity.ppid == ppid) return &task;
-  for (auto& task : m_sleep_queue) if (task.control.identity.ppid == ppid) return &task;
-  return nullptr;
+  {
+    fk::synchronization::ScopedLock lock(m_lock);
+    for (auto& task : m_wait_queue) if (task.control.identity.ppid == ppid) return &task;
+    for (auto& task : m_zombie_queue) if (task.control.identity.ppid == ppid) return &task;
+    for (auto& task : m_sleep_queue) if (task.control.identity.ppid == ppid) return &task;
+  }
+  // Fallback: covers tasks in the SMP steal window (dequeued but not yet set as current_task)
+  fk::synchronization::ScopedLockIRQ reg_lock(m_task_registry_lock);
+  fk::RefPtr<Task> found;
+  m_task_registry.for_each([&](const fk::ProcessId&, Task*& t) {
+    if (!found && t && t->control.identity.ppid == ppid)
+      found = fk::RefPtr<Task>(t);
+  });
+  return found;
 }

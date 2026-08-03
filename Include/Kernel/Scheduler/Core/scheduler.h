@@ -1,18 +1,18 @@
 #pragma once
 
-#include <LibFK/Container/intrusive_list.h>
-#include <LibFK/Container/hash_map.h>
+#include <LibFK/Container/Sequence/intrusive_list.h>
+#include <LibFK/Container/Associative/hash_map.h>
 #include <LibFK/Types/types.h>
-#include <LibFK/Types/cpu_count.h>
-#include <LibFK/Types/tick_count.h>
-#include <LibFK/Types/process_id.h>
+#include <LibFK/Types/Process/cpu_count.h>
+#include <LibFK/Types/Process/tick_count.h>
+#include <LibFK/Types/Process/process_id.h>
 #include <LibFK/Text/string.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Memory/ref_ptr.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 #include <Kernel/Scheduler/Task/task.h>
-#include <Kernel/Scheduler/qos.h>
+#include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Hardware/Cpu/processor.h>
 
 namespace fkernel {

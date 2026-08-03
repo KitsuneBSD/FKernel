@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Kernel/Scheduler/qos.h>
+#include <Kernel/Scheduler/Qos/qos.h>
 
 struct Task;
 

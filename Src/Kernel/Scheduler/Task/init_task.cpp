@@ -2,20 +2,20 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Boot/boot_info.h>
+#include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Fs/Disk/RamDisk/ram_disk.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Loader/elf_loader.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/task_entries.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <Kernel/Scheduler/Sync/task_entries.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Core/result.h>
 
@@ -84,17 +84,22 @@ static uintptr_t setup_user_stack() {
   constexpr size_t STACK_PAGES = 8;
   for (size_t i = 0; i < STACK_PAGES; ++i) {
     uintptr_t stack_phys = PhysicalMemoryManager::the().alloc_page();
+    // Zero through the direct-map alias: a raw write to the user VA would be a
+    // kernel SMAP violation (kernel write to a user page, AC=0).
+    fk::memory::set(reinterpret_cast<void*>(stack_phys + KERNEL_VIRT_BASE), 0, 0x1000);
     VirtualMemoryManager::the().map_page(USER_STACK_TOP - (i + 1) * 0x1000, stack_phys,
                                          PageFlags::Present | PageFlags::Writable |
                                              PageFlags::User);
-    fk::memory::set(reinterpret_cast<void*>(USER_STACK_TOP - (i + 1) * 0x1000), 0, 0x1000);
   }
   return USER_STACK_TOP;
 }
 
 static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintptr_t user_stack_top,
                                                           const ElfLoadResult& elf_res) {
-  // Setup initial stack frame for Musl/BusyBox
+  // Setup initial stack frame for Musl/BusyBox. The frame lives in the mapped user
+  // stack, so build it inside an SMAP window (arch_smap_begin/end), matching the
+  // loader's copy_segment_data() pattern.
+  arch_smap_begin();
   char* string_area = reinterpret_cast<char*>(user_stack_top) - 128;
   fk::memory::copy_string(string_area, boot::BootInfo::the().get_init_path());
   fk::memory::copy_string(string_area + 32, "PATH=/bin:/sbin:/usr/bin:/usr/sbin");
@@ -126,6 +131,7 @@ static void setup_initial_stack_frame_and_enter_user_mode(uintptr_t entry, uintp
   pointers[idx++] = 0; // AT_NULL
 
   uintptr_t final_rsp = reinterpret_cast<uintptr_t>(pointers);
+  arch_smap_end();
 
   enter_user_mode(entry, final_rsp);
 

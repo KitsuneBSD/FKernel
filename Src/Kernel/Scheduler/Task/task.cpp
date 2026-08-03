@@ -1,14 +1,14 @@
-#include <Kernel/Fs/Vfs/node.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <Kernel/Ipc/capability.h>
-#include <Kernel/Ipc/cspace.h>
+#include <Kernel/Ipc/Capabilities/capability.h>
+#include <Kernel/Ipc/Capabilities/cspace.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Algorithms/log.h>
-#include <LibFK/Memory/heap_malloc.h>
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
 
-#include <Kernel/Ipc/global_endpoint_manager.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/Endpoints/global_endpoint_manager.h>
+#include <Kernel/Ipc/Notifications/notification.h>
 
 extern "C" void task_trampoline();
 

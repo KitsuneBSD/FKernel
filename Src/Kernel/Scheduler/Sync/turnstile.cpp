@@ -1,7 +1,7 @@
-#include <Kernel/Scheduler/turnstile.h>
+#include <Kernel/Scheduler/Sync/turnstile.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <Kernel/Scheduler/qos.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Qos/qos.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel::scheduler {
 

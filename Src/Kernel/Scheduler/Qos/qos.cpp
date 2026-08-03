@@ -1,4 +1,4 @@
-#include <Kernel/Scheduler/qos.h>
+#include <Kernel/Scheduler/Qos/qos.h>
 
 namespace fkernel::scheduler {
 

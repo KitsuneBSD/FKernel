@@ -1,27 +1,23 @@
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/qos.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Fs/Virtual/TimerFd/timer_fd_registry.h>
-#include <Kernel/Fs/Vfs/kqueue.h>
-#include <Kernel/Net/Tcp/tcp_socket.h>
-#include <Kernel/Ipc/signal_delivery.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
+#include <Kernel/Net/Sockets/tcp_socket.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
+#include <Kernel/Syscall/posix_timer.h>
 
 using namespace fk::synchronization;
 using namespace fkernel::scheduler;
 
 extern "C" void fkernel_futex_wake_one(uint64_t uaddr);
-
-struct PosixTimerEntry { bool used; int signo; uint64_t interval_ticks;
-  uint64_t expiry_ticks; Task* owner; };
-extern PosixTimerEntry s_timers[];
-static constexpr int POSIX_TIMER_MAX = 8;
 
 void SchedulerManager::block_current() {
   ScopedInterruptDisabler intr_disabler;
@@ -300,7 +296,7 @@ void SchedulerManager::on_tick() {
     }
   }
 
-  for (int i = 0; i < POSIX_TIMER_MAX; ++i) {
+  for (int i = 0; i < MAX_POSIX_TIMERS; ++i) {
     if (!s_timers[i].used || s_timers[i].expiry_ticks == 0) continue;
     --s_timers[i].expiry_ticks;
     if (s_timers[i].expiry_ticks == 0) {

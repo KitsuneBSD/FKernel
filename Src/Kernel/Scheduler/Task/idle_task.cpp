@@ -1,6 +1,6 @@
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/task_entries.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <Kernel/Scheduler/Sync/task_entries.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fkernel;
 

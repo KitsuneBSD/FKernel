@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Container/intrusive_list.h>
-#include <LibFK/Types/tick_count.h>
+#include <LibFK/Container/Sequence/intrusive_list.h>
+#include <LibFK/Types/Process/tick_count.h>
 
 namespace fkernel::scheduler {
 
