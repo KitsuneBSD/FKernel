@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Types/types.h>
 

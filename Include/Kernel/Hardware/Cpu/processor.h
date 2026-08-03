@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Kernel/Scheduler/Task/task.h>
-#include <Kernel/Scheduler/mlfq_queue.h>
-#include <LibFK/Container/intrusive_list.h>
+#include <Kernel/Scheduler/Qos/mlfq_queue.h>
+#include <LibFK/Container/Sequence/intrusive_list.h>
 #include <LibFK/Synchronization/spinlock.h>
 
 namespace fkernel {
