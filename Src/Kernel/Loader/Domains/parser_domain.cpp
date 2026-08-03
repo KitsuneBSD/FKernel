@@ -1,7 +1,7 @@
+#include <LibFK/Algorithms/Crypto/chacha20.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <Kernel/Loader/Domains/parser_domain.h>
 #include <Kernel/Loader/elf_validation.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Algorithms/log.h>
 
 namespace fkernel::elf_domains {
 
@@ -55,13 +55,11 @@ uint16_t ParserDomain::identify_executable_type(const Elf64_Ehdr& header) {
 }
 
 static uintptr_t aslr_random_base() {
-  uint64_t seed = TickManager::the().get_ticks();
-  seed ^= seed >> 17;
-  seed *= 0xBF58476D1CE4E5B9ULL;
-  seed ^= seed >> 31;
-  static constexpr uintptr_t ASLR_MIN  = 0x10000000;
-  static constexpr uintptr_t ASLR_RANGE = 0x60000000;
-  return ASLR_MIN + ((seed & 0x0FFFF000ULL) % ASLR_RANGE & ~0xFFFULL);
+  uint64_t seed = 0;
+  fk::algorithms::ChaCha20PRNG::the().fill_buffer(reinterpret_cast<uint8_t*>(&seed), sizeof(seed));
+  static constexpr uintptr_t ASLR_MIN   = 0x10000000;
+  static constexpr uintptr_t ASLR_PAGES = 0x60000000 / 0x1000;
+  return ASLR_MIN + ((seed % ASLR_PAGES) * 0x1000);
 }
 
 uintptr_t ParserDomain::calculate_load_base(const Elf64_Ehdr& header, uintptr_t preferred_base) {

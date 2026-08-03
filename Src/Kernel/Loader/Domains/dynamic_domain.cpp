@@ -2,9 +2,9 @@
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Loader/Domains/parser_domain.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Utilities/memory.h>
 
@@ -179,7 +179,7 @@ DynamicDomain::find_dynamic_phdr(const fk::containers::Vector<Elf64_Phdr>& heade
   return nullptr;
 }
 
-DynamicDomain::RelaTable
+RelaTable
 DynamicDomain::extract_rela(const Elf64_Dyn* dyn, fk::VirtualAddress load_base) {
   RelaTable table;
   for (const Elf64_Dyn* d = dyn; d->d_tag != DT_NULL; ++d) {
@@ -190,7 +190,7 @@ DynamicDomain::extract_rela(const Elf64_Dyn* dyn, fk::VirtualAddress load_base) 
   return table;
 }
 
-DynamicDomain::RelaTable
+RelaTable
 DynamicDomain::extract_jmprel(const Elf64_Dyn* dyn, fk::VirtualAddress load_base) {
   RelaTable table;
   table.ent = sizeof(Elf64_Rela);
@@ -201,7 +201,7 @@ DynamicDomain::extract_jmprel(const Elf64_Dyn* dyn, fk::VirtualAddress load_base
   return table;
 }
 
-DynamicDomain::SymbolContext
+SymbolContext
 DynamicDomain::extract_symbols(const Elf64_Dyn* dyn, fk::VirtualAddress load_base) {
   SymbolContext ctx;
   for (const Elf64_Dyn* d = dyn; d->d_tag != DT_NULL; ++d) {

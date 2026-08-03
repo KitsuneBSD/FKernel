@@ -2,7 +2,7 @@
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 
@@ -87,13 +87,15 @@ fk::core::Result<void, fk::core::Error> ElfLoaderCore::load_segments() {
   if (headers_res.is_error())
     return headers_res.error();
 
-  // Always map the first page of the ELF file (containing the header and PHDRs)
-  // Most ELFs have a PT_LOAD that covers this, but we ensure it here just in case.
-  uintptr_t first_page_vaddr = m_context.load_base;
+  // Read the first page of the ELF file (containing the header and PHDRs) into a
+  // kernel scratch page via the direct map. Most ELFs have a PT_LOAD that covers
+  // this, but we ensure the bytes are resident here just in case. Reading through
+  // the direct map (rather than mapping load_base as a user page) avoids both an
+  // SMAP violation and a NULL-page mapping when load_base == 0 (ET_EXEC).
   uintptr_t first_page_phys = PhysicalMemoryManager::the().alloc_page();
-  VirtualMemoryManager::the().map_page(first_page_vaddr, first_page_phys,
-                                       PageFlags::Present | PageFlags::User | PageFlags::Writable);
-  auto read_res = m_node->read(0, 4096, reinterpret_cast<uint8_t*>(first_page_vaddr));
+  auto* scratch = reinterpret_cast<uint8_t*>(first_page_phys + KERNEL_VIRT_BASE);
+  auto read_res = m_node->read(0, 4096, scratch);
+  PhysicalMemoryManager::the().free_page(first_page_phys);
   if (read_res.is_error())
     return read_res.error();
 

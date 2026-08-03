@@ -5,7 +5,7 @@
 #include <Kernel/Loader/Types/elf64_ehdr.h>
 #include <Kernel/Loader/Types/elf64_phdr.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 
 namespace fkernel {
 // Result types for ELF operations

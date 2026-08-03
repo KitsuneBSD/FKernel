@@ -3,10 +3,10 @@
 #include <Kernel/Loader/Domains/parser_domain.h>
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
-#include <Kernel/Fs/Vfs/virtual_filesystem.h>
-#include <Kernel/Fs/Vfs/dentry.h>
-#include <LibFK/Algorithms/chacha20.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <LibFK/Algorithms/Crypto/chacha20.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel::elf_domains {
 

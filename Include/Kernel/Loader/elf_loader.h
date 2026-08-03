@@ -2,8 +2,8 @@
 
 #include <Kernel/Loader/elf_types.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Memory/ref_ptr.h>
-#include <Kernel/Fs/Vfs/node.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 
 namespace fkernel {
 

@@ -1,21 +1,15 @@
 #pragma once
 
 #include <Kernel/Loader/Domains/Base/elf_domain.h>
+#include <Kernel/Loader/Domains/domain_rela_table.h>
+#include <Kernel/Loader/Domains/domain_symbol_context.h>
+#include <Kernel/Loader/Domains/library_context.h>
 #include <Kernel/Loader/Types/elf64_dynamic.h>
 #include <Kernel/Loader/Types/elf64_phdr.h>
-#include <LibFK/Container/vector.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Text/string.h>
-#include <LibFK/Types/virtual_address.h>
 
 namespace fkernel::elf_domains {
-
-struct LibraryContext {
-    fk::VirtualAddress load_base;
-    fk::VirtualAddress symtab;
-    fk::VirtualAddress strtab;
-    fk::text::String name;
-};
 
 class DynamicDomain : public ElfDomain {
 public:
@@ -39,17 +33,6 @@ public:
   const fk::containers::Vector<LibraryContext>& libraries() const { return m_libraries; }
 
 private:
-  struct RelaTable {
-    fk::VirtualAddress addr;
-    size_t             size{0};
-    size_t             ent{sizeof(Elf64_Rela)};
-  };
-
-  struct SymbolContext {
-    fk::VirtualAddress symtab;
-    fk::VirtualAddress strtab;
-  };
-
   fk::containers::Vector<LibraryContext> m_libraries;
 
   const Elf64_Phdr* find_dynamic_phdr(const fk::containers::Vector<Elf64_Phdr>& headers);
