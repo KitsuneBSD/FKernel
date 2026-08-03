@@ -96,6 +96,7 @@ typedef struct {
 #define FPE_INTOVF  2
 #define FPE_FLTDIV  3
 #define SEGV_MAPERR 1
+#define SEGV_ACCERR 2
 #define BUS_ADRALN  1
 #define BUS_ADRERR  2
 #define TRAP_BRKPT  1
