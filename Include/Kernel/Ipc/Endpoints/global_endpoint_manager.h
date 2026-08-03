@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Ipc/endpoint.h>
-#include <Kernel/Ipc/notification.h>
-#include <LibFK/Container/hash_map.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
+#include <Kernel/Ipc/Notifications/notification.h>
+#include <LibFK/Container/Associative/hash_map.h>
 
 namespace fkernel {
 namespace ipc {

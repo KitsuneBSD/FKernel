@@ -1,24 +1,18 @@
 #pragma once
 
-#include <LibFK/Core/result.h>
-#include <LibFK/Types/types.h>
-#include <LibFK/Types/notification_bits.h>
-#include <LibFK/Types/tick_count.h>
+#include <Kernel/Ipc/Notifications/notification_payload.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Container/intrusive_list.h>
-
+#include <LibFK/Container/Sequence/intrusive_list.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Synchronization/spinlock.h>
+#include <LibFK/Types/Ipc/notification_bits.h>
+#include <LibFK/Types/Process/tick_count.h>
+#include <LibFK/Types/types.h>
 
 namespace fkernel {
 namespace ipc {
 
-static constexpr size_t NOTIFICATION_PAYLOAD_SIZE = 128;
 static constexpr size_t NOTIFICATION_MAX_PAYLOADS = 16;
-
-struct NotificationPayload {
-  fk::NotificationBits bits;
-  uint8_t data[NOTIFICATION_PAYLOAD_SIZE];
-};
 
 class Notification {
   fk::synchronization::Spinlock m_lock;

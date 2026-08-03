@@ -1,6 +1,6 @@
-#include <Kernel/Ipc/ipc_log_node.h>
+#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
 #include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/new.h>
+#include <LibFK/Memory/Allocators/new.h>
 
 namespace fkernel {
 

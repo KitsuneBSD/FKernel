@@ -1,16 +1,16 @@
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Fs/Virtual/SignalFd/signal_fd_node.h>
-#include <Kernel/Fs/Vfs/kqueue.h>
-#include <Kernel/Ipc/cspace.h>
-#include <Kernel/Ipc/notification.h>
-#include <Kernel/Ipc/signal_delivery.h>
-#include <Kernel/Ipc/signal_frame.h>
-#include <Kernel/Ipc/ipc_log_node.h>
+#include <Kernel/Fs/Vfs/Events/kqueue.h>
+#include <Kernel/Ipc/Capabilities/cspace.h>
+#include <Kernel/Ipc/Notifications/notification.h>
+#include <Kernel/Ipc/Signals/signal_delivery.h>
+#include <Kernel/Ipc/Signals/signal_frame.h>
+#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <Kernel/Scheduler/scheduler.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
@@ -24,7 +24,8 @@ static void fill_default_siginfo(siginfo_t& info, int sig) {
   info.si_code  = SI_KERNEL;
 }
 
-void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info) {
+void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info,
+                                 bool force) {
   if (!target || !target->is_valid() || signum <= 0 || signum >= NSIG) return;
   if (target->control.lifecycle.terminated) return;
 
@@ -38,6 +39,10 @@ void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info
 
   fk::synchronization::ScopedLock lock(target->lock);
   target->resources.ipc.signals.pending |= (1ULL << signum);
+  if (force)
+    target->resources.ipc.signals.forced_pending |= (1ULL << signum);
+  target->resources.ipc.signals.last_info_sig = signum;
+  target->resources.ipc.signals.last_info = si;
 
   if (target->control.lifecycle.state == TaskState::Sleeping ||
       target->control.lifecycle.state == TaskState::Blocked) {
@@ -76,7 +81,7 @@ void SignalDelivery::deliver_to_group(int sig, fk::ProcessId tgid, const siginfo
   if (target) send_signal(target, sig, info);
 }
 
-SignalDelivery::DefaultAction SignalDelivery::classify_default(int sig) {
+DefaultAction SignalDelivery::classify_default(int sig) {
   switch (sig) {
     case SIGCHLD: case SIGURG: case SIGWINCH: return DefaultAction::Ignore;
     case SIGCONT:                              return DefaultAction::Continue;
@@ -87,7 +92,6 @@ SignalDelivery::DefaultAction SignalDelivery::classify_default(int sig) {
 }
 
 void SignalDelivery::apply_default(Task* task, int sig, DefaultAction action) {
-  (void)sig;
   uint64_t pid = task->control.identity.id.value();
   if (action == DefaultAction::Continue) {
     if (task->control.lifecycle.state == TaskState::Stopped) {
@@ -111,7 +115,8 @@ void SignalDelivery::apply_default(Task* task, int sig, DefaultAction action) {
   if (pid == 1) {
     fk::algorithms::kfatal("SIGNAL", "Init process (PID 1) killed by signal %d", sig);
   }
-  SchedulerManager::the().terminate_current(128 + sig);
+  task->control.lifecycle.killed_by_signal = true;
+  SchedulerManager::the().terminate_current(sig);
 }
 
 bool SignalDelivery::install_handler_frame(Task* task, PtRegs* regs, int sig,
@@ -223,9 +228,14 @@ void SignalDelivery::handle_pending_signals(Task* task, PtRegs* regs,
 
   for (int sig = 1; sig < NSIG; ++sig) {
     if (!(task->resources.ipc.signals.pending & (1ULL << sig))) continue;
-    if (task->resources.ipc.signals.blocked & (1ULL << sig)) continue;
+
+    // Fatal fault signals (SIGSEGV/SIGILL/...) are force-delivered even if blocked;
+    // otherwise the faulting instruction retries forever (livelock).
+    bool forced = (task->resources.ipc.signals.forced_pending & (1ULL << sig)) != 0;
+    if (!forced && (task->resources.ipc.signals.blocked & (1ULL << sig))) continue;
 
     task->resources.ipc.signals.pending &= ~(1ULL << sig);
+    task->resources.ipc.signals.forced_pending &= ~(1ULL << sig);
 
     if (task->resources.ipc.signal_fd) {
       if (task->resources.ipc.signal_fd->try_enqueue(sig))
@@ -234,7 +244,12 @@ void SignalDelivery::handle_pending_signals(Task* task, PtRegs* regs,
 
     auto& action = task->resources.ipc.signals.actions[sig];
 
-    if (action.sa_handler == SIG_IGN) continue;
+    if (action.sa_handler == SIG_IGN) {
+      if (!forced) continue;
+      // Force semantics (Linux force_sig): a fatal fault signal runs its default
+      // action even against SIG_IGN, or the faulting instruction retries forever.
+      action.sa_handler = SIG_DFL;
+    }
 
     if (action.sa_handler == SIG_DFL) {
       DefaultAction da = classify_default(sig);
@@ -254,7 +269,12 @@ void SignalDelivery::handle_pending_signals(Task* task, PtRegs* regs,
     if (!regs) return;
 
     siginfo_t si{};
-    fill_default_siginfo(si, sig);
+    if (task->resources.ipc.signals.last_info_sig == sig) {
+      si = task->resources.ipc.signals.last_info;
+      task->resources.ipc.signals.last_info_sig = 0;
+    } else {
+      fill_default_siginfo(si, sig);
+    }
 
     if (install_handler_frame(task, regs, sig, action, si, orig_syscall)) return;
   }

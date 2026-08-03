@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Kernel/Ipc/capability.h>
-#include <LibFK/Container/hash_map.h>
-#include <LibFK/Container/vector.h>
+#include <Kernel/Ipc/Capabilities/capability.h>
+#include <LibFK/Container/Associative/hash_map.h>
+#include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Types/types.h>
 
 namespace fkernel {
@@ -97,8 +97,10 @@ public:
   }
 
   void grant_all_to(CSpace& dest, CapabilityType type = CapabilityType::None) {
-    for (size_t i = 0; i < m_capabilities.size(); ++i) {
+    size_t remaining = size(); // stops when all valid slots found — skips trailing holes
+    for (size_t i = 0; i < m_capabilities.size() && remaining > 0; ++i) {
       if (!m_capabilities[i].is_valid()) continue;
+      --remaining;
       if (type != CapabilityType::None && m_capabilities[i].type() != type) continue;
       dest.install(m_capabilities[i]);
     }

@@ -1,17 +1,13 @@
 #pragma once
 
-#include <LibFK/Types/types.h>
+#include <Kernel/Ipc/SharedMemory/shared_memory_mapping.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
+#include <LibFK/Types/types.h>
 
 struct Task;
 
 namespace fkernel {
 namespace ipc {
-
-struct SharedMemoryMapping {
-  Task* task;
-  uintptr_t vaddr;
-};
 
 class SharedMemory {
   size_t m_size_pages{0};

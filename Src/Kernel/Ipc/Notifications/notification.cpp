@@ -1,7 +1,7 @@
-#include <Kernel/Ipc/ipc_log_node.h>
-#include <Kernel/Ipc/notification.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
+#include <Kernel/Ipc/Notifications/notification.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {

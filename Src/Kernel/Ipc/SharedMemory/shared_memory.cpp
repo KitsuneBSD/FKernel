@@ -1,8 +1,8 @@
-#include <Kernel/Ipc/shared_memory.h>
+#include <Kernel/Ipc/SharedMemory/shared_memory.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Algorithms/log.h>
+#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 namespace ipc {

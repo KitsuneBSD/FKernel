@@ -1,12 +1,12 @@
 #pragma once
 
-#include <Kernel/Ipc/message_info.h>
-#include <Kernel/Ipc/notification.h>
+#include <Kernel/Ipc/Endpoints/message_info.h>
+#include <Kernel/Ipc/Notifications/notification.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Container/intrusive_list.h>
+#include <LibFK/Container/Sequence/intrusive_list.h>
 #include <LibFK/Core/result.h>
-#include <LibFK/Types/notification_bits.h>
-#include <LibFK/Types/tick_count.h>
+#include <LibFK/Types/Ipc/notification_bits.h>
+#include <LibFK/Types/Process/tick_count.h>
 
 #include <LibFK/Synchronization/spinlock.h>
 

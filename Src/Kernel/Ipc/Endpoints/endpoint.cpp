@@ -1,8 +1,8 @@
-#include <Kernel/Ipc/endpoint.h>
-#include <Kernel/Ipc/ipc_log_node.h>
-#include <Kernel/Scheduler/scheduler.h>
-#include <Kernel/Scheduler/turnstile.h>
-#include <LibFK/Algorithms/log.h>
+#include <Kernel/Ipc/Endpoints/endpoint.h>
+#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
+#include <Kernel/Scheduler/Sync/turnstile.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
