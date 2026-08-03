@@ -96,7 +96,7 @@ PathResolver::resolve_to_parent_unlocked(const char* path, int depth) {
     len--;
   }
 
-  char* last_slash = strrnchr(parent_path, '/', 512);
+  char* last_slash = fk::memory::find_last(parent_path, '/', 512);
   fk::text::String name;
 
   if (!last_slash) {

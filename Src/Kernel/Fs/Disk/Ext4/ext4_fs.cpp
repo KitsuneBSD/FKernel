@@ -2,6 +2,7 @@
 #include <Kernel/Fs/Disk/Ext4/ext4_node.h>
 #include <Kernel/Fs/Disk/Ext2/ext2_super.h>
 #include <Kernel/Fs/Disk/Ext3/ext3_super.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
@@ -332,13 +333,13 @@ static bool ext4_replay_journal(fk::RefPtr<StorageDevice> device,
     }
 
     const JbdSuperblock* jsb = reinterpret_cast<const JbdSuperblock*>(jsbuf);
-    if (jbd_be32(jsb->s_header.h_magic) != JBD_MAGIC_NUMBER) {
+    if (fk::algorithms::swap32(jsb->s_header.h_magic) != JBD_MAGIC_NUMBER) {
         fk::algorithms::kwarn("EXT4", "Journal has bad magic — skipping recovery");
         kfree(jsbuf);
         return true;
     }
 
-    uint32_t j_start  = jbd_be32(jsb->s_start);
+    uint32_t j_start  = fk::algorithms::swap32(jsb->s_start);
     kfree(jsbuf);
 
     if (j_start == 0) {

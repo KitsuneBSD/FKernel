@@ -33,18 +33,4 @@ static constexpr uint8_t NM_PARENT   = 0x04;
 static constexpr uint8_t JOLIET_ESC0 = 0x25; // '%'
 static constexpr uint8_t JOLIET_ESC1 = 0x2F; // '/'
 
-// Helper: read little-endian uint32 from byte buffer
-inline uint32_t iso_read_le32(const uint8_t* buf, size_t off) {
-    return static_cast<uint32_t>(buf[off])
-         | static_cast<uint32_t>(buf[off+1]) << 8
-         | static_cast<uint32_t>(buf[off+2]) << 16
-         | static_cast<uint32_t>(buf[off+3]) << 24;
-}
-
-// Helper: read little-endian uint16 from byte buffer
-inline uint16_t iso_read_le16(const uint8_t* buf, size_t off) {
-    return static_cast<uint16_t>(buf[off])
-         | static_cast<uint16_t>(buf[off+1]) << 8;
-}
-
 } // namespace fkernel

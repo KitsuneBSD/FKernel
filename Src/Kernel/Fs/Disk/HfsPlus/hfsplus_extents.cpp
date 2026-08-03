@@ -1,5 +1,6 @@
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 #include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 #include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
@@ -20,8 +21,8 @@ void HFSPlusForkReader::set(
     m_first_sector  = first_sector;
     m_file_id       = file_id;
     m_fork_type     = fork_type;
-    m_logical_size  = hfs_be64(fork.logicalSize);
-    m_total_blocks  = hfs_be32(fork.totalBlocks);
+    m_logical_size  = fk::algorithms::swap64(fork.logicalSize);
+    m_total_blocks  = fk::algorithms::swap32(fork.totalBlocks);
 }
 
 fk::core::Result<uint32_t, fk::core::Error>
@@ -30,8 +31,8 @@ HFSPlusForkReader::resolve_block(uint32_t logical_block) const
     // First, try the 8 inline extents
     uint32_t remaining = logical_block;
     for (int i = 0; i < kHFSPlusExtentDensity; ++i) {
-        uint32_t start = hfs_be32(m_fork.extents[i].startBlock);
-        uint32_t count = hfs_be32(m_fork.extents[i].blockCount);
+        uint32_t start = fk::algorithms::swap32(m_fork.extents[i].startBlock);
+        uint32_t count = fk::algorithms::swap32(m_fork.extents[i].blockCount);
         if (count == 0) break;
         if (remaining < count)
             return start + remaining;
@@ -47,7 +48,7 @@ HFSPlusForkReader::resolve_block(uint32_t logical_block) const
     // so we walk down using the inline extents' total-block count as the base.
     uint32_t inline_blocks = 0;
     for (int i = 0; i < kHFSPlusExtentDensity; ++i)
-        inline_blocks += hfs_be32(m_fork.extents[i].blockCount);
+        inline_blocks += fk::algorithms::swap32(m_fork.extents[i].blockCount);
 
     // Look up the overflow record that covers (logical_block - inline_blocks)
     uint32_t overflow_start = inline_blocks; // first block in overflow
@@ -66,10 +67,10 @@ HFSPlusForkReader::resolve_block(uint32_t logical_block) const
     const auto& exts = ov_res.value();
     uint32_t rem2 = logical_block - overflow_block;
     for (size_t j = 0; j < exts.size(); ++j) {
-        uint32_t cnt = hfs_be32(exts[j].blockCount);
+        uint32_t cnt = fk::algorithms::swap32(exts[j].blockCount);
         if (cnt == 0) break;
         if (rem2 < cnt)
-            return hfs_be32(exts[j].startBlock) + rem2;
+            return fk::algorithms::swap32(exts[j].startBlock) + rem2;
         rem2 -= cnt;
     }
 

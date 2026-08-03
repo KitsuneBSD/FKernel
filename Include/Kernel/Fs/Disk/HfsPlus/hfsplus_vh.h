@@ -4,19 +4,6 @@
 
 namespace fkernel {
 
-// Byte-swap helpers for big-endian HFS+ on-disk structures
-static inline uint16_t hfs_be16(uint16_t x) {
-    return (uint16_t)((x >> 8) | (x << 8));
-}
-static inline uint32_t hfs_be32(uint32_t x) {
-    return ((x >> 24) & 0xFF) | ((x >> 8) & 0xFF00) |
-           ((x << 8) & 0xFF0000) | ((x << 24) & 0xFF000000);
-}
-static inline uint64_t hfs_be64(uint64_t x) {
-    return ((uint64_t)hfs_be32((uint32_t)(x >> 32))) |
-           ((uint64_t)hfs_be32((uint32_t)(x & 0xFFFFFFFF)) << 32);
-}
-
 // Volume header signatures
 static constexpr uint16_t kHFSPlusSig  = 0x482B; // 'H+'
 static constexpr uint16_t kHFSXSig     = 0x4858; // 'HX'

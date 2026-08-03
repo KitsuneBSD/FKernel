@@ -1,5 +1,6 @@
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
 #include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 
 namespace fkernel {
 
@@ -54,11 +55,11 @@ static uint16_t fold(uint16_t cp) {
 }
 
 size_t hfsplus_unicode_to_utf8(const HFSUniStr255& str, char* dst, size_t dst_size) {
-    uint16_t len = hfs_be16(str.length);
+    uint16_t len = fk::algorithms::swap16(str.length);
     if (len > 255) len = 255;
     size_t out = 0;
     for (uint16_t i = 0; i < len && out + 4 < dst_size; ++i) {
-        uint32_t cp = hfs_be16(str.unicode[i]);
+        uint32_t cp = fk::algorithms::swap16(str.unicode[i]);
         if (cp < 0x80) {
             dst[out++] = (char)cp;
         } else if (cp < 0x800) {
@@ -96,31 +97,31 @@ bool hfsplus_utf8_to_unicode(const char* src, HFSUniStr255& out) {
             return false; // codepoint > U+FFFF unsupported
         }
         if (cp > 0xFFFF) return false;
-        out.unicode[count++] = hfs_be16((uint16_t)cp);
+        out.unicode[count++] = fk::algorithms::swap16((uint16_t)cp);
     }
-    out.length = hfs_be16(count);
+    out.length = fk::algorithms::swap16(count);
     return true;
 }
 
 int hfsplus_unicode_cmp_ci(const HFSUniStr255& a, const HFSUniStr255& b) {
-    uint16_t la = hfs_be16(a.length);
-    uint16_t lb = hfs_be16(b.length);
+    uint16_t la = fk::algorithms::swap16(a.length);
+    uint16_t lb = fk::algorithms::swap16(b.length);
     uint16_t n = la < lb ? la : lb;
     for (uint16_t i = 0; i < n; ++i) {
-        uint16_t ca = fold(hfs_be16(a.unicode[i]));
-        uint16_t cb = fold(hfs_be16(b.unicode[i]));
+        uint16_t ca = fold(fk::algorithms::swap16(a.unicode[i]));
+        uint16_t cb = fold(fk::algorithms::swap16(b.unicode[i]));
         if (ca != cb) return (int)ca - (int)cb;
     }
     return (int)la - (int)lb;
 }
 
 int hfsplus_unicode_cmp_cs(const HFSUniStr255& a, const HFSUniStr255& b) {
-    uint16_t la = hfs_be16(a.length);
-    uint16_t lb = hfs_be16(b.length);
+    uint16_t la = fk::algorithms::swap16(a.length);
+    uint16_t lb = fk::algorithms::swap16(b.length);
     uint16_t n = la < lb ? la : lb;
     for (uint16_t i = 0; i < n; ++i) {
-        uint16_t ca = hfs_be16(a.unicode[i]);
-        uint16_t cb = hfs_be16(b.unicode[i]);
+        uint16_t ca = fk::algorithms::swap16(a.unicode[i]);
+        uint16_t cb = fk::algorithms::swap16(b.unicode[i]);
         if (ca != cb) return (int)ca - (int)cb;
     }
     return (int)la - (int)lb;

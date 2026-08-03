@@ -65,7 +65,7 @@ void RamDiskNode::parse_tar() {
       if (!file_node_res.is_error()) {
         auto file_node = file_node_res.value();
 
-        const char* name_ptr = strrnchr(final_filename, '/', 100);
+        const char* name_ptr = fk::memory::find_last(final_filename, '/', 100);
         if (name_ptr)
           name_ptr++;
         else
@@ -102,7 +102,7 @@ void RamDiskNode::parse_tar() {
       if (!symlink_node_res.is_error()) {
         auto symlink_node = symlink_node_res.value();
 
-        const char* name_ptr = strrnchr(final_filename, '/', 100);
+        const char* name_ptr = fk::memory::find_last(final_filename, '/', 100);
         if (name_ptr)
           name_ptr++;
         else

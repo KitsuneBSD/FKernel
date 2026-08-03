@@ -1,6 +1,7 @@
 #include <Kernel/Fs/Disk/Ext3/ext3_fs.h>
 #include <Kernel/Fs/Disk/Ext3/ext3_super.h>
 #include <Kernel/Fs/Disk/Ext2/ext2_super.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
@@ -72,16 +73,16 @@ static bool replay_journal(fk::RefPtr<StorageDevice> device,
     }
 
     const JbdSuperblock* jsb = reinterpret_cast<const JbdSuperblock*>(jsbuf);
-    if (jbd_be32(jsb->s_header.h_magic) != JBD_MAGIC_NUMBER) {
+    if (fk::algorithms::swap32(jsb->s_header.h_magic) != JBD_MAGIC_NUMBER) {
         fk::algorithms::kwarn("EXT3", "Journal has bad magic — skipping recovery");
         kfree(jsbuf);
         return true; // assume clean
     }
 
-    uint32_t j_start    = jbd_be32(jsb->s_start);
-    uint32_t j_sequence = jbd_be32(jsb->s_sequence);
-    uint32_t j_maxlen   = jbd_be32(jsb->s_maxlen);
-    uint32_t j_first    = jbd_be32(jsb->s_first);
+    uint32_t j_start    = fk::algorithms::swap32(jsb->s_start);
+    uint32_t j_sequence = fk::algorithms::swap32(jsb->s_sequence);
+    uint32_t j_maxlen   = fk::algorithms::swap32(jsb->s_maxlen);
+    uint32_t j_first    = fk::algorithms::swap32(jsb->s_first);
     kfree(jsbuf);
 
     if (j_start == 0) {
@@ -117,10 +118,10 @@ static bool replay_journal(fk::RefPtr<StorageDevice> device,
         }
 
         const JbdHeader* hdr = reinterpret_cast<const JbdHeader*>(blk_buf);
-        if (jbd_be32(hdr->h_magic) != JBD_MAGIC_NUMBER) break;
-        if (jbd_be32(hdr->h_sequence) != curr_seq) break;
+        if (fk::algorithms::swap32(hdr->h_magic) != JBD_MAGIC_NUMBER) break;
+        if (fk::algorithms::swap32(hdr->h_sequence) != curr_seq) break;
 
-        uint32_t btype = jbd_be32(hdr->h_blocktype);
+        uint32_t btype = fk::algorithms::swap32(hdr->h_blocktype);
 
         if (btype == JBD_DESCRIPTOR_BLOCK) {
             pending_count = 0;
@@ -129,8 +130,8 @@ static bool replay_journal(fk::RefPtr<StorageDevice> device,
             while (tag_off + sizeof(JbdBlockTag) <= block_size) {
                 const JbdBlockTag* tag =
                     reinterpret_cast<const JbdBlockTag*>(blk_buf + tag_off);
-                uint32_t fs_block  = jbd_be32(tag->t_blocknr);
-                uint16_t flags     = jbd_be16(tag->t_flags);
+                uint32_t fs_block  = fk::algorithms::swap32(tag->t_blocknr);
+                uint16_t flags     = fk::algorithms::swap16(tag->t_flags);
                 tag_off += sizeof(JbdBlockTag);
                 if (!(flags & JBD_FLAG_SAME_UUID)) tag_off += 16;
 
@@ -171,12 +172,12 @@ static bool replay_journal(fk::RefPtr<StorageDevice> device,
             uint32_t count_off = sizeof(JbdHeader);
             uint32_t revoke_count = 0;
             fk::memory::copy(&revoke_count, blk_buf + count_off, 4);
-            revoke_count = jbd_be32(revoke_count);
+            revoke_count = fk::algorithms::swap32(revoke_count);
             count_off += 4;
             for (uint32_t r = 0; r < revoke_count && count_off + 4 <= block_size; r++, count_off += 4) {
                 uint32_t rev_blk = 0;
                 fk::memory::copy(&rev_blk, blk_buf + count_off, 4);
-                rev_blk = jbd_be32(rev_blk);
+                rev_blk = fk::algorithms::swap32(rev_blk);
                 // Mark matching pending blocks as invalid
                 for (uint32_t p = 0; p < pending_count; p++) {
                     if (pending[p].fs_block == rev_blk) pending[p].fs_block = 0;

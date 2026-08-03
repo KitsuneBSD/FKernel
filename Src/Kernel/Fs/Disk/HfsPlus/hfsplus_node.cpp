@@ -5,6 +5,7 @@
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 
 namespace fkernel {
 
@@ -18,11 +19,11 @@ fk::RefPtr<HFSPlusNode> HFSPlusNode::create_file(
     n->m_fs       = fs;
     n->m_cnid     = cnid;
     n->m_is_dir   = false;
-    n->m_mode     = hfs_be16(rec.fileMode);
+    n->m_mode     = fk::algorithms::swap16(rec.fileMode);
     // S_IFLNK = 0xA000
     n->m_is_symlink = ((n->m_mode & 0xF000) == 0xA000);
     fk::memory::copy(&n->m_data_fork, &rec.dataFork, sizeof(HFSPlusForkData));
-    n->m_size = hfs_be64(rec.dataFork.logicalSize);
+    n->m_size = fk::algorithms::swap64(rec.dataFork.logicalSize);
     return fk::RefPtr<HFSPlusNode>(n);
 }
 

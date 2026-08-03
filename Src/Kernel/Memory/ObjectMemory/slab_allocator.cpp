@@ -6,6 +6,7 @@
 #include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
+#include <LibFK/Utilities/aligner.h>
 #include <LibFK/Utilities/memory.h>
 
 namespace {
@@ -19,12 +20,8 @@ static constexpr size_t CACHE_SIZES[CACHE_COUNT] = {
 
 static SlabCache s_caches[CACHE_COUNT];
 
-static size_t align_up(size_t n, size_t alignment) {
-  return (n + alignment - 1) & ~(alignment - 1);
-}
-
 static size_t slab_header_size() {
-  return align_up(sizeof(Slab), 16);
+  return fk::utilities::align_up(sizeof(Slab), 16);
 }
 
 // Object pointer is always in the first page of the slab (header < 4KB,

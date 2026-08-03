@@ -5,6 +5,7 @@
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 
 namespace fkernel {
 
@@ -27,11 +28,11 @@ HFSPlusFileSystem::create(fk::RefPtr<StorageDevice> device)
     HFSPlusVolumeHeader vh;
     fk::memory::copy(&vh, buf.begin() + vh_off_in, sizeof(HFSPlusVolumeHeader));
 
-    uint16_t sig = hfs_be16(vh.signature);
+    uint16_t sig = fk::algorithms::swap16(vh.signature);
     if (sig != kHFSPlusSig && sig != kHFSXSig)
         return fk::core::Error::InvalidData;
 
-    uint32_t block_size = hfs_be32(vh.blockSize);
+    uint32_t block_size = fk::algorithms::swap32(vh.blockSize);
     if (block_size == 0 || (block_size & (block_size - 1)) != 0)
         return fk::core::Error::InvalidData;
 
@@ -42,7 +43,7 @@ HFSPlusFileSystem::create(fk::RefPtr<StorageDevice> device)
     fs->m_block_size     = block_size;
     fs->m_first_sector   = 0; // entire device is the partition
     fs->m_case_sensitive = (sig == kHFSXSig &&
-                            vh.lastMountedVersion == hfs_be32(0x33363063)); // "360c" HFSX
+                            vh.lastMountedVersion == fk::algorithms::swap32(0x33363063)); // "360c" HFSX
 
     auto cat_res = fs->open_btree(fs->m_catalog, vh.catalogFile);
     if (cat_res.is_error()) { delete fs; return cat_res.error(); }
@@ -91,7 +92,7 @@ HFSPlusFileSystem::lookup_in(uint32_t parent_cnid, const char* name)
     const CatalogRecord& cr = rec_res.value();
 
     if (cr.type == kHFSPlusFolderRecord) {
-        uint32_t cnid = hfs_be32(cr.folder.folderID);
+        uint32_t cnid = fk::algorithms::swap32(cr.folder.folderID);
         fk::RefPtr<HFSPlusFileSystem> self(this);
         auto dir_node = HFSPlusNode::create_dir(self, cnid);
         if (!dir_node) return fk::core::Error::OutOfMemory;
@@ -99,7 +100,7 @@ HFSPlusFileSystem::lookup_in(uint32_t parent_cnid, const char* name)
     }
 
     if (cr.type == kHFSPlusFileRecord) {
-        uint32_t cnid = hfs_be32(cr.file.fileID);
+        uint32_t cnid = fk::algorithms::swap32(cr.file.fileID);
         fk::RefPtr<HFSPlusFileSystem> self(this);
         return fk::RefPtr<Node>(HFSPlusNode::create_file(self, cnid, cr.file));
     }

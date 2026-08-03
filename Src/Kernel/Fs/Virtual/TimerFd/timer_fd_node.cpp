@@ -2,6 +2,7 @@
 #include <Kernel/Fs/Virtual/TimerFd/timer_fd_registry.h>
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <LibFK/Algorithms/Generic/time_math.h>
 #include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
@@ -14,10 +15,7 @@ TimerFdNode::create(int clock_id) {
 TimerFdNode::TimerFdNode(int clock_id) : m_clock_id(clock_id) {}
 
 uint64_t TimerFdNode::timespec_to_ticks(const KernelTimespec& ts, uint32_t frequency) {
-    if (frequency == 0)
-        return 0;
-    return static_cast<uint64_t>(ts.tv_sec) * frequency
-         + static_cast<uint64_t>(ts.tv_nsec) * frequency / 1000000000ULL;
+    return fk::algorithms::timespec_to_ticks(ts.tv_sec, ts.tv_nsec, frequency);
 }
 
 void TimerFdNode::settime(const KernelItimerspec& new_spec, KernelItimerspec* old_spec) {

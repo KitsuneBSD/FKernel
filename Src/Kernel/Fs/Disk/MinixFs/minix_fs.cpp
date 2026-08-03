@@ -1,5 +1,6 @@
 #include <Kernel/Fs/Disk/MinixFs/minix_fs.h>
 #include <Kernel/Fs/Disk/MinixFs/minix_node.h>
+#include <LibFK/Algorithms/Generic/bitmap.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
@@ -244,15 +245,12 @@ scan_bitmap(MinixFileSystem* fs, uint32_t first_block,
         uint8_t buf[MINIX_BLOCK_SIZE];
         TRY(fs->read_block(first_block + bi, buf));
 
-        for (uint32_t byte = 0; byte < MINIX_BLOCK_SIZE; ++byte) {
-            if (buf[byte] == 0xFF) continue;
-            for (uint32_t bit = 0; bit < 8; ++bit) {
-                if (buf[byte] & (1u << bit)) continue;
-                buf[byte] |= (1u << bit);
-                TRY(fs->write_block(first_block + bi, buf));
-                uint32_t index = bi * MINIX_BLOCK_SIZE * 8 + byte * 8 + bit;
-                return first_index + index;
-            }
+        size_t bits_per_block = MINIX_BLOCK_SIZE * 8;
+        size_t idx = fk::algorithms::find_first_free_bit(buf, bits_per_block);
+        if (idx < bits_per_block) {
+            fk::algorithms::set_bit(buf, idx);
+            TRY(fs->write_block(first_block + bi, buf));
+            return first_index + bi * bits_per_block + idx;
         }
     }
     return Error::OutOfMemory;
@@ -264,12 +262,11 @@ clear_bitmap(MinixFileSystem* fs, uint32_t first_block,
     (void)num_blocks;
     uint32_t bit_index = index - first_index;
     uint32_t block_off = bit_index / (MINIX_BLOCK_SIZE * 8);
-    uint32_t byte_off  = (bit_index % (MINIX_BLOCK_SIZE * 8)) / 8;
-    uint32_t bit_off   = bit_index % 8;
+    uint32_t bit_off   = bit_index % (MINIX_BLOCK_SIZE * 8);
 
     uint8_t buf[MINIX_BLOCK_SIZE];
     TRY(fs->read_block(first_block + block_off, buf));
-    buf[byte_off] &= ~(1u << bit_off);
+    fk::algorithms::clear_bit(buf, bit_off);
     return fs->write_block(first_block + block_off, buf);
 }
 

@@ -3,6 +3,8 @@
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
+#include <LibFK/Algorithms/Generic/scatter_io.h>
 
 namespace fkernel {
 
@@ -20,30 +22,23 @@ Iso9660FileSystem::read_sector(uint32_t lba, uint8_t* buf) {
 
 fk::core::Result<size_t, Error>
 Iso9660FileSystem::read_bytes(uint32_t lba, uint64_t byte_offset, size_t size, uint8_t* buf) {
+    if (size == 0) return static_cast<size_t>(0);
     uint8_t* sec_buf = static_cast<uint8_t*>(kmalloc(ISO_SECTOR_SIZE));
     if (!sec_buf) return Error::OutOfMemory;
 
-    size_t done = 0;
-    bool ok = true;
-    while (done < size && ok) {
-        uint64_t abs   = static_cast<uint64_t>(lba) * ISO_SECTOR_SIZE + byte_offset + done;
-        uint32_t sec   = static_cast<uint32_t>(abs / ISO_SECTOR_SIZE);
-        uint32_t s_off = static_cast<uint32_t>(abs % ISO_SECTOR_SIZE);
-        size_t   chunk = ISO_SECTOR_SIZE - s_off;
-        if (chunk > size - done) chunk = size - done;
+    uint64_t offset = static_cast<uint64_t>(lba) * ISO_SECTOR_SIZE + byte_offset;
+    auto resolve_block = [](uint32_t lblock) -> fk::core::Result<uint64_t, Error> {
+        return static_cast<uint64_t>(lblock);
+    };
+    auto read_sector_cb = [this](uint64_t phys, uint8_t* scratch) -> fk::core::Result<void, Error> {
+        return read_sector(static_cast<uint32_t>(phys), scratch);
+    };
 
-        if (m_device->read(static_cast<uint64_t>(sec) * ISO_SECTOR_SIZE,
-                           ISO_SECTOR_SIZE, sec_buf).is_error()) {
-            ok = false;
-            break;
-        }
-        fk::memory::copy(buf + done, sec_buf + s_off, chunk);
-        done += chunk;
-    }
-
+    auto res = fk::algorithms::scatter_read(offset, size, buf, ISO_SECTOR_SIZE, sec_buf,
+                                            resolve_block, read_sector_cb);
     kfree(sec_buf);
-    if (!ok) return Error::IOError;
-    return done;
+    if (res.is_error()) return res.error();
+    return res.value();
 }
 
 // ---- Static helpers -----------------------------------------------------------
@@ -167,8 +162,8 @@ bool Iso9660FileSystem::parse_vd(const uint8_t* vd, bool& got_pvd) {
 
     if (type == ISO_VD_PVD) {
         // Root directory record at PVD[156]; extent LBA at dr[2] (LE), size at dr[10] (LE)
-        m_root_lba  = iso_read_le32(vd, 158); // 156 + 2
-        m_root_size = iso_read_le32(vd, 166); // 156 + 10
+        m_root_lba  = fk::algorithms::load_le32(vd, 158); // 156 + 2
+        m_root_size = fk::algorithms::load_le32(vd, 166); // 156 + 10
         got_pvd = true;
     }
 
@@ -179,8 +174,8 @@ bool Iso9660FileSystem::parse_vd(const uint8_t* vd, bool& got_pvd) {
                           (esc[2] == '@' || esc[2] == 'C' || esc[2] == 'E'));
         if (is_joliet) {
             m_joliet           = true;
-            m_joliet_root_lba  = iso_read_le32(vd, 158);
-            m_joliet_root_size = iso_read_le32(vd, 166);
+            m_joliet_root_lba  = fk::algorithms::load_le32(vd, 158);
+            m_joliet_root_size = fk::algorithms::load_le32(vd, 166);
         }
     }
 
@@ -245,8 +240,8 @@ Iso9660FileSystem::create(fk::RefPtr<StorageDevice> device) {
 
 fk::RefPtr<Node> Iso9660FileSystem::make_node_from_dr(const uint8_t* dr) {
     uint8_t dr_len      = dr[0];
-    uint32_t extent_lba  = iso_read_le32(dr, 2);
-    uint32_t extent_size = iso_read_le32(dr, 10);
+    uint32_t extent_lba  = fk::algorithms::load_le32(dr, 2);
+    uint32_t extent_size = fk::algorithms::load_le32(dr, 10);
     uint8_t  flags       = dr[25];
     uint8_t  file_id_len = dr[32];
     bool     is_dir      = (flags & ISO_FLAG_DIR) != 0;

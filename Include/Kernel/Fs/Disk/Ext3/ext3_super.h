@@ -61,14 +61,4 @@ struct JbdBlockTag {
     uint16_t t_flags;    // JBD_FLAG_* (BE)
 } __attribute__((packed));
 
-// Byte-swap helpers (journal uses big-endian)
-inline uint32_t jbd_be32(uint32_t x) {
-    return ((x & 0xFFu) << 24) | ((x >> 8 & 0xFFu) << 16)
-         | ((x >> 16 & 0xFFu) << 8) | (x >> 24);
-}
-
-inline uint16_t jbd_be16(uint16_t x) {
-    return static_cast<uint16_t>(((x & 0xFFu) << 8) | (x >> 8));
-}
-
 } // namespace fkernel

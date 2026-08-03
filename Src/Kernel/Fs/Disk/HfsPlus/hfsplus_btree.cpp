@@ -2,6 +2,7 @@
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Generic/byte_order.h>
 
 namespace fkernel {
 
@@ -18,7 +19,7 @@ uint16_t BTreeNode::record_offset(uint16_t index) const {
     if (off_pos + 2 > node_size) return 0;
     uint16_t raw;
     fk::memory::copy(&raw, data.begin() + off_pos, 2);
-    return hfs_be16(raw);
+    return fk::algorithms::swap16(raw);
 }
 
 const uint8_t* BTreeNode::record_ptr(uint16_t index) const {
@@ -45,11 +46,11 @@ fk::core::Result<void, fk::core::Error> BTreeFile::open(
 
     // Read the B-tree header node (node 0).  We must first compute
     // which physical sector holds block 0 of this fork.
-    uint64_t fork_logical_size = hfs_be64(fork.logicalSize);
+    uint64_t fork_logical_size = fk::algorithms::swap64(fork.logicalSize);
     if (fork_logical_size == 0) return fk::core::Error::InvalidData;
 
     // Assume the first extent contains node 0 at its startBlock.
-    uint32_t start_block = hfs_be32(fork.extents[0].startBlock);
+    uint32_t start_block = fk::algorithms::swap32(fork.extents[0].startBlock);
     // Sector = first_sector + start_block * (block_size / sector_size)
     uint32_t sector_size   = device->sector_size().value();
     uint32_t sects_per_blk = block_size / sector_size;
@@ -66,7 +67,7 @@ fk::core::Result<void, fk::core::Error> BTreeFile::open(
                      hdr_buf.begin() + sizeof(BTNodeDescriptor),
                      sizeof(BTHeaderRec));
 
-    m_node_size = hfs_be16(m_header.nodeSize);
+    m_node_size = fk::algorithms::swap16(m_header.nodeSize);
     if (m_node_size < 512 || m_node_size > 32768)
         return fk::core::Error::InvalidData;
 
@@ -90,8 +91,8 @@ fk::core::Result<uint64_t, fk::core::Error> BTreeFile::logical_to_physical(uint3
     uint32_t remaining = logical_block;
     // Walk the 8 inline extents
     for (int i = 0; i < kHFSPlusExtentDensity; ++i) {
-        uint32_t start = hfs_be32(m_fork.extents[i].startBlock);
-        uint32_t count = hfs_be32(m_fork.extents[i].blockCount);
+        uint32_t start = fk::algorithms::swap32(m_fork.extents[i].startBlock);
+        uint32_t count = fk::algorithms::swap32(m_fork.extents[i].blockCount);
         if (count == 0) break;
         if (remaining < count) {
             uint32_t sector_size   = m_device->sector_size().value();
@@ -136,8 +137,8 @@ static int compare_catalog_keys(const HFSPlusCatalogKey* a,
                                 const HFSPlusCatalogKey* b,
                                 bool case_sensitive)
 {
-    uint32_t pa = hfs_be32(a->parentID);
-    uint32_t pb = hfs_be32(b->parentID);
+    uint32_t pa = fk::algorithms::swap32(a->parentID);
+    uint32_t pb = fk::algorithms::swap32(b->parentID);
     if (pa != pb) return (pa < pb) ? -1 : 1;
     if (case_sensitive)
         return hfsplus_unicode_cmp_cs(a->nodeName, b->nodeName);
@@ -155,13 +156,13 @@ fk::core::Result<CatalogRecord, fk::core::Error> btree_catalog_lookup(
 {
     HFSPlusCatalogKey search_key;
     fk::memory::set(&search_key, 0, sizeof(search_key));
-    search_key.parentID = hfs_be32(parent_id);
+    search_key.parentID = fk::algorithms::swap32(parent_id);
     fk::memory::copy(&search_key.nodeName, &name, sizeof(HFSUniStr255));
     uint16_t key_len = (uint16_t)(sizeof(uint32_t) + sizeof(uint16_t) +
-                                  hfs_be16(name.length) * sizeof(uint16_t));
-    search_key.keyLength = hfs_be16(key_len);
+                                  fk::algorithms::swap16(name.length) * sizeof(uint16_t));
+    search_key.keyLength = fk::algorithms::swap16(key_len);
 
-    uint32_t node_num = hfs_be32(cat.header().rootNode);
+    uint32_t node_num = fk::algorithms::swap32(cat.header().rootNode);
     if (node_num == 0) return fk::core::Error::NotFound;
 
     for (;;) {
@@ -170,7 +171,7 @@ fk::core::Result<CatalogRecord, fk::core::Error> btree_catalog_lookup(
         const BTreeNode& node = node_res.value();
         const BTNodeDescriptor* desc = node.descriptor();
         int8_t kind = desc->kind;
-        uint16_t nr = hfs_be16(desc->numRecords);
+        uint16_t nr = fk::algorithms::swap16(desc->numRecords);
 
         if (kind == kBTLeafNode) {
             // Linear scan through leaf records
@@ -181,7 +182,7 @@ fk::core::Result<CatalogRecord, fk::core::Error> btree_catalog_lookup(
                 int cmp = compare_catalog_keys(&search_key, key, cat.is_case_sensitive());
                 if (cmp == 0) {
                     // Skip past the key to the data record
-                    uint16_t kl = hfs_be16(key->keyLength);
+                    uint16_t kl = fk::algorithms::swap16(key->keyLength);
                     // Key length field is 2 bytes; total key bytes = kl + 2, rounded to even
                     uint16_t key_total = (uint16_t)(kl + 2);
                     if (key_total & 1) key_total++;
@@ -190,7 +191,7 @@ fk::core::Result<CatalogRecord, fk::core::Error> btree_catalog_lookup(
                     CatalogRecord result;
                     int16_t rec_type;
                     fk::memory::copy(&rec_type, data_rec, 2);
-                    rec_type = (int16_t)hfs_be16((uint16_t)rec_type);
+                    rec_type = (int16_t)fk::algorithms::swap16((uint16_t)rec_type);
                     result.type = rec_type;
                     if (rec_type == kHFSPlusFolderRecord)
                         fk::memory::copy(&result.folder, data_rec, sizeof(HFSPlusCatalogFolder));
@@ -217,12 +218,12 @@ fk::core::Result<CatalogRecord, fk::core::Error> btree_catalog_lookup(
             int cmp = compare_catalog_keys(&search_key, key, cat.is_case_sensitive());
             if (cmp < 0) break;
             // Pointer is immediately after key (rounded to even)
-            uint16_t kl = hfs_be16(key->keyLength);
+            uint16_t kl = fk::algorithms::swap16(key->keyLength);
             uint16_t key_total = (uint16_t)(kl + 2);
             if (key_total & 1) key_total++;
             uint32_t child;
             fk::memory::copy(&child, rec + key_total, 4);
-            next_node = hfs_be32(child);
+            next_node = fk::algorithms::swap32(child);
             found = true;
         }
         if (!found) return fk::core::Error::NotFound;
@@ -243,11 +244,11 @@ fk::core::Result<void, fk::core::Error> btree_catalog_list(
     // Build a search key with an empty name to find the first record in the parent
     HFSPlusCatalogKey search_key;
     fk::memory::set(&search_key, 0, sizeof(search_key));
-    search_key.parentID  = hfs_be32(parent_id);
-    search_key.keyLength = hfs_be16(sizeof(uint32_t) + sizeof(uint16_t));
+    search_key.parentID  = fk::algorithms::swap32(parent_id);
+    search_key.keyLength = fk::algorithms::swap16(sizeof(uint32_t) + sizeof(uint16_t));
 
     // Navigate to the first leaf node that could contain our parentID
-    uint32_t node_num = hfs_be32(cat.header().rootNode);
+    uint32_t node_num = fk::algorithms::swap32(cat.header().rootNode);
     if (node_num == 0) return {};
 
     // Descend the index nodes to find the leaf
@@ -264,24 +265,24 @@ fk::core::Result<void, fk::core::Error> btree_catalog_list(
                 if (cur_res.is_error()) break;
                 const BTreeNode& leaf = cur_res.value();
                 const BTNodeDescriptor* ld = leaf.descriptor();
-                uint16_t nr = hfs_be16(ld->numRecords);
+                uint16_t nr = fk::algorithms::swap16(ld->numRecords);
 
                 for (uint16_t i = 0; i < nr; ++i) {
                     const uint8_t* rec = leaf.record_ptr(i);
                     if (!rec) continue;
                     const auto* key = reinterpret_cast<const HFSPlusCatalogKey*>(rec);
-                    uint32_t rec_parent = hfs_be32(key->parentID);
+                    uint32_t rec_parent = fk::algorithms::swap32(key->parentID);
                     if (rec_parent < parent_id) continue;
                     if (rec_parent > parent_id) goto done;
 
-                    uint16_t kl       = hfs_be16(key->keyLength);
+                    uint16_t kl       = fk::algorithms::swap16(key->keyLength);
                     uint16_t key_total = (uint16_t)(kl + 2);
                     if (key_total & 1) key_total++;
                     const uint8_t* data_rec = rec + key_total;
 
                     int16_t rec_type;
                     fk::memory::copy(&rec_type, data_rec, 2);
-                    rec_type = (int16_t)hfs_be16((uint16_t)rec_type);
+                    rec_type = (int16_t)fk::algorithms::swap16((uint16_t)rec_type);
 
                     // Skip thread records; only emit file + folder
                     if (rec_type != kHFSPlusFileRecord && rec_type != kHFSPlusFolderRecord)
@@ -298,26 +299,26 @@ fk::core::Result<void, fk::core::Error> btree_catalog_list(
                         fk::memory::copy(&cr.file, data_rec, sizeof(HFSPlusCatalogFile));
                     cb(ctx, name_utf8, cr);
                 }
-                cur = hfs_be32(ld->fLink);
+                cur = fk::algorithms::swap32(ld->fLink);
             }
             goto done;
         }
 
         // Index node: pick the correct child
         uint32_t next = 0;
-        uint16_t nr   = hfs_be16(desc->numRecords);
+        uint16_t nr   = fk::algorithms::swap16(desc->numRecords);
         for (uint16_t i = 0; i < nr; ++i) {
             const uint8_t* rec = node.record_ptr(i);
             if (!rec) break;
             const auto* key = reinterpret_cast<const HFSPlusCatalogKey*>(rec);
-            int cmp = (int)hfs_be32(key->parentID) - (int)parent_id;
+            int cmp = (int)fk::algorithms::swap32(key->parentID) - (int)parent_id;
             if (cmp > 0) break;
-            uint16_t kl = hfs_be16(key->keyLength);
+            uint16_t kl = fk::algorithms::swap16(key->keyLength);
             uint16_t key_total = (uint16_t)(kl + 2);
             if (key_total & 1) key_total++;
             uint32_t child;
             fk::memory::copy(&child, rec + key_total, 4);
-            next = hfs_be32(child);
+            next = fk::algorithms::swap32(child);
         }
         if (next == 0) goto done;
         node_num = next;
@@ -336,12 +337,12 @@ btree_extents_lookup(const BTreeFile& ext, uint32_t file_id,
 {
     HFSPlusExtentKey search_key;
     fk::memory::set(&search_key, 0, sizeof(search_key));
-    search_key.keyLength   = hfs_be16(sizeof(HFSPlusExtentKey) - 2);
+    search_key.keyLength   = fk::algorithms::swap16(sizeof(HFSPlusExtentKey) - 2);
     search_key.forkType    = fork_type;
-    search_key.fileID      = hfs_be32(file_id);
-    search_key.startBlock  = hfs_be32(start_block);
+    search_key.fileID      = fk::algorithms::swap32(file_id);
+    search_key.startBlock  = fk::algorithms::swap32(start_block);
 
-    uint32_t node_num = hfs_be32(ext.header().rootNode);
+    uint32_t node_num = fk::algorithms::swap32(ext.header().rootNode);
     if (node_num == 0) return fk::core::Error::NotFound;
 
     for (;;) {
@@ -349,18 +350,18 @@ btree_extents_lookup(const BTreeFile& ext, uint32_t file_id,
         if (node_res.is_error()) return node_res.error();
         const BTreeNode& node = node_res.value();
         const BTNodeDescriptor* desc = node.descriptor();
-        uint16_t nr = hfs_be16(desc->numRecords);
+        uint16_t nr = fk::algorithms::swap16(desc->numRecords);
 
         if (desc->kind == kBTLeafNode) {
             for (uint16_t i = 0; i < nr; ++i) {
                 const uint8_t* rec = node.record_ptr(i);
                 if (!rec) continue;
                 const auto* key = reinterpret_cast<const HFSPlusExtentKey*>(rec);
-                if (hfs_be32(key->fileID) != file_id) continue;
+                if (fk::algorithms::swap32(key->fileID) != file_id) continue;
                 if (key->forkType != fork_type) continue;
-                if (hfs_be32(key->startBlock) != start_block) continue;
+                if (fk::algorithms::swap32(key->startBlock) != start_block) continue;
 
-                uint16_t kl = hfs_be16(key->keyLength);
+                uint16_t kl = fk::algorithms::swap16(key->keyLength);
                 uint16_t key_total = (uint16_t)(kl + 2);
                 if (key_total & 1) key_total++;
                 const uint8_t* data = rec + key_total;
@@ -369,7 +370,7 @@ btree_extents_lookup(const BTreeFile& ext, uint32_t file_id,
                 for (int j = 0; j < kHFSPlusExtentDensity; ++j) {
                     HFSPlusExtentDescriptor ed;
                     fk::memory::copy(&ed, data + j * sizeof(HFSPlusExtentDescriptor), sizeof(ed));
-                    if (hfs_be32(ed.blockCount) == 0) break;
+                    if (fk::algorithms::swap32(ed.blockCount) == 0) break;
                     result.push_back(ed);
                 }
                 return result;
@@ -385,18 +386,18 @@ btree_extents_lookup(const BTreeFile& ext, uint32_t file_id,
             const uint8_t* rec = node.record_ptr(i);
             if (!rec) break;
             const auto* key = reinterpret_cast<const HFSPlusExtentKey*>(rec);
-            uint32_t k_fid = hfs_be32(key->fileID);
-            uint32_t k_sb  = hfs_be32(key->startBlock);
+            uint32_t k_fid = fk::algorithms::swap32(key->fileID);
+            uint32_t k_sb  = fk::algorithms::swap32(key->startBlock);
             bool beyond = (k_fid > file_id) ||
                           (k_fid == file_id && key->forkType > fork_type) ||
                           (k_fid == file_id && key->forkType == fork_type && k_sb > start_block);
             if (beyond) break;
-            uint16_t kl = hfs_be16(key->keyLength);
+            uint16_t kl = fk::algorithms::swap16(key->keyLength);
             uint16_t key_total = (uint16_t)(kl + 2);
             if (key_total & 1) key_total++;
             uint32_t child;
             fk::memory::copy(&child, rec + key_total, 4);
-            next = hfs_be32(child);
+            next = fk::algorithms::swap32(child);
             found = true;
         }
         if (!found) return fk::core::Error::NotFound;

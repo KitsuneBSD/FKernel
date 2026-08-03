@@ -1,6 +1,8 @@
 #include <Kernel/Fs/Disk/Ext2/ext2_fs.h>
 #include <Kernel/Fs/Disk/Ext2/ext2_node.h>
 #include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Algorithms/Generic/bitmap.h>
+#include <LibFK/Algorithms/Generic/scatter_io.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 
@@ -266,31 +268,25 @@ Ext2FileSystem::read_from_inode(const Ext2Inode& inode, uint64_t offset,
     if (offset >= inode.i_size) return static_cast<size_t>(0);
     size_t remaining = inode.i_size - static_cast<size_t>(offset);
     if (size > remaining) size = remaining;
+    if (size == 0) return static_cast<size_t>(0);
 
-    size_t total = 0;
-    uint64_t cur = offset;
+    uint8_t* block_buf = static_cast<uint8_t*>(kmalloc(m_block_size));
+    if (!block_buf) return Error::OutOfMemory;
 
-    while (total < size) {
-        uint32_t lblock  = static_cast<uint32_t>(cur / m_block_size);
-        uint32_t blk_off = static_cast<uint32_t>(cur % m_block_size);
-        size_t   chunk   = m_block_size - blk_off;
-        if (chunk > size - total) chunk = size - total;
+    auto resolve_block = [this, &inode](uint32_t lblock) -> fk::core::Result<uint64_t, Error> {
+        auto res = get_data_block(inode, lblock);
+        if (res.is_error()) return res.error();
+        return static_cast<uint64_t>(res.value());
+    };
+    auto read_block_cb = [this](uint64_t phys, uint8_t* scratch) -> fk::core::Result<void, Error> {
+        return read_block(static_cast<uint32_t>(phys), scratch);
+    };
 
-        uint32_t phys = TRY(get_data_block(inode, lblock));
-        if (phys == 0) {
-            fk::memory::set(buf + total, 0, chunk);
-        } else {
-            uint8_t* block_buf = static_cast<uint8_t*>(kmalloc(m_block_size));
-            if (!block_buf) return Error::OutOfMemory;
-            auto res = read_block(phys, block_buf);
-            if (res.is_error()) { kfree(block_buf); return res.error(); }
-            fk::memory::copy(buf + total, block_buf + blk_off, chunk);
-            kfree(block_buf);
-        }
-        total += chunk;
-        cur   += chunk;
-    }
-    return total;
+    auto res = fk::algorithms::scatter_read(offset, size, buf, m_block_size, block_buf,
+                                            resolve_block, read_block_cb);
+    kfree(block_buf);
+    if (res.is_error()) return res.error();
+    return res.value();
 }
 
 // ---- Directory operations ---------------------------------------------------
@@ -404,20 +400,15 @@ Ext2FileSystem::alloc_block(uint32_t prefer_bg) {
         if (!bitmap) return Error::OutOfMemory;
         if (read_block(desc.bg_block_bitmap, bitmap).is_error()) { kfree(bitmap); continue; }
 
-        for (uint32_t byte = 0; byte < m_block_size; ++byte) {
-            if (bitmap[byte] == 0xFF) continue;
-            for (uint32_t bit = 0; bit < 8; ++bit) {
-                if (bitmap[byte] & (1u << bit)) continue;
-                bitmap[byte] |= (1u << bit);
-                write_block(desc.bg_block_bitmap, bitmap);
-                kfree(bitmap);
-                desc.bg_free_blocks_count--;
-                write_bg_desc(bg, desc);
-                uint32_t block = m_super.s_first_data_block
-                               + bg * m_super.s_blocks_per_group
-                               + byte * 8 + bit;
-                return block;
-            }
+        size_t idx = fk::algorithms::find_first_free_bit(bitmap, m_block_size * 8);
+        if (idx < m_block_size * 8) {
+            fk::algorithms::set_bit(bitmap, idx);
+            write_block(desc.bg_block_bitmap, bitmap);
+            kfree(bitmap);
+            desc.bg_free_blocks_count--;
+            write_bg_desc(bg, desc);
+            return m_super.s_first_data_block
+                 + bg * m_super.s_blocks_per_group + idx;
         }
         kfree(bitmap);
     }
@@ -438,18 +429,15 @@ Ext2FileSystem::alloc_inode(bool is_dir) {
         if (!bitmap) return Error::OutOfMemory;
         if (read_block(desc.bg_inode_bitmap, bitmap).is_error()) { kfree(bitmap); continue; }
 
-        for (uint32_t byte = 0; byte < m_block_size; ++byte) {
-            if (bitmap[byte] == 0xFF) continue;
-            for (uint32_t bit = 0; bit < 8; ++bit) {
-                if (bitmap[byte] & (1u << bit)) continue;
-                bitmap[byte] |= (1u << bit);
-                write_block(desc.bg_inode_bitmap, bitmap);
-                kfree(bitmap);
-                desc.bg_free_inodes_count--;
-                if (is_dir) desc.bg_used_dirs_count++;
-                write_bg_desc(bg, desc);
-                return bg * m_super.s_inodes_per_group + byte * 8 + bit + 1;
-            }
+        size_t idx = fk::algorithms::find_first_free_bit(bitmap, m_block_size * 8);
+        if (idx < m_block_size * 8) {
+            fk::algorithms::set_bit(bitmap, idx);
+            write_block(desc.bg_inode_bitmap, bitmap);
+            kfree(bitmap);
+            desc.bg_free_inodes_count--;
+            if (is_dir) desc.bg_used_dirs_count++;
+            write_bg_desc(bg, desc);
+            return bg * m_super.s_inodes_per_group + idx + 1;
         }
         kfree(bitmap);
     }
@@ -468,7 +456,7 @@ Ext2FileSystem::free_block(uint32_t block) {
     uint8_t* bitmap = static_cast<uint8_t*>(kmalloc(m_block_size));
     if (!bitmap) return Error::OutOfMemory;
     if (read_block(desc.bg_block_bitmap, bitmap).is_error()) { kfree(bitmap); return Error::IOError; }
-    bitmap[bit / 8] &= ~(1u << (bit % 8));
+    fk::algorithms::clear_bit(bitmap, bit);
     write_block(desc.bg_block_bitmap, bitmap);
     kfree(bitmap);
     desc.bg_free_blocks_count++;
@@ -486,7 +474,7 @@ Ext2FileSystem::free_inode(uint32_t ino, bool is_dir) {
     uint8_t* bitmap = static_cast<uint8_t*>(kmalloc(m_block_size));
     if (!bitmap) return Error::OutOfMemory;
     if (read_block(desc.bg_inode_bitmap, bitmap).is_error()) { kfree(bitmap); return Error::IOError; }
-    bitmap[bit / 8] &= ~(1u << (bit % 8));
+    fk::algorithms::clear_bit(bitmap, bit);
     write_block(desc.bg_inode_bitmap, bitmap);
     kfree(bitmap);
     desc.bg_free_inodes_count++;

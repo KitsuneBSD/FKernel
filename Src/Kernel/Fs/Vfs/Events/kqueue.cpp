@@ -2,6 +2,7 @@
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Generic/time_math.h>
 
 namespace fkernel {
 
@@ -140,9 +141,9 @@ void KQueueNode::process_changelist(const struct kevent* changelist, int nchange
             detach_reg(reg, current);
             delete reg;
             m_event_index.remove(key);
-            size_t last = m_registered_events.size() - 1;
-            if (idx != last) {
-                m_registered_events[idx] = m_registered_events[last];
+            size_t n = m_registered_events.size();
+            fk::algorithms::swap_remove(&m_registered_events[0], n, idx);
+            if (idx < n) {
                 uint64_t moved_key = event_key(m_registered_events[idx]->event.ident, m_registered_events[idx]->event.filter);
                 m_event_index.insert(moved_key, idx);
             }
@@ -272,9 +273,9 @@ int KQueueNode::scan_ready_events(struct kevent* eventlist, int nevents) {
             m_event_index.remove(del_key);
             detach_reg(reg, current);
             delete reg;
-            size_t last = m_registered_events.size() - 1;
-            if (i != last) {
-                m_registered_events[i] = m_registered_events[last];
+            size_t n = m_registered_events.size();
+            fk::algorithms::swap_remove(&m_registered_events[0], n, i);
+            if (i < n) {
                 uint64_t moved_key = event_key(m_registered_events[i]->event.ident, m_registered_events[i]->event.filter);
                 m_event_index.insert(moved_key, i);
             }
@@ -314,9 +315,7 @@ fk::core::Result<int, fk::core::Error> KQueueNode::kevent(const struct kevent* c
         } else {
             uint32_t freq = TickManager::the().get_frequency();
             if (freq == 0) freq = 1000;
-            uint64_t timeout_ms = static_cast<uint64_t>(timeout->tv_sec) * 1000ULL
-                                + static_cast<uint64_t>(timeout->tv_nsec) / 1000000ULL;
-            uint64_t ticks = timeout_ms * freq / 1000;
+            uint64_t ticks = fk::algorithms::timespec_to_ticks(timeout->tv_sec, timeout->tv_nsec, freq);
             user_deadline = TickManager::the().get_ticks() + (ticks ? ticks : 1);
         }
     }
