@@ -1,8 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
 #include <Kernel/Ipc/Endpoints/ipc_log_node.h>
 #include <Kernel/Ipc/Notifications/notification.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace ipc {
@@ -35,7 +35,7 @@ void Notification::signal(fk::NotificationBits bits) {
     m_waiting_tasks.remove(task);
     uint32_t task_id = task.control.identity.id.value();
 
-    task.registers().rax = m_pending_bits.value();
+    task.ipc().pending_notification = m_pending_bits;
     uint64_t delivered_bits = m_pending_bits.value();
     m_pending_bits.clear_all();
 
@@ -64,7 +64,7 @@ void Notification::signal_with_payload(fk::NotificationBits bits, const void* da
     m_waiting_tasks.remove(task);
     uint32_t task_id = task.control.identity.id.value();
 
-    task.registers().rax = m_pending_bits.value();
+    task.ipc().pending_notification = m_pending_bits;
     uint64_t delivered_bits = m_pending_bits.value();
     m_pending_bits.clear_all();
 
@@ -95,10 +95,12 @@ fk::NotificationBits Notification::wait() {
     scheduler.block_current_noqueue();
   }
 
-  uint64_t result = current->registers().rax;
+  scheduler.schedule();
 
-  IpcLogNode::the()->log_notification_operation("wait_woken", task_id, result);
-  return fk::NotificationBits(result);
+  fk::NotificationBits result = current->ipc().pending_notification;
+
+  IpcLogNode::the()->log_notification_operation("wait_woken", task_id, result.value());
+  return result;
 }
 
 fk::NotificationBits Notification::wait_timeout(fk::TickCount timeout_ticks) {
@@ -121,6 +123,7 @@ fk::NotificationBits Notification::wait_timeout(fk::TickCount timeout_ticks) {
   }
 
   scheduler.sleep_current(timeout_ticks);
+  scheduler.schedule();
 
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
@@ -134,9 +137,9 @@ fk::NotificationBits Notification::wait_timeout(fk::TickCount timeout_ticks) {
     }
   }
 
-  uint64_t result = current->registers().rax;
-  IpcLogNode::the()->log_notification_operation("wait_timeout_woken", task_id, result);
-  return fk::NotificationBits(result);
+  fk::NotificationBits result = current->ipc().pending_notification;
+  IpcLogNode::the()->log_notification_operation("wait_timeout_woken", task_id, result.value());
+  return result;
 }
 
 fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_interruptible() {
@@ -164,11 +167,12 @@ fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_inter
     scheduler.block_current_noqueue();
   }
 
+  scheduler.schedule();
+
   if (current && current->has_pending_signals())
     return fk::core::Error::Interrupted;
 
-  uint64_t result = current->registers().rax;
-  return fk::NotificationBits(result);
+  return current->ipc().pending_notification;
 }
 
 fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_interruptible_timeout(fk::TickCount timeout_ticks) {
@@ -196,6 +200,7 @@ fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_inter
   }
 
   scheduler.sleep_current(timeout_ticks);
+  scheduler.schedule();
 
   {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
@@ -211,8 +216,7 @@ fk::core::Result<fk::NotificationBits, fk::core::Error> Notification::wait_inter
   if (current && current->has_pending_signals())
     return fk::core::Error::Interrupted;
 
-  uint64_t result = current->registers().rax;
-  return fk::NotificationBits(result);
+  return current->ipc().pending_notification;
 }
 
 fk::NotificationBits Notification::poll() {

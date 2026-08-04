@@ -101,6 +101,13 @@ public:
   /** @brief Gets the PTE for a virtual address. */
   uint64_t* get_pte(uintptr_t virt, bool create = false);
 
+  /**
+   * @brief Creates a KPTI shadow user PML4 for a given kernel CR3.
+   * The shadow PML4 carries only user-half entries plus the syscall trampoline.
+   * Returns the physical address of the shadow PML4, or 0 on allocation failure.
+   */
+  uintptr_t create_shadow_pml4(uintptr_t kernel_cr3);
+
   /** @brief Flushes the entire TLB by reloading CR3. Public so fork can flush after CoW marking. */
   void flush_tlb();
 

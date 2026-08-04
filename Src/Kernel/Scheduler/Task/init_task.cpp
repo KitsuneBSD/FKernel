@@ -1,23 +1,24 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/error.h>
+#include <LibFK/Core/result.h>
+#include <LibFK/Utilities/memory.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/Core/boot_info.h>
-#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Fs/Disk/RamDisk/ram_disk.h>
 #include <Kernel/Fs/Vfs/Core/dentry.h>
 #include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Loader/elf_loader.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Scheduler/Sync/task_entries.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/error.h>
-#include <LibFK/Core/result.h>
 
 extern "C" void enter_user_mode(uintptr_t rip, uintptr_t rsp);
 
@@ -73,7 +74,11 @@ load_init_executable_and_setup_address_space() {
 
   uintptr_t new_cr3 = VirtualMemoryManager::the().create_address_space();
   VirtualMemoryManager::the().switch_address_space(new_cr3);
-  SchedulerManager::the().current()->resources.memory.cr3 = new_cr3;
+  auto* t = SchedulerManager::the().current();
+  t->resources.memory.cr3 = new_cr3;
+  t->resources.memory.shadow_cr3 = VirtualMemoryManager::the().create_shadow_pml4(new_cr3);
+  current_cpu_block().kernel_cr3 = new_cr3;
+  current_cpu_block().user_cr3   = t->resources.memory.shadow_cr3 ? t->resources.memory.shadow_cr3 : new_cr3;
 
   return ElfLoader::load(init_dentry_res.value()->top_node());
 }

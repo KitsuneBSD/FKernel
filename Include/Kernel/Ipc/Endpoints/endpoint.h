@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Ipc/Endpoints/ipc_message.h>
 #include <Kernel/Ipc/Endpoints/message_info.h>
 #include <Kernel/Ipc/Notifications/notification.h>
 #include <Kernel/Scheduler/Task/task.h>
@@ -39,15 +40,20 @@ public:
 
   // --- Synchronous rendezvous API (seL4-style) ---
 
-  fk::core::Result<MessageInfo> send(MessageInfo info);
+  // The payload travels in the rendezvous slot (Task::ipc().pending_*) for
+  // the blocked side; these signatures carry the explicit message for the
+  // immediate-delivery case.
 
-  fk::core::Result<MessageInfo> send_timeout(MessageInfo info, uint64_t timeout_ticks);
+  fk::core::Result<MessageInfo> send(MessageInfo info, const IpcMessage& message);
+
+  fk::core::Result<MessageInfo> send_timeout(MessageInfo info, const IpcMessage& message,
+                                             uint64_t timeout_ticks);
 
   fk::core::Result<MessageInfo> receive();
 
   fk::core::Result<MessageInfo> receive_timeout(uint64_t timeout_ticks);
 
-  fk::core::Result<MessageInfo> call(MessageInfo info);
+  fk::core::Result<MessageInfo> call(MessageInfo info, const IpcMessage& message);
 
   // --- Asynchronous signal/wait API (Notification-compatible) ---
 
@@ -72,7 +78,8 @@ public:
   uint64_t generation() const { return m_generation; }
 
 private:
-  void deliver_message(Task &sender, Task &receiver, MessageInfo info);
+  void deliver_message(Task &sender, Task &receiver, MessageInfo info,
+                       const IpcMessage &message);
   void wake_and_unblock(Task &task);
   bool is_on_list(Task& task, fk::containers::IntrusiveListNode<Task> Task::*node_member);
 };

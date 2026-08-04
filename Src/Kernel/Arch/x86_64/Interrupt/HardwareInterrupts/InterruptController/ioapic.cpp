@@ -1,13 +1,13 @@
+#include <LibFK/Algorithms/Logging/log.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
-#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
-#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Buses/Pci/pci_device.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
+#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 uint32_t IoApicController::read(uint32_t reg) const {
   *reinterpret_cast<volatile uint32_t *>(base) = reg;
@@ -192,6 +192,24 @@ void IOAPIC::remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id,
 
   ctrl->write(reg_low, (uint32_t)entry);
   ctrl->write(reg_high, (uint32_t)(entry >> 32));
+}
+
+void IOAPIC::set_irq_affinity(uint8_t irq, uint8_t lapic_id) {
+  uint8_t gsi = m_irq_to_gsi[irq];
+  auto* ctrl = find_controller_for_gsi(gsi);
+  if (!ctrl) return;
+
+  uint32_t local    = gsi - ctrl->gsi_base;
+  uint32_t reg_low  = IOAPIC_REG_TABLE_BASE + local * 2;
+  uint32_t reg_high = reg_low + 1;
+
+  uint64_t entry = ((uint64_t)ctrl->read(reg_high) << 32) | ctrl->read(reg_low);
+  entry &= ~(0xFFULL << 56);
+  entry |= ((uint64_t)lapic_id << 56);
+
+  ctrl->write(reg_low,  (uint32_t)entry);
+  ctrl->write(reg_high, (uint32_t)(entry >> 32));
+  fk::algorithms::klog("IOAPIC", "IRQ %u affinity -> LAPIC %u", irq, lapic_id);
 }
 
 fk::core::Result<uint8_t, fk::core::Error>

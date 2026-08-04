@@ -6,10 +6,8 @@
 #include <Kernel/Syscall/syscall.h>
 
 extern "C" uint64_t sys_ipc_send(uint64_t handle, uint64_t info_raw,
-                                 [[maybe_unused]] uint64_t arg1,
-                                 [[maybe_unused]] uint64_t arg2,
-                                 [[maybe_unused]] uint64_t arg3,
-                                 [[maybe_unused]] uint64_t arg4, [[maybe_unused]] PtRegs* regs) {
+                                 uint64_t arg1, uint64_t arg2, uint64_t arg3,
+                                 uint64_t arg4, [[maybe_unused]] PtRegs* regs) {
   using namespace fkernel::ipc;
   auto *task = SchedulerManager::the().current();
   if (!task || !task->ipc().cspace)
@@ -24,7 +22,13 @@ extern "C" uint64_t sys_ipc_send(uint64_t handle, uint64_t info_raw,
   Endpoint *endpoint = static_cast<Endpoint *>(cap.object());
   MessageInfo info(info_raw);
 
-  auto result = endpoint->send(info);
+  IpcMessage message;
+  message.set_word(0, arg1);
+  message.set_word(1, arg2);
+  message.set_word(2, arg3);
+  message.set_word(3, arg4);
+
+  auto result = endpoint->send(info, message);
   if (result.is_error())
     return (uint64_t)-1;
   return result.value().raw();

@@ -8,9 +8,11 @@ namespace ipc {
 /// @brief Metadata about an IPC message, designed to fit in a single register.
 /// Layout: [Label (48 bits) | Length (12 bits) | Flags (4 bits)]
 class MessageInfo {
-    uint64_t m_raw;
+    uint64_t m_raw{0};
 
 public:
+    MessageInfo() = default;
+
     explicit MessageInfo(uint64_t raw) : m_raw(raw) {}
 
     static MessageInfo create(uint64_t label, uint16_t length, uint8_t flags) {

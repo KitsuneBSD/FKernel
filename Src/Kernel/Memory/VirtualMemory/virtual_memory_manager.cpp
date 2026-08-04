@@ -1,11 +1,11 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/RegionSplitter/region_splitter.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <Kernel/Arch/x86_64/arch_defs.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 VirtualMemoryManager::VirtualMemoryManager() : m_pml4(nullptr), m_pml4_phys(0) {
   /*TODO: Apply this log when we work with LogLevel
@@ -598,4 +598,34 @@ void VirtualMemoryManager::extend_direct_map() {
   flush_tlb();
 
   fk::algorithms::klog("VMM", "Direct map extended: %zu MB", aligned_total / (1024 * 1024));
+}
+
+extern "C" void syscall_stub();
+extern "C" void syscall_stub_post_dispatch();
+
+uintptr_t VirtualMemoryManager::create_shadow_pml4(uintptr_t kernel_cr3) {
+  uintptr_t shadow_phys = PhysicalMemoryManager::the().alloc_page();
+  if (!shadow_phys) return 0;
+  fk::memory::set(reinterpret_cast<void*>(shadow_phys), 0, PAGE_SIZE);
+
+  auto* kernel_pml4 = reinterpret_cast<PageTable*>(kernel_cr3);
+  auto* shadow_pml4 = reinterpret_cast<PageTable*>(shadow_phys);
+
+  // Copy only the lower-half user entries (PML4[0..255])
+  for (size_t i = 0; i < 256; ++i)
+    shadow_pml4->entries[i] = kernel_pml4->entries[i];
+
+  // Map the syscall trampoline: the pages containing syscall_stub must be
+  // accessible in the shadow PML4 so the CPU can execute them on syscall entry
+  // before we switch to the kernel CR3.
+  uintptr_t stub_virt = reinterpret_cast<uintptr_t>(syscall_stub);
+  uintptr_t stub_phys = translate(stub_virt & ~PAGE_FLAGS_MASK);
+  if (stub_phys) {
+    // Clone the upper-half PML4 entry covering the syscall stub so it is
+    // present in the shadow PML4 (supervisor-only, NX disabled for the stub page).
+    size_t pml4_idx = (stub_virt >> 39) & 0x1FF;
+    shadow_pml4->entries[pml4_idx] = kernel_pml4->entries[pml4_idx];
+  }
+
+  return shadow_phys;
 }

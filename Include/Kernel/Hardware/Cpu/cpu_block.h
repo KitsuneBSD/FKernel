@@ -12,6 +12,8 @@ struct CpuControlBlock {
     uint64_t saved_rflags;         // Offset 24
     uint64_t cpu_id;               // Offset 32
     struct Task* current_task;     // Offset 40
+    uint64_t kernel_cr3;           // Offset 48 — KPTI: full kernel PML4 physical address
+    uint64_t user_cr3;             // Offset 56 — KPTI: shadow user PML4 physical address
 };
 
 // Per-CPU array — each AP sets MSR_GS_BASE to &g_cpu_blocks[cpu_index].

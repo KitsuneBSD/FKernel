@@ -1,3 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Synchronization/interrupt_disabler.h>
+#include <LibFK/Utilities/memory.h>
+#include <Kernel/Arch/x86_64/arch_defs.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
@@ -7,20 +13,14 @@
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Arch/x86_64/Smp/ap_entry.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
-#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Driver/Vga/display.h>
-#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
-#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
+#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Scheduler/Sync/task_entries.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Synchronization/interrupt_disabler.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fkernel::scheduler;
 
@@ -135,11 +135,22 @@ fkernel::Processor& SchedulerManager::current_processor() {
 }
 
 static void switch_address_space_if_needed(Task* prev_task, Task* next_task) {
-  if (next_task->resources.memory.cr3 != 0 &&
-      (prev_task == nullptr ||
-       next_task->resources.memory.cr3 != prev_task->resources.memory.cr3)) {
-    VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
+  if (next_task->resources.memory.cr3 == 0) return;
+  if (prev_task && next_task->resources.memory.cr3 == prev_task->resources.memory.cr3) return;
+
+  // Lazily create the KPTI shadow PML4 on first use.
+  if (!next_task->resources.memory.shadow_cr3) {
+    next_task->resources.memory.shadow_cr3 =
+        VirtualMemoryManager::the().create_shadow_pml4(next_task->resources.memory.cr3);
   }
+
+  CpuControlBlock& blk = current_cpu_block();
+  blk.kernel_cr3 = next_task->resources.memory.cr3;
+  blk.user_cr3   = next_task->resources.memory.shadow_cr3
+                   ? next_task->resources.memory.shadow_cr3
+                   : next_task->resources.memory.cr3;
+
+  VirtualMemoryManager::the().switch_address_space(next_task->resources.memory.cr3);
 }
 
 static void save_previous_task_context(Task* prev_task) {
@@ -199,6 +210,49 @@ void SchedulerManager::schedule() {
     uint64_t dummy;
     switch_context(&dummy, next_task->resources.context.stack_pointer);
   }
+}
+
+void SchedulerManager::switch_to_task(Task* next_task) {
+  fk::synchronization::ScopedInterruptDisabler intr_disabler;
+  if (!next_task) return;
+
+  auto& proc = current_processor();
+  Task* prev_task = proc.current_task;
+  if (next_task == prev_task)
+    return;
+
+  next_task->control.lifecycle.state = TaskState::Running;
+  proc.current_task = next_task;
+  proc.need_resched = false;
+
+  switch_address_space_if_needed(prev_task, next_task);
+  save_previous_task_context(prev_task);
+  load_next_task_context(next_task);
+
+  if (prev_task && prev_task == current_processor().last_fpu_task) {
+    void* area = get_fpu_save_area(prev_task->resources.context);
+    arch_fpu_save(area);
+  }
+
+  if (prev_task) {
+    switch_context(&prev_task->resources.context.stack_pointer,
+                   next_task->resources.context.stack_pointer);
+  } else {
+    uint64_t dummy;
+    switch_context(&dummy, next_task->resources.context.stack_pointer);
+  }
+}
+
+void SchedulerManager::requeue_running_task() {
+  fk::synchronization::ScopedInterruptDisabler intr_disabler;
+  auto& proc = current_processor();
+  Task* task = proc.current_task;
+  if (!task || task == proc.idle_task) return;
+
+  uint8_t level = task->control.lifecycle.mlfq_level;
+  task->control.lifecycle.state = TaskState::Ready;
+  fk::synchronization::ScopedLock lock(proc.run_queue_lock);
+  proc.run_queues[level].queue.push_back(task);
 }
 
 void SchedulerManager::start_aps() {

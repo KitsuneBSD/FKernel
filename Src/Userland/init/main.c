@@ -10,10 +10,24 @@ static void fk_puts(const char* s) {
     sys_write(1, s, fk_strlen(s));
 }
 
+static void ensure_dir(const char* path) {
+    sys_mkdir(path, 0755);
+}
+
+static void try_mount(const char* src, const char* target, const char* fstype) {
+    ensure_dir(target);
+    int r = sys_mount(src, target, fstype, 0, 0);
+    if (r < 0) {
+        fk_puts("init: mount failed: ");
+        fk_puts(target);
+        fk_puts("\n");
+    }
+}
+
 static void setup_mounts(void) {
-    sys_mount("tmpfs", "/tmp",     "tmpfs", 0, 0);
-    sys_mount("tmpfs", "/var/run", "tmpfs", 0, 0);
-    sys_mount("tmpfs", "/var/tmp", "tmpfs", 0, 0);
+    try_mount("tmpfs", "/tmp",     "tmpfs");
+    try_mount("tmpfs", "/var/run", "tmpfs");
+    try_mount("tmpfs", "/var/tmp", "tmpfs");
 }
 
 static void run_ktest(void) {

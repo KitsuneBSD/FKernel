@@ -358,3 +358,142 @@ Signal delivery currently targets individual threads, not thread groups. POSIX r
 | 1 | Randomise mmap base address (currently fixed) | `mmap.cpp` |
 | 2 | Randomise stack base on execve | `execve.cpp` |
 | 3 | Add guard page below stack | `execve.cpp` |
+
+---
+
+## Phase 46 — Compressed Swap (ZRam/ZSwap) — HIGH
+
+> Contexto (audit 2026-08-03): FKernel hoje **não tem swap, page cache, reclaim nem OOM killer**. Slab OOM = `kerror`/halt (`slab_allocator.cpp:135`). `CONCEPTS.md:11-13` já previa "compressão como etapa anterior ao swap". Alvo: laptop moderno (>4 GiB RAM, NVMe). **Sem swap core, zram = disco RAM**. Sub-fases ordenadas por dependência.
+
+```
+Userspace (mmap anonymous / page fault)
+   └── VirtualMemoryManager → swap PTE (bit1=1, bits 12–43 = slot)
+         └── SwapManager (slot <-> (swap dev, offset))
+               ├── 46a Swap Core        → zram 46b, reclaim 46c
+               ├── 46b ZramDevice       → BlockDevice + CompressionCodec (Phase 47)
+               ├── 46c Reclaim (síncrono)
+               └── 46d Zswap (deferível, exige swap em disco)
+```
+
+### 46a — Swap Core (~600 LOC, 2–3 dias)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | `SwapManager` (subsystem manager: `SwapManager::the()`, `is_initialized()`) | `Include/Kernel/Memory/Swap/swap_manager.h`, `Src/Kernel/Memory/Swap/swap_manager.cpp` | HIGH |
+| 2 | Slot table: `SlotState` bitmap + per-slot `SwapSlot` (dev id, sector offset) — one struct/class per file (SECRET RULE) | `Include/Kernel/Memory/Swap/swap_slot.h`, `slot_state.h` | HIGH |
+| 3 | Swap PTE encoding: `Present=0` + **bit1 (`Writable`) como marcador swap** + slot em **bits 12–43**; bit0 0 distingue de não-mapeada (zero-fill) | `Include/Kernel/Memory/VirtualMemory/Pages/page_flags.h` (novos helpers `encode_swap_slot()/decode_swap_slot()`) | HIGH |
+| 4 | `swapon(path)` / `swapoff(path)` syscalls — `SYS_SWAPON=167`, `SYS_SWAPOFF=168` livres (`Include/LibFK/Syscalls/numbers.h`, `SYS_MAX=512`) | `Src/Kernel/Syscall/syscall_list/Memory/swap.cpp` (1 handler/arquivo) | HIGH |
+| 5 | `swap_out(page)` → alloc slot, write via `BlockDevice`, set swap PTE; `swap_in(slot)` → read, clear PTE, restore flags | `swap_manager.cpp` | HIGH |
+| 6 | Reclaim: **síncrono** — walk process list (round-robin start), pick cleanest anon page, `swap_out`; retry com backoff | `src/.../Reclaim/reclaim_manager.cpp` | HIGH |
+| 7 | `pf_handler` hook: **swap PTE detectado antes do zero-fill** → `swap_in` | `Src/Kernel/Arch/x86_64/Interrupt/Handler/Exception/pf_handler.cpp:19-35` (região onde M5 já foi corrigido) | HIGH |
+| 8 | zram como swap device: `ZramDevice : BlockDevice` — `read_sectors/write_sectors/sector_size/sector_count` (`Include/Kernel/Driver/Device/BlockDevice/block_device.h`) | `Include/Kernel/Driver/Device/BlockDevice/Zram/zram_device.h`, `Src/Kernel/Driver/Device/BlockDevice/Zram/zram_device.cpp` | HIGH |
+| 9 | OOM fallback: quando reclaim não libera nada e slab falha → `kwarn` + matar tarefa mais pesada (substitui halt); se for kernel task → halt | `src/.../Oom/oom_manager.cpp` | MEDIUM |
+
+**Design decisions:**
+1. **Identidade do slot**: `SwapSlot` = (swap device, 4KiB-aligned offset). Slot index derivado do offset → bitmap por device.
+2. **bit1 como marcador**: `PageFlags` hoje usa bit0=Present, bit1=Writable. Swap PTE = Present(0), Writable(1), slot nos bits 12–43. Colide com nada atual — verificado em `page_flags.h`.
+3. **swap_in preserva flags reais**: lembrar user-ness/kernel-ness da página original (resíduo do antigo M5 não pode voltar — ver `pf_handler.cpp:30`).
+4. **Reclaim síncrono primeiro**: async/kswapd fica para depois; síncrono simplifica o modelo de clock.
+5. **Dirty tracking**: usamos `Accessed`/`Dirty` bits do hardware (`get_page_flags` mascara — M11 ⚠️); página limpa pode ser dropada sem escrita.
+
+### 46b — Zram Driver (~350 LOC, 1–2 dias)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | `ZramDevice` com array de slots em RAM; compress/decompress por página via `CompressionCodec` (Phase 47) | `zram_device.cpp` | HIGH |
+| 2 | **Inline < 4KiB**: LZVN (LZSS, sem entropia) para entradas <4096B — mesma troca do kernel Apple | `zram_device.cpp` | HIGH |
+| 3 | **Página incompressível**: guardar raw + flag; `write_sectors` devolve tamanho comprimido real | `zram_device.cpp` | MEDIUM |
+| 4 | `swapoff` limpa slots e devolve memória ao buddy | `zram_device.cpp` | MEDIUM |
+| 5 | Testes: round-trip de página; página incompressível; swap_on/swap_off repetidos | `tests/Kernel/test_zram.cpp` | HIGH |
+
+### 46c — Reclaim Síncrono (~300 LOC, 1 dia)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | Walk das tarefas (round-robin), páginas anônimas limpas → drop, sujas → `swap_out` | `Reclaim/reclaim_manager.cpp` | HIGH |
+| 2 | **Não toca**: página do kernel, page tables, tarefa em execução no momento do walk | `reclaim_manager.cpp` | HIGH |
+| 3 | Watermarks: `HIGH_WATERMARK`/`LOW_WATERMARK`; reclaim dispara abaixo de LOW | `reclaim_manager.cpp` | MEDIUM |
+| 4 | Teste: alloc até LOW → reclaim → verify swap_out + PTE swap | `tests/Kernel/test_reclaim.cpp` | HIGH |
+
+### 46d — Zswap (deferível, 1–2 dias) — LOW
+
+Compressed cache **em frente ao swap em disco** (requer swap device real, não-zram). Zswap = zram com writeback lazy para disco. **Deferido**: exige page cache / writeback que ainda não existem.
+
+---
+
+## Phase 47 — LZFSE Codec (LibFK) — HIGH
+
+> **Decisão (2026-08-03)**: reimplementar LZFSE em LibFK freestanding (não port do C da Apple). Licença do `lzfse/lzfse` = BSD-3-Clause. Swap prioriza velocidade, mas user manteve LZFSE (ratio superior para workloads de texto/JSON/code). Interface genérica de codec serve zram/zswap e o futuro zstd.
+
+### 47a — Codec Interface (~100 LOC, 0.5 dia)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | `CompressionCodec` virtual: `compress(src, size, dst, capacity) -> Result<size_t, Error>` + `decompress(...)` | `Include/LibFK/Compression/compression_codec.h`, `Src/LibFK/Compression/compression_codec.cpp` | HIGH |
+| 2 | `NullCodec` (identity) — desbloqueia 46a sem LZFSE pronto | `Include/LibFK/Compression/null_codec.h` | HIGH |
+| 3 | Registry por `CodecId` (enum): `None`, `Lzvn`, `Lzfse` — zram escolhe por tamanho (`<4096 → Lzvn`) | `Include/LibFK/Compression/codec_id.h` | HIGH |
+
+### 47b — LZVN (LZSS) (~400 LOC, 1–2 dias)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | LZSS com distância ≤ 8KiB, match ≥ 4 bytes, literal runs | `Include/LibFK/Compression/lzvn_codec.h`, `Src/LibFK/Compression/lzvn_codec.cpp` | HIGH |
+| 2 | **Obrigatório**: entradas < 4KiB (página = fronteira) | `lzvn_codec.cpp` | HIGH |
+| 3 | Golden vectors: pares (input, esperado) gerados no host com CLI `lzfse` | `tests/LibFK/test_lzvn.cpp` | HIGH |
+
+### 47c — LZFSE (~1200 LOC, 4–6 dias)
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | LZ-style back-references (matches, literals) | `Src/LibFK/Compression/lzfse_codec.cpp` | HIGH |
+| 2 | **Entropia**: estimador do "best case" LZ77 + símbolos LZ → código binário de Huffman estático; depois arithmetic coder (`lzma_encoder`) | `lzfse_codec.cpp`, `Src/LibFK/Compression/lzma_encoder.cpp` | HIGH |
+| 3 | **Decodificador com decodificação incremental de um único byte** (estado mantido entre chamadas — necessário para streaming zram) | `lzfse_codec.cpp` | HIGH |
+| 4 | Tamanhos de bloco fixos (`block_size` negociação; fim de entrada = tamanho exato) | `lzfse_codec.cpp` | HIGH |
+| 5 | Testes: round-trip aleatório (seeded), golden vectors vs CLI `lzfse`, **streaming byte-a-byte** | `tests/LibFK/test_lzfse.cpp` | HIGH |
+| 6 | Interop: compressão FKernel decompressível pelo CLI `lzfse` (e vice-versa) | `tests/LibFK/test_lzfse.cpp` | HIGH |
+
+**Design decisions:**
+1. **Licença**: BSD-3-Clause compatível; implementação própria em LibFK freestanding (flags do kernel se aplicam).
+2. **Sem entropia para <4KiB**: LZVN (LZSS puro) — page size 4KiB fica na fronteira exata da troca do formato Apple.
+3. **Streaming**: o decodificador precisa suportar decodificação incremental — zram comprime página a página, mas o codificador streaming evita buffer duplo.
+4. **Prioridade a testabilidade**: golden vectors gerados no host; CI roda `xmake run Test` que inclui LibFK.
+
+---
+
+## Phase 48 — Traits Modernization (LibFK) — MEDIUM
+
+> Contexto (audit 2026-08-03): `Include/LibFK/Traits/type_traits.h` tem 14 traits mas só 2 consumers produtivos (`driver_registry.cpp:52-76`). Containers usam builtins crus (`vector.h:67` `__is_trivially_constructible`, `circular_buffer.h:78`).
+
+| # | Task | Files | Priority |
+|---|------|-------|----------|
+| 1 | `void_t`/`declval` (SFINAE helpers) | `Include/LibFK/Traits/type_traits.h` | MEDIUM |
+| 2 | Envolver builtins crus de `vector.h:67`, `circular_buffer.h:78` em traits nomeadas (`is_trivially_constructible`/`is_trivially_destructible`) | `Include/LibFK/Containers/vector.h`, `Include/LibFK/Containers/circular_buffer.h` | MEDIUM |
+| 3 | `is_constructible`/`is_convertible` p/ factory functions | `type_traits.h` | MEDIUM |
+| 4 | **Concepts C++20** (projeto é C++20, `xmake.lua:6`): `ConceptContainer`, `ConceptBlockDevice` etc. — substituem asserts de interface | novo `Include/LibFK/Concepts/` | LOW |
+| 5 | `Traits<T>` (hash/dump) genérico via template specialisation + detection idiom | `Include/LibFK/Traits/traits.h` | LOW |
+| 6 | Testes: static_asserts p/ cada trait; detection idiom em `rb_tree` morto | `tests/LibFK/test_traits.cpp` | MEDIUM |
+
+**Decisão**: foco em **consumers reais** (containers, factory, interface asserts). `rb_tree.h` morto (0 consumers) vira banco de testes de concepts ou é removido.
+
+---
+
+## Phase 49 — Kernel → LibFK Extraction — MEDIUM
+
+> Contexto (audit 2026-08-03): 12 candidatos catalogados. Estratégia: **wins pequenos primeiro** (código duplicado 3–5×), depois estruturas (slot_map). Padrão consolidado em `notes/fs-to-libfk-extraction.md` + `development-patterns/algorithm-consolidation.md`.
+
+| # | Candidato | Duplicação hoje | Esforço | Prioridade |
+|---|-----------|-----------------|---------|------------|
+| 1 | `time_math` / `datetime_to_epoch` | 5 cópias | 0.5 dia | MEDIUM |
+| 2 | pseudo-header checksum (IPv4/TCP/UDP) | 3 cópias | 0.5 dia | MEDIUM |
+| 3 | `id_generator` (generation counters) | 5 sites | 0.5 dia | MEDIUM |
+| 4 | **`slot_map`** (delete-slot reuso + generation) | CSpace `cspace.h:13-118`, fd table `task.cpp:186-261`, posix timers | 2-3 dias | MEDIUM |
+| 5 | free-list (SLAB per-size freelists) | `slab_free_list.cpp` + buddy free lists | 1 dia | LOW |
+| 6 | `utf8` decode/encode (HFS+, ISO9660, terminal) | 3 cópias parciais | 1 dia | LOW |
+| 7 | bitmap allocator (PMM + zram slot bitmap) | PMM bitmap + futuro zram | 1 dia | LOW |
+
+**Regras de extração:**
+1. LibFK depende só de LibC + self (nunca Kernel) — usar `allocator_backend.h` p/ callbacks de alocação.
+2. One struct/class per file, `snake_case`, métodos/APIs no estilo LibFK (`fk::containers::`).
+3. Cada extração move código e **rewrite dos consumers no mesmo commit** — sem deprecação em duas fases.
+4. `xmake check-layers` deve passar após cada item (boundary LibFK↔Kernel enforced por build).
+5. slot_map primeiro consumer = CSpace; testes `tests/LibFK/test_slot_map.cpp` antes do rewrite. |

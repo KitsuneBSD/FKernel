@@ -209,13 +209,9 @@ void PhysicalMemoryManager::reconcile_buddies() {
 PhysicalZone* PhysicalMemoryManager::find_zone_for_paddr(uintptr_t phys) {
   for (size_t i = 0; i < m_zone_count; ++i) {
     auto& z = m_zones[i].zone;
-    if (phys >= z.base() && phys < z.base() + z.length()) {
+    if (phys >= z.base() && phys < z.base() + z.length())
       return &m_zones[i];
-    }
   }
-
-  fk::algorithms::kwarn("PHYS_MEM", "No zone found for phys=%p", phys);
-
   return nullptr;
 }
 
@@ -303,6 +299,29 @@ uintptr_t PhysicalMemoryManager::alloc_page(ZoneType preferred, uint32_t preferr
   return alloc_page_internal(preferred, preferred_node);
 }
 
+uintptr_t PhysicalMemoryManager::alloc_page_for_pagetable() {
+  if (!m_is_initialized) {
+    fk::algorithms::kwarn("PHYS_MEM", "alloc_page_for_pagetable called before init");
+    return 0;
+  }
+  // Page table pages are accessed via identity mapping (phys == virt, valid only <4GiB).
+  // Never allocate from HIGH zone; return 0 (OOM) rather than a frame above 4GiB.
+  fk::synchronization::ScopedLockIRQ lock(m_lock);
+  for (size_t i = 0; i < m_zone_count; ++i) {
+    if (m_zones[i].zone.type() == ZoneType::HIGH) continue;
+    ssize_t frame = m_zones[i].bitmap.alloc();
+    if (frame < 0) continue;
+    uintptr_t phys = m_zones[i].zone.base() + static_cast<uintptr_t>(frame) * FRAME_SIZE;
+    m_zones[i].buddy.invalidate_page(phys);
+    m_free_memory -= FRAME_SIZE;
+    if (m_zones[i].cow_refcounts)
+      m_zones[i].cow_refcounts[frame] = 1;
+    return phys;
+  }
+  fk::algorithms::kwarn("PHYS_MEM", "alloc_page_for_pagetable: no free pages below 4GiB");
+  return 0;
+}
+
 void PhysicalMemoryManager::free_page(uintptr_t phys) {
   if (!m_is_initialized) {
     fk::algorithms::kwarn("PHYS_MEM", "Free_page called before init");
@@ -316,8 +335,7 @@ void PhysicalMemoryManager::free_page(uintptr_t phys) {
 
   PhysicalZone* pz = find_zone_for_paddr(phys);
   if (!pz) {
-    fk::algorithms::kerror("PHYS_MEM", "free_page: no zone found for address %p",
-                           phys);
+    fk::algorithms::kwarn("PHYS_MEM", "free_page: no zone for phys=%p", (void*)phys);
     return;
   }
 
@@ -395,8 +413,7 @@ void PhysicalMemoryManager::free_contiguous(uintptr_t phys, size_t order) {
 
   PhysicalZone* pz = find_zone_for_paddr(phys);
   if (!pz) {
-    fk::algorithms::kerror("PHYS_MEM",
-                           "free_contiguous: no zone found for address %p", phys);
+    fk::algorithms::kwarn("PHYS_MEM", "free_contiguous: no zone for phys=%p", (void*)phys);
     return;
   }
 

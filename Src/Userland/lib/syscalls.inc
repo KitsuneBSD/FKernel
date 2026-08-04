@@ -61,9 +61,5 @@
 %define SYS_FCHMOD 91
 %define SYS_ACCESS 21
 %define SYS_UTIMENSAT 280
-%define SYS_OPEN 2
-%define SYS_STAT 4
-%define SYS_FSTAT 5
-%define SYS_LSTAT 6
 
 %endif

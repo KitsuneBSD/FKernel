@@ -17,6 +17,7 @@ private:
   bool m_is_write;
   IoCompletionStatus m_status = IoCompletionStatus::Busy;
   uint64_t m_completion_time = 0;
+  uintptr_t m_prp_list_phys = 0;
 
 public:
   NvmeAsyncOperation(uint16_t command_id, uint64_t start_lba, uint32_t block_count, void* buffer,
@@ -60,6 +61,9 @@ public:
 
   void mark_error() { m_status = IoCompletionStatus::Error; }
   void mark_success() { m_status = IoCompletionStatus::Success; }
+
+  void set_prp_list(uintptr_t phys) { m_prp_list_phys = phys; }
+  uintptr_t prp_list_phys() const { return m_prp_list_phys; }
 };
 
 } // namespace fkernel

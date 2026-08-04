@@ -18,6 +18,7 @@ function InitrdBuilder.setup_staging(path)
   RunCommand("mkdir -p " .. path .. "/usr/local/etc")
   RunCommand("mkdir -p " .. path .. "/var/log")
   RunCommand("mkdir -p " .. path .. "/var/run")
+  RunCommand("mkdir -p " .. path .. "/var/tmp")
   RunCommand("mkdir -p " .. path .. "/dev")
   RunCommand("mkdir -p " .. path .. "/proc")
 end

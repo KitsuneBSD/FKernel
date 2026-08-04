@@ -11,6 +11,7 @@
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Memory/Pointers/ref_ptr.h>
 
+#include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Scheduler/Task/task.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Hardware/Cpu/processor.h>
@@ -24,7 +25,7 @@ private:
     SchedulerManager& operator=(const SchedulerManager&) = delete;
 
     fk::synchronization::Spinlock m_lock;
-    fkernel::Processor m_processors[32];
+    fkernel::Processor m_processors[MAX_CPUS];
     fk::CpuCount m_processor_count{1};
 
     fk::containers::IntrusiveList<Task, &Task::wait_node> m_wait_queue;
@@ -62,8 +63,12 @@ public:
     void yield();
     void wake_task(Task* task);
     void terminate_current(int status);
+    // Safe to call from exception handlers: skips copy_to_user cleanup.
+    void kill_current_from_exception(int signal);
     void on_tick();
     void schedule();
+    void switch_to_task(Task* next);
+    void requeue_running_task();
 
     void priority_boost_all();
 

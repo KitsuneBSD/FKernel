@@ -15,6 +15,9 @@ function RunMockOS(debug_flags, output_log_path)
 		RunCommand("mkdir -p logs/")
 	end
 
+	-- Truncate serial log so each run starts with a clean capture.
+	RunCommand("> logs/serial.log")
+
 	if not OSInteract.FileExists(MockOS) or not OSInteract.FileExists(HDA) then
 		local ok = RunCommand("xmake")
 		if not ok then

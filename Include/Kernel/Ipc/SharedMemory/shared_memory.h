@@ -31,6 +31,10 @@ public:
   void unmap_from(Task* task, uintptr_t vaddr);
   void revoke() { ++m_generation; }
 
+  // Kernel-side byte access through the higher-half direct map.
+  size_t read_at(uint64_t offset, size_t n, uint8_t* buf) const;
+  size_t write_at(uint64_t offset, size_t n, const uint8_t* buf);
+
   const uint64_t* generation_ptr() const { return &m_generation; }
   uint64_t generation() const { return m_generation; }
   size_t size_bytes() const { return m_size_pages * 4096; }

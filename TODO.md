@@ -12,19 +12,20 @@
 | Area | Status | Key Gaps |
 |------|--------|----------|
 | **Boot/Init** | ✅ Working | GRUB+Multiboot2 → SMP AP startup → scheduler |
-| **Memory Mgmt** | ⚠️ Audit 2026-08-01 | 4 bugs críticos (order buddy, accounting, bitmap↔buddy, realloc slab) + 9 médios/altos; IOMMU stubbed |
+| **Memory Mgmt** | ⚠️ Audit 2026-08-03 | M1–M4/M5/M7–M9/M13 ✅; **M10 ❌** (file-backed); M6/M11/M12 ⚠️; identidade 4 GiB × zona HIGH agora alcançável; IOMMU stubbed |
+| **Memory Pressure** | ❌ Ausente | **sem swap, sem page cache, sem reclaim, sem OOM killer** (slab OOM = halt) — Phase 46 |
 | **Scheduler** | ✅ Working | MLFQ + SMP work-stealing + QoS; `pick_next()` affinity O(N) |
-| **IPC (seL4)** | ✅ Working | Capabilities, CSpace, Endpoint, Notification, revocation; **Phase 27 (fd→CSpace) DONE** |
-| **VFS** | ✅ Working | Ext2 r/w; ext3/4, UFS, HFS+, FAT write are stubs |
-| **ELF Loader** | ✅ Working | ASLR, TLS, RELRO, dynamic linking; TLS split across execve+init_task |
-| **Syscalls** | ⚠️ 207 registrados | 47 `NotImplemented` (mlock family, UDP connect/listen/accept, ext4 write, IOMMU) |
-| **Networking** | ⚠️ Partial | TCP state machine + retransmit OK; UDP sendto/recvfrom OK; connect/listen/accept stub; sem congestion control; sem IPv6 |
-| **Drivers** | ⚠️ Mixed | E1000, ATA DMA, PS/2, PTY OK; NVMe sem PRP2 (>4KiB) + 5 .cpp vazios; AHCI async stalled |
-| **SMP** | ⚠️ Partial | Bugs 21-36 corrigidos; up to 32 CPUs; no IRQ affinity, no MTRR sync |
-| **Security** | ⚠️ Partial | SMEP/SMAP/NX/W^X on all CPUs; ASLR via ChaCha20 (fix 2026-07-31); KPTI missing; IOMMU stubbed |
-| **Tests** | ⚠️ Growing | LibC/LibFK ~85%; kernel has 8 suites / **89 tests**; Phase 43 target 75% |
-| **Docs** | ⚠️ Partial | AGENTS.md/TODO.md excelentes; Docs/ tem stubs |
-| **Code Quality** | ⚠️ Debt | task.h viola SECRET RULE; include order invertido; calisthenics violado; 5 .cpp NVMe vazios |
+| **IPC (seL4)** | ✅ Rendezvous OK | Capabilities, CSpace, Notification, revocation OK; **Phase 27 DONE**; sync rendezvous corrigido (51a ✅); fastpath call+reply direto via `switch_to_task` (51b ✅); **Phase 51c pendente** (reply+recv fusion + asm skim) |
+| **VFS** | ✅ Working | Ext2 r/w (mas **triple-indirect write ❌** `ext2_fs.cpp:260`); ext3/4, UFS, HFS+, FAT write stubs |
+| **ELF Loader** | ✅ Working | ASLR, TLS, RELRO, dynamic linking |
+| **Syscalls** | ⚠️ 207 registrados | **12** `NotImplemented` (IOMMU, ext4 extent, terminal…); mlock ✅; UDP connect/listen ✅ |
+| **Networking** | ⚠️ Partial | TCP state machine + retransmit OK; UDP sendto/recvfrom/connect/listen OK (`accept`=EOPNOTSUPP, correto); sem congestion control; sem IPv6 |
+| **Drivers** | ⚠️ Mixed | E1000, ATA DMA (>256 setores ✅), PS/2, PTY OK; **sem USB (xHCI/EHCI/HID)** — maior gap p/ laptop moderno; NVMe PRP2 ✅; AHCI async DMA ✅; 5 .cpp NVMe vazios |
+| **SMP** | ⚠️ Partial | Bugs 21-36 corrigidos; up to 64 CPUs (`MAX_CPUS=64`); no IRQ affinity, no MTRR sync |
+| **Security** | ⚠️ Partial | SMEP/SMAP/NX/W^X on all CPUs; ASLR via ChaCha20 (fix 2026-07-31); KPTI missing (Phase 45b); IOMMU stubbed |
+| **Tests** | ⚠️ Growing | LibC/LibFK ~85%; kernel **10 suites / 99 tests**; Phase 43 target 75% |
+| **Docs** | ⚠️ Partial | AGENTS.md/TODO.md excelentes; Docs/ stubs; memory-guide: slab 8192/2048 + file-backed stale (M10) |
+| **Code Quality** | ⚠️ Debt | task.h ✅ refatorado; include order invertido (320/462); calisthenics violado; rb_tree morto; 5 .cpp NVMe vazios |
 
 ---
 
@@ -38,9 +39,9 @@ Todos os bugs das auditorias anteriores foram corrigidos (Bugs 9, 10, 18–36 �
 
 | # | Bug | Local |
 |---|-----|-------|
-| 35 | Bridge VESA real-mode é placeholder — VBE não funciona em x86_64 (só framebuffer multiboot2) | `Driver/Vga/real_mode_bridge.asm` |
+| 35 | Bridge VESA real-mode é placeholder — VBE não funciona em x86_64 (só framebuffer multiboot2) | `Arch/x86_64/Driver/Vga/real_mode_bridge.asm` |
 
-### Auditoria de Memória (2026-08-01) — Bugs confirmados
+### Auditoria de Memória (2026-08-01; re-audit 2026-08-03)
 
 Auditoria do subsistema de memória (PMM, VMM, slab, heap, demand paging). M1–M4 causam corrupção de memória sob condições normais de uso (DMA >4KiB, slab >4KiB, crescimento de Vector/String do kernel, double-allocation silenciosa).
 
@@ -57,44 +58,60 @@ Auditoria do subsistema de memória (PMM, VMM, slab, heap, demand paging). M1–
 
 | # | Bug | Local |
 |---|-----|-------|
-| M5 | CoW break pode criar página **User** a partir de página kernel RO: PF handler trata write fault de kernel em página presente; branch `!(User)` recria com `\| User` | `pf_handler.cpp:64-74,100` |
-| M6 | Slab sem lock e chamado **antes** de `save_and_disable_interrupts()` → race em SMP/IRQ context | `slab_allocator.cpp`, `memory_manager.cpp:100-106` |
+| M5 | ✅ | CoW break preserva user-ness (`pf_handler.cpp:49-62`, "Never add the User bit here") |
+| M6 | ⚠️ | slab self-locks (`ScopedLockIRQ`) mas `memory_manager.cpp:100-106` chama slab antes do `save_and_disable_interrupts()` (inofensivo hoje) |
 
 **🟡 MÉDIO**
 
 | # | Bug | Local |
 |---|-----|-------|
-| M7 | `free_contiguous` devolve bloco ao buddy incondicionalmente mesmo com refcounts CoW > 0 | `physical_memory_manager.cpp:388-394` |
-| M8 | `select_zone` não faz fallback quando a zona escolhida está cheia (bitmap.alloc só na zona selecionada) → OOM com outras zonas livres | `physical_memory_manager.cpp:214-275` |
-| M9 | Huge pages de usuário não tratadas em `free_address_space`/`unmap_page_range` → leak de 511 páginas por PDE 2MiB | `virtual_memory_manager.cpp:357-361,414-416` |
-| M10 | Demand paging **file-backed não implementado** (docs afirmam que lê da page cache; código só zero-fill anônimo) | `pf_handler.cpp:19-33`, `Docs/Domains/memory-management-guide.md:246-248` |
-| M11 | `translate()` exige alinhamento mas soma `(virt & 0xFFF)` (código morto); `get_page_flags` devolve bits crus (inclui Accessed/Dirty) comparados como `PageFlags` | `virtual_memory_manager.cpp:202-207,240-260` |
-| M12 | Direct map RWX (viola W^X declarada), mapeia buracos/memória reservada, dimensionado por `total_memory()` (só disponível) | `virtual_memory_manager.cpp:486-543` |
-| M13 | Frame 0 / low memory (IVT, VGA/BIOS 0xA0000-0xFFFFF) não reservados → `alloc_page` pode devolver 0, interpretado como falha pelo VMM | `physical_memory_manager.cpp:126-154`, `virtual_memory_manager.cpp:48-51` |
+| M7 | ✅ | refcounts por frame: decrementa e difere free enquanto compartilhado (`physical_memory_manager.cpp:388-394,407-422`) |
+| M8 | ✅ | `candidate_zones()` com fallback 5 níveis (`physical_memory_manager.cpp:214-275`); ⚠️ consequência: pode devolver zona HIGH |
+| M9 | ✅ | Huge pages de usuário tratadas em free/unmap (`virtual_memory_manager.cpp:357-361,414-416,445-467`) |
+| M10 | ✅ | Demand paging file-backed implementado — `handle_demand_paging` em `pf_handler.cpp` lê do `backing_node` na falta de página; ver HIGH #5 |
+| M11 | ⚠️ | `get_page_flags` mascara Accessed/Dirty (`virtual_memory_manager.cpp:202-207,240-260`); `translate()` offset add corrigido |
+| M12 | ⚠️ | Direct map com NX ✅ (`virtual_memory_manager.cpp:486-543`); ainda mapeia buracos até `highest_physical_address()` |
+| M13 | ✅ | Frame 0 / IVT / VGA/BIOS 0xA0000-0xFFFFF / AP trampoline reservados (`physical_memory_manager.cpp:126-154`) |
 
 **⚪ BAIXO**
 
-- Invariante não enforced: tabelas de páginas acessadas via **ponteiro físico** dependem do identity map de 4 GiB — quebraria se `alloc_page` caísse na zona HIGH (>4 GiB)
-- `get_refcount` retorna 1 para rc==0 (conflaciona "não rastreado" com "refcount zerado")
-- Docs desatualizadas: slab "≤8192" vs código `≤2048` (`memory_manager.cpp:100`); demand paging file-backed
+- ✅ identidade 4 GiB × zona HIGH — `alloc_page_for_pagetable()` corrige o caso das page tables; `shm_node.cpp:35,47` e acesso VMM a frames >4GiB via identidade ainda pendente (apenas se mmap físico >4GiB for necessário)
+- `get_refcount` retorna 1 para rc==0 (conflaciona "não rastreado" com "refcount zerado") — `physical_memory_manager.cpp:459`
+- Docs desatualizadas: slab "≤8192" vs código `≤2048` (`memory_manager.cpp:100`); demand paging file-backed (M10)
 - `BuddyAllocator::initialize()` é código morto (caminho real é `initialize_from_bitmap`) com lógica de loop confusa
+- Resíduo M5: `handle_demand_paging` OR `User` incondicionalmente (`pf_handler.cpp:30`), alcançável pelo caminho AC em modo kernel (`pf_handler.cpp:121-125`)
 
 ---
 
 ## 🟠 HIGH — Bloqueantes para POSIX e Uso Real
 
+### 0. Hardware Real — Laptop Moderno (audit 2026-08-03)
+
+> Alvo declarado: laptop moderno (sem PS/2, NVMe, >4 GiB RAM). Ordenado por bloqueio real de uso.
+
+| # | Bloqueador | Por quê | Fase |
+|---|-----------|---------|------|
+| 1 | **USB (xHCI + EHCI + HID)** | laptop moderno **não tem PS/2** → teclado/mouse/storage inoperáveis | nova (Phase 50) |
+| 2 | ✅ **NVMe PRP2 (>4KiB)** | implementado: 2 páginas → PRP1+PRP2; >2 páginas → PRP list 4KiB em DMA memory; free após wait_for_completion | curto |
+| 3 | ✅ **Identidade 4 GiB × zona HIGH** | `alloc_page_for_pagetable()` recusa HIGH zone; usado em `ensure_table()` e `extend_direct_map()` | curto |
+| 4 | **Swap/reclaim mínimo** | OOM hoje = halt (`slab_allocator.cpp:135`) | Phase 46 |
+| 5 | ✅ **M10 file-backed paging** | `handle_demand_paging` lê `backing_node->read(file_offset, PAGE_SIZE)` se região tem backing; zero-fill caso contrário | curto |
+| 6 | ✅ **AHCI async / ATA >256 setores** | `interrupt_driven_ahci.cpp`: `setup_dma_buffers/command_header/fis/start_command` implementados; `dma_strategy.cpp`: loop >256 setores em chunks de 256 | curto |
+| 7 | **VBE fallback (Bug 35)** | console em máquina sem GOP | curto |
+| 8 | ✅ **Ext2 triple-indirect write** | `ext2_fs.cpp:260` implementado — L1→L2→leaf com `ensure_indirect` em cada nível | curto |
+
 ### 1. Kernel Test Harness — Phase 43 (13 dias)
 
-Kernel tem ~0% de cobertura. 3 testes existem para 60K+ linhas. **Isso é o maior risco do projeto.**
+Kernel tem ~0% de cobertura. 10 suites / **99 testes** para ~40K linhas (`Src/Kernel` ≈39.7K). **Isso é o maior risco do projeto.**
 
 | Sub-phase | Componente | Dias | Status |
 |-----------|-----------|------|--------|
 | 43a | Test infrastructure (runner, mocks, CI) | 2 | ✅ Done |
-| 43b | **VFS**: path resolution, dentry cache, file description | 3 | ⚠️ Partial (9 dentry cache tests ✅; path resolver + file description ❌) |
+| 43b | **VFS**: path resolution, dentry cache, file description | 3 | ✅ Done (9 dentry + 11 PathResolver + 10 FileDescription tests) |
 | 43c | **Memory**: buddy allocator, slab, multi-zone | 2 | ✅ Done (BuddyState 8 tests + Zone 12 tests) |
 | 43d | ELF loader: header validation | 2 | ✅ Done (15 tests) |
-| 43e | **Scheduler**: MLFQ demotion, QoS, turnstile chain | 2 | ⚠️ Partial (14 QoS tests ✅; MLFQ demotion + turnstile ❌) |
-| 43f | **TCP**: handshake, sliding window, retransmit | 2 | ❌ Open |
+| 43e | **Scheduler**: MLFQ demotion, QoS, turnstile chain | 2 | ✅ Done (14 QoS + 6 MLFQQueue + 6 Turnstile tests) |
+| 43f | **TCP**: handshake, sliding window, retransmit | 2 | ✅ Done (10 TcpConnection tests) |
 
 ### 2. Phase 40a — Hardware Access Primitives (IrqBinding) — 3 dias
 
@@ -140,7 +157,7 @@ Kernel tem ~0% de cobertura. 3 testes existem para 60K+ linhas. **Isso é o maio
 | Sub-phase | Componente | Status |
 |-----------|-----------|--------|
 | 33a | `StackableBlockDevice` base class | ✅ Done |
-| 33b | **dm-crypt** (AES-XTS + LUKS + PBKDF2) | ❌ Open — nada implementado |
+| 33b | **dm-crypt** (AES-XTS + LUKS + PBKDF2) | ✅ Done — `dm_crypt_device.cpp`: LUKS v1 unlock (PBKDF2-HMAC-SHA1 key derivation, AF-merge com SHA1 diffuse, AES-256-XTS decryption); `read_sectors`/`write_sectors` com XTS sector-tweak correto; só AES-256-XTS (keylen=64) suportado |
 | 33c | RAID 0/1 | ⚠️ Implementado mas **órfão** (zero chamadores externos) |
 | 33d | LVM (linear + striped) | ⚠️ Implementado mas **órfão** (zero chamadores externos) |
 
@@ -224,11 +241,59 @@ Extrair dependências x86_64 para interfaces genéricas (AArch64/RISC-V no futur
 
 `Src/Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.cpp` — todas as 3 funções retornam `NotImplemented`. Sem tradução DMA real. (~2 semanas para implementação mínima)
 
-### 14. 47 locais com `NotImplemented` no kernel
+### 14. Limites Rígidos Removidos (2026-08-04) ✅
 
-Distribuídos por: UDP socket (7), TCP socket (6), IOMMU (3), ATA DMA (2), AHCI (1), NVMe (1), ext4 (1), HFS+ (1), ISO9660 (1), FAT16 (1), MinixFS (1), UFS (1), mlock (4), madvise (1), utimensat (2), terminal (5), PCI node (1), VGA terminal (1), unix socket (1), APIC (1), MSI (1), HardwareInterruptManager (2), syscall dispatcher (1).
+| Item | Antes | Depois |
+|------|-------|--------|
+| `MAX_CPUS` | 32 (hard, duplicado em `gdt.h`) | 64 em `arch_defs.h`; `gdt.h` usa `::MAX_CPUS` |
+| POSIX timers | `s_timers[8]` global estático | `Vector<PosixTimer>` + `ScopedLockIRQ s_timer_lock` |
+| FD table | `static_vector<RefPtr<FileDescription>, 1024>` (~8 KiB/task, hard cap) | `Vector<RefPtr<FileDescription>>` (heap, cresce sob demanda) + `SOFT_OPEN_FILES_LIMIT=65536` |
+| Exception recovery | `halt_forever()` em qualquer fault user-task | mata apenas a task (`kill_current_from_exception`); kernel só halts em bugs reais |
+
+### 15. 12 locais com `NotImplemented` no kernel
+
+Recontado 2026-08-03: **12 ocorrências em 7 arquivos** — a família mlock foi implementada (`mlock.cpp` com validação real) e UDP `connect`/`listen` implementados; o "47 locais" antigo estava stale. Lista exata sempre re-derivável: `rg "NotImplemented" Src/Kernel`.
 
 Cada um precisa ser implementado ou documentado como "não vai fazer".
+
+### 15. Phase 46 — Compressed Swap (ZRam/ZSwap)
+
+Resumo aqui; **design técnico completo em `.ai-docs/ROADMAP.md`**. Cadeia: swap core → zram driver → reclaim síncrono → zswap (46d deferível). **Sem swap core, zram = disco RAM** (o `CONCEPTS.md:11-13` já previa "compressão como etapa anterior ao swap"). Depende do codec da Phase 47; `NullCodec` permite começar antes.
+
+### 16. Phase 47 — Codec LZFSE (LibFK)
+
+Interface `CompressionCodec` + LZFSE **reimplementado** (não port do C da Apple) em LibFK freestanding, com testes round-trip + golden vectors vs CLI `lzfse`. Troca para LZVN (LZSS, sem entropia) em entradas <4KiB. Paralelo à 46.
+
+### 17. Phase 48 — Traits (LibFK)
+
+`void_t`/`declval` → envolver builtins crus (`vector.h:67`, `circular_buffer.h:78`) → `is_constructible`/`is_convertible` → concepts C++20. Hoje só 2 consumers produtivos de `fk::traits` (`driver_registry.cpp:52-76`).
+
+### 18. Phase 49 — Extração Kernel→LibFK
+
+Time/checksum/id-generator/free-list pequenos primeiro → `slot_map` (CSpace, fd table, posix timers). Continuação do padrão de `notes/fs-to-libfk-extraction.md`.
+
+### 19. Phase 51 — IPC Fastpath (seL4-style) — ⚠️ Parcial
+
+**51a ✅ Modelo corrigido (2026-08-04):**
+- `IpcMessage` (6×u64) em `ipc_message.h`; `pending_info`/`pending_message` em `TaskIpc`
+- `send/receive/call` chamam `schedule()` após `block_current_noqueue()`
+- `ipc_send.cpp` empacota `arg1..arg4` → `IpcMessage`; `ipc_receive.cpp` / `ipc_call.cpp` desempacotam reply em `regs->rdx/r10/r8/r9`
+- `notification.cpp` usa `pending_notification` (não `registers().rax`)
+- `switch_to_task(Task*)` adicionado ao `SchedulerManager`
+
+**51b ✅ Fastpath call/reply (2026-08-04):**
+- `task_cpu_compatible()` + `fastpath_qos_ok()` em `endpoint.cpp`
+- `call()`: bail se sinal pendente / CPU incompatível / QoS receiver > caller / `m_call_sender` ocupado → `switch_to_task(receiver)` diretamente (sem run-queue/IPI)
+- `send()` reply: bail se sinal pendente / CPU incompatível → `requeue_running_task()` + `switch_to_task(caller)`
+- `SchedulerManager::requeue_running_task()` — reenfileira task atual sem context switch
+
+| Sub-phase | Componente | Status |
+|-----------|-----------|--------|
+| 51a | Modelo corrigido | ✅ Done |
+| 51b | Fastpath call/reply | ✅ Done |
+| 51c | **Reply+recv fusion + asm** — single-pass server loop; skim dos syscalls 400-402 no `syscall_stub.asm`; PCID opcional | ⏳ Pendente |
+
+**Dependência:** 51a/51b corrigem a base para drivers userspace (Phase 40b) e FUSE userspace (Phase 40c).
 
 ---
 
@@ -244,33 +309,24 @@ Todos os arquivos de `Src/Kernel/Syscall/syscall_list/` definem agora no máximo
 
 | # | File | Types | Esforço |
 |---|------|-------|---------|
-| 1 | `task.h` | **8 top-level** + **2 nested** + **4 anonymous nested** | **3-4 dias** |
-| 2 | `boot_info.h` | 7 top-level types | 1 dia |
-| 3 | `srat.h` | 5 types | 0.5 dia |
-| 4 | `exfat_bpb.h` | 5 types | 0.5 dia |
-| 5 | `minix_super.h` | 4 types | 0.5 dia |
-| 6 | `ext2_super.h` | 4 types | 0.5 dia |
-| 7 | `nvme_utilities.h` | 4 types | 0.5 dia |
-| 8 | `nvme_command.h` | 4 types | 0.5 dia |
-| 9 | `dynamic_domain.h` | 2 top-level + 2 nested | 0.5 dia |
-| 10 | `ahci_controller.h` | 6 nested structs | 1 dia |
-| 11 | `nvme_controller.h` | 4 nested | 1 dia |
-| 12 | 40+ files com **2 types** | Helper + main class | 0.25 dia cada |
-| 13 | 30+ files com **nested types** | Vários drivers/containers | 0.25 dia cada |
+| 1 | 40+ files com **2 types** | Helper + main class | 0.25 dia cada |
+| 2 | 30+ files com **nested types** | Vários drivers/containers | 0.25 dia cada |
 
-**Total estimado**: ~15-20 dias para resolver tudo.
+**Já refatorados** (commit `fdaf30f` e branch `fix/create-directories`): `task.h`, `boot_info.h`, `dynamic_domain.h`, `nvme_utilities.h`, `srat.h`, `exfat_bpb.h`, `ahci_controller.h`, `minix_super.h`, `ext2_super.h`, `nvme_command.h` (+ layout NVMe SQE corrigido para 64 bytes); anonymous nested de `task_ipc.h`, `task_lifecycle.h`, `task_memory.h` extraídos para `TaskSignalState`/`TaskAltStack`/`TaskITimer`/`TaskMemoryRegions`; **`nvme_controller.h`** 4 nested (`Namespace`→`NvmeNamespace`, `QueuePair`→`NvmeQueuePair`, `Command`→`NvmeCommand`, `Completion`→`NvmeCompletion`) extraídos para arquivos próprios.
 
-### Empty Scaffolding — arquivos `.cpp` vazios
+### Empty Scaffolding — arquivos `.cpp` vazios ✅
 
-| # | Arquivos | Status | Esforço |
-|---|----------|--------|---------|
-| 1 | `nvme_device_configuration.cpp`, `nvme_queue_setup.cpp`, `nvme_register_mapper.cpp`, `nvme_interrupt_configurator.cpp`, `nvme_pending_operations.cpp` | Cascas vazias (`namespace fkernel {}` apenas); headers declarados usados por `test_nvme_refactoring.cpp` e `interrupt_driven_nvme.cpp` | ~1-2 dias para implementar (ou remover com ajuste do teste) |
+`nvme_device_configuration.cpp`, `nvme_queue_setup.cpp`, `nvme_register_mapper.cpp`, `nvme_interrupt_configurator.cpp`, `nvme_pending_operations.cpp` — **header-only**: todas as implementações estão inline nos `.h` correspondentes; os `.cpp` existem apenas como unidades de compilação. Nenhuma implementação adicional necessária.
 
 ### Include Order Reversed
 
-Todos os `.cpp` do Kernel colocam **Kernel headers antes de LibFK headers**. Ordem correta: `LibC → LibFK → Kernel → Local`. ~200 arquivos afetados.
+Todos os `.cpp` do Kernel colocam **Kernel headers antes de LibFK headers**. Ordem correta: `LibC → LibFK → Kernel → Local`. **320 de 462 arquivos (69%) kernel-first** — re-verificado 2026-08-03 (`rg -l` + `check_layers.lua`).
 
 **Fix**: Bulk reorder com script. (~1 dia)
+
+### Dead Code — `LibFK/Tree/rb_tree.h`
+
+`Include/LibFK/Tree/rb_tree.h` tem **zero consumers**; `map.h`/`set.h`/`multi_map.h`/`multi_set.h`/`deque.h` são `[[deprecated]]`. Reviver (p/ estruturas ordenadas futuras, ex. rota/LPM) ou remover.
 
 ### Object Calisthenics Violations
 
@@ -279,7 +335,7 @@ Todos os `.cpp` do Kernel colocam **Kernel headers antes de LibFK headers**. Ord
 | No `else` — early returns | 30+ arquivos violam | ~5 dias |
 | Max 2 instance vars | Virtualmente toda classe viola | Reforma arquitetural |
 | No getters/setters | Generalizado (VGA, VFS Node, APIC, Scheduler) | ~10 dias |
-| Files >500 linhas | 5 arquivos (ext2_fs.cpp: 752, exfat_fs.cpp: 703, VMM: 543, minix_fs: 521, syscall.cpp: 504) | ~3 dias |
+| Files >500 linhas | 5 arquivos (ext2_fs.cpp: 740, exfat_fs.cpp: 704, VMM: 601, minix_fs: 518, syscall.cpp: 512) | ~3 dias |
 | No abbreviations | 3 violações (BootInfo, MessageInfo, DmaBuffer) | 0.5 dia |
 | Lowercase class names | `class serial`, `class vga` | 0.5 dia |
 | Directory naming | `syscall_list/` → `SyscallList/` | 0.5 dia |
@@ -297,7 +353,8 @@ Todos os `.cpp` do Kernel colocam **Kernel headers antes de LibFK headers**. Ord
 | **`/proc/sys/` writable nodes** | Phase 31d, LOW |
 | **Coredumps** | Phase 31d, LOW |
 | **Userspace terminal emulator** | Phase 31e, novo programa |
-| **UDP server** | Socket bind/recvfrom para UDP |
+| **Swap em disco / zswap** | Depois da Phase 46d (zswap exige swap em disco, não-zram) |
+| **Matriz de teste em hardware real (laptop)** | Boot testado em silício após bloqueadores HIGH resolvidos |
 | **DRM/GEM** | Para GPU userspace |
 | **Audio DMA engine** | Para audio stack userspace |
 | **HCI/netlink socket** | Para wireless/Bluetooth userspace |
