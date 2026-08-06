@@ -113,7 +113,8 @@ L1 (errno ABI), L3 (signed overflow), L6 (testes órfãos) e L11 (`operator new`
 
 **⚪ BAIXO**
 
-- `Result<T>` não suporta move-only por lvalue (só `std::move`); `optional` sem `emplace`/`value_or`/`operator*`/`->`/move-assign
+- `Result<T>` não suporta move-only por lvalue (só `std::move`)
+- ~~`optional` sem `emplace`/`value_or`/`operator*`/`->`/move-assign~~: ✅ corrigido (2026-08-06): adicionados `operator*`, `operator->`, `value_or(U&&)`, `emplace(Args&&...)`, `operator=(optional&&)`, `operator bool()`; stale TODO comments removidos
 - ~~`__cxa_guard_acquire` spin com load sem acquire~~: ✅ corrigido (2026-08-06): `__atomic_load_n(guard_byte, __ATOMIC_ACQUIRE)` — acquire load correto para ARM/RISC-V; `__cxa_pure_virtual` também migrado para `__builtin_trap()`; pause inline asm marcado para Phase 42 (`arch_cpu_relax()`); `__cxa_atexit` nunca roda destructors (aceitável em kernel)
 - ~~`assert` sempre ativo (sem gate `NDEBUG`); `LibC/assert.h` nem define `assert` (só `ASSERT`/`KASSERT`)~~: ✅ corrigido (2026-08-06): `assert(expr)` adicionado com gate `#ifdef NDEBUG` → `(void)0`; `ASSERT`/`KASSERT` mantidos para código kernel
 - ~~`Spinlock::unlock` sem check de dono~~: ✅ guard adicionado (2026-08-06): `if (m_recursion_count == 0) return;` evita underflow para `0xFFFFFFFF` e lock preso; detecção de recursão por `(apic_id+1)` quebra se APIC ID = `0xFFFFFFFF` ainda pendente (saturação a slot 0 mitiga na prática)
@@ -196,7 +197,7 @@ Auditoria de regras de código em `Include/LibC`, `Include/LibFK`, `Include/Kern
 | # | Fix | Prioridade |
 |---|-----|------------|
 | 7 | **KPTI** (Meltdown mitigation) — two PML4 roots + CR3 swap on syscall entry/exit | MEDIUM |
-| 13 | Early serial fallback on COM1 | LOW |
+| ~~13~~ | ~~Early serial fallback on COM1~~ | ✅ Done — `Serial::init()` + `set_log_targets(Serial)` chamados no início de `kernel_entry()` (antes de qualquer klog) |
 
 ### 5. Phase 34d — SMP Hardening
 

@@ -18,6 +18,7 @@ int run_libfk_bitmap_unordered_set_tests();
 int run_libfk_algorithm_tests();
 int run_libfk_string_view_tests();
 int run_libfk_fixed_string_tests();
+int run_libfk_optional_tests();
 int run_libfk_byte_checksum_tests();
 int run_libfk_byte_order_tests();
 int run_libfk_crc32_tests();
@@ -66,6 +67,7 @@ int main() {
     failed += run_libfk_algorithm_tests();
     failed += run_libfk_string_view_tests();
     failed += run_libfk_fixed_string_tests();
+    failed += run_libfk_optional_tests();
     failed += run_libfk_byte_checksum_tests();
     failed += run_libfk_byte_order_tests();
     failed += run_libfk_crc32_tests();
