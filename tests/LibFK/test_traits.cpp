@@ -65,6 +65,79 @@ static const char* test_is_base_of_non_class_types() {
 }
 
 // ---------------------------------------------------------------------------
+// is_constructible / is_convertible / is_assignable families
+// ---------------------------------------------------------------------------
+
+struct NonCopyable {
+    NonCopyable() = default;
+    NonCopyable(const NonCopyable&) = delete;
+    NonCopyable& operator=(const NonCopyable&) = delete;
+    NonCopyable(NonCopyable&&) = default;
+    NonCopyable& operator=(NonCopyable&&) = default;
+};
+
+struct NonMovable {
+    NonMovable() = default;
+    NonMovable(const NonMovable&) = default;
+    NonMovable& operator=(const NonMovable&) = default;
+    NonMovable(NonMovable&&) = delete;
+    NonMovable& operator=(NonMovable&&) = delete;
+};
+
+static const char* test_is_constructible() {
+    TEST_ASSERT(is_constructible_v<int>,            "int default-constructible");
+    constexpr bool int_from_int = is_constructible_v<int, int>;
+    TEST_ASSERT(int_from_int,                       "int constructible from int");
+    constexpr bool int_from_base = is_constructible_v<int, TestBase>;
+    TEST_ASSERT(!int_from_base,                     "int not constructible from TestBase");
+    TEST_ASSERT(is_constructible_v<TestBase>,       "TestBase default-constructible");
+    return NULL;
+}
+
+static const char* test_is_default_constructible() {
+    TEST_ASSERT(is_default_constructible_v<int>,      "int default-constructible");
+    TEST_ASSERT(is_default_constructible_v<TestBase>, "TestBase default-constructible");
+    return NULL;
+}
+
+static const char* test_is_copy_constructible() {
+    TEST_ASSERT(is_copy_constructible_v<int>,           "int copy-constructible");
+    TEST_ASSERT(is_copy_constructible_v<TestBase>,      "TestBase copy-constructible");
+    TEST_ASSERT(!is_copy_constructible_v<NonCopyable>,  "NonCopyable not copy-constructible");
+    TEST_ASSERT(is_copy_constructible_v<NonMovable>,    "NonMovable is copy-constructible");
+    return NULL;
+}
+
+static const char* test_is_move_constructible() {
+    TEST_ASSERT(is_move_constructible_v<int>,          "int move-constructible");
+    TEST_ASSERT(is_move_constructible_v<NonCopyable>,  "NonCopyable move-constructible");
+    TEST_ASSERT(!is_move_constructible_v<NonMovable>,  "NonMovable not move-constructible");
+    return NULL;
+}
+
+static const char* test_is_convertible() {
+    TEST_ASSERT((is_convertible_v<int, long>),       "int converts to long");
+    TEST_ASSERT((is_convertible_v<int, float>),      "int converts to float");
+    TEST_ASSERT((!is_convertible_v<TestBase, int>),  "TestBase not convertible to int");
+    TEST_ASSERT((is_convertible_v<TestDerived*, TestBase*>), "Derived* to Base*");
+    return NULL;
+}
+
+static const char* test_is_copy_assignable() {
+    TEST_ASSERT(is_copy_assignable_v<int>,           "int copy-assignable");
+    TEST_ASSERT(!is_copy_assignable_v<NonCopyable>,  "NonCopyable not copy-assignable");
+    TEST_ASSERT(is_copy_assignable_v<NonMovable>,    "NonMovable copy-assignable");
+    return NULL;
+}
+
+static const char* test_is_move_assignable() {
+    TEST_ASSERT(is_move_assignable_v<int>,           "int move-assignable");
+    TEST_ASSERT(is_move_assignable_v<NonCopyable>,   "NonCopyable move-assignable");
+    TEST_ASSERT(!is_move_assignable_v<NonMovable>,   "NonMovable not move-assignable");
+    return NULL;
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -76,6 +149,13 @@ static struct { const char* name; const char* (*fn)(); } s_tests[] = {
     { "is_base_of: reversed",           test_is_base_of_reversed           },
     { "is_base_of: unrelated classes",  test_is_base_of_unrelated          },
     { "is_base_of: non-class types",    test_is_base_of_non_class_types    },
+    { "is_constructible",               test_is_constructible              },
+    { "is_default_constructible",       test_is_default_constructible      },
+    { "is_copy_constructible",          test_is_copy_constructible         },
+    { "is_move_constructible",          test_is_move_constructible         },
+    { "is_convertible",                 test_is_convertible                },
+    { "is_copy_assignable",             test_is_copy_assignable            },
+    { "is_move_assignable",             test_is_move_assignable            },
 };
 
 int run_libfk_traits_tests() {

@@ -287,9 +287,9 @@ Resumo aqui; **design técnico completo em `.ai-docs/ROADMAP.md`**. Cadeia: swap
 
 Interface `CompressionCodec` + LZFSE **reimplementado** (não port do C da Apple) em LibFK freestanding, com testes round-trip + golden vectors vs CLI `lzfse`. Troca para LZVN (LZSS, sem entropia) em entradas <4KiB. Paralelo à 46.
 
-### 15. Phase 48 — Traits (LibFK)
+### 15. Phase 48 — Traits (LibFK) ✅ Done (2026-08-06)
 
-`void_t`/`declval` → envolver builtins crus (`vector.h:67`, `circular_buffer.h:78`) → `is_constructible`/`is_convertible` → concepts C++20. Hoje só 2 consumers produtivos de `fk::traits` (`driver_registry.cpp:52-76`).
+`void_t`/`declval` ✅ → builtins crus encapsulados (`vector.h`, `circular_buffer.h`) ✅ → `is_constructible`/`is_convertible`/`is_assignable` + *_constructible/*_assignable families ✅ → concepts C++20 (deferred — not needed yet).
 
 ### 16. Phase 49 — Extração Kernel→LibFK
 

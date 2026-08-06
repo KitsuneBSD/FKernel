@@ -268,5 +268,56 @@ template <typename...> using void_t = void;
 // declval: produces an rvalue reference to T for use in unevaluated contexts
 template <typename T> T &&declval() noexcept;
 
+// is_constructible<T, Args...>: true if T{Args...} is well-formed
+template <typename T, typename... Args> struct is_constructible {
+  static constexpr bool value = __is_constructible(T, Args...);
+};
+template <typename T, typename... Args>
+inline constexpr bool is_constructible_v = is_constructible<T, Args...>::value;
+
+// is_default_constructible<T>: true if T{} is well-formed
+template <typename T>
+struct is_default_constructible : is_constructible<T> {};
+template <typename T>
+inline constexpr bool is_default_constructible_v = is_default_constructible<T>::value;
+
+// is_copy_constructible<T>: true if T{const T&} is well-formed
+template <typename T>
+struct is_copy_constructible : is_constructible<T, const T &> {};
+template <typename T>
+inline constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
+
+// is_move_constructible<T>: true if T{T&&} is well-formed
+template <typename T>
+struct is_move_constructible : is_constructible<T, T &&> {};
+template <typename T>
+inline constexpr bool is_move_constructible_v = is_move_constructible<T>::value;
+
+// is_convertible<From, To>: true if From implicitly converts to To
+template <typename From, typename To> struct is_convertible {
+  static constexpr bool value = __is_convertible_to(From, To);
+};
+template <typename From, typename To>
+inline constexpr bool is_convertible_v = is_convertible<From, To>::value;
+
+// is_assignable<T, U>: true if T = U is well-formed
+template <typename T, typename U> struct is_assignable {
+  static constexpr bool value = __is_assignable(T, U);
+};
+template <typename T, typename U>
+inline constexpr bool is_assignable_v = is_assignable<T, U>::value;
+
+// is_copy_assignable<T>: true if T = const T& is well-formed
+template <typename T>
+struct is_copy_assignable : is_assignable<T &, const T &> {};
+template <typename T>
+inline constexpr bool is_copy_assignable_v = is_copy_assignable<T>::value;
+
+// is_move_assignable<T>: true if T = T&& is well-formed
+template <typename T>
+struct is_move_assignable : is_assignable<T &, T &&> {};
+template <typename T>
+inline constexpr bool is_move_assignable_v = is_move_assignable<T>::value;
+
 } // namespace traits
 } // namespace fk
