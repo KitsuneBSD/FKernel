@@ -291,9 +291,9 @@ Interface `CompressionCodec` + LZFSE **reimplementado** (não port do C da Apple
 
 `void_t`/`declval` ✅ → builtins crus encapsulados (`vector.h`, `circular_buffer.h`) ✅ → `is_constructible`/`is_convertible`/`is_assignable` + *_constructible/*_assignable families ✅ → concepts C++20 (deferred — not needed yet).
 
-### 16. Phase 49 — Extração Kernel→LibFK
+### 16. Phase 49 — Extração Kernel→LibFK ⚠️ Parcial (2026-08-06)
 
-Time/checksum/id-generator/free-list pequenos primeiro → `slot_map` (CSpace, fd table, posix timers). Continuação do padrão de `notes/fs-to-libfk-extraction.md`.
+Time/checksum ✅ (já em LibFK) → free-list ✅ (`SlabFreeList` → `fk::memory::IntrusiveFreeList` em `LibFK/Memory/Allocators/intrusive_free_list.h`; shim em `slab_free_list.h`) → id-generator ✅ (`IdGenerator<T>` em `LibFK/Algorithms/Generic/id_generator.h`; `pid_generator.h` morto removido) → `slot_map` (CSpace, fd table, posix timers) — pendente.
 
 ### 17. Phase 51 — IPC Fastpath (seL4-style) — ⚠️ Parcial
 
