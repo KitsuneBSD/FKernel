@@ -113,7 +113,7 @@ L1 (errno ABI), L3 (signed overflow), L6 (testes órfãos) e L11 (`operator new`
 
 **⚪ BAIXO**
 
-- `Result<T>` não suporta move-only por lvalue (só `std::move`)
+- ~~`Result<T>` não suporta move-only por lvalue~~: ✅ corrigido (2026-08-06): `optional::take()` (move-out + reset) + `Result::take()` que chama `m_value.take()` — move-only types como `OwnPtr<T>` agora extraíveis sem template tricks
 - ~~`optional` sem `emplace`/`value_or`/`operator*`/`->`/move-assign~~: ✅ corrigido (2026-08-06): adicionados `operator*`, `operator->`, `value_or(U&&)`, `emplace(Args&&...)`, `operator=(optional&&)`, `operator bool()`; stale TODO comments removidos
 - ~~`__cxa_guard_acquire` spin com load sem acquire~~: ✅ corrigido (2026-08-06): `__atomic_load_n(guard_byte, __ATOMIC_ACQUIRE)` — acquire load correto para ARM/RISC-V; `__cxa_pure_virtual` também migrado para `__builtin_trap()`; pause inline asm marcado para Phase 42 (`arch_cpu_relax()`); `__cxa_atexit` nunca roda destructors (aceitável em kernel)
 - ~~`assert` sempre ativo (sem gate `NDEBUG`); `LibC/assert.h` nem define `assert` (só `ASSERT`/`KASSERT`)~~: ✅ corrigido (2026-08-06): `assert(expr)` adicionado com gate `#ifdef NDEBUG` → `(void)0`; `ASSERT`/`KASSERT` mantidos para código kernel

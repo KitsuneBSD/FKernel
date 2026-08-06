@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibC/stddef.h>
+#include <LibFK/Traits/type_traits.h>
 
 namespace fk {
 namespace containers {
@@ -75,7 +76,7 @@ public:
     }
 
     void clear() {
-        if (!__is_trivially_destructible(T)) {
+        if (!fk::traits::is_trivially_destructible_v<T>) {
             for (size_t i = 0; i < m_size; ++i) {
                 size_t idx = (m_tail + i) % N;
                 m_data[idx].~T();

@@ -242,5 +242,31 @@ template <typename T, typename F> struct conditional<false, T, F> { using type =
 template <bool B, typename T, typename F>
 using conditional_t = typename conditional<B, T, F>::type;
 
+// Trivially-constructible/destructible/copyable — wrap compiler builtins so
+// callers don't scatter __is_trivially_* throughout the codebase.
+template <typename T> struct is_trivially_constructible {
+  static constexpr bool value = __is_trivially_constructible(T);
+};
+template <typename T>
+inline constexpr bool is_trivially_constructible_v = is_trivially_constructible<T>::value;
+
+template <typename T> struct is_trivially_destructible {
+  static constexpr bool value = __is_trivially_destructible(T);
+};
+template <typename T>
+inline constexpr bool is_trivially_destructible_v = is_trivially_destructible<T>::value;
+
+template <typename T> struct is_trivially_copyable {
+  static constexpr bool value = __is_trivially_copyable(T);
+};
+template <typename T>
+inline constexpr bool is_trivially_copyable_v = is_trivially_copyable<T>::value;
+
+// void_t: maps any well-formed types to void — detection idiom helper
+template <typename...> using void_t = void;
+
+// declval: produces an rvalue reference to T for use in unevaluated contexts
+template <typename T> T &&declval() noexcept;
+
 } // namespace traits
 } // namespace fk

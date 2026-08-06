@@ -102,6 +102,14 @@ public:
     return *ptr();
   }
 
+  // Move the stored value out, leaving optional empty.
+  T take() {
+    if (!has_value_) __builtin_trap();
+    T val(static_cast<T &&>(*ptr()));
+    reset();
+    return val;
+  }
+
   void reset() {
     if (has_value_) {
       ptr()->~T();

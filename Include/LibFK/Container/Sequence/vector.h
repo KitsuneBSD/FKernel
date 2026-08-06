@@ -72,7 +72,7 @@ public:
   [[nodiscard]] fk::core::Result<void> push_range(const T* data, size_t count) {
     if (!data || count == 0) return {};
     TRY(ensure_capacity(m_metadata.size + count));
-    if (__is_trivially_constructible(T)) {
+    if (fk::traits::is_trivially_constructible_v<T>) {
       memcpy(m_data + m_metadata.size, data, count * sizeof(T));
       m_metadata.size += count;
     } else {

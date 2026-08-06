@@ -36,6 +36,12 @@ public:
     return m_value.value();
   }
 
+  // Move the value out of the Result (for move-only types such as OwnPtr<T>).
+  T take() {
+    if (is_error()) __builtin_trap();
+    return m_value.take();
+  }
+
   E error() const {
     if (is_ok()) __builtin_trap();
     return m_error;

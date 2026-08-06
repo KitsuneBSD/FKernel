@@ -88,6 +88,14 @@ static const char* test_arrow_operator() {
   return nullptr;
 }
 
+static const char* test_take() {
+  optional<int> o(55);
+  int v = o.take();
+  TEST_ASSERT_EQ(v, 55, "take returns value");
+  TEST_ASSERT(!o.has_value(), "take leaves optional empty");
+  return nullptr;
+}
+
 static const test_case_t s_tests[] = {
   {"default empty",     test_default_empty},
   {"construct value",   test_construct_value},
@@ -99,6 +107,7 @@ static const test_case_t s_tests[] = {
   {"emplace",           test_emplace},
   {"reset",             test_reset},
   {"arrow operator",    test_arrow_operator},
+  {"take",              test_take},
 };
 
 int run_libfk_optional_tests() {
