@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LibFK/Arch/cpu.h>
 #include <LibFK/Types/types.h>
 
 namespace fk::synchronization {
@@ -30,9 +31,7 @@ inline LockRank g_cpu_lock_ranks[FK_MAX_CPUS] = {};
 // and pre-APIC kernel paths). Saturates to slot 0 on unexpected APIC ID.
 inline uint32_t cpu_lock_slot() {
 #ifdef __fkernel__
-    uint32_t ebx;
-    asm volatile("cpuid" : "=b"(ebx) : "a"(1) : "ecx", "edx");
-    uint32_t slot = (ebx >> 24) + 1;
+    uint32_t slot = fk::arch::get_apic_id() + 1;
     return (slot < FK_MAX_CPUS) ? slot : 0;
 #else
     return 0;

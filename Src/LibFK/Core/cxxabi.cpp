@@ -1,5 +1,6 @@
 #include <LibC/stddef.h>
 #include <LibC/stdint.h>
+#include <LibFK/Arch/cpu.h>
 
 typedef void (*atexit_fn_t)();
 
@@ -43,7 +44,7 @@ extern "C" int __cxa_guard_acquire(uint64_t *guard) {
     return 1;
   // Lost the race — spin until the winner marks it done (0xFF); acquire load for ARM/RISC-V portability
   while (__atomic_load_n(guard_byte, __ATOMIC_ACQUIRE) == 1)
-    asm volatile("pause" ::: "memory"); /* L7: x86 pause hint; replace with arch_cpu_relax() in Phase 42 */
+    fk::arch::cpu_relax();
   return 0;
 }
 

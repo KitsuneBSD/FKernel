@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Arch/cpu.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Synchronization/lock_rank.h>
 #include <LibFK/Types/types.h>
@@ -34,7 +35,7 @@ public:
 
         while (__sync_lock_test_and_set(&m_lock, 1)) {
             while (m_lock) {
-                asm volatile("pause");
+                fk::arch::cpu_relax();
             }
         }
 
@@ -110,15 +111,12 @@ private:
 class ScopedLockIRQ {
 public:
     explicit ScopedLockIRQ(Spinlock& lock) : m_lock(lock) {
-        uint64_t rflags;
-        asm volatile("pushfq ; popq %0" : "=r"(rflags));
-        m_interrupt_state = (rflags & (1ULL << 9)) != 0;
-        asm volatile("cli" ::: "memory");
+        m_interrupt_state = fk::arch::save_and_disable_interrupts();
         m_lock.lock();
     }
     ~ScopedLockIRQ() {
         m_lock.unlock();
-        if (m_interrupt_state) asm volatile("sti" ::: "memory");
+        fk::arch::restore_interrupts(m_interrupt_state);
     }
 
 private:

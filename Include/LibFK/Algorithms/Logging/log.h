@@ -2,6 +2,7 @@
 
 #include <LibC/stdarg.h>
 #include <LibC/stdio.h>
+#include <LibFK/Arch/cpu.h>
 
 namespace fk {
 namespace algorithms {
@@ -51,9 +52,7 @@ inline void kfatal(const char *prefix, const char *fmt, ...) {
 
   kprintf("%s[FATAL][%s]%s: %s\n", KLOG_COLOR_RED, prefix, KLOG_COLOR_RESET, buf);
 
-  while (true) {
-    asm("cli;hlt");
-  }
+  fk::arch::cpu_halt_forever();
 }
 
 /**
