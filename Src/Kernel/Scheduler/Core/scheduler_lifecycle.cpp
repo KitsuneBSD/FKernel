@@ -159,6 +159,10 @@ void SchedulerManager::wake_task(Task* task) {
   if (target_cpu >= m_processor_count.value())
     target_cpu = 0;
 
+  fk::algorithms::ktrace("SCHEDULER", "wake_task pid=%lu -> cpu=%u level=%d quantum=%lu",
+                         task->control.identity.id.value(), target_cpu,
+                         task->control.lifecycle.mlfq_level,
+                         task->control.lifecycle.time_slice_ticks);
   {
     ScopedLock lock(m_processors[target_cpu].run_queue_lock);
     m_processors[target_cpu].run_queues[task->control.lifecycle.mlfq_level].queue.push_back(task);
@@ -242,6 +246,9 @@ void SchedulerManager::add_task(Task* task) {
   fk::algorithms::klog("SCHEDULER", "Task %lu added at MLFQ level %d", task->control.identity.id.value(), task->control.lifecycle.mlfq_level);
 
   uint32_t target_cpu = find_least_loaded_cpu(&m_processors[0], m_processor_count.value());
+  fk::algorithms::ktrace("SCHEDULER", "add_task pid=%lu: target_cpu=%u quantum=%lu",
+                         task->control.identity.id.value(), target_cpu,
+                         task->control.lifecycle.time_slice_ticks);
   if (task->control.lifecycle.cpu_affinity != 0) {
     for (uint32_t i = 0; i < 32; ++i) {
       if (task->control.lifecycle.cpu_affinity & (1ULL << i)) {
@@ -374,6 +381,8 @@ void SchedulerManager::on_tick() {
           task->control.lifecycle.cpu_time_consumed >= task->control.lifecycle.allotment_ticks) {
         ++task->control.lifecycle.mlfq_level;
         task->control.lifecycle.cpu_time_consumed = 0;
+        fk::algorithms::ktrace("SCHEDULER", "pid=%lu demoted to MLFQ level %d",
+                               task->control.identity.id.value(), task->control.lifecycle.mlfq_level);
       }
 
       task->control.lifecycle.state = TaskState::Ready;

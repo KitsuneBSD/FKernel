@@ -71,9 +71,11 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info, const IpcMessage&
       bool can_fastpath = !caller->has_pending_signals() && task_cpu_compatible(caller);
       if (can_fastpath) {
         IpcLogNode::the()->log_endpoint_operation("send_reply_fastpath", sender_id, caller_id, info.raw());
+        fk::algorithms::ktrace("IPC", "send pid=%u: fastpath reply -> caller pid=%u", sender_id, caller_id);
         fastpath_caller = caller;
       } else {
         IpcLogNode::the()->log_endpoint_operation("send_reply", sender_id, caller_id, info.raw());
+        fk::algorithms::ktrace("IPC", "send pid=%u: reply -> caller pid=%u (wake)", sender_id, caller_id);
         wake_and_unblock(*caller);
       }
 
@@ -82,11 +84,13 @@ fk::core::Result<MessageInfo> Endpoint::send(MessageInfo info, const IpcMessage&
       m_receivers.remove(receiver);
       uint32_t receiver_id = receiver->control.identity.id.value();
       IpcLogNode::the()->log_endpoint_operation("send_immediate", sender_id, receiver_id, info.raw());
+      fk::algorithms::ktrace("IPC", "send pid=%u: immediate deliver -> receiver pid=%u", sender_id, receiver_id);
       deliver_message(*current, *receiver, info, message);
       wake_and_unblock(*receiver);
 
     } else {
       IpcLogNode::the()->log_endpoint_operation("send_blocked", sender_id, 0, info.raw());
+      fk::algorithms::ktrace("IPC", "send pid=%u: blocked (no receiver)", sender_id);
       unboost_current_if_boosted();
       current->ipc().pending_info = info;
       current->ipc().pending_message = message;
@@ -187,6 +191,7 @@ fk::core::Result<MessageInfo> Endpoint::receive() {
       IpcMessage message = sender->ipc().pending_message;
 
       IpcLogNode::the()->log_endpoint_operation("receive_immediate", receiver_id, sender_id, info.raw());
+      fk::algorithms::ktrace("IPC", "receive pid=%u: immediate from sender pid=%u is_call=%d", receiver_id, sender_id, (int)is_call_sender);
       deliver_message(*sender, *current, info, message);
 
       // A call sender must stay blocked until it receives a reply; only a
@@ -197,6 +202,7 @@ fk::core::Result<MessageInfo> Endpoint::receive() {
     }
 
     IpcLogNode::the()->log_endpoint_operation("receive_blocked", receiver_id, 0, 0);
+    fk::algorithms::ktrace("IPC", "receive pid=%u: blocked (no sender)", receiver_id);
     unboost_current_if_boosted();
     m_receivers.push_back(current);
     scheduler.block_current_noqueue();

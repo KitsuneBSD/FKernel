@@ -70,6 +70,7 @@ static Slab *grow_slab(SlabCache *cache) {
   cache->total_objects += cache->objects_per_slab;
   cache->total_free += cache->objects_per_slab;
 
+  fk::algorithms::ktrace("SLAB", "grow_slab: objsize=%zu new slab @%p count=%zu", cache->object_size, slab, cache->objects_per_slab);
   return slab;
 }
 
@@ -147,6 +148,7 @@ void *SlabAllocator::allocate_locked(size_t size) {
     slab->next = nullptr;
   }
 
+  fk::algorithms::ktrace("SLAB", "allocate(%zu) -> %p (slab=%p free=%zu)", size, obj, slab, cache->total_free);
   return obj;
 }
 
@@ -217,5 +219,6 @@ bool SlabAllocator::deallocate_locked(void *ptr) {
     cache->partial_slabs = slab;
   }
 
+  fk::algorithms::ktrace("SLAB", "deallocate(%p): objsize=%zu free=%zu", ptr, cache->object_size, cache->total_free);
   return true;
 }

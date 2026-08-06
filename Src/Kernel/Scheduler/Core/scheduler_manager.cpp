@@ -70,6 +70,8 @@ Task* SchedulerManager::steal_task(fk::CpuCount stealing_cpu) {
     }
   }
   if (busiest_cpu == stealing_cpu.value()) return nullptr;
+  fk::algorithms::ktrace("SCHEDULER", "steal_task: cpu=%u stealing from cpu=%u (%zu tasks)",
+                         stealing_cpu.value(), busiest_cpu, max_tasks);
   fk::synchronization::ScopedLockIRQ lock(m_processors[busiest_cpu].run_queue_lock);
 
   for (int level = MLFQ_LEVELS - 1; level >= 0; --level) {
@@ -109,6 +111,7 @@ Task* SchedulerManager::pick_next() {
         task->control.lifecycle.time_slice_ticks = proc.run_queues[level].quantum_ticks.value();
         proc.current_task = task;
         proc.need_resched = false;
+        fk::algorithms::ktrace("SCHEDULER", "pick_next cpu=%u: pid=%lu level=%u", cpu_id, task->control.identity.id.value(), level);
         return proc.current_task;
       }
     }
@@ -118,8 +121,10 @@ Task* SchedulerManager::pick_next() {
     stolen->control.lifecycle.state = TaskState::Running;
     proc.current_task = stolen;
     proc.need_resched = false;
+    fk::algorithms::ktrace("SCHEDULER", "pick_next cpu=%u: stole pid=%lu", cpu_id, stolen->control.identity.id.value());
     return proc.current_task;
   }
+  fk::algorithms::ktrace("SCHEDULER", "pick_next cpu=%u: idle", cpu_id);
   proc.current_task = proc.idle_task;
   proc.need_resched = false;
   return proc.current_task;
@@ -184,6 +189,10 @@ void SchedulerManager::schedule() {
   Task* next_task = pick_next();
   if (next_task == prev_task)
     return;
+
+  fk::algorithms::ktrace("SCHEDULER", "schedule: switch pid=%lu -> pid=%lu",
+                         prev_task ? prev_task->control.identity.id.value() : 0,
+                         next_task->control.identity.id.value());
 
   if (prev_task && prev_task != proc.idle_task &&
       prev_task->control.lifecycle.state == TaskState::Running) {

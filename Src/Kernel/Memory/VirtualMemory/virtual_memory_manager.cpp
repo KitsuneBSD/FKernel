@@ -211,6 +211,8 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags fl
   pt->entries[pt_idx] =
       phys | static_cast<uint64_t>(flags) | static_cast<uint64_t>(PageFlags::Present);
 
+  fk::algorithms::ktrace("VMM", "map_page: %p -> %p flags=0x%lx", (void*)virt, (void*)phys, (uint64_t)flags);
+
   if (changed_parents) {
     flush_tlb();
     return;
@@ -220,7 +222,7 @@ void VirtualMemoryManager::map_page(uintptr_t virt, uintptr_t phys, PageFlags fl
 }
 
 void VirtualMemoryManager::unmap_page(uintptr_t virt) {
-  fk::algorithms::kdebug("VMM", "unmap_page(%p)", (void*)virt);
+  fk::algorithms::ktrace("VMM", "unmap_page(%p)", (void*)virt);
   if ((virt % PAGE_SIZE) != 0) {
     fk::algorithms::kwarn("VMM", "unmap_page: unaligned addr %p", (void*)virt);
     return;
@@ -295,7 +297,9 @@ uintptr_t VirtualMemoryManager::translate(uintptr_t virt) {
     return 0;
   }
 
-  return (pt->entries[pt_idx] & PHYSICAL_ADDRESS_MASK) + (virt & 0xFFF);
+  uintptr_t phys = (pt->entries[pt_idx] & PHYSICAL_ADDRESS_MASK) + (virt & 0xFFF);
+  fk::algorithms::ktrace("VMM", "translate(%p) -> %p", (void*)virt, (void*)phys);
+  return phys;
 }
 
 fk::core::Result<PageFlags, fk::core::Error> VirtualMemoryManager::get_page_flags(uintptr_t virt) {

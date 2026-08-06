@@ -42,6 +42,8 @@ Todos os bugs das auditorias anteriores foram corrigidos (Bugs 9, 10, 18–36 �
 | # | Bug | Local |
 |---|-----|-------|
 | 35 | Bridge VESA real-mode é placeholder — VBE não funciona em x86_64 (só framebuffer multiboot2) | `Arch/x86_64/Driver/Vga/real_mode_bridge.asm` |
+| ~~apic_timer_handler dead~~ | ✅ **Removida declaração morta** (2026-08-06): `apic_timer_handler` declarada mas nunca implementada — removida de `handlers.h`; APIC timer usa `timer_handler` em vetor 32 (APIC_TIMER_VECTOR=0x20) | — |
+| ~~send_eoi(vector)~~ | ✅ **`send_eoi(vector-32)` normalizado** (2026-08-06): todos os 5 handlers IRQ passavam `vector` (32+irq) em vez de `irq`; PIC usa o arg para spurious check (IRQ7/15) e slave routing (>=8) — passagem de `vector` quebrava ambos; corrigido `timer`, `keyboard`, `mouse`, `clock`, `ata_primary`, `ata_secondary` | — |
 
 ### Auditoria de Memória (2026-08-01; re-audit 2026-08-03)
 
@@ -68,9 +70,13 @@ I1–I5 e R1–R4 corrigidos + sprint de estabilidade completo (ver `.ai-docs/CH
 
 **⚪ BAIXO**
 
-- `apic_timer_handler` declarado (`handlers.h:67`) e **nunca registrado** — dead; verificar também qual fonte o `TimerManager::initialize(1000)` escolhe (PIT/HPET/APIC) e se entrega no vetor 32
-- `send_eoi(vector)` vs `send_eoi(irq)`: handlers passam vector (32+irq) para API nomeada irq — funciona **por acidente** (APIC ignora o arg; PIC usa EOI não-específico 0x20); normalizar `vector-32` no dispatch (desbloqueia o check spurious do PIC, resíduo de I1)
+- ~~`apic_timer_handler` declarado e nunca registrado~~: ✅ removida declaração morta (2026-08-06)
+- ~~`send_eoi(vector)` vs `send_eoi(irq)`~~: ✅ normalizado `vector-32` em todos os handlers (2026-08-06)
 - Phase 51c (IPC fastpath reply+recv fusion + asm skim) — ver MEDIUM 17
+
+### Bug Crítico: CoW/demand-page sem User flag (2026-08-06)
+
+**✅ CORRIGIDO (2026-08-06)**: `handle_demand_paging` e `handle_write_protection` não propagavam `PageFlags::User` para páginas mapeadas em faults de user-mode. `brk` estende `heap_break` sem adicionar `MemoryRegion` → scan de regiões falha → flags default sem `User` → página mapeada como supervisor-only → write fault infinito (500× na mesma VA) até fault storm matar init. Fix: passar `is_user_fault` a ambos os handlers; `if (is_user_fault) flags = flags | PageFlags::User`. Também `unmap_page` kdebug → ktrace (elimina 448 linhas de noise de guard pages IST).
 
 ### Recuperação de Falhas (pesquisa 2026-08-04)
 
@@ -110,9 +116,9 @@ L1 (errno ABI), L3 (signed overflow), L6 (testes órfãos) e L11 (`operator new`
 - `Result<T>` não suporta move-only por lvalue (só `std::move`); `optional` sem `emplace`/`value_or`/`operator*`/`->`/move-assign
 - `__cxa_guard_acquire` spin com load sem acquire (ok em x86 TSO, não portável p/ ARM/RISC-V); `__cxa_atexit` nunca roda destructors
 - `assert` sempre ativo (sem gate `NDEBUG`); `LibC/assert.h` nem define `assert` (só `ASSERT`/`KASSERT`)
-- `Spinlock::unlock` sem check de dono → underflow de `m_recursion_count` deixa lock preso; detecção de recursão por `(apic_id+1)` quebra se APIC ID = `0xFFFFFFFF` (cpu_id vira 0)
+- ~~`Spinlock::unlock` sem check de dono~~: ✅ guard adicionado (2026-08-06): `if (m_recursion_count == 0) return;` evita underflow para `0xFFFFFFFF` e lock preso; detecção de recursão por `(apic_id+1)` quebra se APIC ID = `0xFFFFFFFF` ainda pendente (saturação a slot 0 mitiga na prática)
 - `posix_stubs.c`: `#include <termios.h>`/`<pthread.h>` no meio do arquivo (viola include order), `pthread_create` sem errno
-- `fixed_string::assign` em overflow seta `length = N` (perde o conteúdo original); ctor `fixed_string(const char*)` não-constexpr
+- ~~`fixed_string::assign` overflow seta `length = N`~~: ✅ corrigido (2026-08-06): check-first `if (len > N) return false` sem modificar buffer; ~~ctor `fixed_string(const char*)` não-constexpr~~: ✅ constexpr adicionado
 
 **Prioridade de correção:** L1 ✅, L2 ✅, L3 ✅, L4 ✅, L5 ✅, L6 ✅, L8 ✅, L11 ✅ → **L7** (decisão de arquitetura: camada arch do LibFK — Phase 42) → L9/L10 (restante).
 

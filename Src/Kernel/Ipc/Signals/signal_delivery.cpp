@@ -44,8 +44,14 @@ void SignalDelivery::send_signal(Task* target, int signum, const siginfo_t* info
   target->resources.ipc.signals.last_info_sig = signum;
   target->resources.ipc.signals.last_info = si;
 
+  fk::algorithms::ktrace("SIGNAL", "send_signal(%d): pid=%lu state=%d pending=0x%llx",
+                         signum, target->control.identity.id.value(),
+                         (int)target->control.lifecycle.state,
+                         (unsigned long long)target->resources.ipc.signals.pending);
+
   if (target->control.lifecycle.state == TaskState::Sleeping ||
       target->control.lifecycle.state == TaskState::Blocked) {
+    fk::algorithms::ktrace("SIGNAL", "send_signal(%d): waking blocked/sleeping pid=%lu", signum, target->control.identity.id.value());
     SchedulerManager::the().wake_task(target);
   }
 

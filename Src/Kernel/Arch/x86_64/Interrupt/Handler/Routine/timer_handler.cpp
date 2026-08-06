@@ -14,5 +14,5 @@ void timer_handler([[maybe_unused]] uint8_t vector, InterruptFrame *frame) {
   Display::the().background_flush();
   SchedulerManager::the().on_tick();
 
-  HardwareInterruptManager::the().send_eoi(vector);
+  HardwareInterruptManager::the().send_eoi(static_cast<uint8_t>(vector - 32));
 }

@@ -16,22 +16,28 @@ ElfLoadOperationResult ElfLoaderCore::execute_load() {
 }
 
 ElfLoadOperationResult ElfLoaderCore::execute_load_with_base(uintptr_t load_base) {
+  fk::algorithms::ktrace("ELF", "execute_load_with_base(%p)", (void*)load_base);
+
   auto init_res = initialize_context(load_base);
   if (init_res.is_error())
     return init_res.error();
 
+  fk::algorithms::ktrace("ELF", "phase: parse_and_validate");
   auto parse_res = parse_and_validate();
   if (parse_res.is_error())
     return parse_res.error();
 
+  fk::algorithms::ktrace("ELF", "phase: handle_interpreter (has_interp=%d)", (int)m_context.has_interpreter);
   auto interp_res = handle_interpreter();
   if (interp_res.is_error())
     return interp_res.error();
 
+  fk::algorithms::ktrace("ELF", "phase: load_segments");
   auto load_res = load_segments();
   if (load_res.is_error())
     return load_res.error();
 
+  fk::algorithms::ktrace("ELF", "phase: process_dynamic");
   auto dynamic_res = process_dynamic();
   if (dynamic_res.is_error())
     return dynamic_res.error();

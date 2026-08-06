@@ -114,6 +114,7 @@ extern "C" void interrupt_dispatch(uint8_t vector,
 
   uint64_t tsc_start = irq_tsc_now();
   auto handler = InterruptController::the().get_interrupt(vector);
+  fk::algorithms::ktrace("IRQ", "dispatch vec=%u handler=%s", (unsigned)vector, handler ? "registered" : "default");
   if (handler)
     handler(vector, frame);
   else

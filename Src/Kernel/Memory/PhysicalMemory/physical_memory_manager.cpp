@@ -35,6 +35,8 @@ PhysicalZone* PhysicalMemoryManager::create_zone(uintptr_t base, size_t length, 
   // Set proximity domain using TopologyManager
   pz.proximity_domain = fkernel::acpi::TopologyManager::the().get_node_for_paddr(base);
 
+  fk::algorithms::ktrace("PHYS_MEM", "create_zone[%zu]: base=%p len=%zu type=%d node=%u",
+                         m_zone_count, (void*)base, length, (int)type, pz.proximity_domain);
   m_zone_count++;
   return &pz;
 }
@@ -72,6 +74,8 @@ void PhysicalMemoryManager::reserve_range(uintptr_t base, size_t length) {
 
   uintptr_t start = fk::utilities::align_down(base, FRAME_SIZE);
   uintptr_t end = fk::utilities::align_up(base + length, FRAME_SIZE);
+
+  fk::algorithms::ktrace("PHYS_MEM", "reserve_range: %p-%p (%zu pages)", (void*)start, (void*)end, (end - start) / FRAME_SIZE);
 
   for (uintptr_t addr = start; addr < end; addr += FRAME_SIZE) {
     PhysicalZone* pz = find_zone_for_paddr(addr);
@@ -284,6 +288,7 @@ uintptr_t PhysicalMemoryManager::alloc_page_internal(ZoneType preferred,
     if (pz->cow_refcounts) {
       pz->cow_refcounts[frame] = 1;
     }
+    fk::algorithms::ktrace("PHYS_MEM", "alloc_page -> %p (zone type=%d frame=%zd)", (void*)phys, (int)pz->zone.type(), frame);
     return phys;
   }
 
@@ -344,11 +349,13 @@ void PhysicalMemoryManager::free_page(uintptr_t phys) {
 
   if (pz->cow_refcounts && pz->cow_refcounts[frame] > 0) {
     pz->cow_refcounts[frame]--;
+    fk::algorithms::ktrace("PHYS_MEM", "free_page(%p): rc-- = %u", (void*)phys, pz->cow_refcounts[frame]);
     if (pz->cow_refcounts[frame] > 0) {
       return;
     }
   }
 
+  fk::algorithms::ktrace("PHYS_MEM", "free_page(%p): released to buddy (frame=%zu)", (void*)phys, frame);
   pz->bitmap.clear(frame);
   pz->buddy.free(reinterpret_cast<void*>(phys), MIN_ORDER);
   m_free_memory += FRAME_SIZE;
@@ -383,6 +390,7 @@ uintptr_t PhysicalMemoryManager::alloc_contiguous_internal(size_t order, ZoneTyp
       }
     }
 
+    fk::algorithms::ktrace("PHYS_MEM", "alloc_contiguous(order=%zu) -> %p (%zu pages)", order, (void*)phys, page_count);
     m_free_memory -= order_to_size(effective_order);
     return phys;
   }
@@ -454,6 +462,7 @@ void PhysicalMemoryManager::increment_refcount(uintptr_t phys) {
   size_t frame = (phys - pz->zone.base()) / FRAME_SIZE;
   if (frame >= pz->cow_frame_count) return;
   pz->cow_refcounts[frame]++;
+  fk::algorithms::ktrace("PHYS_MEM", "incref(%p) -> rc=%u", (void*)phys, pz->cow_refcounts[frame]);
 }
 
 uint16_t PhysicalMemoryManager::decrement_refcount(uintptr_t phys) {
@@ -463,6 +472,7 @@ uint16_t PhysicalMemoryManager::decrement_refcount(uintptr_t phys) {
   if (frame >= pz->cow_frame_count) return 0;
   if (pz->cow_refcounts[frame] > 0)
     pz->cow_refcounts[frame]--;
+  fk::algorithms::ktrace("PHYS_MEM", "decref(%p) -> rc=%u", (void*)phys, pz->cow_refcounts[frame]);
   return pz->cow_refcounts[frame];
 }
 

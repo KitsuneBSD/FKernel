@@ -64,6 +64,7 @@ public:
     }
 
     void unlock() {
+        if (m_recursion_count == 0) return; // unbalanced unlock guard
         uint32_t new_count = m_recursion_count - 1;
         m_recursion_count = new_count;
         if (new_count == 0) {

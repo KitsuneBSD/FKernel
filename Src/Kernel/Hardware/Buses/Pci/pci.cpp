@@ -250,6 +250,8 @@ void PciManager::check_device(uint8_t bus, uint8_t device) {
   if (vendor == 0xFFFF)
     return;
 
+  fk::algorithms::ktrace("PCI", "check_device bus=%u dev=%u vendor=%04x", bus, device, vendor);
+
   check_function(bus, device, function);
 
   uint32_t header_type_reg = read_config_dword(address, 0x0C);

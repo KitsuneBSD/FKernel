@@ -16,7 +16,7 @@ static constexpr uint64_t PF_STORM_LIMIT  = 500;  // >500 faults per 100ms → k
 
 extern "C" void print_stack_trace();
 
-static void handle_demand_paging(Task* task, uint64_t cr2, InterruptFrame*) {
+static void handle_demand_paging(Task* task, uint64_t cr2, InterruptFrame*, bool is_user_fault) {
   uintptr_t vaddr = cr2 & ~0xFFFULL;
   uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
   if (!phys) {
@@ -30,14 +30,18 @@ static void handle_demand_paging(Task* task, uint64_t cr2, InterruptFrame*) {
   fk::memory::set(page_virt, 0, PAGE_SIZE);
 
   // Single O(N) scan: derive flags and handle file-backing in one pass.
-  // Default flags used when vaddr falls outside all tracked regions.
-  // Do NOT add User unconditionally: let region.flags decide privilege level.
+  // Default flags used when vaddr falls outside all tracked regions (e.g., brk heap).
+  // User faults always get the User bit — brk extends heap_break without a MemoryRegion
+  // entry, so the region scan misses heap pages. Without User the CPU will fault on every
+  // user-mode access to the page, creating an infinite protection-fault loop.
   PageFlags flags = PageFlags::Present | PageFlags::Writable | PageFlags::ExecuteDisable;
+  if (is_user_fault) flags = flags | PageFlags::User;
   auto& regions = task->resources.memory.regions.list;
   for (size_t i = 0; i < regions.size(); ++i) {
     auto& region = regions[i];
     if (!region.contains(vaddr)) continue;
     flags = region.flags | PageFlags::Present;
+    if (is_user_fault) flags = flags | PageFlags::User;
     if (region.backing_node) {
       uint64_t file_offset = region.backing_offset + (vaddr - region.start);
       region.backing_node->read(file_offset, PAGE_SIZE, page_virt);
@@ -48,7 +52,7 @@ static void handle_demand_paging(Task* task, uint64_t cr2, InterruptFrame*) {
   VirtualMemoryManager::the().map_page(vaddr, phys, flags);
 }
 
-static void handle_write_protection(uint64_t cr2) {
+static void handle_write_protection(uint64_t cr2, bool is_user_fault) {
   uintptr_t vaddr = cr2 & ~0xFFFULL;
 
   uintptr_t phys = VirtualMemoryManager::the().translate(vaddr);
@@ -58,11 +62,13 @@ static void handle_write_protection(uint64_t cr2) {
   if (flags_res.is_error()) return;
   PageFlags current = flags_res.value();
 
+  // For user-mode write faults, always ensure the User bit. A demand-paged heap page
+  // (from brk) may have been mapped without User if no MemoryRegion covered it;
+  // without User the remap would still be supervisor-only, causing the same fault again.
+  if (is_user_fault) current = current | PageFlags::User;
+
   uint16_t refcount = PhysicalMemoryManager::the().get_refcount(phys);
 
-  // CoW break.  Never add the User bit here: if the page was a supervisor
-  // (kernel) RO page, remapping it User would be a privilege escalation (M5).
-  // Preserve the current user-ness and just make the page writable.
   if (refcount > 1) {
     uintptr_t new_phys = PhysicalMemoryManager::the().alloc_page();
     if (!new_phys) {
@@ -124,13 +130,13 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
 
     if (not_present && task->is_address_in_allowed_regions(cr2)) {
       fk::algorithms::kdebug("PF", "demand-page %p pid=%lu", (void*)cr2, task->control.identity.id.value());
-      handle_demand_paging(task, cr2, frame);
+      handle_demand_paging(task, cr2, frame, /*is_user_fault=*/true);
       return;
     }
 
     if (write_fault && !not_present && task->is_address_in_allowed_regions(cr2)) {
       fk::algorithms::kdebug("PF", "cow-fault %p pid=%lu", (void*)cr2, task->control.identity.id.value());
-      handle_write_protection(cr2);
+      handle_write_protection(cr2, /*is_user_fault=*/true);
       return;
     }
 
@@ -185,13 +191,13 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
   if (!task->is_a_kernel_task()) {
     if (not_present && kmode_access_authorized && task->is_address_in_allowed_regions(cr2)) {
       fk::algorithms::kdebug("PF", "kernel demand-page %p pid=%lu (AC)", (void*)cr2, task->control.identity.id.value());
-      handle_demand_paging(task, cr2, frame);
+      handle_demand_paging(task, cr2, frame, /*is_user_fault=*/false);
       return;
     }
 
     if (write_fault && !not_present && kmode_access_authorized && is_user_page(cr2)) {
       fk::algorithms::kdebug("PF", "kernel cow-fault %p pid=%lu (AC)", (void*)cr2, task->control.identity.id.value());
-      handle_write_protection(cr2);
+      handle_write_protection(cr2, /*is_user_fault=*/false);
       return;
     }
   }

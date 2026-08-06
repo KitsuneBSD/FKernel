@@ -5,5 +5,5 @@
 void mouse_handler(uint8_t vector, InterruptFrame* frame) {
     (void)frame;
     PS2Mouse::the().irq_handler();
-    HardwareInterruptManager::the().send_eoi(vector);
+    HardwareInterruptManager::the().send_eoi(static_cast<uint8_t>(vector - 32));
 }

@@ -17,7 +17,7 @@ template <size_t N> struct fixed_string {
   char buffer[N + 1] = {}; ///< Internal buffer (always null-terminated).
   size_t length = 0;       ///< Current string length (not counting terminator).
 
-  fixed_string(const char *s) {
+  constexpr fixed_string(const char *s) : buffer{}, length(0) {
     size_t i = 0;
     while (s[i] != '\0' && i < N) {
       buffer[i] = s[i];
@@ -54,20 +54,11 @@ template <size_t N> struct fixed_string {
    * @return True if assignment succeeded, false if string is too long.
    */
   constexpr bool assign(const char *s, size_t len) noexcept {
-    size_t i = 0;
-    while (i < len) {
-      if (i >= N) {
-        length = N;
-        buffer[N] = '\0';
-        return false;
-      }
-
+    if (len > N) return false; // check before modifying: preserve original on overflow
+    for (size_t i = 0; i < len; ++i)
       buffer[i] = s[i];
-      ++i;
-    }
-
-    length = i;
-    buffer[length] = '\0';
+    length = len;
+    buffer[len] = '\0';
     return true;
   }
 

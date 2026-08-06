@@ -105,6 +105,7 @@ bool BuddyAllocator::in_range(uintptr_t address) const {
 void BuddyAllocator::push_free_block(size_t order, uintptr_t address) {
     size_t idx = order_to_index(order);
     m_state.push(idx, address);
+    fk::algorithms::ktrace("BUDDY", "push order=%zu addr=%p", order, (void*)address);
 }
 
 uintptr_t BuddyAllocator::pop_free_block(size_t order) {
@@ -120,6 +121,7 @@ uintptr_t BuddyAllocator::pop_free_block(size_t order) {
         return 0;
     }
 
+    fk::algorithms::ktrace("BUDDY", "pop order=%zu -> %p", order, (void*)phys);
     return phys;
 }
 
@@ -150,9 +152,11 @@ void* BuddyAllocator::alloc(size_t order) {
     while (cur > order) {
         cur--;
         uintptr_t buddy = addr + order_to_size(cur);
+        fk::algorithms::ktrace("BUDDY", "alloc split: order=%zu buddy=%p", cur, (void*)buddy);
         push_free_block(cur, buddy);
     }
 
+    fk::algorithms::ktrace("BUDDY", "alloc(order=%zu) -> %p", order, (void*)addr);
     return reinterpret_cast<void*>(addr);
 }
 
@@ -190,10 +194,12 @@ void BuddyAllocator::free(void* ptr, size_t order) {
             break;
         }
 
+        fk::algorithms::ktrace("BUDDY", "free merge: order=%zu addr=%p", order + 1, (void*)(addr < buddy ? addr : buddy));
         addr = addr < buddy ? addr : buddy;
         order++;
     }
 
+    fk::algorithms::ktrace("BUDDY", "free(%p) final: push order=%zu", ptr, order);
     push_free_block(order, addr);
 }
 

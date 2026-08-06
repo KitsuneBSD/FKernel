@@ -14,7 +14,7 @@ void ata_primary_handler(uint8_t vector, InterruptFrame *frame) {
   inb(primary_base + ATA_REG_STATUS);
 
   fk::algorithms::klog("ATA", "Primary channel interrupt handled (vector 0x%x)", vector);
-  HardwareInterruptManager::the().send_eoi(vector);
+  HardwareInterruptManager::the().send_eoi(static_cast<uint8_t>(vector - 32));
 }
 
 void ata_secondary_handler(uint8_t vector, InterruptFrame *frame) {
@@ -24,5 +24,5 @@ void ata_secondary_handler(uint8_t vector, InterruptFrame *frame) {
   inb(secondary_base + ATA_REG_STATUS);
 
   fk::algorithms::klog("ATA", "Secondary channel interrupt handled (vector 0x%x)", vector);
-  HardwareInterruptManager::the().send_eoi(vector);
+  HardwareInterruptManager::the().send_eoi(static_cast<uint8_t>(vector - 32));
 }

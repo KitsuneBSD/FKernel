@@ -1,3 +1,4 @@
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 
 #include <Kernel/Fs/Vfs/Core/path_resolver.h>
@@ -59,6 +60,7 @@ PathResolver::resolve_unlocked(const char* path, fk::RefPtr<Dentry> base, int de
       continue;
     }
 
+    fk::algorithms::ktrace("VFS", "resolve: lookup '%s'", name);
     auto next_res = current->lookup(name);
     if (next_res.is_error()) return next_res.error();
     current = next_res.value();
@@ -67,6 +69,7 @@ PathResolver::resolve_unlocked(const char* path, fk::RefPtr<Dentry> base, int de
       auto link_res = current->top_node()->read_link();
       if (link_res.is_error()) return link_res.error();
       auto& link = link_res.value();
+      fk::algorithms::ktrace("VFS", "resolve: symlink '%s' -> '%s'", name, link.c_str());
       auto symlink_base = link.c_str()[0] == '/' ? nullptr : current->parent();
       auto resolved = resolve_unlocked(link.c_str(), symlink_base, depth + 1);
       if (resolved.is_error()) return resolved.error();

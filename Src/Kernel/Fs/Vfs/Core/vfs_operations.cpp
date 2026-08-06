@@ -39,6 +39,7 @@ VirtualFileSystem::open(const char* path, int flags) {
   if (dentry_res.is_ok()) {
     if (flags & O_EXCL)
       return fk::core::Error::AlreadyExists;
+    fk::algorithms::ktrace("VFS", "open(%s): found existing dentry flags=0x%x", path, flags);
     return open_existing(dentry_res.value(), flags);
   }
 
@@ -47,6 +48,7 @@ VirtualFileSystem::open(const char* path, int flags) {
     return dentry_res.error();
   }
 
+  fk::algorithms::ktrace("VFS", "open(%s): O_CREAT — creating new file", path);
   auto parent_res = resolve_path_to_parent_unlocked(path);
   if (parent_res.is_error())
     return parent_res.error();

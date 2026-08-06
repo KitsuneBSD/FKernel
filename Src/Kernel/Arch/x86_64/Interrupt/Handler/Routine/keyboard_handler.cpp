@@ -7,5 +7,5 @@
 void keyboard_handler(uint8_t vector, InterruptFrame *frame) {
   (void)frame;
   PS2Keyboard::the().irq_handler();
-  HardwareInterruptManager::the().send_eoi(vector);
+  HardwareInterruptManager::the().send_eoi(static_cast<uint8_t>(vector - 32));
 }

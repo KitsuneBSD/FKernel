@@ -15,12 +15,13 @@ enum LogTarget : uint32_t {
 };
 
 enum LogLevel : uint32_t {
-    LevelDebug = 0,
-    LevelInfo  = 1,
-    LevelWarn  = 2,
-    LevelError = 3,
-    LevelFatal = 4,
-    LevelSilent = 5
+    LevelTrace = 0,
+    LevelDebug = 1,
+    LevelInfo  = 2,
+    LevelWarn  = 3,
+    LevelError = 4,
+    LevelFatal = 5,
+    LevelSilent = 6
 };
 
 void set_log_targets(uint32_t targets);
@@ -86,6 +87,7 @@ inline void kexception(const char *prefix, const char *fmt, ...) {
  * -DFKERNEL_LOG_LEVEL=1  → +kwarn
  * -DFKERNEL_LOG_LEVEL=2  → +klog  (recommended release)
  * -DFKERNEL_LOG_LEVEL=3  → +kdebug (default debug build)
+ * -DFKERNEL_LOG_LEVEL=4  → +ktrace (verbose tracing)
  * Unset → all levels enabled (same as 3).
  */
 #ifndef FKERNEL_LOG_LEVEL
@@ -135,6 +137,21 @@ inline void klog(const char *prefix, const char *fmt, ...) {
 }
 #else
 inline void klog(const char*, const char*, ...) {}
+#endif
+
+/** Print a formatted kernel log message in cyan. No-op when FKERNEL_LOG_LEVEL < 4. */
+#if FKERNEL_LOG_LEVEL >= 4
+inline void ktrace(const char *prefix, const char *fmt, ...) {
+  if (get_log_level() > LevelTrace) return;
+  char buf[512];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  kprintf("%s[%s]%s: %s\n", KLOG_COLOR_CYAN, prefix, KLOG_COLOR_RESET, buf);
+}
+#else
+inline void ktrace(const char*, const char*, ...) {}
 #endif
 
 /** Print a formatted kernel log message in a specified ANSI color. */

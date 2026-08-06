@@ -103,6 +103,7 @@ void* MemoryManager::allocate(size_t size) {
     if (SlabAllocator::the().is_initialized() && size > 0 && size <= 2048) {
         void* ptr = SlabAllocator::the().allocate(size);
         if (ptr) {
+            fk::algorithms::ktrace("MEMORY", "allocate(%zu) -> slab %p", size, ptr);
             restore_interrupts(flags);
             return ptr;
         }
@@ -116,7 +117,7 @@ void* MemoryManager::allocate(size_t size) {
     BlockHeader* current = m_heap_head;
     while (current) {
         if (current->magic != BlockHeader::MAGIC) {
-            fk::algorithms::kfatal("MEMORY", "Kernel Heap Corruption at %p! Magic: 0x%lx Expected: 0x%lx", 
+            fk::algorithms::kfatal("MEMORY", "Kernel Heap Corruption at %p! Magic: 0x%lx Expected: 0x%lx",
                                   current, (uint64_t)current->magic, (uint64_t)BlockHeader::MAGIC);
         }
 
@@ -125,7 +126,7 @@ void* MemoryManager::allocate(size_t size) {
                 BlockHeader* new_block = reinterpret_cast<BlockHeader*>(
                     reinterpret_cast<uint8_t*>(current) + sizeof(BlockHeader) + size
                 );
-                
+
                 new_block->size = current->size - size - sizeof(BlockHeader);
                 new_block->is_free = true;
                 new_block->next = current->next;
@@ -136,10 +137,12 @@ void* MemoryManager::allocate(size_t size) {
 
                 current->size = size;
                 current->next = new_block;
+                fk::algorithms::ktrace("MEMORY", "allocate(%zu): split block @%p remainder=%zu", size, current, new_block->size);
             }
 
             current->is_free = false;
             void* ptr = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(current) + sizeof(BlockHeader));
+            fk::algorithms::ktrace("MEMORY", "allocate(%zu) -> heap %p", size, ptr);
             m_heap_lock.unlock();
             restore_interrupts(flags);
             return ptr;
@@ -168,6 +171,7 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     if (SlabAllocator::the().is_initialized() &&
         SlabAllocator::the().is_slab_allocation(ptr)) {
         void* result = SlabAllocator::the().reallocate(ptr, size);
+        fk::algorithms::ktrace("MEMORY", "reallocate(%p, %zu) -> slab %p", ptr, size, result);
         restore_interrupts(flags);
         return result;
     }
@@ -184,6 +188,7 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
 
     size_t old_size = header->size;
     if (size <= old_size) {
+        fk::algorithms::ktrace("MEMORY", "reallocate(%p, %zu): fits in existing block (old=%zu)", ptr, size, old_size);
         m_heap_lock.unlock();
         restore_interrupts(flags);
         return ptr;
@@ -194,9 +199,10 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
     void* new_ptr = allocate(size);
     if (!new_ptr) return nullptr;
 
+    fk::algorithms::ktrace("MEMORY", "reallocate(%p, %zu): moved to %p (copy %zu)", ptr, size, new_ptr, old_size);
     fk::memory::copy(new_ptr, ptr, old_size);
     free(ptr);
-    
+
     return new_ptr;
 }
 
@@ -230,6 +236,7 @@ void MemoryManager::free(void* ptr) {
     }
 
     header->is_free = true;
+    fk::algorithms::ktrace("MEMORY", "free(%p): heap block size=%zu", ptr, header->size);
 
     // Merge with next free block
     if (header->next && header->next->is_free && header->next->magic == BlockHeader::MAGIC) {
@@ -238,6 +245,7 @@ void MemoryManager::free(void* ptr) {
         header->next = next->next;
         if (header->next)
             header->next->prev = header;
+        fk::algorithms::ktrace("MEMORY", "free(%p): merged next, new size=%zu", ptr, header->size);
     }
 
     // Merge with previous free block
@@ -247,6 +255,7 @@ void MemoryManager::free(void* ptr) {
         prev->next = header->next;
         if (prev->next)
             prev->next->prev = prev;
+        fk::algorithms::ktrace("MEMORY", "free(%p): merged prev @%p, new size=%zu", ptr, prev, prev->size);
     }
 
     m_heap_lock.unlock();
