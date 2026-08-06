@@ -187,6 +187,7 @@ target("Test")
     add_files("../tests/LibFK/test_path.cpp")
     add_files("../tests/LibFK/test_time_math.cpp")
     add_files("../tests/LibFK/test_id_generator.cpp")
+    add_files("../tests/LibFK/test_slot_map.cpp")
 
     add_files("../tests/Kernel/test_file_lock.cpp")
     add_files("../tests/Kernel/test_cspace.cpp")

@@ -100,7 +100,7 @@ L1 (errno ABI), L3 (signed overflow), L6 (testes órfãos) e L11 (`operator new`
 | # | Bug | Local |
 |---|-----|-------|
 | ~~L5~~ | ✅ **`g_printf_buf` global removido** (2026-08-06): `vprintf` usa `char buf[2048]` local eliminando reentrância de IRQ. `fprintf`/`fputs`/`fputc` ignoram stream — comportamento correto em freestanding. | — |
-| L7 | **asm x86 cru dentro do LibFK** (viola a política arch_* do AGENTS.md): `cpuid`/`pause`/`pushfq`/`cli`/`sti` em `spinlock.h`, `cli;hlt` em `log.h`/`cxxabi.cpp`, `LibFK/Arch/x86_64/io.h`. LibFK não-portável; resolver com camada de callbacks arch (padrão `allocator_backend.h`) ou mover para o Kernel. **Conecta à Phase 42** | `Include/LibFK/Synchronization/spinlock.h:27,44,121-138`, `Include/LibFK/Algorithms/Logging/log.h:53-55`, `Src/LibFK/Core/cxxabi.cpp:34,50`, `Include/LibFK/Arch/x86_64/io.h` |
+| ~~L7~~ | ✅ **asm x86 extraído para camada Arch/** (2026-08-06): `Include/LibFK/Arch/x86_64/cpu_primitives.h` (pause, cpuid, cli/sti, hlt) + `Include/LibFK/Arch/cpu.h` (dispatcher: `__fkernel__` → x86_64 real; host → no-op stubs); `spinlock.h`/`lock_rank.h`/`interrupt_disabler.h`/`log.h`/`cxxabi.cpp` — todos os `asm` substituídos por chamadas `fk::arch::*`; `check-arch-asm` 0 violações; 41 suites passam. `io.h` já estava em Arch/, não precisava mover. | — |
 
 **🟡 MÉDIO**
 
@@ -121,7 +121,7 @@ L1 (errno ABI), L3 (signed overflow), L6 (testes órfãos) e L11 (`operator new`
 - ~~`posix_stubs.c`~~: ✅ corrigido (2026-08-06): includes movidos para o topo (ordem `dirent/errno/fcntl/pthread/stdlib/stat/termios/unistd`); `pthread_create` retorna `EAGAIN` diretamente (padrão POSIX — pthread não usa -1/errno)
 - ~~`fixed_string::assign` overflow seta `length = N`~~: ✅ corrigido (2026-08-06): check-first `if (len > N) return false` sem modificar buffer; ~~ctor `fixed_string(const char*)` não-constexpr~~: ✅ constexpr adicionado
 
-**Prioridade de correção:** L1 ✅, L2 ✅, L3 ✅, L4 ✅, L5 ✅, L6 ✅, L8 ✅, L11 ✅ → **L7** (decisão de arquitetura: camada arch do LibFK — Phase 42) → L9/L10 (restante).
+**Prioridade de correção:** L1 ✅, L2 ✅, L3 ✅, L4 ✅, L5 ✅, L6 ✅, L7 ✅, L8 ✅, L9 ✅, L10 ✅, L11 ✅ — todos concluídos.
 
 ### Auditoria de Conformidade AGENTS.md (2026-08-05)
 

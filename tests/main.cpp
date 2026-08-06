@@ -28,6 +28,7 @@ int run_libfk_bitmap_tests();
 int run_libfk_path_tests();
 int run_libfk_time_math_tests();
 int run_libfk_id_generator_tests();
+int run_libfk_slot_map_tests();
 
 // Kernel subsystem tests (host-side, mocked hardware)
 int run_kernel_file_lock_tests();
@@ -78,6 +79,7 @@ int main() {
     failed += run_libfk_path_tests();
     failed += run_libfk_time_math_tests();
     failed += run_libfk_id_generator_tests();
+    failed += run_libfk_slot_map_tests();
 
     // Kernel subsystem tests
     failed += run_kernel_file_lock_tests();
