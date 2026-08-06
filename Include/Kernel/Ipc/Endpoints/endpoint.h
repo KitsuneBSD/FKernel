@@ -55,6 +55,11 @@ public:
 
   fk::core::Result<MessageInfo> call(MessageInfo info, const IpcMessage& message);
 
+  // Phase 51c fastpath: reply to the current call-sender then immediately block to receive.
+  // Reduces one syscall + one context-switch per server loop iteration vs separate send+receive.
+  // Designed for single-concurrent-call-per-endpoint usage; concurrent callers not supported.
+  fk::core::Result<MessageInfo> reply_recv(MessageInfo reply_info, const IpcMessage& reply_msg);
+
   // --- Asynchronous signal/wait API (Notification-compatible) ---
 
   void signal(fk::NotificationBits bits);

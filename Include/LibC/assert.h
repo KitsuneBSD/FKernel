@@ -19,6 +19,12 @@ void __kernel_assert_fail_fmt(const char *expr, const char *file, int line,
   ((expr) ? (void)0 : __kernel_assert_fail_fmt(#expr, __FILE__, __LINE__,      \
                                                __func__, __VA_ARGS__))
 
+#ifdef NDEBUG
+#  define assert(expr) ((void)0)
+#else
+#  define assert(expr) ASSERT(expr)
+#endif
+
 #ifdef __cplusplus
 }
 #endif

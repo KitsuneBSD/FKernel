@@ -133,6 +133,7 @@ uint64_t sys_exit_group(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64
 uint64_t sys_ipc_send(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_ipc_receive(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_ipc_call(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
+uint64_t sys_ipc_reply_recv(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_cap_revoke(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_cap_transfer(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
 uint64_t sys_cap_grant(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, PtRegs*);
@@ -346,6 +347,7 @@ extern "C" void initialize_syscalls() {
   SyscallManager::the().register_syscall(SYS_IPC_SEND, sys_ipc_send);
   SyscallManager::the().register_syscall(SYS_IPC_RECEIVE, sys_ipc_receive);
   SyscallManager::the().register_syscall(SYS_IPC_CALL, sys_ipc_call);
+  SyscallManager::the().register_syscall(SYS_IPC_REPLY_RECV, sys_ipc_reply_recv);
   SyscallManager::the().register_syscall(SYS_CAP_REVOKE, sys_cap_revoke);
   SyscallManager::the().register_syscall(SYS_CAP_TRANSFER, sys_cap_transfer);
   SyscallManager::the().register_syscall(SYS_CAP_GRANT, sys_cap_grant);

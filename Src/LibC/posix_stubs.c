@@ -1,8 +1,10 @@
-#include <LibC/fcntl.h>
 #include <LibC/dirent.h>
-#include <LibC/sys/stat.h>
-#include <LibC/stdlib.h>
 #include <LibC/errno.h>
+#include <LibC/fcntl.h>
+#include <LibC/pthread.h>
+#include <LibC/stdlib.h>
+#include <LibC/sys/stat.h>
+#include <LibC/termios.h>
 #include <LibC/unistd.h>
 
 /* These are user-space POSIX stubs. The kernel uses VFS directly.
@@ -79,8 +81,6 @@ void rewinddir(DIR *dir) {
 }
 
 /* termios stubs */
-#include <LibC/termios.h>
-
 int tcgetattr(int fd, struct termios *termios_p) {
   (void)fd; (void)termios_p;
   return -1;
@@ -122,12 +122,10 @@ int cfsetospeed(struct termios *termios_p, speed_t speed) {
 }
 
 /* pthread stubs — single-threaded stub implementation */
-#include <LibC/pthread.h>
-
 static void* s_tls_slots[128] = {0};
 
 int pthread_create(pthread_t *t, const pthread_attr_t *a, void *(*fn)(void*), void *arg) {
-  (void)t; (void)a; (void)fn; (void)arg; return -1;
+  (void)t; (void)a; (void)fn; (void)arg; return EAGAIN; /* threads not supported */
 }
 int pthread_join(pthread_t t, void **r)         { (void)t; (void)r; return 0; }
 int pthread_detach(pthread_t t)                 { (void)t; return 0; }

@@ -329,6 +329,67 @@ fk::core::Result<MessageInfo> Endpoint::call(MessageInfo info, const IpcMessage&
   return current->ipc().pending_info;
 }
 
+fk::core::Result<MessageInfo> Endpoint::reply_recv(MessageInfo reply_info, const IpcMessage& reply_msg) {
+  auto& scheduler = SchedulerManager::the();
+  Task* current = scheduler.current();
+  uint32_t server_id = current->control.identity.id.value();
+  Task* fastpath_caller = nullptr;
+
+  {
+    fk::synchronization::ScopedLockIRQ lock(m_lock);
+
+    // Phase 1: deliver reply to the pending call-sender (if any)
+    if (m_call_sender != nullptr) {
+      Task* caller = m_call_sender;
+      m_call_sender = nullptr;
+      deliver_message(*current, *caller, reply_info, reply_msg);
+      IpcLogNode::the()->log_endpoint_operation("reply_recv_reply", server_id,
+          caller->control.identity.id.value(), reply_info.raw());
+      fk::algorithms::ktrace("IPC", "reply_recv pid=%u: replied to caller pid=%u",
+          server_id, caller->control.identity.id.value());
+
+      bool can_fastpath = !caller->has_pending_signals() && task_cpu_compatible(caller);
+      if (can_fastpath)
+        fastpath_caller = caller;
+      else
+        wake_and_unblock(*caller);
+    }
+
+    // Phase 2: try to receive immediately from any waiting sender
+    if (!m_senders.empty()) {
+      Task* sender = m_senders.front();
+      m_senders.remove(sender);
+      MessageInfo sender_info = sender->ipc().pending_info;
+      IpcLogNode::the()->log_endpoint_operation("reply_recv_immediate", server_id,
+          sender->control.identity.id.value(), sender_info.raw());
+      fk::algorithms::ktrace("IPC", "reply_recv pid=%u: immediate recv from pid=%u",
+          server_id, sender->control.identity.id.value());
+      deliver_message(*sender, *current, sender_info, sender->ipc().pending_message);
+      wake_and_unblock(*sender);
+      if (fastpath_caller)
+        wake_and_unblock(*fastpath_caller);
+      return current->ipc().pending_info;
+    }
+
+    // Phase 3: no immediate sender — block as receiver
+    unboost_current_if_boosted();
+    m_receivers.push_back(current);
+    scheduler.block_current_noqueue();
+  }
+
+  if (fastpath_caller) {
+    // Server is blocked in m_receivers. Direct switch to the reply recipient.
+    // Server resumes when a new sender delivers a message via receive().
+    fk::algorithms::ktrace("IPC", "reply_recv pid=%u: fastpath switch to caller pid=%u",
+        server_id, fastpath_caller->control.identity.id.value());
+    scheduler.switch_to_task(fastpath_caller);
+  } else {
+    scheduler.schedule();
+  }
+
+  return current->ipc().pending_info;
+}
+
 // --- Async API ---
 
 void Endpoint::signal(fk::NotificationBits bits) {

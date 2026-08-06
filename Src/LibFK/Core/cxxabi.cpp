@@ -28,11 +28,7 @@ int __cxa_atexit(atexit_fn_t func, void *arg, void *dso_handle) {
 }
 
 extern "C" void __cxa_pure_virtual() {
-  // This should ideally not be called in a freestanding environment.
-  // If it is, it indicates a programming error.
-  while (true) {
-    asm("cli; hlt");
-  }
+  __builtin_trap();
 }
 
 /**
@@ -45,9 +41,9 @@ extern "C" int __cxa_guard_acquire(uint64_t *guard) {
   // CAS 0→1: wins the init race, returns 1 (caller should initialize)
   if (__sync_bool_compare_and_swap(guard_byte, (uint8_t)0, (uint8_t)1))
     return 1;
-  // Lost the race — spin until the winner marks it done (0xFF)
-  while (*guard_byte == 1)
-    asm volatile("pause" ::: "memory");
+  // Lost the race — spin until the winner marks it done (0xFF); acquire load for ARM/RISC-V portability
+  while (__atomic_load_n(guard_byte, __ATOMIC_ACQUIRE) == 1)
+    asm volatile("pause" ::: "memory"); /* L7: x86 pause hint; replace with arch_cpu_relax() in Phase 42 */
   return 0;
 }
 

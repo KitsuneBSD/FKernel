@@ -11,13 +11,13 @@
 
 | Area | Status | Key Gaps |
 |------|--------|----------|
-| **Boot/Init** | ✅ Working | GRUB+Multiboot2 → SMP AP startup → scheduler |
+| **Boot/Init** | ✅ Working | GRUB+Multiboot2 → SMP AP startup → scheduler → userspace init (CoW demand-page bug fixed 2026-08-06) |
 | **Memory Mgmt** | ⚠️ Open (audit 2026-08-03) | M1–M13 ✅ (ver CHANGELOG); identidade 4 GiB × zona HIGH parcial; IOMMU stubbed |
 | **Memory Pressure** | ❌ Ausente | **sem swap, sem page cache, sem reclaim, sem OOM killer** (slab OOM = `kerror`+nullptr — **C3**, callers sem check de null) — Phase 46 |
 | **Scheduler** | ✅ Working | MLFQ + SMP work-stealing + QoS; `pick_next()` affinity O(N) (Phase 39b) |
 | **Exceptions/Interrupts** | ✅ Sprint concluído (2026-08-04) | I1–I5 + R1–R4 ✅ (ver CHANGELOG); restam BAIXO: `apic_timer_handler` dead, `send_eoi` vector−32; Phase 51c pendente |
 | **IPC (seL4)** | ✅ Rendezvous OK | Capabilities, CSpace, Notification, revocation OK; 51a/51b ✅; **Phase 51c pendente** (reply+recv fusion + asm skim) |
-| **VFS** | ✅ Working | Ext2 r/w completo (triple-indirect ✅); ext3/4, UFS, HFS+ write stubs; FAT node write ✅ (só `FileSystem::write` top-level é stub) |
+| **VFS** | ✅ Working | Ext2 r/w completo (triple-indirect ✅); ext3/4, UFS, HFS+ write stubs; FAT node write ✅ (`FileSystem::write` retorna `IsDirectory` = EISDIR — comportamento correto para diretório) |
 | **ELF Loader** | ✅ Working | ASLR, TLS, RELRO, dynamic linking |
 | **Syscalls** | ⚠️ 206 registrados | **8** `NotImplemented` em 4 arquivos (IOMMU, terminal Serial/PTY, syscall desconhecida); mlock ✅; UDP connect/listen ✅ |
 | **Networking** | ⚠️ Partial | TCP state machine + retransmit OK; UDP sendto/recvfrom/connect/listen OK (`accept`=EOPNOTSUPP, correto); sem congestion control; sem IPv6 |
@@ -27,7 +27,7 @@
 | **Security** | ⚠️ Partial | SMEP/SMAP/NX/W^X on all CPUs; ASLR via ChaCha20; **KPTI missing** (Phase 45b); IOMMU stubbed |
 | **Tests** | ⚠️ Growing | LibC/LibFK ~85% (stdiocomp + 6 suites kernel re-linkados — **L6 ✅**, 41 suites / 450 tests); kernel **17 suites / 145 tests**; Phase 43 target 75% |
 | **Docs** | ⚠️ Partial | memory-guide slab + file-backed (M10) corrigidos 2026-08-04; AGENTS.md desatualizado (`arch_cpu_idle` já existe; tabela de logging ainda diz "kerror → halt") |
-| **Code Quality** | ⚠️ Debt | task.h ✅ refatorado; ~~include order invertido~~ ✅ 315/464 corrigidos (2026-08-06); ~~xmake.lua monolítico~~ ✅ particionado; calisthenics violado; rb_tree morto |
+| **Code Quality** | ⚠️ Debt | task.h ✅ refatorado; ~~include order invertido~~ ✅ 315/464 corrigidos (2026-08-06); ~~xmake.lua monolítico~~ ✅ particionado; ~~posix_stubs.c~~ ✅ include order + pthread_create; ~~rb_tree.h~~ ✅ removido; calisthenics violado |
 
 ---
 
@@ -114,10 +114,10 @@ L1 (errno ABI), L3 (signed overflow), L6 (testes órfãos) e L11 (`operator new`
 **⚪ BAIXO**
 
 - `Result<T>` não suporta move-only por lvalue (só `std::move`); `optional` sem `emplace`/`value_or`/`operator*`/`->`/move-assign
-- `__cxa_guard_acquire` spin com load sem acquire (ok em x86 TSO, não portável p/ ARM/RISC-V); `__cxa_atexit` nunca roda destructors
-- `assert` sempre ativo (sem gate `NDEBUG`); `LibC/assert.h` nem define `assert` (só `ASSERT`/`KASSERT`)
+- ~~`__cxa_guard_acquire` spin com load sem acquire~~: ✅ corrigido (2026-08-06): `__atomic_load_n(guard_byte, __ATOMIC_ACQUIRE)` — acquire load correto para ARM/RISC-V; `__cxa_pure_virtual` também migrado para `__builtin_trap()`; pause inline asm marcado para Phase 42 (`arch_cpu_relax()`); `__cxa_atexit` nunca roda destructors (aceitável em kernel)
+- ~~`assert` sempre ativo (sem gate `NDEBUG`); `LibC/assert.h` nem define `assert` (só `ASSERT`/`KASSERT`)~~: ✅ corrigido (2026-08-06): `assert(expr)` adicionado com gate `#ifdef NDEBUG` → `(void)0`; `ASSERT`/`KASSERT` mantidos para código kernel
 - ~~`Spinlock::unlock` sem check de dono~~: ✅ guard adicionado (2026-08-06): `if (m_recursion_count == 0) return;` evita underflow para `0xFFFFFFFF` e lock preso; detecção de recursão por `(apic_id+1)` quebra se APIC ID = `0xFFFFFFFF` ainda pendente (saturação a slot 0 mitiga na prática)
-- `posix_stubs.c`: `#include <termios.h>`/`<pthread.h>` no meio do arquivo (viola include order), `pthread_create` sem errno
+- ~~`posix_stubs.c`~~: ✅ corrigido (2026-08-06): includes movidos para o topo (ordem `dirent/errno/fcntl/pthread/stdlib/stat/termios/unistd`); `pthread_create` retorna `EAGAIN` diretamente (padrão POSIX — pthread não usa -1/errno)
 - ~~`fixed_string::assign` overflow seta `length = N`~~: ✅ corrigido (2026-08-06): check-first `if (len > N) return false` sem modificar buffer; ~~ctor `fixed_string(const char*)` não-constexpr~~: ✅ constexpr adicionado
 
 **Prioridade de correção:** L1 ✅, L2 ✅, L3 ✅, L4 ✅, L5 ✅, L6 ✅, L8 ✅, L11 ✅ → **L7** (decisão de arquitetura: camada arch do LibFK — Phase 42) → L9/L10 (restante).
@@ -300,7 +300,7 @@ Time/checksum/id-generator/free-list pequenos primeiro → `slot_map` (CSpace, f
 
 | Sub-phase | Componente | Status |
 |-----------|-----------|--------|
-| 51c | **Reply+recv fusion + asm** — single-pass server loop; skim dos syscalls 400-402 no `syscall_stub.asm`; PCID opcional | ⏳ Pendente |
+| 51c | **Reply+recv fusion** — `SYS_IPC_REPLY_RECV = 408`; `Endpoint::reply_recv()` (reply to call-sender + receive next in one syscall, fastpath switch to caller); `sys_ipc_reply_recv.cpp` registrado | ✅ Done (2026-08-06) |
 
 **Dependência:** 51a/51b corrigem a base para drivers userspace (Phase 40b) e FUSE userspace (Phase 40c).
 
@@ -335,9 +335,9 @@ Já refatorados: `task.h`, `boot_info.h`, `dynamic_domain.h`, `nvme_controller.h
 
 ✅ **Particionado em xmake/ (2026-08-06)**: `xmake.lua` (379→40 linhas) agora só tem rules/policies/toolchain + `includes()` para 3 arquivos; `xmake/options.lua` (configuração: initrd_mode); `xmake/targets.lua` (FKernel/LibC_Testing/Test); `xmake/tasks.lua` (check-*/setup-hda/build-initrd/analyze); `xmake` + `xmake run Test` passando limpo.
 
-### Dead Code — `LibFK/Tree/rb_tree.h`
+### ~~Dead Code — `LibFK/Tree/rb_tree.h`~~
 
-`Include/LibFK/Tree/rb_tree.h` tem **zero consumers**; `map.h`/`set.h`/`multi_map.h`/`multi_set.h`/`deque.h` são `[[deprecated]]`. Reviver (p/ estruturas ordenadas futuras, ex. rota/LPM) ou remover.
+✅ Removido (2026-08-06): `Include/LibFK/Tree/rb_tree.h` e diretório `Tree/` deletados — zero consumers confirmados. `map.h`/`set.h`/`multi_map.h`/`multi_set.h`/`deque.h` ainda presentes como `[[deprecated]]`; serão removidos quando HashMap substituir todos os call sites.
 
 ### Object Calisthenics Violations
 
