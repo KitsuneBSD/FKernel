@@ -2,6 +2,7 @@
 #include <LibFK/Utilities/memory.h>
 
 #include <Kernel/Driver/Terminal/terminal_manager.h>
+#include <Kernel/Driver/Terminal/serial_terminal.h>
 #include <Kernel/Driver/Terminal/vga_terminal.h>
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
@@ -45,12 +46,20 @@ TerminalManager::create_terminal(TerminalType type, const char *name_hint) {
     return id;
   }
 
-  case TerminalType::Serial:
-    // TODO: Implement serial terminals
-    return fk::core::Error::NotImplemented;
+  case TerminalType::Serial: {
+    const char* cfg = name_hint ? name_hint : "com1";
+    auto terminal = fk::make_owned<SerialTerminal>(cfg);
+    if (!terminal)
+        return fk::core::Error::OutOfMemory;
+    auto* ptr = terminal.get();
+    fkernel::DriverManager::the().register_device(fk::RefPtr<Node>(ptr));
+    TRY(m_serial_terminals.push_back(fk::types::move(terminal)));
+    fk::algorithms::klog("TERMINAL_MANAGER", "Created serial terminal %s", cfg);
+    return id;
+  }
 
   case TerminalType::PTY:
-    // TODO: Implement pseudo-terminals
+    // TODO: Implement pseudo-terminals (requires PTY master/slave pair)
     return fk::core::Error::NotImplemented;
   }
 
@@ -89,7 +98,21 @@ TerminalManager::delete_terminal(TerminalId id) {
     }
   }
 
-  // TODO: Handle other terminal types when implemented
+  // Remove serial terminal by sequential order (id - vga_count - 1)
+  size_t serial_idx = id.value() - 1 - m_vga_terminals.size();
+  if (serial_idx < m_serial_terminals.size()) {
+      fkernel::DriverManager::the().unregister_device(
+          fk::RefPtr<Node>(m_serial_terminals[serial_idx].get()));
+      if (serial_idx < m_serial_terminals.size() - 1) {
+          auto tmp = fk::types::move(m_serial_terminals[serial_idx]);
+          m_serial_terminals[serial_idx] =
+              fk::types::move(m_serial_terminals[m_serial_terminals.size() - 1]);
+          m_serial_terminals[m_serial_terminals.size() - 1] = fk::types::move(tmp);
+      }
+      m_serial_terminals.pop_back();
+      fk::algorithms::klog("TERMINAL_MANAGER", "Deleted serial terminal");
+      return {};
+  }
   return fk::core::Error::NotFound;
 }
 
@@ -100,7 +123,10 @@ fk::memory::optional<Terminal *> TerminalManager::find_terminal(TerminalId id) {
     return vga_term.value();
   }
 
-  // TODO: Check other terminal types when implemented
+  // Check serial terminals
+  size_t serial_idx = id.value() - 1 - m_vga_terminals.size();
+  if (serial_idx < m_serial_terminals.size())
+      return m_serial_terminals[serial_idx].get();
   return {};
 }
 

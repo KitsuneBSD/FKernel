@@ -1,4 +1,5 @@
 #include <Kernel/Driver/Terminal/terminal_factory.h>
+#include <Kernel/Driver/Terminal/serial_terminal.h>
 
 namespace fkernel {
 namespace terminal {
@@ -12,9 +13,10 @@ fk::core::Result<fk::memory::OwnPtr<VGATerminal>, fk::core::Error> TerminalFacto
 }
 
 fk::core::Result<fk::memory::OwnPtr<Terminal>, fk::core::Error> TerminalFactory::create_serial_terminal(const char* port_config) {
-    [[maybe_unused]] const char* config = port_config;
-    // TODO: Implement serial terminal creation
-    return fk::core::Error::NotImplemented;
+    auto terminal = fk::make_owned<SerialTerminal>(port_config);
+    if (!terminal)
+        return fk::core::Error::OutOfMemory;
+    return fk::memory::OwnPtr<Terminal>(terminal.leak_ptr());
 }
 
 fk::core::Result<fk::memory::OwnPtr<Terminal>, fk::core::Error> TerminalFactory::create_pty_terminal() {

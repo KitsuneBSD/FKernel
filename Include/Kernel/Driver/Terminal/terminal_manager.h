@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Kernel/Driver/Terminal/terminal_type.h"
+#include "Kernel/Driver/Terminal/serial_terminal.h"
 #include "Kernel/Driver/Terminal/vga_terminal.h"
 #include "Kernel/Driver/Terminal/terminal_id.h"
 #include <LibFK/Memory/Pointers/own_ptr.h>
@@ -53,7 +54,8 @@ private:
 
     bool m_is_initialized{false};
     TerminalId m_next_id{1};
-    fk::containers::Vector<fk::OwnPtr<VGATerminal>> m_vga_terminals;
+    fk::containers::Vector<fk::OwnPtr<VGATerminal>>    m_vga_terminals;
+    fk::containers::Vector<fk::OwnPtr<SerialTerminal>> m_serial_terminals;
     int m_active_terminal_index{0};
 
     // Non-copyable, non-movable
