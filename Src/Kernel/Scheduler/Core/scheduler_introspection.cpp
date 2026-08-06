@@ -40,10 +40,8 @@ fk::RefPtr<Task> SchedulerManager::find_task(fk::ProcessId id) {
   if (!id.is_valid()) return nullptr;
   fk::synchronization::ScopedLockIRQ lock(m_task_registry_lock);
   auto entry = m_task_registry.get(id);
-  if (!entry.has_value() || !entry.value()) {
-    fk::algorithms::kdebug("SCHEDULER", "find_task: PID %lu not found", id.value());
+  if (!entry.has_value() || !entry.value())
     return nullptr;
-  }
   // Construct RefPtr (calls task->ref()) while holding the registry lock so the
   // task cannot be reaped between pointer extraction and ref-count increment.
   return fk::RefPtr<Task>(entry.value());

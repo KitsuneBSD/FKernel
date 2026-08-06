@@ -36,9 +36,7 @@ void AutoMounter::try_mount(fk::RefPtr<StorageDevice> device) {
     
     // Ensure mount directory exists
     auto mkdir_res = fkernel::VirtualFileSystem::the().mkdir("/mnt", 0755);
-    if (mkdir_res.is_error() && mkdir_res.error() != fk::core::Error::PermissionDenied) {
-        // If it's not a "PermissionDenied" (which TmpFs uses for AlreadyExists),
-        // we might have a real issue. But let's try to proceed anyway if /mnt exists.
+    if (mkdir_res.is_error() && mkdir_res.error() != fk::core::Error::AlreadyExists) {
         fk::algorithms::kwarn("AUTO_MOUNT", "mkdir /mnt failed: %d", (int)mkdir_res.error());
     }
 

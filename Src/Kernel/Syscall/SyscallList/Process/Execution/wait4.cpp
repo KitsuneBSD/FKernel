@@ -20,14 +20,15 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
 
   while (true) {
     fk::RefPtr<Task> task;
+    fk::RefPtr<Task> found; // cached find_task result for specific-PID case
+
     if (pid.is_any()) {
       task = SchedulerManager::the().find_terminated_child(current_task->control.identity.id);
     } else {
-      task = SchedulerManager::the().find_task(pid);
-      if (task && (!task->control.lifecycle.terminated ||
-                   task->control.identity.ppid != current_task->control.identity.id)) {
-        task = nullptr;
-      }
+      found = SchedulerManager::the().find_task(pid);
+      if (found && found->control.lifecycle.terminated &&
+          found->control.identity.ppid == current_task->control.identity.id)
+        task = found;
     }
 
     if (task) {
@@ -57,8 +58,7 @@ uint64_t sys_wait4(uint64_t pid_val, uint64_t status_ptr, uint64_t options,
     if (pid.is_any()) {
       has_children = !!SchedulerManager::the().find_any_child(current_task->control.identity.id);
     } else {
-      auto t = SchedulerManager::the().find_task(pid);
-      has_children = (t && t->control.identity.ppid == current_task->control.identity.id);
+      has_children = (found && found->control.identity.ppid == current_task->control.identity.id);
     }
 
     if (!has_children) {

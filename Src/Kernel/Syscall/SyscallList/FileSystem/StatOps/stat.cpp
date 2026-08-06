@@ -25,10 +25,9 @@ uint64_t sys_stat(uint64_t path_ptr, uint64_t statbuf_ptr, uint64_t, uint64_t,
     return fkernel::return_error(fk::core::Error::PermissionDenied);
 
   char path[512];
-  auto path_copy = fkernel::memory::copy_from_user(path, reinterpret_cast<const void*>(path_ptr), sizeof(path));
+  auto path_copy = fkernel::memory::copy_string_from_user(path, reinterpret_cast<const void*>(path_ptr), sizeof(path));
   if (path_copy.is_error())
     return -14;
-  path[sizeof(path) - 1] = '\0';
 
   struct stat kbuf;
   fk::memory::set(&kbuf, 0, sizeof(kbuf));

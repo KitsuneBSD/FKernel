@@ -59,7 +59,7 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> TmpFsDirectoryNode::lookup(c
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
 TmpFsDirectoryNode::create_child(const char* name, [[maybe_unused]] int mode) {
   if (m_children.find_by_name(name))
-    return fk::core::Error::PermissionDenied;
+    return fk::core::Error::AlreadyExists;
 
   auto result = fk::make_ref<TmpFsNode>().value();
   if (!result)
@@ -78,7 +78,7 @@ TmpFsDirectoryNode::create_child(const char* name, [[maybe_unused]] int mode) {
 fk::core::Result<fk::RefPtr<Node>, fk::core::Error>
 TmpFsDirectoryNode::mkdir(const char* name, [[maybe_unused]] int mode) {
   if (m_children.find_by_name(name))
-    return fk::core::Error::PermissionDenied;
+    return fk::core::Error::AlreadyExists;
 
   auto result = fk::make_ref<TmpFsDirectoryNode>().value();
   if (!result)
@@ -147,7 +147,7 @@ fk::core::Result<void, fk::core::Error> TmpFsDirectoryNode::unlink(const char* n
 fk::core::Result<void, fk::core::Error> TmpFsDirectoryNode::link(const char* name,
                                                                  const char* target) {
   if (m_children.find_by_name(name))
-    return fk::core::Error::PermissionDenied;
+    return fk::core::Error::AlreadyExists;
 
   auto target_node = m_children.find_by_name(target);
   if (!target_node)
@@ -164,7 +164,7 @@ fk::core::Result<void, fk::core::Error> TmpFsDirectoryNode::rename(const char* o
     return fk::core::Error::NotFound;
 
   if (m_children.find_by_name(new_name))
-    return fk::core::Error::PermissionDenied;
+    return fk::core::Error::AlreadyExists;
 
   m_children.remove_by_name(old_name);
   node->set_name(new_name);

@@ -19,10 +19,9 @@ uint64_t sys_mkdir(uint64_t path_ptr, uint64_t mode, uint64_t, uint64_t, uint64_
     return -static_cast<int>(fk::core::Error::InvalidParameter);
 
   char kpath[512];
-  auto copy_res = fkernel::memory::copy_from_user(kpath, reinterpret_cast<const void*>(path_ptr), sizeof(kpath));
+  auto copy_res = fkernel::memory::copy_string_from_user(kpath, reinterpret_cast<const void*>(path_ptr), sizeof(kpath));
   if (copy_res.is_error())
     return -14;
-  kpath[sizeof(kpath) - 1] = '\0';
 
   const char* path = kpath;
 

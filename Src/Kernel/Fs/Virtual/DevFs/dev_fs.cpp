@@ -22,7 +22,7 @@ fk::core::Result<void, fk::core::Error> DevFs::register_device(fk::RefPtr<Node> 
     fk::synchronization::ScopedLockIRQ lock(m_lock);
     size_t idx = fk::algorithms::find_if(m_devices.begin(), m_devices.size(),
         [&name](const auto& e) { return e.name == name; });
-    if (idx != m_devices.size()) return fk::core::Error::PermissionDenied;
+    if (idx != m_devices.size()) return fk::core::Error::AlreadyExists;
 
     TRY(m_devices.push_back({name, node}));
     fk::algorithms::klog("DEVFS", "Registered device: /dev/%s", name);

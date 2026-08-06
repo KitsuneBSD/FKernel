@@ -57,5 +57,49 @@ fk::core::Result<void, fk::core::Error> copy_to_user(void* user_dst, const void*
     return {};
 }
 
+fk::core::Result<size_t, fk::core::Error> copy_string_from_user(char* dst, const void* user_src, size_t max_len) {
+    if (!user_src || !dst || max_len == 0)
+        return fk::core::Error::InvalidParameter;
+
+    uintptr_t addr = reinterpret_cast<uintptr_t>(user_src);
+    if (!is_user_address(addr, 1))
+        return fk::core::Error::InvalidParameter;
+
+    Task* task = SchedulerManager::the().current();
+    if (!task)
+        return fk::core::Error::InvalidParameter;
+
+    const char* src = static_cast<const char*>(user_src);
+    size_t copied = 0;
+
+    stac_if_smap();
+    while (copied < max_len - 1) {
+        // Check accessibility at each page boundary.
+        uintptr_t page = (addr + copied) & ~static_cast<uintptr_t>(0xFFF);
+        if (!task->is_address_in_allowed_regions(page)) {
+            clac_if_smap();
+            return fk::core::Error::Fault;
+        }
+
+        // Copy up to end of this page or max_len, whichever is sooner.
+        size_t page_offset = (addr + copied) & 0xFFF;
+        size_t bytes_in_page = PAGE_SIZE - page_offset;
+        size_t limit = bytes_in_page < (max_len - 1 - copied) ? bytes_in_page : (max_len - 1 - copied);
+
+        for (size_t i = 0; i < limit; ++i) {
+            char c = src[copied + i];
+            dst[copied + i] = c;
+            if (c == '\0') {
+                clac_if_smap();
+                return copied + i;
+            }
+        }
+        copied += limit;
+    }
+    clac_if_smap();
+    dst[max_len - 1] = '\0';
+    return max_len - 1;
+}
+
 } // namespace memory
 } // namespace fkernel
