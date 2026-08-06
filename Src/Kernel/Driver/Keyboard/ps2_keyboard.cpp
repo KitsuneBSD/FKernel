@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Keyboard/ps2_keyboard.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
@@ -6,7 +8,6 @@
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Keyboard/keymap_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 fk::core::Result<size_t, fk::core::Error> PS2Keyboard::read([[maybe_unused]] uint64_t offset, [[maybe_unused]] size_t size, [[maybe_unused]] uint8_t* out_buffer) {
     return fk::core::Error::PermissionDenied;

@@ -1,6 +1,7 @@
-#include <Kernel/Fs/Vfs/Mount/fstab.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/error.h>
+
+#include <Kernel/Fs/Vfs/Mount/fstab.h>
 
 namespace fkernel {
 namespace fs {
@@ -60,7 +61,7 @@ Fstab::parse(const char* content) {
         if (*p == '\n') p++;
 
         if (!entry.device.is_empty() && !entry.mountpoint.is_empty())
-            entries.push_back(entry);
+            TRY(entries.push_back(entry));
     }
 
     return entries;

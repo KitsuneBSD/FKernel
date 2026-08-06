@@ -1,12 +1,13 @@
-#include <Kernel/Net/Sockets/udp_socket.h>
-#include <Kernel/Net/Udp/udp_header.h>
-#include <Kernel/Net/Ip/ipv4_header.h>
-#include <Kernel/Net/Core/network_stack.h>
 #include <LibFK/Algorithms/Generic/container_algorithms.h>
 #include <LibFK/Algorithms/Crypto/internet_checksum.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Net/Sockets/udp_socket.h>
+#include <Kernel/Net/Udp/udp_header.h>
+#include <Kernel/Net/Ip/ipv4_header.h>
+#include <Kernel/Net/Core/network_stack.h>
 
 namespace fkernel {
 namespace net {
@@ -250,8 +251,8 @@ void UdpSocket::on_receive(IPv4Address src, uint16_t src_port,
     UdpRecvEntry entry;
     entry.src_ip   = src.value;
     entry.src_port = src_port;
-    entry.data.push_range(data, len);
-    m_recv_queue.push_back(fk::types::move(entry));
+    TRY_OR_FATAL(entry.data.push_range(data, len));
+    TRY_OR_FATAL(m_recv_queue.push_back(fk::types::move(entry)));
 }
 
 } // namespace net

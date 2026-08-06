@@ -133,7 +133,7 @@ Earlier FKernel versions used a **port** abstraction (similar to L4) for message
 | `sys_cap_grant(pid, local_handle, rights)` | Copy capability to another process's CSpace |
 | `sys_cap_revoke(handle)` | Increment revoke counter on kernel object |
 
-Total syscall count: **207**.
+Total syscall count: **206**.
 
 ### Endpoint
 

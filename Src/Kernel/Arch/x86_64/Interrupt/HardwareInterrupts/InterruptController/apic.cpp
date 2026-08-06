@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
@@ -6,7 +8,6 @@
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Buses/Pci/pci_device.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 APIC* g_apic_ptr = nullptr;
 

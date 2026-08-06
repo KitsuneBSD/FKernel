@@ -1,11 +1,12 @@
-#include <Kernel/Driver/Storage/Controllers/Ahci/ahci_controller.h>
-#include <Kernel/Memory/memory_manager.h>
-#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Storage/Controllers/Ahci/ahci_controller.h>
+#include <Kernel/Memory/memory_manager.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Hardware/Buses/Pci/pci.h>
 
 namespace fkernel {
 
@@ -93,28 +94,22 @@ fk::core::Result<void, fk::core::Error> AHCIController::initialize_controller() 
     for (auto& port : m_ports) {
         if (!port.is_implemented) continue;
 
-        auto clb_result = dma_alloc_buffer(1024);
-        auto fb_result = dma_alloc_buffer(256);
-        auto ct_result = dma_alloc_buffer(256 * 32);
-
-        if (clb_result.is_error() || fb_result.is_error() || ct_result.is_error()) {
+        if (port.cmd_list.allocate(1024).is_error() ||
+            port.fis_buffer.allocate(256).is_error() ||
+            port.cmd_tables.allocate(256 * 32).is_error()) {
             fk::algorithms::kwarn("AHCI", "Failed to allocate DMA memory for port");
             return fk::core::Error::OutOfMemory;
         }
 
-        port.cmd_list = clb_result.value();
-        port.fis_buffer = fb_result.value();
-        port.cmd_tables = ct_result.value();
-
-        port.regs->clb = (uint32_t)port.cmd_list.phys;
-        port.regs->clbu = (uint32_t)(port.cmd_list.phys >> 32);
-        port.regs->fb = (uint32_t)port.fis_buffer.phys;
-        port.regs->fbu = (uint32_t)(port.fis_buffer.phys >> 32);
+        port.regs->clb = (uint32_t)port.cmd_list.physical_address().as_uintptr();
+        port.regs->clbu = (uint32_t)(port.cmd_list.physical_address().as_uintptr() >> 32);
+        port.regs->fb = (uint32_t)port.fis_buffer.physical_address().as_uintptr();
+        port.regs->fbu = (uint32_t)(port.fis_buffer.physical_address().as_uintptr() >> 32);
 
         // Initialize Command Headers
-        HBA_CMD_HEADER* cmd_headers = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.vaddr);
+        HBA_CMD_HEADER* cmd_headers = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.virtual_address());
         for (int i = 0; i < 32; i++) {
-            uintptr_t ct_phys = port.cmd_tables.phys + (i * 256);
+            uintptr_t ct_phys = port.cmd_tables.physical_address().as_uintptr() + (i * 256);
             cmd_headers[i].ctba = (uint32_t)ct_phys;
             cmd_headers[i].ctbau = (uint32_t)(ct_phys >> 32);
             cmd_headers[i].prdtl = 8; // 8 entries
@@ -177,7 +172,7 @@ void AHCIController::scan_ports() {
             continue; // Port not implemented
         }
         
-        Port port;
+        AhciPort port;
         port.index = i;
         port.is_implemented = true;
         port.has_device = false;
@@ -206,7 +201,7 @@ void AHCIController::scan_ports() {
                                  i, device_type, port.sig);
             
             if (port.sig == 0x00000101) {
-                m_ports.push_back(port);
+                TRY_OR_FATAL(m_ports.push_back(port));
                 uint32_t new_idx = m_ports.size() - 1;
                 m_ports[new_idx].sectors = 1024 * 1024 * 2; // 1GB fallback
                 auto sec_res = identify_port(new_idx);
@@ -216,26 +211,26 @@ void AHCIController::scan_ports() {
             }
         }
         
-        m_ports.push_back(port);
+        TRY_OR_FATAL(m_ports.push_back(port));
     }
 }
 
 fk::core::Result<uint64_t, fk::core::Error> AHCIController::identify_port(uint32_t port_idx) {
-    Port& port = m_ports[port_idx];
+    AhciPort& port = m_ports[port_idx];
     int slot = find_cmd_slot(port_idx);
     if (slot == -1) return fk::core::Error::DeviceError;
 
     static uint16_t identify_buf[256];
     fk::memory::set(identify_buf, 0, sizeof(identify_buf));
 
-    HBA_CMD_HEADER* cmd_header = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.vaddr);
+    HBA_CMD_HEADER* cmd_header = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.virtual_address());
     cmd_header += slot;
     cmd_header->cfl = sizeof(FIS_REG_H2D) / sizeof(uint32_t);
     cmd_header->w = 0;
     cmd_header->prdtl = 1;
 
     HBA_CMD_TABLE* cmd_table = reinterpret_cast<HBA_CMD_TABLE*>(
-        static_cast<uint8_t*>(port.cmd_tables.vaddr) + slot * 256);
+        static_cast<uint8_t*>(port.cmd_tables.virtual_address()) + slot * 256);
     fk::memory::set(cmd_table, 0, sizeof(HBA_CMD_TABLE));
 
     cmd_table->prdt_entry[0].dba  = (uint32_t)VirtualMemoryManager::the().translate((uintptr_t)identify_buf);
@@ -290,7 +285,7 @@ fk::core::Result<void, fk::core::Error> AHCIController::read_port(uint32_t port_
         fk::algorithms::kwarn("AHCI", "read_port: invalid port %u", port_idx);
         return fk::core::Error::InvalidParameter;
     }
-    Port& port = m_ports[port_idx];
+    AhciPort& port = m_ports[port_idx];
 
     port.regs->is = 0xFFFFFFFF; // Clear interrupts
     int slot = find_cmd_slot(port_idx);
@@ -299,14 +294,14 @@ fk::core::Result<void, fk::core::Error> AHCIController::read_port(uint32_t port_
         return fk::core::Error::DeviceError;
     }
 
-    HBA_CMD_HEADER* cmd_header = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.vaddr);
+    HBA_CMD_HEADER* cmd_header = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.virtual_address());
     cmd_header += slot;
     cmd_header->cfl = sizeof(FIS_REG_H2D) / sizeof(uint32_t);
     cmd_header->w = 0; // Read
     cmd_header->prdtl = 1;
 
     HBA_CMD_TABLE* cmd_table = reinterpret_cast<HBA_CMD_TABLE*>(
-        static_cast<uint8_t*>(port.cmd_tables.vaddr) + slot * 256);
+        static_cast<uint8_t*>(port.cmd_tables.virtual_address()) + slot * 256);
     fk::memory::set(cmd_table, 0, sizeof(HBA_CMD_TABLE) + (cmd_header->prdtl - 1) * sizeof(HBA_PRDT_ENTRY));
 
     cmd_table->prdt_entry[0].dba = (uint32_t)VirtualMemoryManager::the().translate((uintptr_t)buffer);
@@ -354,7 +349,7 @@ fk::core::Result<void, fk::core::Error> AHCIController::write_port(uint32_t port
         fk::algorithms::kwarn("AHCI", "write_port: invalid port %u", port_idx);
         return fk::core::Error::InvalidParameter;
     }
-    Port& port = m_ports[port_idx];
+    AhciPort& port = m_ports[port_idx];
 
     port.regs->is = 0xFFFFFFFF;
     int slot = find_cmd_slot(port_idx);
@@ -363,14 +358,14 @@ fk::core::Result<void, fk::core::Error> AHCIController::write_port(uint32_t port
         return fk::core::Error::DeviceError;
     }
 
-    HBA_CMD_HEADER* cmd_header = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.vaddr);
+    HBA_CMD_HEADER* cmd_header = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.virtual_address());
     cmd_header += slot;
     cmd_header->cfl = sizeof(FIS_REG_H2D) / sizeof(uint32_t);
     cmd_header->w = 1; // Write
     cmd_header->prdtl = 1;
 
     HBA_CMD_TABLE* cmd_table = reinterpret_cast<HBA_CMD_TABLE*>(
-        static_cast<uint8_t*>(port.cmd_tables.vaddr) + slot * 256);
+        static_cast<uint8_t*>(port.cmd_tables.virtual_address()) + slot * 256);
     fk::memory::set(cmd_table, 0, sizeof(HBA_CMD_TABLE) + (cmd_header->prdtl - 1) * sizeof(HBA_PRDT_ENTRY));
 
     cmd_table->prdt_entry[0].dba = (uint32_t)VirtualMemoryManager::the().translate((uintptr_t)buffer);

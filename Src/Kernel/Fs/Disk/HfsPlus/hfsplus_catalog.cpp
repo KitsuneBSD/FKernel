@@ -1,6 +1,7 @@
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_catalog.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
+
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_catalog.h>
 
 namespace fkernel {
 

@@ -1,5 +1,6 @@
-#include <Kernel/Clock/ClockController/cmos.h>
 #include <LibFK/Utilities/converter.h>
+
+#include <Kernel/Clock/ClockController/cmos.h>
 
 uint8_t CMOSClock::read_register(uint8_t reg) {
   outb(CMOS_ADDRESS_PORT, (inb(CMOS_ADDRESS_PORT) & 0x80) | reg);

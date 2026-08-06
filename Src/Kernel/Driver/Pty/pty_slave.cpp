@@ -1,5 +1,6 @@
-#include <Kernel/Driver/Pty/pty_slave.h>
 #include <LibFK/Text/string.h>
+
+#include <Kernel/Driver/Pty/pty_slave.h>
 
 namespace fkernel {
 

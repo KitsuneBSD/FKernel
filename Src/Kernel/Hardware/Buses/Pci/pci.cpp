@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Hardware/Firmware/Acpi/mcfg.h>
@@ -5,8 +8,6 @@
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/Generic/container_algorithms.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 void PciManager::initialize() {
   detect_legacy_ports();
@@ -191,7 +192,7 @@ uint8_t PciDevice::find_capability(uint8_t cap_id) const {
 
 void PciManager::register_driver(uint8_t class_code, uint8_t subclass, DriverFactory factory) {
   fk::algorithms::klog("PCI", "Registering driver for Class %02x, Subclass %02x", class_code, subclass);
-  m_drivers.push_back({class_code, subclass, fk::types::move(factory)});
+  TRY_OR_FATAL(m_drivers.push_back({class_code, subclass, fk::types::move(factory)}));
 }
 
 void PciManager::instantiate_drivers() {
@@ -273,8 +274,8 @@ void PciManager::check_function(uint8_t bus, uint8_t device, uint8_t function) {
   uint8_t subclass = (class_reg >> 16) & 0xFF;
   uint8_t prog_if = (class_reg >> 8) & 0xFF;
 
-  m_devices.push_back(
-      PciDevice(address, vendor, dev_id, class_code, subclass, prog_if));
+  TRY_OR_FATAL(m_devices.push_back(
+      PciDevice(address, vendor, dev_id, class_code, subclass, prog_if)));
 
   fk::algorithms::klog("PCI",
                        "Found device %02x:%02x.%d - Vendor: %04x, Device: "
@@ -289,7 +290,7 @@ void PciManager::enable_hotplug_detection() {
 }
 
 void PciManager::register_hotplug_callback(HotplugCallback callback) {
-    m_hotplug_callbacks.push_back(fk::types::move(callback));
+    TRY_OR_FATAL(m_hotplug_callbacks.push_back(fk::types::move(callback)));
 }
 
 void PciManager::scan_for_new_devices() {
@@ -335,7 +336,7 @@ void PciManager::handle_hotplug_event(uint8_t bus, uint8_t device, uint8_t funct
         uint8_t prog_if = (class_reg >> 8) & 0xFF;
 
         PciDevice new_device(address, vendor, dev_id, class_code, subclass, prog_if);
-        m_devices.push_back(new_device);
+        TRY_OR_FATAL(m_devices.push_back(new_device));
 
         fk::algorithms::klog("PCI", "Hotplug: New device inserted at %02x:%02x.%d", bus, device, function);
         

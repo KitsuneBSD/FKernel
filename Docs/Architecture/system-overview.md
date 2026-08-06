@@ -51,7 +51,7 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 ## Project Status
 
 **Kernel Completion**: ~70% — POSIX-compatible x86_64 hobby kernel, boots to MockOS test harness with BusyBox 1.36.1 (~60 applets, ~40 fully functional)
-**POSIX Compliance**: ~60% (207 implemented syscall handlers, ELF dynamic linking, real-time scheduling, major FS families)
+**POSIX Compliance**: ~60% (206 implemented syscall handlers, ELF dynamic linking, real-time scheduling, major FS families)
 **Immediate Priority**: Kernel test coverage (Phase 43 — 10 kernel test files so far, target 75% of critical paths)
 **Long-term Goal**: Full POSIX compliance for a well-designed hobby kernel
 
@@ -78,7 +78,7 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 ### 4. Hardware Compatibility
 - ACPI-driven discovery (HPET, MCFG/ECAM, MADT)
 - PCI driver matching (class/subclass based)
-- Supports real hardware, not just QEMU — with caveats: ATA DMA, E1000, PS/2 verified on real hardware; **NVMe limited to 4 KiB transfers (no PRP2)**, **AHCI async DMA stalled**, **VBE real-mode bridge is a placeholder** (framebuffer via Multiboot2 only). IOMMU VT-d parses DMAR but does not translate (3/3 methods `NotImplemented`).
+- Supports real hardware, not just QEMU — with caveats: ATA DMA, E1000, PS/2 verified on real hardware; NVMe (PRP2, interrupt-driven) and AHCI async DMA implemented; **VBE real-mode bridge is a placeholder** (framebuffer via Multiboot2 only). IOMMU VT-d parses DMAR but does not translate (3/3 methods `NotImplemented`).
 
 ## Key Domains
 
@@ -88,7 +88,7 @@ FKernel is a **hybrid kernel** — see [design-philosophy.md](design-philosophy.
 - **Hardware**: CPU, ACPI, PCI, APIC/IOAPIC, MSI-X
 - **Filesystem**: VFS (BSD-style dentry/vnode/mount), Ext2/3/4, FAT12/16/32, exFAT, ISO9660, MinixFS, TmpFs, DevFs, ProcFs, DebugFs, PtsFs, SemFs, MqueueFs, ShmFs, PipeFs, Epoll, EventFd, SignalFd, TimerFd
 - **Drivers**: Storage (ATA/AHCI/NVMe), Network (E1000), PS/2 mouse, Serial, PTY, USB (headers)
-- **Syscalls**: POSIX-compatible Linux x86_64 interface (207 registered syscalls)
+- **Syscalls**: POSIX-compatible Linux x86_64 interface (206 registered syscalls)
 
 ### Networking (Full Stack)
 - **E1000**: MMIO, RX/TX rings, MAC

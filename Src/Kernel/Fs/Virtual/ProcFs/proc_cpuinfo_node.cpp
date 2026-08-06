@@ -1,6 +1,7 @@
-#include <Kernel/Fs/Virtual/ProcFs/proc_cpuinfo_node.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/ProcFs/proc_cpuinfo_node.h>
 
 using namespace fk::core;
 
@@ -17,7 +18,7 @@ void ProcCpuinfoNode::ensure_cached() {
                "mtrr pge mca cmov pat pse36 clflush mmx fxsr sse "
                "sse2 ht syscall nx rdtscp lm\n\n";
   m_cached.clear();
-  for (size_t i = 0; CPUINFO[i]; ++i) m_cached.push_back(static_cast<uint8_t>(CPUINFO[i]));
+  for (size_t i = 0; CPUINFO[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(CPUINFO[i])));
 }
 
 fk::core::Result<size_t, fk::core::Error> ProcCpuinfoNode::read(uint64_t offset, size_t size, uint8_t* buffer) {

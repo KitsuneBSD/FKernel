@@ -1,7 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Driver/Storage/Controllers/Nvme/nvme_queue_manager.h>
 #include <Kernel/Driver/Storage/Controllers/Nvme/nvme_register_access.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 

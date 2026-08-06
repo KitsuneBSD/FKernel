@@ -1,3 +1,6 @@
+#include <LibFK/Traits/type_traits.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Driver/Registry/driver_registry.h>
 #include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <Kernel/Driver/Storage/Controllers/Ata/ata_controller.h>
@@ -6,8 +9,6 @@
 #include <Kernel/Driver/Network/E1000/e1000.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Fs/Vfs/Mount/auto_mounter.h>
-#include <LibFK/Traits/type_traits.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 

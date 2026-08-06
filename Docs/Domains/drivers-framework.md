@@ -180,44 +180,46 @@ sequenceDiagram
 
 ### NVMe Controller Decomposition
 
-The NVMe driver is decomposed into four classes:
+The NVMe driver is decomposed into specialized classes (SECRET RULE: one class per file):
 
 ```mermaid
 classDiagram
     class NvmeController {
-        +AdminQueuePair m_admin
-        +Vector~IOQueuePair*~ m_io_queues
-        +Vector~Namespace*~ m_namespaces
+        +NvmeQueuePair m_admin
+        +Vector~NvmeQueuePair*~ m_io_queues
+        +Vector~NvmeNamespace*~ m_namespaces
         +initialize()
         +identify_controller()
     }
-    class IOQueuePair {
+    class NvmeQueuePair {
         +SubmissionQueue m_submission
         +CompletionQueue m_completion
         +submit_command()
         +poll_completions()
     }
-    class Namespace {
+    class NvmeNamespace {
         +u64 m_block_count
         +u32 m_block_size
         +StorageDevice interface
         +read_sectors()
         +write_sectors()
     }
-    class AdminCommand {
-        +identify_namespace()
-        +create_io_cq()
-        +create_io_sq()
+    class NvmeCommandBuilder {
+        +build_admin_command()
+        +build_nvm_command()
     }
-    class NvmCommand {
-        +read()
-        +write()
-        +flush()
+    class NvmeCommand {
+        +CommandId m_cid
+        +submit_to_queue()
     }
-    NvmeController --> IOQueuePair
-    NvmeController --> Namespace
-    IOQueuePair --> AdminCommand
-    IOQueuePair --> NvmCommand
+    class NvmeCompletionProcessor {
+        +process_completions()
+    }
+    NvmeController --> NvmeQueuePair
+    NvmeController --> NvmeNamespace
+    NvmeQueuePair --> NvmeCommandBuilder
+    NvmeQueuePair --> NvmeCompletionProcessor
+    NvmeCommandBuilder --> NvmeCommand
 ```
 
 ## Network Drivers
@@ -254,6 +256,19 @@ classDiagram
 - Job control: TIOCGPGRP/TIOCSPGRP/TIOCSCTTY
 - Foreground process group signal delivery (Ctrl+C/Z/\)
 - Window size reporting (TIOCGWINSZ)
+
+## USB Status (Phase 50) — Não implementado
+
+USB existe **apenas como interface scaffolding** em `Include/Kernel/Driver/Usb/` — não há um único `.cpp` em `Src/Kernel/` (verificado 2026-08-04: `glob Src/**/*usb*` = 0 hits). Para o alvo "laptop moderno" (sem PS/2), teclado/mouse/storage USB ficam inoperantes — é o bloqueador #1 de hardware real.
+
+| Header | Conteúdo | Status |
+|--------|----------|--------|
+| `usb_device.h` | `USBDevice` (address/port) — 19 linhas | Stub |
+| `usb_host_controller.h` | `USBHostController` abstrato (initialize / enumerate_device / submit_transfer) | Interface apenas |
+| `usb_transfer.h` | `USBTransfer` | Stub |
+| `usb_transfer_direction.h` / `usb_transfer_type.h` | Enums | Definição |
+
+Falta: xHCI (BAR MMIO + ring management), EHCI, HID (teclado/mouse), mass storage (BOT/UAS). Nenhuma classe PCI 0x0C registrada no `PciManager`.
 
 ## Hardware Discovery
 
@@ -338,6 +353,6 @@ Each CPU has a dedicated per-CPU data structure accessible via `GS_BASE`:
 - **Strategy pattern**: Abstract driver interfaces with concrete implementations (ATA PIO vs DMA)
 - **Dual-inheritance controllers**: AHCI/NVMe are both `Driver` and `StorageDevice`
 - **Partition as StorageDevice**: Transparent offset, can be mounted directly in VFS
-- **Polling-based storage** currently (interrupt-driven removed for code quality)
+- **Interrupt-driven storage**: AHCI (`interrupt_driven_ahci.cpp`) e NVMe (`interrupt_driven_nvme.cpp`) com async read/write via ISR + completion processing; ATA permanece PIO/DMA síncrono
 - **ACPI-driven discovery** over hardcoded addresses (progressive removal complete)
 - **VFS integration**: All devices appear as files in `/dev`

@@ -44,7 +44,7 @@ ProgramHeadersResult ParserDomain::parse_program_headers(const Elf64_Ehdr& heade
     if (read_res.value() < sizeof(Elf64_Phdr))
       return fk::core::Error::InvalidParameter;
 
-    headers.push_back(phdr);
+    TRY(headers.push_back(phdr));
   }
 
   return headers;

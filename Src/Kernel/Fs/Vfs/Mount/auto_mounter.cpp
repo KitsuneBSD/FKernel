@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Fs/Vfs/Mount/auto_mounter.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Fs/Disk/Fat12/fat_12_fs.h>
@@ -12,7 +14,6 @@
 #include <Kernel/Fs/Disk/Ufs/ufs_fs.h>
 #include <Kernel/Fs/Disk/HfsPlus/hfsplus_fs.h>
 #include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 

@@ -1,12 +1,13 @@
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
+#include <LibFK/Synchronization/spinlock.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Net/Sockets/tcp_socket.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Net/Ip/ipv4_header.h>
 #include <Kernel/Net/Core/network_stack.h>
 #include <Kernel/Net/Core/byte_order.h>
-#include <LibFK/Algorithms/Crypto/internet_checksum.h>
-#include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 namespace net {
@@ -151,7 +152,7 @@ fk::core::Result<size_t, fk::core::Error> TcpSocket::write(
             m_connection.peer_window = 0;
         sent += chunk;
 
-        m_retransmit_buf.resize(chunk);
+        TRY(m_retransmit_buf.resize(chunk));
         fk::memory::copy(&m_retransmit_buf[0], buf + sent - chunk, chunk);
         m_retransmit_seq = m_connection.send_next - (uint32_t)chunk;
         m_retransmit_len = chunk;
@@ -220,7 +221,7 @@ void TcpSocket::process_handshake(const TcpHeader* hdr, uint8_t flags, uint32_t 
                                   synack, TCP_HEADER_SIZE);
 
     // Parent stays registered; process_ack will complete the handshake via m_pending
-    m_pending.push_back(child);
+    TRY_OR_FATAL(m_pending.push_back(child));
 }
 
 void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
@@ -241,7 +242,7 @@ void TcpSocket::process_ack(const TcpHeader* hdr, uint8_t flags) {
             if (i != m_pending.size() - 1)
                 m_pending[i] = m_pending[m_pending.size() - 1];
             m_pending.pop_back();
-            m_accept_queue.push_back(ready);
+            TRY_OR_FATAL(m_accept_queue.push_back(ready));
             m_connection.state_changed.signal(fk::NotificationBits(1));
             return;
         }
@@ -382,7 +383,7 @@ static fk::containers::Vector<TcpSocket*>& tcp_socket_list() {
 }
 
 void TcpSocket::register_socket(TcpSocket* s) {
-  tcp_socket_list().push_back(s);
+  TRY_OR_FATAL(tcp_socket_list().push_back(s));
 }
 
 void TcpSocket::unregister_socket(TcpSocket* s) {
@@ -414,7 +415,7 @@ void TcpSocket::do_retransmit() {
   if (m_retransmit_len == 0) return;
 
   fk::containers::Vector<uint8_t> packet;
-  packet.resize(TCP_HEADER_SIZE + m_retransmit_len);
+  TRY_OR_FATAL(packet.resize(TCP_HEADER_SIZE + m_retransmit_len));
   auto* hdr = reinterpret_cast<TcpHeader*>(&packet[0]);
   hdr->fill(m_connection.local().port, m_connection.remote().port,
             m_retransmit_seq, m_connection.recv_next,

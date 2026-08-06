@@ -1,5 +1,5 @@
 #pragma once
 
-#include <LibFK/Core/errno_codes.h>
+#include <LibC/errno.h>
 
 extern int errno;

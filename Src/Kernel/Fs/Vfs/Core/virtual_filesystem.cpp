@@ -1,5 +1,9 @@
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Types/types.h>
+#include <LibFK/Core/result.h>
+#include <LibFK/Memory/Allocators/new.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Utilities/pair.h>
 
 #include <Kernel/Driver/Serial/serial_node.h>
 #include <Kernel/Driver/Vga/vga_node.h>
@@ -23,10 +27,6 @@
 #include <Kernel/Fs/Vfs/Core/dentry.h>
 #include <Kernel/Fs/Vfs/Mount/mount_namespace.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Core/result.h>
-#include <LibFK/Memory/Allocators/new.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Utilities/pair.h>
 
 namespace fkernel {
 

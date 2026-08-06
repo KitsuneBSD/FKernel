@@ -26,7 +26,7 @@ public:
       m_free_list.pop_back();
       m_capabilities[idx] = cap;
     } else {
-      m_capabilities.push_back(cap);
+      TRY_OR_FATAL(m_capabilities.push_back(cap));
       idx = static_cast<uint32_t>(m_capabilities.size() - 1);
     }
     if (cap.object()) m_obj_index.insert(cap.object(), idx);
@@ -44,7 +44,7 @@ public:
     void* obj = m_capabilities[handle].object();
     if (obj) m_obj_index.remove(obj);
     m_capabilities[handle] = {};
-    m_free_list.push_back(handle);
+    TRY_OR_FATAL(m_free_list.push_back(handle));
   }
 
   bool contains(uint32_t handle) const {

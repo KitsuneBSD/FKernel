@@ -9,7 +9,7 @@
  * vga class, while internally using the new display abstraction that supports
  * both BIOS and EFI boot modes.
  */
-class vga {
+class VgaAdapter {
 public:
   /**
    * @brief Get the singleton instance
@@ -17,8 +17,8 @@ public:
    * Automatically selects between BIOS text mode and EFI framebuffer
    * based on the boot method.
    */
-  static vga &the() {
-    static vga instance;
+  static VgaAdapter &the() {
+    static VgaAdapter instance;
     return instance;
   }
 
@@ -78,5 +78,5 @@ public:
   }
 
 private:
-  vga() = default;
+  VgaAdapter() = default;
 };

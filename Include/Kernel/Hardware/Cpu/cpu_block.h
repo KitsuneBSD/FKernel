@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <LibFK/Types/types.h>
 
@@ -21,9 +22,7 @@ extern CpuControlBlock g_cpu_blocks[MAX_CPUS];
 
 // Read the current CPU id from GS:32 (valid after init_syscalls() has run).
 inline uint64_t get_current_cpu_id() {
-    uint64_t id;
-    asm volatile("mov %%gs:32, %0" : "=r"(id));
-    return id;
+    return arch_get_cpu_id();
 }
 
 // Return the CpuControlBlock for the currently executing CPU.

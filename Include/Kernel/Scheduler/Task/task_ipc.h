@@ -1,9 +1,15 @@
 #pragma once
 
-#include <LibFK/Types/types.h>
 #include <LibFK/Synchronization/spinlock.h>
-#include <Kernel/Posix/signal_defs.h>
+#include <LibFK/Types/Ipc/notification_bits.h>
+#include <LibFK/Types/types.h>
 #include <Kernel/Fs/Vfs/Events/node_knote_list.h>
+#include <Kernel/Ipc/Endpoints/fast_ipc_cache.h>
+#include <Kernel/Ipc/Endpoints/ipc_message.h>
+#include <Kernel/Ipc/Endpoints/message_info.h>
+#include <Kernel/Posix/signal_defs.h>
+#include <Kernel/Scheduler/Task/task_alt_stack.h>
+#include <Kernel/Scheduler/Task/task_signal_state.h>
 
 namespace fkernel::ipc {
   class CSpace;
@@ -20,20 +26,16 @@ namespace fkernel::scheduler {
 
 struct TaskIpc {
   ::fkernel::ipc::CSpace *cspace{nullptr};
-  struct {
-    uint64_t pending{0};
-    uint64_t blocked{0};
-    uint64_t forced_pending{0};
-    sigaction actions[NSIG];
-    uintptr_t trampoline{0};
-    int last_info_sig{0};
-    siginfo_t last_info{};
-  } signals{};
-  struct {
-    void* ss_sp{nullptr};
-    size_t ss_size{0};
-    int ss_flags{0};
-  } alt_stack{};
+  // Rendezvous slot: deliver_message() writes the incoming message here and
+  // the blocked task reads it back after schedule() resumes it.
+  ::fkernel::ipc::MessageInfo pending_info{};
+  ::fkernel::ipc::IpcMessage pending_message{};
+  // Async notification result slot (Notification::signal/wait).
+  fk::NotificationBits pending_notification{0};
+  // Fastpath cache for the last endpoint capability (Phase 51).
+  ::fkernel::ipc::FastIpcCache fast_ipc_cache;
+  TaskSignalState signals{};
+  TaskAltStack alt_stack{};
   ::fkernel::ipc::Notification *signal_notification{nullptr};
   ::fkernel::SignalFdNode *signal_fd{nullptr};
   ::fkernel::scheduler::Turnstile *pending_turnstile{nullptr};

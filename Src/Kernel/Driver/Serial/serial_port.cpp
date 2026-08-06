@@ -1,6 +1,6 @@
 #include <Kernel/Driver/Serial/serial_port.h>
 
-void serial::init() {
+void Serial::init() {
   outb(COM1 + 1, 0x00);
   outb(COM1 + 3, 0x80);
   outb(COM1 + 0, 0x03);
@@ -10,13 +10,13 @@ void serial::init() {
   outb(COM1 + 4, 0x0B);
 }
 
-void serial::write_char(char c) {
+void Serial::write_char(char c) {
   while (!is_transmit_empty())
     ;
   outb(COM1, c);
 }
 
-void serial::write_buffer(const char *data, size_t len) {
+void Serial::write_buffer(const char *data, size_t len) {
   static constexpr size_t FIFO_DEPTH = 16;
   size_t i = 0;
   while (i < len) {
@@ -30,13 +30,13 @@ void serial::write_buffer(const char *data, size_t len) {
   }
 }
 
-void serial::write(const char *str) {
+void Serial::write(const char *str) {
   size_t len = 0;
   while (str[len]) ++len;
   write_buffer(str, len);
 }
 
-void serial::write_dec(int64_t value) {
+void Serial::write_dec(int64_t value) {
   char buffer[20] = {};
   bool negative = value < 0;
   size_t i = 0;
@@ -59,14 +59,14 @@ void serial::write_dec(int64_t value) {
   write(buffer);
 }
 
-size_t serial::read(uint8_t* buf, size_t max) {
+size_t Serial::read(uint8_t* buf, size_t max) {
   size_t n = 0;
   while (n < max && is_data_ready())
     buf[n++] = static_cast<uint8_t>(inb(COM1));
   return n;
 }
 
-void serial::write_hex(uint64_t value) {
+void Serial::write_hex(uint64_t value) {
   char buffer[17] = {};
   const char hex_chars[] = "0123456789ABCDEF";
   for (int i = 15; i >= 0; --i) {

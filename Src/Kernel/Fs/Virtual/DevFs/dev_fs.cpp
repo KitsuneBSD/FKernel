@@ -1,8 +1,9 @@
-#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <LibFK/Algorithms/Generic/container_algorithms.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 
 namespace fkernel {
 
@@ -23,7 +24,7 @@ fk::core::Result<void, fk::core::Error> DevFs::register_device(fk::RefPtr<Node> 
         [&name](const auto& e) { return e.name == name; });
     if (idx != m_devices.size()) return fk::core::Error::PermissionDenied;
 
-    m_devices.push_back({name, node});
+    TRY(m_devices.push_back({name, node}));
     fk::algorithms::klog("DEVFS", "Registered device: /dev/%s", name);
     return {};
 }
@@ -65,7 +66,7 @@ fk::core::Result<void, fk::core::Error> DevFs::list_dir(fk::containers::Vector<D
             de.type = 0; // DT_REG (or block/char, but we use 0 for now)
         }
         
-        entries.push_back(de);
+        TRY(entries.push_back(de));
     }
     return {};
 }

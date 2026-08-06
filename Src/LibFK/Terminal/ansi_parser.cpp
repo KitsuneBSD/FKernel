@@ -69,14 +69,14 @@ void AnsiParser::process_char(char c) {
                 m_current_parameter = m_current_parameter * 10 + (c - '0');
                 m_has_parameter = true;
             } else if (c == ';') {
-                m_parameters.push_back(m_current_parameter);
+                TRY_OR_FATAL(m_parameters.push_back(m_current_parameter));
                 m_current_parameter = 0;
                 m_has_parameter = false;
             } else if (c == '?') {
                 m_is_private = true;
             } else {
                 if (m_has_parameter) {
-                    m_parameters.push_back(m_current_parameter);
+                    TRY_OR_FATAL(m_parameters.push_back(m_current_parameter));
                 }
                 handle_csi(c);
                 reset_sequence();

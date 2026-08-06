@@ -1,10 +1,11 @@
-#include <Kernel/Fs/Disk/Iso9660/iso9660_fs.h>
-#include <Kernel/Fs/Disk/Iso9660/iso9660_node.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
 #include <LibFK/Algorithms/Generic/scatter_io.h>
+
+#include <Kernel/Fs/Disk/Iso9660/iso9660_fs.h>
+#include <Kernel/Fs/Disk/Iso9660/iso9660_node.h>
 
 namespace fkernel {
 
@@ -334,7 +335,7 @@ Iso9660FileSystem::list_dir_lba(uint32_t lba, uint32_t data_size,
             size_t nlen = fk::memory::length(name);
             fk::memory::copy(de.name, name, nlen + 1);
             de.type = (flags & ISO_FLAG_DIR) ? 1u : (is_sym ? 2u : 0u);
-            entries.push_back(de);
+            TRY(entries.push_back(de));
 
             pos += dr_len;
         }

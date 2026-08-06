@@ -1,6 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_state.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 void BuddyState::reset() {
     for (size_t i = 0; i < NUM_ORDERS; ++i)

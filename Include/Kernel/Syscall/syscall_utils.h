@@ -18,7 +18,7 @@ inline int error_to_errno(fk::core::Error error) {
   case fk::core::Error::NotImplemented:
     return 38; // ENOSYS
   case fk::core::Error::PermissionDenied:
-    return 1;  // EACCES
+    return 1;  // EPERM
   case fk::core::Error::IsDirectory:
     return 21; // EISDIR
   case fk::core::Error::NotADirectory:
@@ -27,6 +27,8 @@ inline int error_to_errno(fk::core::Error error) {
     return 5;  // EIO
   case fk::core::Error::Interrupted:
     return 4;  // EINTR
+  case fk::core::Error::Fault:
+    return 14; // EFAULT
   case fk::core::Error::NoChildProcesses:
     return 10; // ECHILD
   case fk::core::Error::InappropriateIoctlForDevice:
@@ -60,7 +62,9 @@ inline int error_to_errno(fk::core::Error error) {
   case fk::core::Error::NotSupported:
     return 95; // EOPNOTSUPP
   case fk::core::Error::NotASymlink:
-    return 101; // fk-specific
+    return 22; // EINVAL (readlink(2) on non-symlink)
+  case fk::core::Error::InvalidData:
+    return 22; // EINVAL
   case fk::core::Error::NotConnected:
     return 107; // ENOTCONN
   case fk::core::Error::Timeout:

@@ -1,9 +1,10 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_loadavg_node.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Scheduler/Task/task_state.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;
 
@@ -35,7 +36,7 @@ void ProcLoadavgNode::ensure_cached() {
                      (unsigned long long)total,
                      (unsigned long long)total);
   m_cached.clear();
-  for (int i = 0; i < len; ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+  for (int i = 0; i < len; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(buf[i])));
 }
 
 fk::core::Result<size_t, fk::core::Error> ProcLoadavgNode::read(uint64_t offset, size_t size, uint8_t* buffer) {

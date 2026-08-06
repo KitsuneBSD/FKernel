@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_dir_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_cmdline_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_exe_node.h>
@@ -6,8 +9,6 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_sched_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_stat_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_process_node.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;
 
@@ -17,7 +18,7 @@ fk::core::Result<void, fk::core::Error> ProcPidDirNode::list_dir(fk::containers:
     DirectoryEntry de;
     fk::memory::copy_n(de.name, n, sizeof(de.name));
     de.type = 0;
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

@@ -1,7 +1,8 @@
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
 #include <LibFK/Algorithms/Logging/log.h>
+
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 
 namespace fkernel {
 
@@ -110,7 +111,7 @@ HFSPlusForkReader::read(uint64_t offset, size_t size, uint8_t* buf) const
         } else {
             // Partial block — read full block then copy the slice
             fk::containers::Vector<uint8_t> tmp;
-            tmp.resize(m_block_size);
+            TRY(tmp.resize(m_block_size));
             if (m_device->read_sectors(sector, m_block_size / sector_size, tmp.begin()).is_error())
                 break;
             fk::memory::copy(buf + bytes_read, tmp.begin() + blk_offset, chunk);

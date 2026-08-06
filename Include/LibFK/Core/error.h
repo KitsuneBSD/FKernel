@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LibFK/Core/errno_codes.h>
+#include <LibC/errno.h>
 #include <LibC/stdint.h>
 
 namespace fk {
@@ -18,12 +18,13 @@ enum class Error {
   IsDirectory = 21,                 // EISDIR
   NotADirectory = 20,               // ENOTDIR
   EndOfFile = 999,                  // Custom (no real equivalent for EOF in errno)
-  InvalidData = 100,                // fk-specific, distinct from EINVAL
+  InvalidData = 1001,               // fk-specific, distinct from EINVAL (100 = Linux ENETDOWN)
   Interrupted = 4,                  // EINTR
+  Fault = 14,                       // EFAULT
   NoChildProcesses = 10,            // ECHILD
   InappropriateIoctlForDevice = 25, // ENOTTY
   NoSpaceLeftOnDevice = 28,         // ENOSPC
-  NotASymlink = 101,                // fk-specific, distinct from EINVAL
+  NotASymlink = 1000,               // fk-specific, distinct from EINVAL (101 = Linux ENETUNREACH)
   IsASymlink = 40,                  // ELOOP or EINVAL
   NotImplemented = 38,              // ENOSYS
   AlreadyExists = 17,               // EEXIST

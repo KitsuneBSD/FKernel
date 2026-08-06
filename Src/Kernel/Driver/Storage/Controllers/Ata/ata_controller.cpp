@@ -1,3 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Memory/Pointers/own_ptr.h>
+
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Storage/Controllers/Ata/ata_controller.h>
 #include <Kernel/Driver/Storage/Controllers/Ata/pio_strategy.h>
@@ -6,9 +10,6 @@
 #include <Kernel/Driver/Storage/Interfaces/storage_device_name.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
 #include <Kernel/Fs/Vfs/Mount/auto_mounter.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/Pointers/own_ptr.h>
 
 void ATAController::initialize() {
   fk::algorithms::klog("ATA_CONTROLLER", "Controller initialized");
@@ -160,7 +161,7 @@ void ATAController::probe_channel(uint16_t io, uint16_t ctrl, int channel_index,
     if (dev_res.is_error()) continue;
     
     auto dev = fk::types::move(dev_res.value());
-    m_devices.push_back(dev);
+    TRY_OR_FATAL(m_devices.push_back(dev));
 
     // Register with DriverManager (which also handles DevFs)
     fkernel::DriverManager::the().register_device(dev);

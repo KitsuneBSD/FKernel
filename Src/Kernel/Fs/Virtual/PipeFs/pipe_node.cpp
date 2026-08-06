@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -11,7 +12,7 @@ fk::core::Result<fk::RefPtr<PipeNode>, fk::core::Error> PipeNode::create() {
 }
 
 PipeNode::PipeNode() {
-    m_buffer.resize(PIPE_BUFFER_SIZE);
+    TRY_OR_FATAL(m_buffer.resize(PIPE_BUFFER_SIZE));
 }
 
 fk::core::Result<size_t, fk::core::Error> PipeNode::read([[maybe_unused]] uint64_t offset, size_t size, uint8_t* buffer) {

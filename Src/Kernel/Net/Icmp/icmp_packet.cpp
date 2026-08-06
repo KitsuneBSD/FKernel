@@ -1,6 +1,7 @@
-#include <Kernel/Net/Icmp/icmp_packet.h>
 #include <LibFK/Types/types.h>
 #include <LibFK/Algorithms/Crypto/internet_checksum.h>
+
+#include <Kernel/Net/Icmp/icmp_packet.h>
 
 namespace fkernel {
 namespace net {

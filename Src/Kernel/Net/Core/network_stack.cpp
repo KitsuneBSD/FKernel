@@ -1,3 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Crypto/internet_checksum.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Net/Core/network_stack.h>
 #include <Kernel/Net/Arp/arp_packet.h>
 #include <Kernel/Net/Arp/arp_table.h>
@@ -9,9 +13,6 @@
 #include <Kernel/Net/Udp/udp_header.h>
 #include <Kernel/Net/Sockets/tcp_socket.h>
 #include <Kernel/Net/Sockets/udp_socket.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/Crypto/internet_checksum.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 namespace net {

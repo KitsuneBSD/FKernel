@@ -1,7 +1,8 @@
-#include <Kernel/Fs/Virtual/MqueueFs/mqueue_node.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/MqueueFs/mqueue_node.h>
 
 namespace fkernel {
 
@@ -32,10 +33,10 @@ int MqueueNode::send(const void* buf, size_t len, uint32_t prio) {
     return -12;
   }
   entry->prio = prio;
-  entry->data.resize(len);
+  TRY_OR_FATAL(entry->data.resize(len));
   fk::memory::copy(&entry->data[0], buf, len);
 
-  m_queue.push_back(entry);
+  TRY_OR_FATAL(m_queue.push_back(entry));
   ++m_count;
   m_lock.unlock();
 

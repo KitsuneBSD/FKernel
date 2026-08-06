@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/SysFs/sys_pci_dev_dir_node.h>
 #include <Kernel/Fs/Virtual/SysFs/sys_attr_node.h>
-#include <LibFK/Utilities/memory.h>
 
 static void u16_to_hex(char* buf, uint16_t val) {
   const char hex[] = "0123456789abcdef";
@@ -33,7 +34,7 @@ fk::core::Result<void, fk::core::Error> SysPciDevDirNode::list_dir(fk::container
     DirectoryEntry de;
     fk::memory::copy_n(de.name, n, sizeof(de.name));
     de.type = 0;
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

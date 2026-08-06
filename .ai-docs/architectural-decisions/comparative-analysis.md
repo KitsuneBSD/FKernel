@@ -86,7 +86,7 @@ OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr (non-intrusive, d
 |--------|---------|-------|---------|------------|------|
 | Physical allocator | Bitmap+Buddy per zone | Buddy orders 0-10 | Buddy+UMA | Buddy | Simple buddy |
 | COW | Yes (fixed) | Yes | Yes | Yes | N/A |
-| Slab/UMA | Slab (8 caches, 16B-2048B) | SLUB | UMA | Slab-like | None |
+| Slab/UMA | Slab (10 caches, 16B-8192B) | SLUB | UMA | Slab-like | None |
 | Heap | 32MB fixed, first-fit | kmalloc+vmalloc | UMA zones | Growing heap | Static pool |
 | Page tables | 4-level PML4 | 4/5-level | 4/5-level | 4-level | 4-level |
 | NUMA | Basic zone selection | Full NUMA | Full NUMA | Basic | None |
@@ -138,7 +138,7 @@ OwnPtr (unique), RefPtr (intrusive ref-counted), and RetainPtr (non-intrusive, d
 
 2. **COW is not optional for production** — Now fixed. CoW fork with per-frame refcounts.
 
-3. **Slab/UMA is necessary for kernel longevity** — First-fit heap fragments badly. SlabAllocator (8 caches) implemented.
+3. **Slab/UMA is necessary for kernel longevity** — First-fit heap fragments badly. SlabAllocator (10 caches) implemented.
 
 4. **Layer enforcement is rare and valuable** — FKernel's automated layer checking is ahead of most projects.
 

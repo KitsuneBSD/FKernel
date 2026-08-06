@@ -4,16 +4,22 @@
 #include <LibC/stdio.h>
 #include <LibC/string.h>
 
-static void write_char(char *buf, size_t *idx, size_t max, char c) {
-    if (*idx < max - 1) buf[(*idx)++] = c;
+// C11 semantics: every helper increments the running total regardless of
+// buffer space, so vsnprintf returns the length the full string WOULD have
+// had (snprintf(size=0) works as a length query). Storage happens only while
+// buf is valid and idx < max - 1 (room for the trailing NUL).
+
+static void write_char(char *buf, size_t *idx, size_t max, size_t *total, char c) {
+    (*total)++;
+    if (buf && max > 0 && *idx < max - 1) buf[(*idx)++] = c;
 }
 
-static void write_padding(char *buf, size_t *idx, size_t max, int count, char pad_char) {
-    while (count-- > 0) write_char(buf, idx, max, pad_char);
+static void write_padding(char *buf, size_t *idx, size_t max, size_t *total, int count, char pad_char) {
+    while (count-- > 0) write_char(buf, idx, max, total, pad_char);
 }
 
-static void print_num(char *buf, size_t *idx, size_t max, uint64_t uval, bool negative,
-                      int base, bool uppercase, int width, bool zero_pad, bool left_align, bool always_sign, bool alt_form) {
+static void print_num(char *buf, size_t *idx, size_t max, size_t *total, uint64_t uval, bool negative,
+                      int base, bool uppercase, int width, bool zero_pad, bool left_align, bool always_sign, bool alt_form, int precision) {
     char tmp[66];
     const char *digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
     int i = 0;
@@ -22,11 +28,15 @@ static void print_num(char *buf, size_t *idx, size_t max, uint64_t uval, bool ne
     if (val_copy == 0) tmp[i++] = '0';
     else while (val_copy > 0) { tmp[i++] = digits[val_copy % base]; val_copy /= base; }
 
+    // precision specifies minimum digit count; '0' flag is ignored when precision is given
+    int prec_zeros = precision > i ? precision - i : 0;
+    if (precision >= 0) zero_pad = false;
+
     char prefix[3];
     int prefix_len = 0;
     if (negative) prefix[prefix_len++] = '-';
     else if (always_sign) prefix[prefix_len++] = '+';
-    
+
     if (alt_form && (uval != 0 || base == 16)) { // Always add 0x for pointers (alt_form is set for %p)
         if (base == 16) {
             prefix[prefix_len++] = '0';
@@ -36,24 +46,27 @@ static void print_num(char *buf, size_t *idx, size_t max, uint64_t uval, bool ne
         }
     }
 
-    int padding = width - (i + prefix_len);
+    int content_len = prefix_len + prec_zeros + i;
+    int padding = width - content_len;
     if (padding < 0) padding = 0;
 
-    if (!left_align && !zero_pad) write_padding(buf, idx, max, padding, ' ');
-    for (int j = 0; j < prefix_len; j++) write_char(buf, idx, max, prefix[j]);
-    if (!left_align && zero_pad) write_padding(buf, idx, max, padding, '0');
-    while (i > 0) write_char(buf, idx, max, tmp[--i]);
-    if (left_align) write_padding(buf, idx, max, padding, ' ');
+    if (!left_align && !zero_pad) write_padding(buf, idx, max, total, padding, ' ');
+    for (int j = 0; j < prefix_len; j++) write_char(buf, idx, max, total, prefix[j]);
+    if (!left_align && zero_pad) write_padding(buf, idx, max, total, padding, '0');
+    write_padding(buf, idx, max, total, prec_zeros, '0');
+    while (i > 0) write_char(buf, idx, max, total, tmp[--i]);
+    if (left_align) write_padding(buf, idx, max, total, padding, ' ');
 }
 
 int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
-    if (!buf || max == 0 || !fmt) return 0;
+    if (!fmt) return 0;
     size_t idx = 0;
+    size_t total = 0;
     const char *p = fmt;
-    while (*p && idx < max - 1) {
-        if (*p != '%') { write_char(buf, &idx, max, *p++); continue; }
+    while (*p) {
+        if (*p != '%') { write_char(buf, &idx, max, &total, *p++); continue; }
         p++; // Skip '%'
-        
+
         bool alt_form = false, zero_pad = false, left_align = false, always_sign = false;
         while (*p) {
             if (*p == '#') alt_form = true;
@@ -84,7 +97,7 @@ int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
         if (!*p) break;
 
         switch (*p) {
-            case 'c': write_char(buf, &idx, max, (char)va_arg(args, int)); break;
+            case 'c': write_char(buf, &idx, max, &total, (char)va_arg(args, int)); break;
             case 's': {
                 const char *s = va_arg(args, const char *);
                 if (!s) s = "(null)";
@@ -92,9 +105,9 @@ int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
                 if (precision >= 0 && (size_t)precision < len) len = precision;
                 int padding = width - (int)len;
                 if (padding < 0) padding = 0;
-                if (!left_align) write_padding(buf, &idx, max, padding, ' ');
-                for (size_t j = 0; j < len && idx < max - 1; j++) write_char(buf, &idx, max, s[j]);
-                if (left_align) write_padding(buf, &idx, max, padding, ' ');
+                if (!left_align) write_padding(buf, &idx, max, &total, padding, ' ');
+                for (size_t j = 0; j < len; j++) write_char(buf, &idx, max, &total, s[j]);
+                if (left_align) write_padding(buf, &idx, max, &total, padding, ' ');
                 break;
             }
             case 'd':
@@ -103,7 +116,7 @@ int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
                 if (long_long_flag) val = va_arg(args, long long);
                 else if (long_flag) val = va_arg(args, long);
                 else val = (int64_t)va_arg(args, int);
-                print_num(buf, &idx, max, (uint64_t)(val < 0 ? -val : val), val < 0, 10, false, width, zero_pad, left_align, always_sign, false);
+                print_num(buf, &idx, max, &total, val < 0 ? 0 - (uint64_t)val : (uint64_t)val, val < 0, 10, false, width, zero_pad, left_align, always_sign, false, precision);
                 break;
             }
             case 'u':
@@ -116,18 +129,18 @@ int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
                 else if (size_t_flag) val = (uint64_t)va_arg(args, size_t);
                 else val = (uint64_t)va_arg(args, unsigned int);
                 int base = (*p == 'o') ? 8 : ((*p == 'u') ? 10 : 16);
-                print_num(buf, &idx, max, val, false, base, (*p == 'X'), width, zero_pad, left_align, always_sign, alt_form);
+                print_num(buf, &idx, max, &total, val, false, base, (*p == 'X'), width, zero_pad, left_align, always_sign, alt_form, precision);
                 break;
             }
             case 'p': {
-                print_num(buf, &idx, max, (uintptr_t)va_arg(args, void *), false, 16, false, width ? width : 18, true, left_align, false, true);
+                print_num(buf, &idx, max, &total, (uintptr_t)va_arg(args, void *), false, 16, false, width, false, left_align, false, true, -1);
                 break;
             }
-            case '%': write_char(buf, &idx, max, '%'); break;
-            default: write_char(buf, &idx, max, *p); break;
+            case '%': write_char(buf, &idx, max, &total, '%'); break;
+            default: write_char(buf, &idx, max, &total, *p); break;
         }
         p++;
     }
-    buf[idx] = '\0';
-    return (int)idx;
+    if (buf && max > 0) buf[idx] = '\0';
+    return (int)total;
 }

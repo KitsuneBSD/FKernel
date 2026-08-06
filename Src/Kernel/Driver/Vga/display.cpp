@@ -1,10 +1,11 @@
+#include <LibFK/Text/string.h>
+
 #include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Driver/Vga/display.h>
 #include <Kernel/Driver/Vga/display_text.h>
 #include <Kernel/Driver/Vga/display_framebuffer.h>
 #include <Kernel/Driver/Vga/font.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Text/string.h>
 
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/io.h>

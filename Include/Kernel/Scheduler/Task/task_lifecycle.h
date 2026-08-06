@@ -1,7 +1,8 @@
 #pragma once
 
-#include <Kernel/Scheduler/Task/task_state.h>
 #include <Kernel/Scheduler/Qos/qos.h>
+#include <Kernel/Scheduler/Task/task_itimer.h>
+#include <Kernel/Scheduler/Task/task_state.h>
 
 struct TaskLifecycle {
   TaskState state;
@@ -19,12 +20,7 @@ struct TaskLifecycle {
   fk::ProcessId vfork_parent_id;
   bool is_vfork_sharing_address_space{false};
   bool in_wait_queue{false};
-  struct {
-    uint64_t remaining_ticks{0};
-    uint64_t interval_ticks{0};
-    int signo{14};
-    bool active{false};
-  } itimers[3]{};
+  TaskITimer itimers[3]{};
 
   fkernel::scheduler::QoSClass qos{fkernel::scheduler::QoSClass::Default};
   fkernel::scheduler::SchedulingPolicy policy{fkernel::scheduler::SchedulingPolicy::Normal};

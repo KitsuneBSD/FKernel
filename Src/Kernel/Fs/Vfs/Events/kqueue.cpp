@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Generic/container_algorithms.h>
+#include <LibFK/Algorithms/Generic/time_math.h>
+
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Generic/container_algorithms.h>
-#include <LibFK/Algorithms/Generic/time_math.h>
 
 namespace fkernel {
 
@@ -125,7 +126,7 @@ void KQueueNode::process_changelist(const struct kevent* changelist, int nchange
             }
 
             size_t new_idx = m_registered_events.size();
-            m_registered_events.push_back(reg);
+            TRY_OR_FATAL(m_registered_events.push_back(reg));
             m_event_index.insert(key, new_idx);
             continue;
         }

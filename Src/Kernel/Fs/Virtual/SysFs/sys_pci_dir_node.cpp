@@ -1,9 +1,9 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/SysFs/sys_pci_dir_node.h>
 #include <Kernel/Fs/Virtual/SysFs/sys_pci_dev_dir_node.h>
 #include <Kernel/Hardware/Buses/Pci/pci.h>
-#include <LibFK/Utilities/memory.h>
 
-// BDF format: "0000:00:1f.0" (domain:bus:device.function)
 static void bdf_to_str(char* buf, size_t len, uint8_t bus, uint8_t dev, uint8_t func) {
   const char hex[] = "0123456789abcdef";
   if (len < 13) return;
@@ -23,7 +23,7 @@ fk::core::Result<void, fk::core::Error> SysPciDirNode::list_dir(fk::containers::
     DirectoryEntry de;
     fk::memory::copy_n(de.name, bdf, sizeof(de.name));
     de.type = 1; // DT_DIR
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

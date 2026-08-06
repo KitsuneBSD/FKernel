@@ -1,7 +1,8 @@
-#include <Kernel/Arch/x86_64/Driver/Vga/vesa.h>
-#include <Kernel/Memory/memory_manager.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Arch/x86_64/Driver/Vga/vesa.h>
+#include <Kernel/Memory/memory_manager.h>
 
 namespace fkernel::drivers::vesa {
 
@@ -54,7 +55,7 @@ void VESADriver::discover_vbe() {
     
     m_supported_modes.clear();
     for (int i = 0; mode_list[i] != 0xFFFF && i < 256; i++) {
-        m_supported_modes.push_back(mode_list[i]);
+        TRY_OR_FATAL(m_supported_modes.push_back(mode_list[i]));
     }
 
     fk::algorithms::klog("VESA", "Found %zu supported modes", m_supported_modes.size());

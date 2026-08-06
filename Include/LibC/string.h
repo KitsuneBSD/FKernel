@@ -36,7 +36,7 @@ static inline void itoa_signed(int64_t value, char *buf, int base) {
   if (!buf || base < 2 || base > 16) return;
   if (value < 0) {
     *buf++ = '-';
-    itoa_unsigned((uint64_t)(-value), buf, base, 0);
+    itoa_unsigned(0 - (uint64_t)value, buf, base, 0);
   } else {
     itoa_unsigned((uint64_t)value, buf, base, 0);
   }

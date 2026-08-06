@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Smp/ap_entry.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
@@ -7,7 +9,6 @@
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 extern void init_syscalls(size_t cpu_index);
 

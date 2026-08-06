@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Synchronization/spinlock.h>
+
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Ipc/Signals/signal_delivery.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Synchronization/spinlock.h>
 
 using namespace fkernel::scheduler;
 

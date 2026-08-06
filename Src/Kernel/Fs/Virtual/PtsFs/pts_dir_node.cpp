@@ -1,5 +1,6 @@
-#include <Kernel/Fs/Virtual/PtsFs/pts_dir_node.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/PtsFs/pts_dir_node.h>
 
 namespace fkernel {
 
@@ -15,7 +16,7 @@ void PtsDirNode::register_slave(uint32_t index, fk::RefPtr<Node> slave) {
     if (e.first == index) { e.second = slave; return; }
   }
   fk::utilities::Pair<uint32_t, fk::RefPtr<Node>> entry{index, slave};
-  m_slaves.push_back(entry);
+  TRY_OR_FATAL(m_slaves.push_back(entry));
 }
 
 void PtsDirNode::unregister_slave(uint32_t index) {
@@ -44,7 +45,7 @@ PtsDirNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
       fk::memory::copy_n(de.name, e.second->name().c_str(), sizeof(de.name) - 1);
     }
     de.type = 0;
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

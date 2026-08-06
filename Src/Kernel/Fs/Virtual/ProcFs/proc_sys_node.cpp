@@ -1,9 +1,10 @@
-#include <Kernel/Fs/Virtual/ProcFs/proc_sys_node.h>
-#include <Kernel/Fs/Virtual/ProcFs/proc_sys_kernel_node.h>
-#include <Kernel/Fs/Virtual/ProcFs/proc_sys_string_node.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Algorithms/Generic/string_algorithms.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/ProcFs/proc_sys_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_sys_kernel_node.h>
+#include <Kernel/Fs/Virtual/ProcFs/proc_sys_string_node.h>
 
 char g_proc_hostname[64]   = "fkernel";
 char g_proc_domainname[64] = "(none)";
@@ -15,7 +16,7 @@ ProcSysNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
   DirectoryEntry de;
   fk::memory::copy_n(de.name, "kernel", sizeof(de.name));
   de.type = 1;
-  entries.push_back(de);
+    TRY(entries.push_back(de));
   return {};
 }
 
@@ -39,7 +40,7 @@ ProcSysKernelNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
     DirectoryEntry de;
     fk::memory::copy_n(de.name, n, sizeof(de.name));
     de.type = 0;
-    entries.push_back(de);
+  TRY(entries.push_back(de));
   }
   return {};
 }

@@ -259,7 +259,7 @@ Memory is mapped lazily on first access. The page fault handler (`pf_handler.cpp
    - **Write-protection fault**: CoW break — allocate new page, copy data, update PTE with Writable
 
 2. **File-backed memory** (`mmap of a file descriptor`):
-   - **Not-present fault**: Read the missing page from the file's page cache via the filesystem; map into address space
+   - **Not-present fault**: Read the missing page via `backing_node->read(file_offset, PAGE_SIZE)` (M10 — file-backed demand paging, sem page cache); map into address space
    - **Write-protection fault**: CoW break for private mappings; for shared mappings, write-through to page cache
 
 ### Direct Map
@@ -274,6 +274,8 @@ Memory is mapped lazily on first access. The page fault handler (`pf_handler.cpp
 - `copy_from_user()` / `copy_to_user()` validate addresses are in userspace (`< 0x800000000000`)
 - Uses STAC/CLAC instructions when hardware SMAP is available
 - Returns `Result<void, Error>` for error propagation
+
+**Kernel-mode fault recovery and SMAP**: the kernel-mode CoW/demand-paging recovery path in `pf_handler.cpp` requires `RFLAGS.AC` to distinguish a legitimate `copy_to_user` access from a kernel bug. On CPUs **without SMAP** (e.g. QEMU's default CPU model), STAC is unavailable so AC is never set — the handler accepts supervisor faults on user pages unconditionally, since without SMAP the kernel can touch user pages at the hardware level and any such fault is CoW/demand-paging recovery.
 
 ## ASLR, W^X, and RELRO
 
@@ -312,7 +314,7 @@ Implemented in Phase 30b:
 | 4096B | Page-sized allocations |
 | 8192B | Large kernel objects |
 
-The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤8192 bytes, falling back to the linked-list heap only when the slab cache is exhausted.
+The kernel heap (`MemoryManager::allocate()`) tries slab first for allocations ≤2048 bytes, falling back to the linked-list heap only when the slab cache is exhausted.
 
 Multi-page slabs (4096B/8192B caches) allocate their backing pages via `size_to_order(slab_size)` (absolute buddy order, M1). Slab-backed objects have **no `BlockHeader`**, so `MemoryManager::reallocate()` first checks `SlabAllocator::is_slab_allocation(ptr)` and routes growing/frees through `SlabAllocator::reallocate()` — this prevents a growing LibFK `Vector`/`String` from tripping the heap `0xC0FFEE` magic check (M4).
 
@@ -355,7 +357,7 @@ flowchart TD
 - **CoW refcounts**: Per-zone uint16_t arrays for accurate shared page tracking
 - **COW-safe table creation**: `ensure_table()` copies shared kernel tables when user bit needed
 - **2MB huge pages**: Direct map via `PageFlags::HugePage` for low TLB pressure
-- **Slab-first heap**: `allocate()` tries slab for ≤8192B, falls back to linked-list heap
+- **Slab-first heap**: `allocate()` tries slab for ≤2048B, falls back to linked-list heap
 - **ASLR**: Randomized mmap/ELF/stack/heap base per process (Phase 30b)
 - **W^X**: No page may be simultaneously writable and executable; enforced at PTE level
 - **RELRO**: GOT marked read-only after ELF relocations applied (Phase 30b)

@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Ipc/Signals/signal_delivery.h>
@@ -5,10 +7,19 @@
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Syscall/syscall.h>
 #include <Kernel/Syscall/syscall_utils.h>
-#include <LibFK/Algorithms/Logging/log.h>
+
 #ifdef __x86_64__
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #endif
+
+// TSC syscall latency tracking (sprint Item 1). Non-static so interrupt_dispatch.cpp
+// can include it in the periodic dump via `extern uint64_t g_tsc_max_syscall`.
+uint64_t g_tsc_max_syscall = 0;
+
+static inline uint64_t syscall_tsc_now() {
+    return arch_read_tsc();
+}
 
 
 SyscallManager& SyscallManager::the() {
@@ -476,7 +487,11 @@ extern "C" uint64_t syscall_dispatcher(uint64_t num, uint64_t arg1, uint64_t arg
       syscall_log->append(enter_buf, enter_len);
   }
 
+  uint64_t tsc_start = syscall_tsc_now();
   uint64_t result = SyscallManager::the().handle(num, arg1, arg2, arg3, arg4, arg5, arg6, regs);
+  uint64_t tsc_elapsed = syscall_tsc_now() - tsc_start;
+  if (tsc_elapsed > g_tsc_max_syscall)
+      g_tsc_max_syscall = tsc_elapsed;
 
   if (MemoryManager::the().is_heap_initialized()) {
     char exit_buf[128];

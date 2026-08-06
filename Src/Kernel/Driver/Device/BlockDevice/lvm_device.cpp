@@ -1,7 +1,8 @@
-#include <Kernel/Driver/Device/BlockDevice/lvm_device.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Device/BlockDevice/lvm_device.h>
 
 namespace fkernel {
 
@@ -16,7 +17,7 @@ void LvmDevice::add_segment(uint64_t lv_start, uint64_t length,
     seg.lv_end    = lv_start + length;
     seg.pv_index  = pv_index;
     seg.pv_start  = pv_start;
-    m_segments.push_back(seg);
+    TRY_OR_FATAL(m_segments.push_back(seg));
     if (seg.lv_end > m_total_sectors) m_total_sectors = seg.lv_end;
 }
 
@@ -27,7 +28,7 @@ void LvmDevice::add_stripe_segments(uint64_t lv_start_sectors, uint64_t total_se
     uint64_t remaining = total_sectors;
     size_t   pv_idx = 0;
     fk::containers::Vector<uint64_t> pv_offsets;
-    pv_offsets.resize(pv_count);
+    TRY_OR_FATAL(pv_offsets.resize(pv_count));
     for (size_t i = 0; i < pv_count; ++i) pv_offsets[i] = pv_base_starts[i];
 
     while (remaining > 0) {

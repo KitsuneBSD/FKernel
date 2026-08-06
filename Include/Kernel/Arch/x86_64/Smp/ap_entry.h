@@ -2,6 +2,8 @@
 
 #include <LibFK/Types/types.h>
 
+extern "C" void ap_entry(uint32_t cpu_index);
+
 namespace fkernel {
 namespace smp {
 

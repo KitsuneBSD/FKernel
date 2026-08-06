@@ -4,6 +4,34 @@
 
 ---
 
+## TODO ↔ Source Verification Audit (2026-08-05)
+
+Verificação ponto-a-ponto de `TODO.md` contra `Include/` + `Src/` (greps, sub-agentes e leituras diretas). Objetivo: TODO.md deve refletir o código real — nada de itens ✅ que não estão no código, nada de bugs abertos já corrigidos.
+
+### Resultado
+
+| Auditoria | Aberto | Corrigido/Confirmado |
+|-----------|--------|----------------------|
+| Memória (M) | M6/M11/M12 ⚠️; get_refcount, `BuddyAllocator::initialize()` dead, resíduo M5, identidade 4 GiB parcial | M1–M5, M7–M10, M13 ✅ |
+| Exceções (I) | `apic_timer_handler` dead, `send_eoi` vector−32 | I1–I5 ✅ |
+| Recuperação (R) | fixup/extable, watchdog real, depth de exceção (futuro) | R1–R4 ✅ |
+| LibC/LibFK (L) | L1–L11 (todos) | — |
+| Conformidade (C) | C1–C4 | C5 + checkers ✅ |
+
+**7 claims stale/invertidas corrigidas no TODO.md:** syscalls 207→206 (206 `register_syscall` em `syscall.cpp:264-469`); ext2 triple-indirect confirmado (`ext2_fs.cpp:262-296`); I1 spurious handler confirmado (`interrupt_controller.cpp:69`); R1 Design A confirmado (`user_access.cpp:20-35`); **C1 refutado** — `fadt_manager.cpp:69` ainda tem asm cru (proposta `__sync_synchronize()` não aplicada); include order **315/325 (97%)** não 320/462; DmaBuffer legacy **21 call sites**.
+
+**Fatos novos confirmados:** slab tem **10 caches (16–8192B)** (`slab_allocator.cpp:17-18`) — header comentário 16–2048 era stale; kernel tem **10 suites / 99 testes** no target Test (xmake.lua:218-227); NVMe PRP2 (`interrupt_driven_nvme.cpp:137-144`) e AHCI async (`interrupt_driven_ahci.cpp`) implementados; `arch_cpu_idle()` implementado (`cpu_ops.cpp:151`).
+
+**Correções de docs no mesmo dia:** 207→206 syscalls (system-overview, Syscalls README, ipc-capabilities, DocsSummary, current-state-analysis); NVMe PRP2/AHCI async documentados como implementados; slab 10 caches; split `kfatal`/`kerror` em AGENTS.md + 3 docs de logging; `arch_cpu_idle` removido do Phase 42; testes kernel 0→10 suites/99.
+
+### Itens abertos para as próximas auditorias
+
+- C1: 6 `asm` crus no kernel genérico + 4 no LibFK — `xmake check-arch-asm` falha em 10 arquivos.
+- L6: 8 testes órfãos do target `Test`; `LibC_Testing` só compila `string/*.c` + `ctype.c`.
+- M6/M11/M12, C3/C4 (detalhes em `TODO.md`).
+
+---
+
 ## IPC Substrate Fragmentation Audit (2026-07-26)
 
 ### Finding

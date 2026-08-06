@@ -1,5 +1,6 @@
-#include <Kernel/Driver/Vga/extended_font.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Vga/extended_font.h>
 
 namespace VgaExtended {
 

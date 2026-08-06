@@ -1,9 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
-// ATA register offsets
 static constexpr uint16_t ATA_REG_STATUS = 0x07;
 
 void ata_primary_handler(uint8_t vector, InterruptFrame *frame) {

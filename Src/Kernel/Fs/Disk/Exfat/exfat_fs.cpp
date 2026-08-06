@@ -1,8 +1,9 @@
-#include <Kernel/Fs/Disk/Exfat/exfat_fs.h>
-#include <Kernel/Fs/Disk/Exfat/exfat_node.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
+
+#include <Kernel/Fs/Disk/Exfat/exfat_fs.h>
+#include <Kernel/Fs/Disk/Exfat/exfat_node.h>
 
 namespace fkernel {
 
@@ -367,7 +368,7 @@ static DirWalkResult walk_dir_cluster(ExfatFileSystem* fs, uint32_t first_cluste
                     size_t nlen = fk::memory::length(ds.name);
                     fk::memory::copy(de.name, ds.name, nlen + 1);
                     de.type = ds.is_dir ? 1u : 0u;
-                    out_list->push_back(de);
+                    TRY_OR_FATAL(out_list->push_back(de));
                     entry_count++;
                 }
 

@@ -19,7 +19,7 @@ void RegionSplitter::handle_region(size_t& i, uintptr_t unmap_start, uintptr_t u
     MemoryRegion right = region;
     right.start = unmap_end;
     region.end = unmap_start;
-    m_regions.push_back(fk::types::move(right));
+    TRY_OR_FATAL(m_regions.push_back(fk::types::move(right)));
     ++i;
 }
 

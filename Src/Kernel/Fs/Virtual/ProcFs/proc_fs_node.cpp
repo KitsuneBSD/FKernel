@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_fs_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_partitions_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_process_node.h>
@@ -14,8 +17,6 @@
 #include <Kernel/Fs/Virtual/ProcFs/proc_filesystems_node.h>
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_dir_node.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;
 
@@ -23,62 +24,62 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
   DirectoryEntry p_de;
   fk::memory::copy_n(p_de.name, "partitions", sizeof(p_de.name));
   p_de.type = 0;
-  entries.push_back(p_de);
+  TRY(entries.push_back(p_de));
 
   DirectoryEntry self_de;
   fk::memory::copy_n(self_de.name, "self", sizeof(self_de.name));
   self_de.type = 0;
-  entries.push_back(self_de);
+  TRY(entries.push_back(self_de));
 
   DirectoryEntry ver_de;
   fk::memory::copy_n(ver_de.name, "version", sizeof(ver_de.name));
   ver_de.type = 0;
-  entries.push_back(ver_de);
+  TRY(entries.push_back(ver_de));
 
   DirectoryEntry mnt_de;
   fk::memory::copy_n(mnt_de.name, "mounts", sizeof(mnt_de.name));
   mnt_de.type = 0;
-  entries.push_back(mnt_de);
+  TRY(entries.push_back(mnt_de));
 
   DirectoryEntry uptime_de;
   fk::memory::copy_n(uptime_de.name, "uptime", sizeof(uptime_de.name));
   uptime_de.type = 0;
-  entries.push_back(uptime_de);
+  TRY(entries.push_back(uptime_de));
 
   DirectoryEntry meminfo_de;
   fk::memory::copy_n(meminfo_de.name, "meminfo", sizeof(meminfo_de.name));
   meminfo_de.type = 0;
-  entries.push_back(meminfo_de);
+  TRY(entries.push_back(meminfo_de));
 
   DirectoryEntry stat_de;
   fk::memory::copy_n(stat_de.name, "stat", sizeof(stat_de.name));
   stat_de.type = 0;
-  entries.push_back(stat_de);
+  TRY(entries.push_back(stat_de));
 
   DirectoryEntry sys_de;
   fk::memory::copy_n(sys_de.name, "sys", sizeof(sys_de.name));
   sys_de.type = 1;
-  entries.push_back(sys_de);
+  TRY(entries.push_back(sys_de));
 
   DirectoryEntry loadavg_de;
   fk::memory::copy_n(loadavg_de.name, "loadavg", sizeof(loadavg_de.name));
   loadavg_de.type = 0;
-  entries.push_back(loadavg_de);
+  TRY(entries.push_back(loadavg_de));
 
   DirectoryEntry cpuinfo_de;
   fk::memory::copy_n(cpuinfo_de.name, "cpuinfo", sizeof(cpuinfo_de.name));
   cpuinfo_de.type = 0;
-  entries.push_back(cpuinfo_de);
+  TRY(entries.push_back(cpuinfo_de));
 
   DirectoryEntry fs_de;
   fk::memory::copy_n(fs_de.name, "filesystems", sizeof(fs_de.name));
   fs_de.type = 0;
-  entries.push_back(fs_de);
+  TRY(entries.push_back(fs_de));
 
   DirectoryEntry cmdline_de;
   fk::memory::copy_n(cmdline_de.name, "cmdline", sizeof(cmdline_de.name));
   cmdline_de.type = 0;
-  entries.push_back(cmdline_de);
+  TRY(entries.push_back(cmdline_de));
 
   auto& scheduler = SchedulerManager::the();
   uint64_t max_pid = scheduler.last_pid().value();
@@ -89,7 +90,7 @@ fk::core::Result<void, fk::core::Error> ProcFsNode::list_dir(fk::containers::Vec
       snprintf(pid_str, sizeof(pid_str), "%lu", pid);
       fk::memory::copy_n(de.name, pid_str, sizeof(de.name));
       de.type = 0;
-      entries.push_back(de);
+      TRY(entries.push_back(de));
     }
   }
 

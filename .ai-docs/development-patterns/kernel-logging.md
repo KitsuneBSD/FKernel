@@ -85,7 +85,7 @@ The Display target (`vga::the().write_ansi()`) interprets ANSI escape sequences 
 
 1. **No log-level filtering** — all levels always compiled in; 20 `kdebug()` calls commented out waiting for LogLevel feature
 2. **Panic bypasses logging** — `panic.cpp` uses raw `kprintf()`, messages never reach dmesg ring buffer
-3. **`kerror()` halts on every call** — no distinction between fatal and non-fatal errors; should split into `kfatal()` (halt) and `kerror()` (non-halting)
+3. ~~**`kerror()` halts on every call**~~ — split `kfatal()`/`kerror()` DONE (2026-08-05): `kfatal()` halts, `kerror()` returns
 4. **Inconsistent prefix naming** — ALL_CAPS, mixed case, lowercase, hyphenated all used across codebase
 5. **Dead code** — StdoutLogNode/StderrLogNode headers exist but are never instantiated
 6. **`set_log_target_bits()` declared but not implemented** in `kernel_puts.h`

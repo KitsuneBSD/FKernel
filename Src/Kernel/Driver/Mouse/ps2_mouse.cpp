@@ -1,7 +1,8 @@
-#include <Kernel/Driver/Mouse/ps2_mouse.h>
-#include <Kernel/Arch/x86_64/io.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Synchronization/spinlock.h>
+
+#include <Kernel/Driver/Mouse/ps2_mouse.h>
+#include <Kernel/Arch/x86_64/io.h>
 
 static constexpr uint16_t PS2_DATA_PORT   = 0x60;
 static constexpr uint16_t PS2_STATUS_PORT = 0x64;
@@ -102,7 +103,7 @@ void PS2Mouse::process_packet() {
 
     fk::synchronization::ScopedLock lock(m_lock);
     if (m_events.size() < MOUSE_BUFFER_SIZE)
-        m_events.push_back(ev);
+        TRY_OR_FATAL(m_events.push_back(ev));
 }
 
 fk::core::Result<size_t, fk::core::Error> PS2Mouse::read(

@@ -1,6 +1,7 @@
-#include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/new.h>
+
+#include <Kernel/Fs/Virtual/DebugFs/debug_fs.h>
 
 namespace fkernel {
 
@@ -18,7 +19,7 @@ void DebugLogNode::append(const char* str, size_t len) {
         if (m_buffer.size() >= MAX_LOG_SIZE) {
             m_buffer.clear();
         }
-        m_buffer.push_back(static_cast<uint8_t>(str[i]));
+        TRY_OR_FATAL(m_buffer.push_back(static_cast<uint8_t>(str[i])));
     }
 }
 
@@ -50,7 +51,7 @@ void SyscallLogNode::append(const char* str, size_t len) {
     fk::synchronization::ScopedLockIRQ lock(m_lock);
     for (size_t i = 0; i < len; ++i) {
         if (m_buffer.size() >= MAX_LOG_SIZE) m_buffer.clear();
-        m_buffer.push_back(static_cast<uint8_t>(str[i]));
+        TRY_OR_FATAL(m_buffer.push_back(static_cast<uint8_t>(str[i])));
     }
 }
 
@@ -90,17 +91,17 @@ fk::core::Result<void, fk::core::Error> DebugFsNode::list_dir(fk::containers::Ve
     DirectoryEntry klog_de;
     fk::memory::copy_string(klog_de.name, "klog");
     klog_de.type = 0;
-    entries.push_back(klog_de);
+    TRY(entries.push_back(klog_de));
 
     DirectoryEntry syscalls_de;
     fk::memory::copy_string(syscalls_de.name, "syscalls");
     syscalls_de.type = 0;
-    entries.push_back(syscalls_de);
+    TRY(entries.push_back(syscalls_de));
 
     DirectoryEntry ipc_de;
     fk::memory::copy_string(ipc_de.name, "ipc");
     ipc_de.type = 0;
-    entries.push_back(ipc_de);
+    TRY(entries.push_back(ipc_de));
 
     return {};
 }

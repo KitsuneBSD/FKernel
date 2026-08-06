@@ -3,6 +3,7 @@
 // Forward declarations of test runners
 int run_libfk_traits_tests();
 int run_libc_string_tests();
+int run_libc_stdio_tests();
 int run_libfk_container_tests();
 int run_libfk_container_advanced_tests();
 int run_libfk_smart_pointer_tests();
@@ -37,12 +38,20 @@ int run_kernel_qos_tests();
 int run_kernel_dentry_tests();
 int run_kernel_buddy_allocator_tests();
 int run_kernel_slab_allocator_tests();
+int run_kernel_errno_abi_tests();
+int run_kernel_turnstile_tests();
+int run_kernel_mlfq_queue_tests();
+int run_kernel_tcp_connection_tests();
+int run_kernel_path_resolver_tests();
+int run_kernel_file_description_tests();
+int run_nvme_refactoring_tests();
 
 int main() {
     int failed = 0;
 
     failed += run_libfk_traits_tests();
     failed += run_libc_string_tests();
+    failed += run_libc_stdio_tests();
     failed += run_libfk_container_tests();
     failed += run_libfk_container_advanced_tests();
     failed += run_libfk_smart_pointer_tests();
@@ -77,6 +86,13 @@ int main() {
     failed += run_kernel_dentry_tests();
     failed += run_kernel_buddy_allocator_tests();
     failed += run_kernel_slab_allocator_tests();
+    failed += run_kernel_errno_abi_tests();
+    failed += run_kernel_turnstile_tests();
+    failed += run_kernel_mlfq_queue_tests();
+    failed += run_kernel_tcp_connection_tests();
+    failed += run_kernel_path_resolver_tests();
+    failed += run_kernel_file_description_tests();
+    failed += run_nvme_refactoring_tests();
 
     if (failed == 0) {
         TEST_LOG("\n>>> SUMMARY: ALL TEST SUITES PASSED!\n");

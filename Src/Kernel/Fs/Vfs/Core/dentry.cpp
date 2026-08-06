@@ -1,9 +1,9 @@
-#include <Kernel/Fs/Vfs/Core/dentry.h>
-#include <Kernel/Fs/Vfs/Mount/mount_namespace.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
-
 #include <LibFK/Synchronization/spinlock.h>
+
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Mount/mount_namespace.h>
 
 namespace fkernel {
 
@@ -97,7 +97,7 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
         if (cached.has_value() && cached.value())
             return fk::RefPtr<Dentry>(cached.value());
         m_child_map.insert(new_dentry->name(), new_dentry.get());
-        m_children.push_back(new_dentry);
+        TRY(m_children.push_back(new_dentry));
         return new_dentry;
     }
 
@@ -107,7 +107,7 @@ fk::core::Result<fk::RefPtr<Dentry>, fk::core::Error> Dentry::lookup(const char*
 void Dentry::add_child(fk::RefPtr<Dentry> child) {
     fk::synchronization::ScopedLock lock(m_lock);
     m_child_map.insert(child->name(), child.get());
-    m_children.push_back(child);
+    TRY_OR_FATAL(m_children.push_back(child));
 }
 
 fk::text::String Dentry::get_path() const {

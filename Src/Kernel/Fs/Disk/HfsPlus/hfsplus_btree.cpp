@@ -1,8 +1,9 @@
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
+
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
 
 namespace fkernel {
 
@@ -58,7 +59,7 @@ fk::core::Result<void, fk::core::Error> BTreeFile::open(
 
     // Read 512-byte header to get nodeSize before we know the full node
     fk::containers::Vector<uint8_t> hdr_buf;
-    hdr_buf.resize(sector_size);
+    TRY(hdr_buf.resize(sector_size));
     if (device->read_sectors(node0_sector, 1, hdr_buf.begin()).is_error())
         return fk::core::Error::IOError;
 
@@ -74,7 +75,7 @@ fk::core::Result<void, fk::core::Error> BTreeFile::open(
     // Re-read the full header node now that we know its size
     uint32_t sects_for_node = m_node_size / sector_size;
     fk::containers::Vector<uint8_t> node_buf;
-    node_buf.resize(m_node_size);
+    TRY(node_buf.resize(m_node_size));
     if (device->read_sectors(node0_sector, sects_for_node, node_buf.begin()).is_error())
         return fk::core::Error::IOError;
 
@@ -119,7 +120,7 @@ fk::core::Result<BTreeNode, fk::core::Error> BTreeFile::read_node(uint32_t node_
     uint64_t start_sector = phys_res.value() + (uint64_t)(block_off / sector_size);
 
     BTreeNode node;
-    node.data.resize(m_node_size);
+    TRY(node.data.resize(m_node_size));
     node.node_number = node_num;
 
     if (m_device->read_sectors(start_sector, node_sects, node.data.begin()).is_error())
@@ -371,7 +372,7 @@ btree_extents_lookup(const BTreeFile& ext, uint32_t file_id,
                     HFSPlusExtentDescriptor ed;
                     fk::memory::copy(&ed, data + j * sizeof(HFSPlusExtentDescriptor), sizeof(ed));
                     if (fk::algorithms::swap32(ed.blockCount) == 0) break;
-                    result.push_back(ed);
+                    TRY(result.push_back(ed));
                 }
                 return result;
             }

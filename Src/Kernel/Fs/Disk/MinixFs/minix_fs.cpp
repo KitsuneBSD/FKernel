@@ -1,9 +1,10 @@
-#include <Kernel/Fs/Disk/MinixFs/minix_fs.h>
-#include <Kernel/Fs/Disk/MinixFs/minix_node.h>
 #include <LibFK/Algorithms/Generic/bitmap.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
+
+#include <Kernel/Fs/Disk/MinixFs/minix_fs.h>
+#include <Kernel/Fs/Disk/MinixFs/minix_node.h>
 
 namespace fkernel {
 
@@ -199,7 +200,7 @@ MinixFileSystem::list_dir_inode(const MinixInode& inode,
             MinixInode child_ino;
             if (read_inode(dino, child_ino).is_error()) continue;
             de.type = ((child_ino.i_mode & 0170000u) == 0040000u) ? 1u : 0u;
-            entries.push_back(de);
+            TRY(entries.push_back(de));
         }
     }
     return {};

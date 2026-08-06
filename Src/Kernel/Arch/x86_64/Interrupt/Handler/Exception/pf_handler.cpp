@@ -1,37 +1,51 @@
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/Handler/exception_macros.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Algorithms/Logging/log.h>
+
+static constexpr uint64_t PF_STORM_WINDOW = 10;   // 10 ticks = 100ms at 100 Hz
+static constexpr uint64_t PF_STORM_LIMIT  = 500;  // >500 faults per 100ms → kill task
 
 extern "C" void print_stack_trace();
-
-static PageFlags resolve_region_flags(Task* task, uintptr_t vaddr) {
-  auto& regions = task->resources.memory.regions.list;
-  for (size_t i = 0; i < regions.size(); ++i) {
-    if (regions[i].contains(vaddr))
-      return regions[i].flags;
-  }
-  return PageFlags::Present | PageFlags::Writable | PageFlags::User | PageFlags::ExecuteDisable;
-}
 
 static void handle_demand_paging(Task* task, uint64_t cr2, InterruptFrame*) {
   uintptr_t vaddr = cr2 & ~0xFFFULL;
   uintptr_t phys = PhysicalMemoryManager::the().alloc_page();
   if (!phys) {
-    fk::algorithms::kwarn("PF", "demand paging OOM at %p pid=%lu", (void*)cr2, task->control.identity.id.value());
-    return;
+    fk::algorithms::kwarn("PF", "demand paging OOM at %p pid=%lu, killing task",
+                          (void*)cr2, task->control.identity.id.value());
+    SchedulerManager::the().kill_current_from_exception(SIGSEGV);
+    return; // [[noreturn]] — defensive: kill must be the terminal statement
   }
 
-  PageFlags flags = resolve_region_flags(task, vaddr);
-  flags = flags | PageFlags::Present | PageFlags::User;
+  uint8_t* page_virt = reinterpret_cast<uint8_t*>(phys + KERNEL_VIRT_BASE);
+  fk::memory::set(page_virt, 0, PAGE_SIZE);
+
+  // Single O(N) scan: derive flags and handle file-backing in one pass.
+  // Default flags used when vaddr falls outside all tracked regions.
+  // Do NOT add User unconditionally: let region.flags decide privilege level.
+  PageFlags flags = PageFlags::Present | PageFlags::Writable | PageFlags::ExecuteDisable;
+  auto& regions = task->resources.memory.regions.list;
+  for (size_t i = 0; i < regions.size(); ++i) {
+    auto& region = regions[i];
+    if (!region.contains(vaddr)) continue;
+    flags = region.flags | PageFlags::Present;
+    if (region.backing_node) {
+      uint64_t file_offset = region.backing_offset + (vaddr - region.start);
+      region.backing_node->read(file_offset, PAGE_SIZE, page_virt);
+    }
+    break;
+  }
 
   VirtualMemoryManager::the().map_page(vaddr, phys, flags);
-
-  fk::memory::set(reinterpret_cast<void*>(phys + KERNEL_VIRT_BASE), 0, PAGE_SIZE);
 }
 
 static void handle_write_protection(uint64_t cr2) {
@@ -51,7 +65,11 @@ static void handle_write_protection(uint64_t cr2) {
   // Preserve the current user-ness and just make the page writable.
   if (refcount > 1) {
     uintptr_t new_phys = PhysicalMemoryManager::the().alloc_page();
-    if (!new_phys) return;
+    if (!new_phys) {
+      fk::algorithms::kwarn("PF", "CoW break OOM at %p, killing task", (void*)cr2);
+      SchedulerManager::the().kill_current_from_exception(SIGSEGV);
+      return; // [[noreturn]] — defensive: kill must be the terminal statement
+    }
 
     fk::memory::copy(reinterpret_cast<void*>(new_phys + KERNEL_VIRT_BASE),
                      reinterpret_cast<void*>(phys + KERNEL_VIRT_BASE), 0x1000);
@@ -91,6 +109,19 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
 
   // User-mode fault: demand paging, CoW break, or SIGSEGV with the faulting address.
   if (is_user) {
+    // Per-task page-fault rate limit (R3): kill before a fault storm consumes the CPU.
+    auto& mem = task->resources.memory.regions;
+    uint64_t now = TickManager::the().get_ticks();
+    if (now - mem.pf_window_ticks >= PF_STORM_WINDOW) {
+      mem.pf_count = 0;
+      mem.pf_window_ticks = now;
+    }
+    if (++mem.pf_count > PF_STORM_LIMIT) {
+      fk::algorithms::kwarn("PF", "Fault storm: pid=%lu %lu faults in %lu ticks — killing",
+                            task->control.identity.id.value(), mem.pf_count, PF_STORM_WINDOW);
+      SchedulerManager::the().kill_current_from_exception(SIGSEGV);
+    }
+
     if (not_present && task->is_address_in_allowed_regions(cr2)) {
       fk::algorithms::kdebug("PF", "demand-page %p pid=%lu", (void*)cr2, task->control.identity.id.value());
       handle_demand_paging(task, cr2, frame);
@@ -110,6 +141,32 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
     fk::algorithms::kwarn("PF", "User-mode Page Fault at %p pid=%lu code=%d RIP=%p err=0x%lx -> SIGSEGV",
                           (void*)cr2, task->control.identity.id.value(), (int)si.si_code,
                           (void*)frame->rip, (uint64_t)frame->error_code);
+    if (not_present) {
+      uintptr_t hw_cr3 = arch_read_cr3() & ~0xFFFULL;
+      uintptr_t task_cr3 = task->resources.memory.cr3;
+      fk::algorithms::kwarn("PF", "  CR3: hw=%p task=%p %s",
+                            (void*)hw_cr3, (void*)task_cr3,
+                            hw_cr3 == task_cr3 ? "match" : "MISMATCH");
+      uintptr_t walk = cr2 & ~0xFFFULL;
+      auto* pml4 = reinterpret_cast<uint64_t*>(hw_cr3);
+      size_t i4 = (walk >> 39) & 0x1FF;
+      size_t i3 = (walk >> 30) & 0x1FF;
+      size_t i2 = (walk >> 21) & 0x1FF;
+      size_t i1 = (walk >> 12) & 0x1FF;
+      fk::algorithms::kwarn("PF", "  PML4[%zu]=%p", i4, (void*)pml4[i4]);
+      if (pml4[i4] & 1) {
+        auto* pdpt = reinterpret_cast<uint64_t*>(pml4[i4] & ~0xFFFULL);
+        fk::algorithms::kwarn("PF", "  PDPT[%zu]=%p", i3, (void*)pdpt[i3]);
+        if ((pdpt[i3] & 1) && !(pdpt[i3] & (1ULL<<7))) {
+          auto* pd = reinterpret_cast<uint64_t*>(pdpt[i3] & ~0xFFFULL);
+          fk::algorithms::kwarn("PF", "  PD[%zu]=%p", i2, (void*)pd[i2]);
+          if ((pd[i2] & 1) && !(pd[i2] & (1ULL<<7))) {
+            auto* pt = reinterpret_cast<uint64_t*>(pd[i2] & ~0xFFFULL);
+            fk::algorithms::kwarn("PF", "  PT[%zu]=%p", i1, (void*)pt[i1]);
+          }
+        }
+      }
+    }
     fkernel::ipc::SignalDelivery::send_signal(task, SIGSEGV, &si, /*force=*/true);
     return;
   }
@@ -117,21 +174,39 @@ void page_fault_handler(uint8_t vector, InterruptFrame* frame) {
   // Kernel-mode fault. The only legitimate case is the kernel writing to user memory
   // through copy_to_user/copy_from_user inside an arch_smap_begin() window — that path
   // runs with RFLAGS.AC set. Without AC set, a supervisor fault on a user page is a bug.
+  //
+  // Exception: when the CPU has no SMAP (e.g. QEMU's default CPU model, SMAP=0), STAC
+  // is unavailable and RFLAGS.AC is never set by copy_to_user/copy_from_user. Without
+  // SMAP the kernel is free to touch user pages at the hardware level, so any supervisor
+  // fault on a user page is CoW/demand-paging recovery, not a kernel bug. Require AC only
+  // when SMAP is actually present.
+  bool smap_present = CPU::the().has_smap();
+  bool kmode_access_authorized = ac_flag || !smap_present;
   if (!task->is_a_kernel_task()) {
-    if (not_present && ac_flag && task->is_address_in_allowed_regions(cr2)) {
+    if (not_present && kmode_access_authorized && task->is_address_in_allowed_regions(cr2)) {
       fk::algorithms::kdebug("PF", "kernel demand-page %p pid=%lu (AC)", (void*)cr2, task->control.identity.id.value());
       handle_demand_paging(task, cr2, frame);
       return;
     }
 
-    if (write_fault && !not_present && ac_flag && is_user_page(cr2)) {
+    if (write_fault && !not_present && kmode_access_authorized && is_user_page(cr2)) {
       fk::algorithms::kdebug("PF", "kernel cow-fault %p pid=%lu (AC)", (void*)cr2, task->control.identity.id.value());
       handle_write_protection(cr2);
       return;
     }
   }
 
-  // Unhandled kernel fault — a genuine kernel bug. Dump context and halt.
+  // Kernel-mode fault while running a user task: kill it, don't halt the kernel.
+  if (!task->is_a_kernel_task()) {
+    fk::algorithms::kwarn("PF", "kmode PF CR2=%p ec=0x%lx RIP=%p",
+        (void*)cr2, (uint64_t)frame->error_code, (void*)frame->rip);
+    fk::algorithms::kwarn("PF", "  np=%d wr=%d ac=%d pid=%lu -> kill",
+        (int)not_present, (int)write_fault, (int)ac_flag,
+        task->control.identity.id.value());
+    SchedulerManager::the().kill_current_from_exception(SIGSEGV);
+  }
+
+  // Unhandled kernel fault in a kernel task — a genuine kernel bug. Dump context and halt.
   fk::algorithms::kexception(
       "Page Fault", "vector=%u error=0x%lx (%s, %s, %s %s) RIP=%p RSP=%p CR2=%p PID=%lu AC=%d",
       (unsigned)vector, (uint64_t)frame->error_code,

@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Loader/elf_loader_core.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 
@@ -158,9 +159,16 @@ ElfLoadOperationResult ElfLoaderCore::calculate_entry_point() {
     }
   }
 
-  // Fallback: If no PT_PHDR, it usually follows the ELF header
+  // Fallback: No PT_PHDR — find the first PT_LOAD and compute the virtual
+  // address of the phdrs from the file offset, matching Linux binfmt_elf.c.
   if (ph_addr == 0) {
-    ph_addr = m_context.load_base + m_context.header.e_phoff;
+    for (const auto& phdr : headers) {
+      if (phdr.p_type == PT_LOAD) {
+        ph_addr = m_context.load_base + phdr.p_vaddr +
+                  (m_context.header.e_phoff - phdr.p_offset);
+        break;
+      }
+    }
   }
 
   bool stack_executable = false;

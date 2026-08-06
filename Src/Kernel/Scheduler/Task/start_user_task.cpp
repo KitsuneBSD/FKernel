@@ -1,5 +1,6 @@
-#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <LibFK/Types/types.h>
+
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 
 extern "C" void enter_user_mode(uint64_t user_rip, uint64_t user_rsp);
 

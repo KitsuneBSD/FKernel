@@ -224,6 +224,13 @@ static const char* test_itoa_zero() {
   return nullptr;
 }
 
+static const char* test_itoa_int_min() {
+  char buffer[40];
+  kernel_itoa(-2147483647 - 1, buffer, 10);
+  TEST_ASSERT_STR_EQ("-2147483648", buffer, "itoa must not overflow on INT_MIN");
+  return nullptr;
+}
+
 // Test stol function
 static const char* test_stol_basic() {
   const char* str = "12345";
@@ -285,6 +292,7 @@ static const test_case_t libc_tests[] = {
     {"test_itoa_positive", test_itoa_positive},
     {"test_itoa_negative", test_itoa_negative},
     {"test_itoa_zero", test_itoa_zero},
+    {"test_itoa_int_min", test_itoa_int_min},
     {"test_stol_basic", test_stol_basic},
     {"test_memmove_basic", test_memmove_basic},
     {"test_memcpy_overlap", test_memcpy_overlap},

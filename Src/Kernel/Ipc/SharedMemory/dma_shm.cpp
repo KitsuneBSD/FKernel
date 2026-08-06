@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Ipc/SharedMemory/dma_shm.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 namespace ipc {

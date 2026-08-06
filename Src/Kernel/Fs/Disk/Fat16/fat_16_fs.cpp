@@ -1,12 +1,13 @@
-#include <Kernel/Fs/Disk/Fat16/fat_16_fs.h>
-#include <Kernel/Fs/Disk/Fat16/fat_16_node.h>
-#include <Kernel/Fs/Disk/Fat16/bpb.h>
-#include <Kernel/Fs/Disk/Fat16/directory_entry.h>
 #include <LibFK/Algorithms/Generic/fat_name.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Algorithms/Generic/string_algorithms.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Disk/Fat16/fat_16_fs.h>
+#include <Kernel/Fs/Disk/Fat16/fat_16_node.h>
+#include <Kernel/Fs/Disk/Fat16/bpb.h>
+#include <Kernel/Fs/Disk/Fat16/directory_entry.h>
 
 namespace fkernel {
 
@@ -80,7 +81,7 @@ Fat16FileSystem::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
             if (has_lfn) fk::memory::copy(entry.name, lfn_buf, 256);
             has_lfn = false;
             entry.type = (dir[j].attr & 0x10) != 0 ? 1 : 0;
-            entries.push_back(entry);
+            TRY(entries.push_back(entry));
         }
     }
     return {};

@@ -1,6 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_cmdline_node.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fk::core;
 

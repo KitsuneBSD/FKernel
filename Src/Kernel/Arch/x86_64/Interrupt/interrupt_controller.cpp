@@ -1,17 +1,15 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/i8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Arch/x86_64/Interrupt/isr_stubs.h>
 #include <Kernel/Arch/x86_64/Interrupt/non_maskable_interrupt.h>
-
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
-
 #include <Kernel/Clock/clock_interrupt.h>
-
-#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" void arch_flush_idt(void *idtr);
 
@@ -38,6 +36,12 @@ void InterruptController::initialize() {
   set_gate(8,  g_isr_stubs[8],  GateType::InterruptGate, GDT_KERNEL_CODE_SELECTOR, 1);
   set_gate(18, g_isr_stubs[18], GateType::InterruptGate, GDT_KERNEL_CODE_SELECTOR, 3);
 
+  // Vectors 1 (#DB) and 3 (#BP) must be DPL=3 trap gates so that user-space
+  // int1/int3 instructions reach the handler instead of faulting as #GP.
+  // SDM §6.11: gate DPL=0 blocks software INT from CPL>0.  Linux idt.c uses 0xEF.
+  set_gate(1, g_isr_stubs[1], GateType::UserTrapGate, GDT_KERNEL_CODE_SELECTOR, 0);
+  set_gate(3, g_isr_stubs[3], GateType::UserTrapGate, GDT_KERNEL_CODE_SELECTOR, 0);
+
   // NOTE: Interrupt Exception
   register_interrupt(divide_by_zero_handler, 0);
   register_interrupt(debug_handler, 1);
@@ -58,6 +62,9 @@ void InterruptController::initialize() {
   register_interrupt(machine_check_handler, 18);
   register_interrupt(simd_floating_point_exception_handler, 19);
   register_interrupt(virtualization_exception_handler, 20);
+
+  // APIC spurious vector: must not send EOI, must not panic (Intel SDM §10.9).
+  register_interrupt(apic_spurious_handler, 0xFF);
 
   // NOTE: Interrupt Routine
   register_interrupt(timer_handler, 32);         // IRQ0 -> timer

@@ -1,7 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_sched_node.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 using namespace fkernel::scheduler;
 
@@ -20,7 +21,7 @@ void ProcPidSchedNode::ensure_cached() {
   if (!t) {
     const char* msg = "(process not found)\n";
     m_cached.clear();
-    for (size_t i = 0; msg[i]; ++i) m_cached.push_back(static_cast<uint8_t>(msg[i]));
+    for (size_t i = 0; msg[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(msg[i])));
     return;
   }
 
@@ -55,5 +56,5 @@ void ProcPidSchedNode::ensure_cached() {
              (int)(t->resources.ipc.active_turnstile != nullptr));
   }
   m_cached.clear();
-  for (size_t i = 0; buf[i]; ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+  for (size_t i = 0; buf[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(buf[i])));
 }

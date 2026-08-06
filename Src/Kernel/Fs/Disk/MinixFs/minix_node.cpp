@@ -1,7 +1,8 @@
-#include <Kernel/Fs/Disk/MinixFs/minix_node.h>
-#include <Kernel/Fs/Disk/MinixFs/minix_fs.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Text/string.h>
+
+#include <Kernel/Fs/Disk/MinixFs/minix_node.h>
+#include <Kernel/Fs/Disk/MinixFs/minix_fs.h>
 
 namespace fkernel {
 

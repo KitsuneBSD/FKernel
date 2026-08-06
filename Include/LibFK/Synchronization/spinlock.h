@@ -19,14 +19,7 @@ public:
         : m_lock(0), m_owner_cpu(0), m_recursion_count(0), m_rank(rank) {}
 
     void lock() {
-        uint32_t cpu_id = 0;
-#ifdef __fkernel__
-        // Get CPU ID via local APIC ID (using assembly to avoid including APIC header)
-        // This is safe even before APIC is fully initialized by the manager.
-        uint32_t ebx;
-        asm volatile("cpuid" : "=b"(ebx) : "a"(1) : "rcx", "rdx");
-        cpu_id = (ebx >> 24) + 1;
-#endif
+        uint32_t cpu_id = cpu_lock_slot();
 
         if (m_owner_cpu == cpu_id && cpu_id != 0) {
             m_recursion_count = m_recursion_count + 1;
@@ -54,12 +47,7 @@ public:
     }
 
     bool try_lock() {
-        uint32_t cpu_id = 0;
-#ifdef __fkernel__
-        uint32_t ebx;
-        asm volatile("cpuid" : "=b"(ebx) : "a"(1) : "rcx", "rdx");
-        cpu_id = (ebx >> 24) + 1;
-#endif
+        uint32_t cpu_id = cpu_lock_slot();
 
         if (m_owner_cpu == cpu_id && cpu_id != 0) {
             m_recursion_count = m_recursion_count + 1;

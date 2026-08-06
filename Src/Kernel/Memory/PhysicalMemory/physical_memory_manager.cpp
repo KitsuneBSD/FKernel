@@ -1,13 +1,14 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Memory/Allocators/new.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Hardware/Firmware/Acpi/topology_manager.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_zone.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/Allocators/new.h>
-#include <LibFK/Utilities/memory.h>
 
 extern "C" uint8_t __kernel_start[];
 extern "C" uint8_t __kernel_end[];
@@ -472,9 +473,7 @@ uint16_t PhysicalMemoryManager::get_refcount(uintptr_t phys) const {
       if (!m_zones[i].cow_refcounts) return 1;
       size_t frame = (phys - z.base()) / FRAME_SIZE;
       if (frame >= m_zones[i].cow_frame_count) return 1;
-      uint16_t rc = m_zones[i].cow_refcounts[frame];
-      if (rc == 0) return 1;
-      return rc;
+      return m_zones[i].cow_refcounts[frame];
     }
   }
   return 1;

@@ -1,11 +1,12 @@
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_fs.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_node.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
+
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_fs.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_node.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 
 namespace fkernel {
 
@@ -18,7 +19,7 @@ HFSPlusFileSystem::create(fk::RefPtr<StorageDevice> device)
     uint32_t vh_off_in   = 1024 % sector_size;
 
     fk::containers::Vector<uint8_t> buf;
-    buf.resize(sector_size);
+    TRY(buf.resize(sector_size));
     if (device->read_sectors(vh_sector, 1, buf.begin()).is_error())
         return fk::core::Error::IOError;
 
@@ -123,7 +124,7 @@ static void list_cb(void* ctx, const char* name, const CatalogRecord& rec) {
     de.name[len] = '\0';
     de.type = (rec.type == kHFSPlusFolderRecord) ? 1u
                                                   : 0u;
-    lc->entries->push_back(de);
+    TRY_OR_FATAL(lc->entries->push_back(de));
 }
 
 fk::core::Result<void, fk::core::Error>

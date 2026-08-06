@@ -5,12 +5,12 @@ namespace fk {
 namespace text {
 
 void StringBuilder::append(char c) {
-    m_buffer.push_back(c);
+    TRY_OR_FATAL(m_buffer.push_back(c));
 }
 
 void StringBuilder::append(const char* s) {
     if (!s) return;
-    m_buffer.push_range(s, __builtin_strlen(s));
+    TRY_OR_FATAL(m_buffer.push_range(s, __builtin_strlen(s)));
 }
 
 void StringBuilder::append(const String& s) {
@@ -21,7 +21,7 @@ void StringBuilder::append(const String& s) {
 // append it. `hex_digits` selects lowercase hex for base 16.
 static void append_unsigned_impl(uint64_t n, int base, bool hex_upper,
                                   fk::containers::Vector<char>& out) {
-    if (n == 0) { out.push_back('0'); return; }
+    if (n == 0) { TRY_OR_FATAL(out.push_back('0')); return; }
     char buf[66]; // enough for base-2 64-bit + null
     int i = 65;
     buf[i] = '\0';
@@ -34,7 +34,7 @@ static void append_unsigned_impl(uint64_t n, int base, bool hex_upper,
         n /= (uint64_t)base;
     }
     const char* p = &buf[i];
-    while (*p) out.push_back(*p++);
+    while (*p) TRY_OR_FATAL(out.push_back(*p++));
 }
 
 void StringBuilder::append_decimal(int n) {

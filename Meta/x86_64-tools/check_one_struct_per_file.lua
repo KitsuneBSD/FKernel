@@ -29,11 +29,11 @@ local script_name = "check-one-struct-per-file"
 local EXEMPTED = {}
 for _, path in ipairs {
   -- ACPI specification structures
-  "Include/Kernel/Hardware/Acpi/srat.h",
-  "Include/Kernel/Hardware/Acpi/dmar.h",
-  "Include/Kernel/Hardware/Acpi/mcfg.h",
-  "Include/Kernel/Hardware/Acpi/topology_manager.h",
-  "Include/Kernel/Hardware/Acpi/acpi.h",
+  "Include/Kernel/Hardware/Firmware/Acpi/srat.h",
+  "Include/Kernel/Hardware/Firmware/Acpi/dmar.h",
+  "Include/Kernel/Hardware/Firmware/Acpi/mcfg.h",
+  "Include/Kernel/Hardware/Firmware/Acpi/topology_manager.h",
+  "Include/Kernel/Hardware/Firmware/Acpi/acpi.h",
   -- On-disk filesystem format structures
   "Include/Kernel/Fs/Disk/Ext2/ext2_super.h",
   "Include/Kernel/Fs/Disk/Ext3/ext3_super.h",
@@ -46,29 +46,24 @@ for _, path in ipairs {
   "Include/Kernel/Fs/Disk/RamDisk/ram_disk.h",
   "Include/Kernel/Fs/Disk/Iso9660/iso9660_vd.h",
   -- Storage hardware spec/impl structures
-  "Include/Kernel/Driver/Storage/storage_cache.h",
-  "Include/Kernel/Driver/Storage/Nvme/nvme_command.h",
-  "Include/Kernel/Driver/Storage/Nvme/nvme_queue_manager.h",
-  "Include/Kernel/Driver/Storage/Nvme/nvme_controller.h",
-  "Include/Kernel/Driver/Storage/Ata/dma_strategy.h",
-  "Include/Kernel/Driver/Storage/Ahci/ahci_controller.h",
-  "Include/Kernel/Driver/Storage/Ahci/interrupt_driven_ahci.h",
+  "Include/Kernel/Driver/Storage/Interfaces/storage_cache.h",
+  "Include/Kernel/Driver/Storage/Controllers/Nvme/nvme_command.h",
+  "Include/Kernel/Driver/Storage/Controllers/Nvme/nvme_queue_manager.h",
+  "Include/Kernel/Driver/Storage/Controllers/Nvme/nvme_controller.h",
+  "Include/Kernel/Driver/Storage/Controllers/Ata/dma_strategy.h",
+  "Include/Kernel/Driver/Storage/Controllers/Ahci/ahci_controller.h",
+  "Include/Kernel/Driver/Storage/Controllers/Ahci/interrupt_driven_ahci.h",
   -- Loader ABI/result type groupings
   "Include/Kernel/Loader/Types/elf64_dynamic.h",
   "Include/Kernel/Loader/Types/elf_results.h",
   -- PCI device + ioctl param
-  "Include/Kernel/Hardware/Pci/pci_node.h",
+  "Include/Kernel/Hardware/Buses/Pci/pci_node.h",
   -- VFS types
-  "Include/Kernel/Fs/Vfs/file_lock.h",
-  "Include/Kernel/Fs/Disk/Fat/fat_common.h",
+  "Include/Kernel/Fs/Vfs/FileLock/file_lock.h",
   -- Signal definitions
   "Include/Kernel/Posix/signal_defs.h",
   -- Volume layer
   "Include/Kernel/Driver/Device/BlockDevice/stackable_block_device.h",
-  -- SMP
-  "Include/Kernel/Smp/smp.h",
-  -- Debug
-  "Include/Kernel/Debug/debug_commands.h",
   -- VBE BIOS specification structures
   "Include/Kernel/Arch/x86_64/Driver/Vga/vbe_types.h",
   -- x86_64 IDT hardware specification
@@ -92,16 +87,10 @@ end
 local scope_label = FULL_SCAN and "ALL" or "KERNEL"
 
 -- Known tech debt (documented in TODO.md, reported as warnings not errors)
-local TECH_DEBT = {
-  ["Include/Kernel/Scheduler/Task/task.h"] =
-    "8+ top-level structs + nested Control/Resources (TODO.md: AGENTS.md P1 Secret Rule #1)",
-  ["Include/Kernel/Boot/boot_info.h"] =
-    "7 top-level types (TODO.md: AGENTS.md P1 Secret Rule #2)",
-  ["Include/Kernel/Boot/boot_timer.h"] =
-    "nested Mark struct (TODO.md: AGENTS.md P1 Secret Rule #10)",
-  ["Include/Kernel/Loader/Domains/dynamic_domain.h"] =
-    "nested RelaTable/SymbolContext (TODO.md: AGENTS.md P1 Secret Rule #9)",
-}
+-- NOTE: task.h, boot_info.h, boot_timer.h, dynamic_domain.h were previously
+-- listed here; all four are refactored to one type per file (verified
+-- 2026-08-05). boot_info.h/boot_timer.h moved to Include/Kernel/Boot/Core/.
+local TECH_DEBT = {}
 
 -- ─── C++ comment/string stripper ────────────────────────────────────────────
 

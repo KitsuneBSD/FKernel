@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/format.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_fd_node.h>
 #include <Kernel/Fs/Vfs/Core/file_description.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/format.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;
 
@@ -16,7 +17,7 @@ fk::core::Result<void, fk::core::Error> ProcPidFdDirNode::list_dir(fk::container
     DirectoryEntry de;
     fk::algorithms::format(de.name, sizeof(de.name), "%zu", i);
     de.type = 0;
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

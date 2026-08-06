@@ -1,9 +1,10 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_stat_node.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Scheduler/Task/task_state.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;
 
@@ -27,7 +28,7 @@ void ProcPidStatNode::ensure_cached() {
     snprintf(buf, sizeof(buf), "%llu (unknown) Z 0 0 0 0 -1 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0\n",
              (unsigned long long)m_pid.value());
     m_cached.clear();
-    for (size_t i = 0; buf[i]; ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+    for (size_t i = 0; buf[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(buf[i])));
     return;
   }
   {
@@ -49,7 +50,7 @@ void ProcPidStatNode::ensure_cached() {
              (unsigned long long)t->control.lifecycle.cpu_affinity);
   }
   m_cached.clear();
-  for (size_t i = 0; buf[i]; ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+  for (size_t i = 0; buf[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(buf[i])));
 }
 
 fk::core::Result<size_t, fk::core::Error> ProcPidStatNode::read(uint64_t offset, size_t size, uint8_t* buffer) {

@@ -1,11 +1,10 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/msi_helpers.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic_common.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Buses/Pci/pci_device.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
-// IOAPIC uses vectors 0x20..0x5F (32 base + up to 64 GSIs).
-// MSI pool starts at 0x60 to avoid collision with IOAPIC/LVT vectors.
 static uint32_t g_next_msi_vector = 0x60;
 
 uint32_t msi::lapic_phys_address() {

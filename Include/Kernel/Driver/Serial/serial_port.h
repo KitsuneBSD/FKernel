@@ -13,7 +13,7 @@
  * kernel output. Supports character output, string output,
  * and numeric formatting (decimal and hexadecimal).
  */
-class serial {
+class Serial {
 private:
   static constexpr uint16_t COM1 = 0x3F8; ///< COM1 base I/O port
 

@@ -1,6 +1,7 @@
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+
 #include <Kernel/Fs/Virtual/EventFd/event_fd_node.h>
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
-#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
 

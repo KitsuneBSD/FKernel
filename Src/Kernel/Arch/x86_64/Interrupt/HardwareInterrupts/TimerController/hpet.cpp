@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/TimerController/hpet.h>
 #include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Hardware/Firmware/Acpi/hpet.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 uint64_t HPETTimer::read_reg(uint64_t reg) {
   return m_hpet_regs[reg / sizeof(uint64_t)];

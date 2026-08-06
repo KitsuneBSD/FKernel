@@ -1,11 +1,12 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Types/types.h>
+
 #include <Kernel/Arch/x86_64/Segments/Gdt/gdt_structures.h>
 #include <Kernel/Arch/x86_64/Segments/Tss/tss_stacks.h>
 #include <Kernel/Arch/x86_64/Segments/gdt.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Types/types.h>
 
 extern "C" uint64_t stack_top;
 extern "C" uint64_t stack_bottom;

@@ -1,17 +1,13 @@
-#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/aligner.h>
+
+#include <Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h>
 
 BuddyAllocator::BuddyAllocator()
     : m_base_address(0), m_length(0) {
     m_state.reset();
 }
 
-BuddyAllocator::BuddyAllocator(uintptr_t base_address, size_t length)
-    : m_base_address(base_address), m_length(length) {
-    m_state.reset();
-    initialize();
-}
 
 void BuddyAllocator::add_range(uintptr_t base_address, size_t length) {
     fk::algorithms::klog(
@@ -127,51 +123,6 @@ uintptr_t BuddyAllocator::pop_free_block(size_t order) {
     return phys;
 }
 
-void BuddyAllocator::initialize() {
-    fk::algorithms::klog(
-        "BUDDY",
-        "Initialize start: base=%p len=%zu",
-        m_base_address,
-        m_length
-    );
-
-    uintptr_t aligned = fk::utilities::align_up(
-        m_base_address,
-        BUDDY_PAGE_SIZE
-    );
-
-    uintptr_t end = m_base_address + m_length;
-
-    m_base_address = aligned;
-    m_length = end - aligned;
-
-    uintptr_t current = m_base_address;
-    size_t remaining = m_length;
-
-    while (remaining >= order_to_size(MIN_ORDER)) {
-        size_t order = MAX_ORDER;
-
-        while (order > MIN_ORDER) {
-            size_t size = order_to_size(order);
-            if ((current & (size - 1)) == 0 && size <= remaining)
-                break;
-            order--;
-        }
-
-        push_free_block(order, current);
-
-        size_t size = order_to_size(order);
-        current += size;
-        remaining -= size;
-    }
-
-    fk::algorithms::klog(
-        "BUDDY",
-        "Initialize done: base=%p len=%zu",
-        m_base_address,
-        m_length
-    );
-}
 
 void* BuddyAllocator::alloc(size_t order) {
     if (order < MIN_ORDER)

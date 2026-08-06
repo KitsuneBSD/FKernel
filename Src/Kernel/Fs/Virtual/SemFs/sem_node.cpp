@@ -1,5 +1,6 @@
-#include <Kernel/Fs/Virtual/SemFs/sem_node.h>
 #include <LibFK/Memory/Pointers/ref_ptr.h>
+
+#include <Kernel/Fs/Virtual/SemFs/sem_node.h>
 
 namespace fkernel {
 

@@ -1,7 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 CPU::CPU() {
   uint32_t eax, ebx, ecx, edx;

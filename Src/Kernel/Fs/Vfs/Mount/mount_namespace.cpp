@@ -1,8 +1,9 @@
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
+
 #include <Kernel/Fs/Vfs/Mount/mount_namespace.h>
 #include <Kernel/Fs/Vfs/Core/dentry.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 

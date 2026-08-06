@@ -1,9 +1,10 @@
-#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
-#include <Kernel/Hardware/Firmware/Fadt/fadt.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Crypto/byte_checksum.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
+
+#include <Kernel/Hardware/Firmware/Acpi/acpi.h>
+#include <Kernel/Hardware/Firmware/Fadt/fadt.h>
 
 extern void initialize_fadt_from_acpi(fkernel::ACPIManager *);
 

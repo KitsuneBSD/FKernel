@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Driver/Vga/display.h>
 #include <Kernel/Driver/Vga/display_text.h>
-#include <LibFK/Utilities/memory.h>
 
 #ifdef __x86_64
 #include <Kernel/Arch/x86_64/io.h>

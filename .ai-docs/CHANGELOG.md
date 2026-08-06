@@ -4,6 +4,258 @@
 
 ---
 
+## Bugfixes + Refactors — L9/L10/M6/M5-residual/PMM/BuddyAllocator + Include order + xmake partition ✅ (2026-08-06)
+
+### L9 — vsscanf: matching failure corrigido ✅
+- `Src/LibC/stdio/file.c` → extraído em `Src/LibC/stdio/sscanf.c` (compatível com LibC_Testing).
+- `%i` com input sem dígitos nem prefixo: adicionado `const char *num_start`/`after_sign` tracking; agora retorna matching failure (break) em vez de escrever 0 e contar como match.
+- `%d`/`%i` com sinal mas sem dígitos: `s` restaurado a `num_start` para backtracking correto.
+- `%i` com prefixo "0" ou "0x" mas sem dígitos: valor 0, conta como match (correto).
+- xmake.lua: `sscanf=kernel_sscanf`/`vsscanf=kernel_vsscanf` + `add_files sscanf.c` adicionados ao target `LibC_Testing`.
+- 2 testes adicionados: `test_sscanf_matching_failure` em `tests/LibC/test_stdio_comprehensive.cpp`.
+
+### L10 — vsnprintf: precision para tipos inteiros ✅
+- `Src/LibC/stdio/vsnprintf.c`: `print_num()` recebe parâmetro `int precision` (-1 = nenhum).
+- `prec_zeros = max(0, precision - digit_count)`: zeros de precisão inseridos entre prefixo e dígitos.
+- Flag `0` (zero_pad) ignorada quando precision ≥ 0 (comportamento C99/C11 correto).
+- `%d/%i/%u/%o/%x/%X` passam `precision` para `print_num`; `%p` passa -1.
+- 6 sub-casos testados em `test_vsnprintf_precision_integer`: `%.5d`, `%.5d` largo, negativo, `%8.5d`, `%08.5d`, `%.5x`.
+
+### M6 — slab chamado antes de save_and_disable_interrupts ✅
+- `Src/Kernel/Memory/memory_manager.cpp`: `save_and_disable_interrupts()` movido para antes da chamada ao slab em `allocate()`, `reallocate()` e `free()`.
+- Caminhos de retorno via slab chamam `restore_interrupts(flags)` antes de retornar.
+- Elimina janela de IRQ não protegida entre entrada na função e chamada ao slab.
+
+### PMM — get_refcount conflating rc==0 com "não rastreado" ✅
+- `Src/Kernel/Memory/PhysicalMemory/physical_memory_manager.cpp`: `get_refcount()` agora retorna 0 para frames rastreados com refcount zero; retorna 1 somente para frames não rastreados (sem array cow_refcounts ou out-of-range).
+
+### BuddyAllocator — dead code removido ✅
+- `Include/Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.h`: declaração de `void initialize()` e construtor de 2 argumentos removidos.
+- `Src/Kernel/Memory/PhysicalMemory/Buddy/buddy_allocator.cpp`: implementação de `BuddyAllocator::initialize()` e construtor `(uintptr_t, size_t)` removidos. Única initialização válida é `initialize_from_bitmap()`.
+
+### Resíduo M5 — handle_demand_paging OR User incondicional ✅
+- `Src/Kernel/Arch/x86_64/Interrupt/Handler/Exception/pf_handler.cpp`: flags default de demand-paging não incluem mais `PageFlags::User` incondicionalmente; `region.flags | PageFlags::Present` (sem OR User) preserva o User bit apenas se region.flags já o contiver.
+
+### Include Order Reversed — bulk fix ✅
+- Script `Meta/reorder_includes.py` criado; aplica ordem canônica `LibC → LibFK → Kernel → Other` a todos os `.cpp` do Kernel.
+- 315/464 arquivos reordenados; `xmake` + `xmake check-layers` passando limpo.
+- `Include/LibFK/Synchronization/interrupt_disabler.h`: `#include <LibFK/Types/types.h>` adicionado (header self-contained — `uint64_t` estava implicitamente disponível via Kernel transitive antes da reordenação).
+
+### xmake.lua — Particionado por construct ✅
+- `xmake.lua` (379→40 linhas): rules/policies/dirs/toolchain + `includes()`.
+- `xmake/options.lua`: knobs de configuração (`initrd_mode`).
+- `xmake/targets.lua`: targets `FKernel`, `LibC_Testing`, `Test` (com flags/sources).
+- `xmake/tasks.lua`: todas as tasks (`check-*`, `setup-hda`, `build-initrd`, `analyze`).
+
+Build: `xmake` limpo, `xmake run Test` → **ALL TEST SUITES PASSED** (19 testes LibC::Stdio incluindo 2 novos), `check-layers` ✅.
+
+---
+
+## Bugfixes — L4/C2 ✅ (2026-08-06)
+
+### L4 — Lock rank tracker agora per-CPU ✅
+- `Include/LibFK/Synchronization/lock_rank.h`: `g_current_lock_rank` (single global) → `g_cpu_lock_ranks[FK_MAX_CPUS=64]` (per-CPU array). Adicionado `cpu_lock_slot()` inline que extrai APIC ID via CPUID com guard `#ifdef __fkernel__` (retorna slot 0 em host-side tests e em caminhos pre-APIC). `current_cpu_lock_rank()` e `set_cpu_lock_rank()` agora usam o slot per-CPU.
+- `Include/LibFK/Synchronization/spinlock.h`: dois blocos de CPUID inline (`lock()` e `try_lock()`) substituídos por chamada a `cpu_lock_slot()` — elimina duplicação de código.
+
+### C2 — `DmaBuffer` legacy removido; todos os 21 call sites migrados ✅
+- Legacy `struct DmaBuffer` (`Memory/Dma/dma_buffer.h`) + funções `dma_alloc_buffer`/`dma_free_buffer` deletados.
+- 4 consumers migrados para `fkernel::DmaBuffer` (`Driver/Async/dma_buffer.h`) via API `allocate(size)` / `virtual_address()` / `physical_address().as_uintptr()`:
+  - `ahci_controller.cpp` + `interrupt_driven_ahci.cpp` (6 call sites): alocação via `port.X.allocate()` diretamente no membro; `.vaddr` → `.virtual_address()`, `.phys` → `.physical_address().as_uintptr()`.
+  - `nvme_controller.cpp` (12 call sites): `TRY(m_admin_queue.sq_buffer.allocate(4096))` etc.; `scan_namespaces` (void) usa `.is_error()` manual; `dma_free_buffer` eliminados (RAII).
+  - `dma_strategy.cpp` (2 call sites): `!m_prdt_buffer.is_valid()` guard + `TRY(m_prdt_buffer.allocate(4096))`.
+  - `e1000.cpp` (4 call sites + 2 vaddr em send/recv): `m_rx_ring.allocate()`, `.virtual_address()`, `.physical_address().as_uintptr()`.
+- Headers atualizados: `ahci_port.h`, `ahci_controller.h`, `nvme_queue_pair.h`, `dma_strategy.h`, `e1000.h`.
+- RAII cleanup dos DmaBuffers elimina leak de recursos que existia antes (AHCI destructor não limpava DMA buffers dos ports).
+
+Build: `xmake` limpo, testes **42 suites / PASS**, `check-layers` ✅.
+
+---
+
+## Bugfixes — C3/M11/M12/L5/L8 ✅ (2026-08-06)
+
+### C3 — FAT32 read path: null check ausente no kmalloc ✅
+- `Src/Kernel/Fs/Disk/Fat32/fat_32_fs.cpp:237` (`read_from_cluster_chain`): `temp` alocado sem null check e passado direto para `m_device->read()` + `fk::memory::copy()`. Adicionado null check retornando `Error::OutOfMemory`; also added `is_error()` check on the device read to return `Error::IOError` consistently (bônus: fat16 já tinha o check, ext2/ext3/ext4/ufs/iso9660/block_device todos verificados como corretos — único caller sem check era fat32).
+
+### M11 — `get_page_flags` não mascara mais Accessed/Dirty ✅
+- `Src/Kernel/Memory/VirtualMemory/virtual_memory_manager.cpp:329-330`: removidos os dois `flags &= ~PageFlags::Accessed/Dirty`. A função agora retorna o raw PTE flags sem mascarar bits de hardware — callers que precisem excluir esses bits podem fazê-lo localmente. Nenhum caller existente inspeciona Accessed/Dirty, então a mudança é backward-compatible.
+
+### M12 — Direct map pula buracos físicos ✅
+- `Include/Kernel/Memory/PhysicalMemory/physical_memory_manager.h`: adicionado `for_each_zone(Fn&&)` template para iterar sobre zonas usáveis.
+- `Src/Kernel/Memory/VirtualMemory/virtual_memory_manager.cpp` (`extend_direct_map`): adicionado lambda `chunk_has_ram(offset)` que verifica se alguma zona usável se sobrepõe com o chunk de 2 MiB; chunks sem RAM real (buracos de MMIO, ACPI, VGA, etc.) são pulados. Melhora corretude W^X: o direct map agora não mapeia regiões MMIO não-RAM como memória regular.
+
+### L5 — `printf`: buffer global → stack-allocated ✅
+- `Src/LibC/stdio/printf.c`: `static char g_printf_buf[2048]` global removido; `vprintf` usa `char buf[2048]` local. Elimina reentrância e corrupção de buffer quando chamado de contexto de IRQ concorrente.
+
+### L8 — `strtoull`/`strtoll`/`strtoul`: overflow silencioso corrigido ✅
+- `Src/LibC/stdlib.c`:
+  - `strtoul`: adicionado check `result > (ULONG_MAX - digit) / base → errno=ERANGE, return ULONG_MAX`.
+  - `strtoll`: reimplementado corretamente (antes delegava em `strtol`, perdendo a faixa >LONG_MAX/LLONG_MAX). Agora usa `unsigned long long` internamente com cutoff para LLONG_MAX/LLONG_MIN, `errno=ERANGE`.
+  - `strtoull`: adicionado check `result > (ULLONG_MAX - digit) / base → errno=ERANGE, return ULLONG_MAX`.
+
+Build: `xmake` limpo, testes **42 suites / 482+ PASS**, `check-layers` ✅.
+
+---
+
+## Conformidade AGENTS.md — C1/C4 + doc fixes ✅ (2026-08-06)
+
+### C1 — asm x86 cru → arch_* em 7 arquivos Kernel ✅
+- Novas funções em `cpu_ops.h/cpp`: `arch_read_cr0`, `arch_write_cr0`, `arch_wbinvd`, `arch_flush_tlb`, `arch_get_cpu_id`.
+- `Init/init.cpp:135`: `asm volatile("cli")` → `arch_disable_interrupts()`.
+- `Syscall/syscall.cpp:17-21`: `syscall_tsc_now()` com `rdtsc` inline → `arch_read_tsc()`; include `cpu_ops.h` adicionado no `#ifdef __x86_64__`.
+- `Hardware/Firmware/Fadt/fadt_manager.cpp:69`: `asm volatile("" ::: "memory")` → `__sync_synchronize()`.
+- `Scheduler/Core/scheduler_manager.cpp:286`: `asm volatile("lea ap_entry(%%rip), %0")` → `reinterpret_cast<uint64_t>(reinterpret_cast<void*>(ap_entry))`; `extern "C" void ap_entry(uint32_t)` declarado em `ap_entry.h`.
+- `Hardware/Cpu/mtrr.cpp:12-23,56,77`: helpers estáticos locais `read_cr0/write_cr0/flush_tlb` com asm cru removidos; substituídos por `arch_read_cr0/write_cr0/arch_wbinvd/arch_flush_tlb`. Include `cpu_ops.h` adicionado.
+- `Hardware/Cpu/cpu_block.h:25`: `get_current_cpu_id()` com `mov %%gs:32` → chama `arch_get_cpu_id()`. Include `cpu_ops.h` adicionado.
+- Bônus: `Arch/x86_64/Interrupt/Handler/Exception/device_not_available.cpp` — removido `extern "C" uint8_t g_use_xsave` (conflito de linkage com `cpu_ops.h`); `fpu_save/fpu_restore` locais com asm cru substituídos por `arch_fpu_save/arch_fpu_restore`.
+- `check-arch-asm` agora reporta **4 violações** (todas em LibFK/L7 — decisão arquitetural pendente) vs 10 anteriores.
+
+### C4 — `kerror` → `kwarn` para erros recuperáveis ✅
+- `Driver/Device/driver_manager.cpp:21,32`: null pointer de entrada → `kwarn` (função retorna `Error::InvalidParameter`).
+- `Driver/Storage/Controllers/Ata/ata_device.cpp:7,19`: null strategy → `kwarn` (retorna `Error::InvalidParameter`).
+- `Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.cpp:73,82,90,99`: sem controller → `kwarn` (retorna graciosamente ou `Error::NoDevice`).
+- `Driver/Storage/Controllers/Ata/pio_strategy.cpp:71,103`: timeout DRQ → `kwarn` (retorna `Error::IOError` ao caller).
+
+### Doc fix — AGENTS.md ✅
+- `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` → `panic.cpp` (nome real do arquivo).
+- Tabela logging e `arch_cpu_idle` já estavam corretos.
+
+Build: `xmake` limpo, testes **42 suites / 482 PASS**, `check-layers`/`check-syscalls` ✅, `check-arch-asm` 4 violações (LibFK/L7 — esperado).
+
+---
+
+## PF handler — kmode CoW recovery sem SMAP ✅ (2026-08-05)
+
+- **Bug**: QEMU reporta `SMAP=0` (CPU default). Sem SMAP, `stac_if_smap()` nunca executa STAC → `RFLAGS.AC` fica 0. O handler kmode do `pf_handler.cpp` exigia `ac_flag` para recuperar CoW/demand-paging em página de usuário → todo kmode PF legítimo (ex.: `sys_read` → `copy_to_user` → `memcpy` num buffer CoW RO pós-fork) matava a task com falso positivo. Exposto pelo sh interativo do MockOS: `echo hi` → fork → SIGCHLD → handler faz `read` em página CoW → PF → kill.
+- **Fix** (`Src/Kernel/Arch/x86_64/Interrupt/Handler/Exception/pf_handler.cpp`): a recuperação kmode aceita o PF quando `ac_flag || !CPU::the().has_smap()`. Sem SMAP o kernel toca páginas de usuário sem restrição de hardware, então todo fault supervisor em página de usuário é CoW/demand-paging; AC só é exigido quando SMAP está presente. Include `Kernel/Hardware/Cpu/cpu.h` adicionado.
+- **Verificação**: reprodução QEMU (sendkey `echo hi` via monitor socket) — 3 comandos consecutivos: `fork: parent=9, child=10/11/12` → execve echo → exit → SIGCHLD → handler → **sh sobrevive** (antes: `kmode PF CR2=0x40002040 -> kill` na 1ª execução). `xmake` limpo, testes **42 suites / 482 PASS**, `check-layers`/`check-syscalls` ✅.
+
+---
+
+## Auditoria LibC/LibFK — L1/L2/L3/L6/L10(metade)/L11 ✅ (2026-08-05)
+
+### L2 — `Vector` propaga `Result` no OOM (nunca engolir) ✅
+- `Include/LibFK/Container/Sequence/vector.h`: mutators `push_back`/`push_range`/`insert_at`/`resize` → `[[nodiscard]] fk::core::Result<void>`; privados `ensure_capacity`/`grow`/`reallocate_to` → `Result<void>`; `reallocate_to` retorna `Error::OutOfMemory` em overflow de tamanho e kmalloc null (antes: return sem crescer + placement-new fora da capacidade → corrupção de heap sob pressão).
+- `Include/LibFK/Core/result.h`: nova macro `TRY_OR_FATAL(expr)` (kfatal + `__builtin_unreachable()`) junto do `TRY` — consistente com L11.
+- **Sweep de 165 call sites** (`-Werror` + `[[nodiscard]]` tornam ignorar um erro de compilação; coletados com `-Wno-error=unused-result`): `TRY(...)` onde o caller propaga `Result`/`Error`; `TRY_OR_FATAL(...)` em callers `void`/`int`/syscall handlers (que não têm canal de propagação). 6 subagentes paralelos (grupos A–F por subsystem), re-coleta final confirmou **0 sites restantes**.
+- Kernel builda limpo (`xmake`), testes **42 suites / 482 tests PASS** (incl. suites relinkadas do L6), `check-layers`/`check-syscalls` ✅. `check-arch-asm`: 10 violações pré-existentes (mtrr/fadt/init/scheduler/syscall/cpu_block/cxxabi/log.h — Phase 42, fora do escopo).
+
+
+### L1 — errno ABI (contrato musl/BusyBox) ✅
+- `Include/LibFK/Core/errno_codes.h` **deletado** (grep: zero referências) — fonte única virou `<LibC/errno.h>`.
+- `Include/LibFK/Core/error.h` → `#include <LibC/errno.h>`; `Error::InvalidData 100→1001`, `NotASymlink 101→1000` (anotadas colisões com `ENETDOWN=100`/`ENETUNREACH=101`).
+- `Include/Kernel/Posix/sys/errno.h` → inclui `<LibC/errno.h>` (fachada ABI userspace).
+- `Include/Kernel/Syscall/syscall_utils.h`: `NotASymlink→22 (EINVAL)`, `InvalidData→22`, comentário `PermissionDenied→EPERM` corrigido.
+- **Checker**: `check_layer_separation.lua` ganhou exceção documentada para `Kernel/Posix/sys/errno.h` (fachada ABI, não código de kernel) e agora aplica a tabela de exceções também a headers (antes só `.cpp`).
+- **Teste**: `tests/Kernel/test_errno_abi.cpp` (static_asserts Linux: EAGAIN=11, ENOSYS=38, ENOTEMPTY=39, ENAMETOOLONG=36, ELOOP=40, ETIMEDOUT=110, EINVAL=22, ENETUNREACH=101, ENETDOWN=100 + `error_to_errno` runtime) → suite `Kernel::ErrnoABI`.
+
+### L3 — signed overflow no formatting ✅
+- `Src/LibC/string/itoa.c`, `Include/LibC/string.h:39` (`itoa_signed`) e `Src/LibC/stdio/vsnprintf.c:106`: magnitude calculada como `0 - (uint64_t)val` (nunca `-val` em int64/int → UB para INT_MIN/INT64_MIN, índice negativo em `digits[]`).
+- **Teste**: `test_itoa_int_min` em `test_string_memory_comprehensive.cpp` + `test_format_int64_min` (INT64_MIN/INT32_MIN) no stdio.
+
+### L6 — testes órfãos re-linkados ✅
+- `LibC_Testing` passa a compilar `stdio/vsnprintf.c` + `stdio/snprintf.c` (renames `kernel_*` já existiam).
+- `tests/LibC/test_stdio_comprehensive.cpp` reescrito para `kernel_snprintf`/`kernel_vsnprintf` (wrapper variádico real), **corrigido bug de teste**: `strncmp("String: test", 13)` comparava até o NUL do literal → agora `"String: test, Char: A", 21`.
+- **Deletado** `tests/LibC/test_string_memory.cpp` (redundante com o comprehensive).
+- **Relinkados** 6 suites kernel órfãs: `Kernel::Turnstile`, `Kernel::MLFQQueue`, `Kernel::TcpConnection`, `Kernel::PathResolver`, `Kernel::FileDescription`, `Driver::Nvme::Refactoring` (convertido de `main()` para runner). Fontes/stubs adicionados: `turnstile.cpp`, `tcp_connection.cpp`, `path_resolver.cpp`, `file_description.cpp`, `scheduler_stubs.cpp`, `vfs_resolver_stubs.cpp`.
+- Total: **41 suites / 450 tests** (kernel: **17 suites / 145 tests**), `xmake run Test` verde.
+
+### L10 (metade) — vsnprintf retorno C11 ✅
+- `vsnprintf` agora conta o total mesmo com buffer cheio/null (helpers com `total*`), retornando o comprimento completo (C11 §7.21.6.5/12 — `snprintf(nullptr,0,...)` vira query de tamanho); `%p` não impõe mais width=18. Buffer null/`max==0` é seguro.
+- **Restante de L10** (precision `%.5d` em inteiros) permanece em aberto no TODO.md.
+
+### L11 — `operator new` OOM ✅
+- `Src/LibFK/Memory/Allocators/new.cpp`: `operator new`/`new[]` com `heap_malloc` null → `kfatal("HEAP", ...)` + `__builtin_unreachable()` (com `-fno-exceptions` não há canal de propagação; simplifica L2).
+
+---
+
+## TODO ↔ source verification + docs sync ✅ (2026-08-05)
+
+Verificação completa do `TODO.md` contra o código real (sub-agentes + greps + reads diretos). 7 claims stale/invertidas corrigidas; todas as auditorias M/I/R re-derivadas do código; docs sincronizadas.
+
+**Claims corrigidas no TODO.md:**
+- **Syscalls: 207 → 206 registrados** — verificado: 206 `register_syscall` em `syscall.cpp:264-469`; `syscall_list/` tem 207 arquivos (206 handlers + 1 suporte `Time/posix_timer.cpp` sem handler). `check-syscalls` passa.
+- **Ext2 triple-indirect ✅** — `ext2_fs.cpp:262-296` implementa L1→L2→leaf com `ensure_indirect` (TODO dizia o contrário).
+- **I1 confirmado** — handler spurious APIC (0xFF) registrado em `interrupt_controller.cpp:69` (no-op sem EOI; não cai no `default_handler`). Resíduo: normalizar `vector−32` no dispatch (check spurious do PIC em `8259_pic.cpp:73-76` continua código morto).
+- **R1 confirmado** — `user_range_is_accessible()` em `user_access.cpp:20-35` (Design A).
+- **C1 refutado** (TODO anterior dizia "fadt fix aplicado") — `fadt_manager.cpp:69` **ainda tem** `asm volatile("" ::: "memory")` cru; proposta `__sync_synchronize()` NÃO aplicada.
+- **Include order: 315/325 (97%)**, não 320/462 (re-derivado via `rg` + `check_layers.lua`).
+- **DmaBuffer legacy: 21 call sites** (NVMe 12, AHCI 3, ATA 2, E1000 4) — não removível sem migrar 4 consumers.
+
+**Verificações confirmadas:** M1–M4 corrigidos com testes (`test_buddy_allocator.cpp`, `test_slab_allocator.cpp`); M5/M7–M10/M13 ✅; M6/M11/M12 ⚠️ abertos; I2–I5 ✅; R2–R4 ✅; L1–L11 abertos; C5 + checkers corrigidos; C1–C4 abertos; kernel **10 suites / 99 testes** (xmake.lua:218-227); slab **10 caches (16–8192B)** — header dizia "16–2048", corrigido.
+
+**TODO.md limpo:** removidas todas as seções concluídas (itens ✅ das auditorias M/I/R, sprint de estabilidade, Recuperação de Falhas, Phase 43, Phase 40a, Limites Rígidos, scaffolding vazio, um-handler-por-arquivo). Restam só bugs abertos e trabalho pendente; seções MEDIUM re-numeradas 3–18.
+
+**Docs sincronizadas:**
+- `Docs/Architecture/system-overview.md`: 207→206; NVMe PRP2 + AHCI async removidos dos caveats (implementados); VBE placeholder mantido.
+- `Docs/Kernel/Syscalls/README.md` (3 pontos) + `Docs/Domains/ipc-capabilities.md`: 207→206.
+- `DocsSummary.md`: syscall 206 (6 pontos), ext2 triple-indirect ✅, NotImplemented 8, test coverage (10 suites/99 kernel), logging split.
+- `.ai-docs/architectural-decisions/current-state-analysis.md`: slab 8→10 caches, syscalls ~139→~206, kernel tests 0→10 suites/99.
+- `AGENTS.md`: `arch_cpu_idle()` removido do Phase 42 (já implementado em `cpu_ops.cpp:151`, usado em `scheduler_manager.cpp:321`); tabela de logging `kerror` "halts" → "returns" (split `kfatal`/`kerror`).
+- Docs de logging (`Docs/Kernel/Logging/README.md`, `Docs/Domains/logging.md`, `.ai-docs/development-patterns/kernel-logging.md`): split `kfatal`/`kerror` refletido.
+- `Include/Kernel/Memory/ObjectMemory/slab_allocator.h`: comentário "16–2048 bytes" → "16–8192 bytes".
+
+---
+
+## Sprint de estabilidade — completo ✅ (2026-08-04)
+
+Continuação do sprint de corretude + latência de exceções/interrupções.
+
+**I2 — DPL=3 para #DB e #BP:**
+- `Include/Kernel/Arch/x86_64/Interrupt/gate_type.h`: `UserTrapGate = 0xEF` (P=1, DPL=3, Type=Trap) adicionado ao enum `GateType`.
+- `Src/Kernel/Arch/x86_64/Interrupt/interrupt_controller.cpp`: vetores 1 (#DB) e 3 (#BP) re-setados com `UserTrapGate` após o loop geral. `int3`/`int1` de user space agora entregam SIGTRAP em vez de #GP→SIGILL.
+
+**I5 — static_assert PtRegs↔InterruptFrame:**
+- `Src/Kernel/Arch/x86_64/Interrupt/interrupt_dispatch.cpp`: `static_assert` de `sizeof` + `__builtin_offsetof` para `rip`/`rflags`/`rsp` em ambos os structs. Qualquer mudança de layout nos dois structs falha o build imediatamente.
+
+**R2-resíduo — `return` defensivo pós-kill:**
+- `pf_handler.cpp`: `return;` adicionado após cada `kill_current_from_exception(SIGSEGV)` em `handle_demand_paging` (OOM) e `handle_write_protection` (CoW break OOM). Código com `phys=0` era dead-code-por-atributo; agora é dead-code-por-estrutura.
+
+**R1 Design A — EFAULT em copy_from_user/copy_to_user:**
+- Já implementado: `user_range_is_accessible()` em `user_access.cpp` faz validação por página via `is_address_in_allowed_regions()`. Marcado como ✅ no TODO.
+
+**R4 / Layer 3 — panic_exception() unificado:**
+- Já implementado: `panic.cpp:33-59` + macros `GENERIC_EXCEPTION_HANDLER*` em `exception_macros.h`. Marcado como ✅ no TODO.
+
+**Hot path #PF — double O(N) scan eliminado:**
+- `pf_handler.cpp`: `resolve_region_flags()` (função separada) fundida com o loop de file-backing em `handle_demand_paging`. Um único passe O(N) agora deriva flags e lida com backing; a função auxiliar foi removida.
+
+**TSC instrumentation (Item 1):**
+- `interrupt_dispatch.cpp`: `g_tsc_max_irq[256]` + `irq_tsc_now()` — max cycles per interrupt vector medido em cada `interrupt_dispatch`; dump periódico de 5 s via `tsc_latency_dump()` integrado ao loop de avaliação de IRQ storm.
+- `syscall.cpp`: `g_tsc_max_syscall` — max cycles do `SyscallManager::handle()` medido em cada `syscall_dispatcher`; resetado junto com os IRQ maxes no dump de 5 s.
+
+**I4 — sinais no epilogue do syscall:**
+- Já implementado: `syscall_dispatcher` chama `handle_pending_signals(task, regs, orig_syscall_num)` antes de retornar para `sysret`. POSIX: sinais entregues antes de voltar ao user. Marcado como ✅.
+
+**Sprint completo:** todos os 10 itens do sprint de estabilidade (corretude + latência) estão fechados. Próximo sprint: Phase 51c (IPC fastpath reply+recv fusion).
+
+---
+
+## IRQ storm fix + interrupt hardening ✅ (2026-08-04)
+
+**Root cause** of 387k page-fault storm on SMP: `VirtualMemoryManager::m_pml4` is a global singleton field. On SMP, whenever any CPU calls `switch_address_space()` (e.g. CPU 1 scheduling its idle task) the shared `m_pml4` field changes globally. CPU 0, while handling a CoW write-protection fault for busybox-init, called `translate(user_vaddr)` which walked the WRONG (idle/kernel) PML4, returned 0, and `handle_write_protection` returned without fixing the mapping → infinite fault retry → 387k faults/second.
+
+**Fixes:**
+
+- `Src/Kernel/Memory/VirtualMemory/virtual_memory_manager.cpp`: Added `cpu_pml4()` static helper that reads the actual CPU CR3 via `arch_read_cr3()`. All per-CPU page table operations now use `cpu_pml4()` instead of the stale `m_pml4` singleton field: `translate`, `get_page_flags`, `map_page`, `protect_page`, `get_pte`, `unmap_page_range`. Kernel-init operations (`initialize`, `extend_direct_map`) keep using `m_pml4` (correct at boot, no user tasks running).
+
+- `Src/Kernel/Arch/x86_64/Interrupt/Handler/Exception/pf_handler.cpp` + `Include/Kernel/Scheduler/Task/task_memory_regions.h`: Per-task page fault rate-limit (R3) — 500 faults per 10 ticks (100ms) triggers `kill_current_from_exception(SIGSEGV)`. Fields `pf_count`/`pf_window_ticks` added to `TaskMemoryRegions`.
+
+- `Src/Kernel/Arch/x86_64/Interrupt/Handler/Routine/apic_spurious_handler.cpp` + `interrupt_controller.cpp` (I1): APIC spurious interrupt (vector 0xFF) now handled by a no-op that does NOT send EOI (Intel SDM §10.9). Prevents kernel halt on any EOI race with PCI/MSI + LAPIC.
+
+- `Src/Kernel/Loader/Domains/elf_loader_core.cpp`: AT_PHDR fallback formula fixed for ET_EXEC without PT_PHDR — now uses `load_base + phdr.p_vaddr + (e_phoff - phdr.p_offset)` matching Linux `binfmt_elf.c`. For busybox: `0 + 0x400000 + (0x40 - 0) = 0x400040` (was `0x40` → musl crash at `__init_tls`).
+
+---
+
+## Documentation sync — hardware/storage/memory gaps ✅ (2026-08-04)
+
+- TODO.md: `NotImplemented` 12→**8 em 4 arquivos** (re-derivado por `rg "NotImplemented" Src/Kernel`); M10 (file-backed) ✅ na Quick Status; nova linha **Hardware/Firmware (ACPI)** (AML ❌); Drivers: USB = headers-only, AHCI/NVMe interrupt-driven; nova seção 20 ACPI.
+- `Docs/Domains/drivers-framework.md`: corrigido claim stale "polling-based storage (interrupt-driven removed)" → AHCI/NVMe interrupt-driven async; nova seção **USB Status (Phase 50)**; decomposição NVMe atualizada (NvmeController/NvmeQueuePair/NvmeNamespace/NvmeCommand/NvmeCommandBuilder/NvmeCompletionProcessor).
+- `Docs/Domains/memory-management-guide.md`: slab-first heap ≤**2048**B (era 8192); demand paging file-backed via `backing_node->read()` (não "page cache").
+- `Docs/Kernel/Hardware/README.md`: Current Status com storage interrupt-driven + USB headers-only + AML ausente.
+- `Docs/Kernel/Process/README.md`: thread groups (CLONE_THREAD) parcial — tgid existe, signal routing incompleto (Phase 44).
+
+---
+
 ## Status sync + ASLR entropy fix ✅ (session 23)
 
 - `Src/Kernel/Loader/Domains/parser_domain.cpp`: `aslr_random_base()` agora usa `ChaCha20PRNG` (CSPRNG seeded em `init.cpp`) em vez de `TickManager::get_ticks()`. Corrige também bug de entropia: `(seed & 0x0FFFF000)` limitava o range efetivo do ASLR a 1 MiB (~14 bits) em vez de 1.5 GiB. Removido include arch-específico `tick_manager.h` do loader genérico (portabilidade Phase 42).

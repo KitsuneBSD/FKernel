@@ -95,6 +95,12 @@ public:
    */
   uintptr_t alloc_page(ZoneType preferred = ZoneType::NORMAL, uint32_t preferred_node = 0);
 
+  /**
+   * @brief Like alloc_page() but never returns a frame from ZoneType::HIGH.
+   * Use for page table pages, which must be accessible via identity mapping (<4GiB).
+   */
+  uintptr_t alloc_page_for_pagetable();
+
   /** @brief Frees a previously allocated page (refcount-aware). */
   void free_page(uintptr_t phys);
 
@@ -139,6 +145,13 @@ public:
 
   /** @return Total free RAM in bytes. */
   size_t free_memory() const { return m_free_memory; }
+
+  /** Calls fn(base, length) for each usable RAM zone. */
+  template <typename Fn>
+  void for_each_zone(Fn&& fn) const {
+    for (size_t i = 0; i < m_zone_count; ++i)
+      fn(m_zones[i].zone.base(), m_zones[i].zone.length());
+  }
 };
 
 } // namespace fkernel

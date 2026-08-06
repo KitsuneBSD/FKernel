@@ -1,7 +1,8 @@
-#include <Kernel/Fs/Virtual/SemFs/sem_dir_node.h>
-#include <Kernel/Fs/Virtual/SemFs/sem_node.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/SemFs/sem_dir_node.h>
+#include <Kernel/Fs/Virtual/SemFs/sem_node.h>
 
 namespace fkernel {
 
@@ -20,7 +21,7 @@ SemDirNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
     DirectoryEntry de{};
     fk::memory::copy_n(de.name, child.first.c_str(), sizeof(de.name) - 1);
     de.type = 0;
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }
@@ -38,7 +39,7 @@ SemDirNode::create_child(const char* name, [[maybe_unused]] int mode) {
   sem->set_name(name);
   sem->set_parent(this);
 
-  m_children.push_back({fk::text::String(name), fk::RefPtr<Node>(sem)});
+  TRY(m_children.push_back({fk::text::String(name), fk::RefPtr<Node>(sem)}));
   fk::algorithms::kdebug("SEMFS", "Created semaphore: %s", name);
   return fk::RefPtr<Node>(sem);
 }

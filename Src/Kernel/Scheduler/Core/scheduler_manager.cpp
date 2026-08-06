@@ -282,9 +282,7 @@ void SchedulerManager::start_aps() {
     data->online_flag = 0;
     __sync_synchronize();
 
-    void (*ap_entry_fn)(uint32_t) = nullptr;
-    asm volatile("lea ap_entry(%%rip), %0" : "=r"(ap_entry_fn));
-    data->entry_point = reinterpret_cast<uint64_t>(ap_entry_fn);
+    data->entry_point = reinterpret_cast<uint64_t>(reinterpret_cast<void*>(ap_entry));
 
     if (CPU::the().has_x2apic()) {
       X2APIC::the().send_ipi(apic_id, 0, IPI_INIT);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <LibC/string.h>
+#include <LibFK/Core/result.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Traits/type_traits.h>
@@ -43,14 +44,21 @@ public:
     return *this;
   }
 
-  void push_back(T &&value) {
-    ensure_capacity(m_metadata.size + 1);
+  // The mutating operations below return Result<void> so that OOM (kmalloc
+  // failure) is never swallowed silently. [[nodiscard]] forces every caller
+  // to handle the result: propagate via TRY() when the caller returns a
+  // Result, or TRY_OR_FATAL() when it does not. Writing past capacity on OOM
+  // used to corrupt the heap (L2 audit).
+  [[nodiscard]] fk::core::Result<void> push_back(T &&value) {
+    TRY(ensure_capacity(m_metadata.size + 1));
     new (&m_data[m_metadata.size++]) T(fk::types::move(value));
+    return {};
   }
 
-  void push_back(const T &value) {
-    ensure_capacity(m_metadata.size + 1);
+  [[nodiscard]] fk::core::Result<void> push_back(const T &value) {
+    TRY(ensure_capacity(m_metadata.size + 1));
     new (&m_data[m_metadata.size++]) T(value);
+    return {};
   }
 
   void pop_back() {
@@ -61,9 +69,9 @@ public:
 
   // Append `count` elements from `data` in bulk.
   // Uses memcpy for trivially-constructible types; element copy otherwise.
-  void push_range(const T* data, size_t count) {
-    if (!data || count == 0) return;
-    ensure_capacity(m_metadata.size + count);
+  [[nodiscard]] fk::core::Result<void> push_range(const T* data, size_t count) {
+    if (!data || count == 0) return {};
+    TRY(ensure_capacity(m_metadata.size + count));
     if (__is_trivially_constructible(T)) {
       memcpy(m_data + m_metadata.size, data, count * sizeof(T));
       m_metadata.size += count;
@@ -71,16 +79,18 @@ public:
       for (size_t i = 0; i < count; ++i)
         new (&m_data[m_metadata.size++]) T(data[i]);
     }
+    return {};
   }
 
-  void insert_at(size_t index, const T &value) {
-    ensure_capacity(m_metadata.size + 1);
+  [[nodiscard]] fk::core::Result<void> insert_at(size_t index, const T &value) {
+    TRY(ensure_capacity(m_metadata.size + 1));
     for (size_t i = m_metadata.size; i > index; --i) {
       new (&m_data[i]) T(fk::types::move(m_data[i - 1]));
       m_data[i - 1].~T();
     }
     new (&m_data[index]) T(value);
     ++m_metadata.size;
+    return {};
   }
 
   void remove_at(size_t index) {
@@ -101,8 +111,8 @@ public:
   size_t capacity() const { return m_metadata.capacity; }
   bool is_empty() const { return m_metadata.size == 0; }
 
-  void resize(size_t new_size) {
-    ensure_capacity(new_size);
+  [[nodiscard]] fk::core::Result<void> resize(size_t new_size) {
+    TRY(ensure_capacity(new_size));
     if (new_size < m_metadata.size) {
         for (size_t i = new_size; i < m_metadata.size; ++i) {
             m_data[i].~T();
@@ -113,6 +123,7 @@ public:
         }
     }
     m_metadata.size = new_size;
+    return {};
   }
 
   void clear() {
@@ -128,32 +139,33 @@ public:
   const T *end() const { return m_data + m_metadata.size; }
 
 private:
-  void ensure_capacity(size_t required) {
+  fk::core::Result<void> ensure_capacity(size_t required) {
     if (required <= m_metadata.capacity)
-      return;
-
-    grow(required);
+      return {};
+    return grow(required);
   }
 
-  void grow(size_t required) {
+  fk::core::Result<void> grow(size_t required) {
     size_t new_capacity = m_metadata.capacity == 0 ? 4 : m_metadata.capacity * 2;
     if (new_capacity < required)
       new_capacity = required;
 
-    reallocate_to(new_capacity);
+    return reallocate_to(new_capacity);
   }
 
-  void reallocate_to(size_t new_capacity) {
+  fk::core::Result<void> reallocate_to(size_t new_capacity) {
     if (new_capacity > static_cast<size_t>(-1) / sizeof(T))
-      return;
+      return fk::core::Error::OutOfMemory;
     T *new_data = static_cast<T *>(kmalloc(new_capacity * sizeof(T)));
-    if (!new_data) return;
+    if (!new_data)
+      return fk::core::Error::OutOfMemory;
 
     move_elements(new_data);
     free_old();
 
     m_data = new_data;
     m_metadata.capacity = new_capacity;
+    return {};
   }
 
   void move_elements(T *new_data) {

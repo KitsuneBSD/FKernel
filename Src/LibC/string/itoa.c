@@ -14,12 +14,13 @@ int itoa(int val, char *buf, int base) {
 
   if (base == 10 && val < 0) {
     is_negative = 1;
-    val = -val;
   }
 
-  while (val && i < 31) {
-    tmp[i++] = digits[val % base];
-    val /= base;
+  unsigned int uv = val < 0 ? 0u - (unsigned int)val : (unsigned int)val;
+
+  while (uv && i < 31) {
+    tmp[i++] = digits[uv % base];
+    uv /= base;
   }
 
   if (is_negative) {

@@ -1,7 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Clock/ClockController/cmos.h>
 #include <Kernel/Clock/ClockController/rtc.h>
 #include <Kernel/Clock/clock_interrupt.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 void ClockManager::initialize() {
   select_and_configure_clock();

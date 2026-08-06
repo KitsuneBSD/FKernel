@@ -43,4 +43,10 @@ void arch_smap_end();
 
 void detect_tsc_frequency();
 
+uint64_t arch_read_cr0();
+void arch_write_cr0(uint64_t value);
+void arch_wbinvd();
+void arch_flush_tlb();
+uint64_t arch_get_cpu_id();
+
 } // extern "C"

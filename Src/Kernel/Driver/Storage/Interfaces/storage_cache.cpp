@@ -1,6 +1,7 @@
-#include <Kernel/Driver/Storage/Interfaces/storage_cache.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Storage/Interfaces/storage_cache.h>
 
 StorageCache::CacheEntry* StorageCache::find_entry(uint64_t sector) {
     size_t index = sector % CACHE_SIZE;

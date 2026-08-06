@@ -31,7 +31,7 @@ FKernel is a hobby kernel at ~70% kernel completeness -- boots successfully to M
 - Bitmap+buddy reconciliation, CoW fork with per-frame refcount arrays
 - Direct map at KERNEL_VIRT_BASE with 2MB huge pages
 - Embedded FreeBlock buddy metadata in free pages (saves ~1MB BSS)
-- SlabAllocator: 8 caches (16B-2048B)
+- SlabAllocator: 10 caches (16B-8192B)
 - Anonymous demand paging: lazy zero-fill on first access
 
 ### Phases 30-30b: ELF Loader (Complete)
@@ -59,14 +59,14 @@ FKernel is a hobby kernel at ~70% kernel completeness -- boots successfully to M
 |-----------|--------|-------|-------|
 | LibFK | ~75% | ~78 | Containers, text, core, algorithms solid |
 | LibC | ~65% | ~37 | Strings/stdio/ctype complete |
-| Memory | ~90% | ~19 | Buddy+zones+CoW; VMM with demand paging; SlabAllocator (8 caches); 2MB huge page direct map |
+| Memory | ~90% | ~19 | Buddy+zones+CoW; VMM with demand paging; SlabAllocator (10 caches); 2MB huge page direct map |
 | Scheduler | ~90% | ~12 | QoS (6 classes) + MLFQ (4 levels) + Turnstiles; SMP with work stealing |
 | VFS | ~85% | ~24 | BSD-style dentry/vnode/mount; FAT12/16/32 LFN+write; mount namespaces; pivot_root; KQueue |
 | Drivers | ~70% | ~53 | ATA/AHCI/NVMe/E1000 + PS/2 + PTY + Serial; USB headers only |
 | Networking | ~85% | ~12 | Full TCP/IP: ARP, ICMP, IP, TCP (handshake+window+retransmit), UDP, DHCP, DNS, routing |
 | ELF Loader | ~85% | ~12 | DT_NEEDED + 10 reloc types + cross-object symbols + ASLR + W^X + RELRO + SMAP |
 | IPC | ~75% | ~8 | seL4-style CSpace/Endpoint/Notification; POSIX wrappers use Notification directly |
-| Syscalls | ~75% | ~144 | ~139 registered handlers across 10 domain directories |
+| Syscalls | ~80% | ~144 | ~206 registered handlers across 11 domain directories |
 | Arch/x86_64 | ~85% | ~77 | GDT/IDT/TSS, page tables, context switch with FPU, syscall entry, SMP AP startup |
 
 ## Key Architecture Insights (from Source Audit)
@@ -75,7 +75,7 @@ FKernel is a hobby kernel at ~70% kernel completeness -- boots successfully to M
 
 - CoW fork: clone_table_recursive() with per-zone uint16_t refcount arrays
 - Anonymous demand paging: pf_handler allocates + zero-fills on first access
-- SlabAllocator: 8 caches, tried first in kernel heap allocate()
+- SlabAllocator: 10 caches, tried first in kernel heap allocate()
 - 2MB huge pages: extend_direct_map() maps all RAM at KERNEL_VIRT_BASE
 - Embedded buddy FreeBlock: metadata in free pages via direct map, no BSS allocation
 - Full POSIX signal delivery: SA_SIGINFO, SA_RESTART (rip -= 2), SA_ONSTACK, SA_RESETHAND, SA_NODEFER, builtin restorer trampoline
@@ -93,7 +93,7 @@ FKernel is a hobby kernel at ~70% kernel completeness -- boots successfully to M
 | IPC fragmentation | POSIX mechanisms use Notification directly; CSpace/Endpoint is parallel subsystem (Phase 27) |
 | Thread group signal delivery | CLONE_THREAD tgid set, but signal delivery to thread groups not implemented |
 | TCP out-of-order | process_data() only accepts in-order segments (seq must match recv_next exactly) |
-| Kernel tests | 0% coverage -- all 207 tests are LibC/LibFK only |
+| Kernel tests | Phase 43 started -- 10 kernel suites / 99 tests (kernel coverage target 75%) |
 | CSPRNG | init.cpp lines 105-107 commented out; ASLR may use unseeded PRNG |
 | POSIX networking syscalls | ~25 advanced socket options still missing |
 
@@ -104,8 +104,8 @@ FKernel is a hobby kernel at ~70% kernel completeness -- boots successfully to M
 | LibC (string/memory/stdio) | ~65 | ~60% |
 | LibFK containers | ~110 | ~75% |
 | LibFK text/algos/core/memory | ~55 | ~60-80% |
-| Kernel | 0 | 0% |
-| Total | ~207 test cases | ~40-50% |
+| Kernel | 10 suites / 99 | 0% (target 75%) |
+| Total | ~330 test cases (incl. 99 kernel) | ~40-50% |
 
 ## Strategic Recommendations
 

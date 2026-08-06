@@ -1,12 +1,13 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/SysFs/sys_devices_dir_node.h>
 #include <Kernel/Fs/Virtual/SysFs/sys_pci_dir_node.h>
-#include <LibFK/Utilities/memory.h>
 
 fk::core::Result<void, fk::core::Error> SysDevicesDirNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
   DirectoryEntry de;
   fk::memory::copy_n(de.name, "pci", sizeof(de.name));
   de.type = 1;
-  entries.push_back(de);
+  TRY(entries.push_back(de));
   return {};
 }
 

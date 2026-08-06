@@ -145,7 +145,7 @@ static constexpr size_t MAX_PHYSICAL_ZONES = 32;
 /**
  * @brief Maximum number of CPUs supported
  */
-static constexpr size_t MAX_CPUS = 32;
+static constexpr size_t MAX_CPUS = 64;
 
 /**
  * @brief IDT entry count (x86_64 supports 256 vectors)

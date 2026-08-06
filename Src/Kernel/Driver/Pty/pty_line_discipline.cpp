@@ -1,5 +1,6 @@
-#include <Kernel/Driver/Pty/pty_line_discipline.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Pty/pty_line_discipline.h>
 
 namespace fkernel {
 

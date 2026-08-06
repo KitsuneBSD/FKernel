@@ -1,5 +1,6 @@
-#include <Kernel/Arch/x86_64/Interrupt/Handler/exception_macros.h>
 #include <LibFK/Algorithms/Logging/log.h>
+
+#include <Kernel/Arch/x86_64/Interrupt/Handler/exception_macros.h>
 
 static void dump_mca_banks() {
   uint32_t lo, hi;

@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Crypto/chacha20.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/Stages/init.h>
 #include <Kernel/Boot/Core/boot_info.h>
@@ -15,9 +18,6 @@
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
-#include <LibFK/Algorithms/Crypto/chacha20.h>
-#include <LibFK/Algorithms/Logging/log.h>
-
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 
 static uint64_t rdtsc_entropy_source() {
@@ -132,7 +132,7 @@ void init() {
   // Disable interrupts for the scheduler transition. Timer interrupts firing
   // during boot log output and context initialization can race. The idle task's
   // idle_loop() will re-enable interrupts via sti;hlt.
-  asm volatile("cli");
+  arch_disable_interrupts();
 
   fk::algorithms::klog("INIT", "Starting scheduler...");
   BootTimer::the().mark("init_end");

@@ -1,5 +1,6 @@
-#include <Kernel/Fs/Vfs/FileLock/file_lock_list.h>
 #include <LibFK/Algorithms/Logging/log.h>
+
+#include <Kernel/Fs/Vfs/FileLock/file_lock_list.h>
 
 namespace fkernel {
 
@@ -28,7 +29,7 @@ bool FileLockList::try_acquire(fk::ProcessId pid, short l_type,
   entry.l_type  = l_type;
   entry.l_start = start;
   entry.l_end   = end;
-  m_entries.push_back(entry);
+  TRY_OR_FATAL(m_entries.push_back(entry));
   return true;
 }
 

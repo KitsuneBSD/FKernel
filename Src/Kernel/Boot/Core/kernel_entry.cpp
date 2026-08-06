@@ -1,22 +1,23 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Boot/Stages/early_init.h>
 #include <Kernel/Boot/Core/boot_info.h>
 #include <Kernel/Driver/Serial/serial_port.h>
 #include <Kernel/Driver/Vga/vga_adapter.h>
 #include <Kernel/Io/kernel_puts.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
 
 extern char __heap_start[];
 extern char __heap_end[];
 
 extern "C" void kernel_entry() {
-  serial::init();
+  Serial::init();
   // Wire up the puts hook now so every klog/kwarn/kerror below actually reaches serial.
   fkernel::io::initialize_kernel_puts();
   fk::algorithms::set_log_targets(fk::algorithms::LogTarget::Serial);
 
-  auto &vga = vga::the();
+  auto &vga = VgaAdapter::the();
   vga.clear();
 
   assert(boot::BootInfo::the().is_initialized() && "BootInfo not initialized!");

@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Boot/Core/boot_timer.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 size_t g_xsave_area_size = 512;  // default: FXSAVE size, updated in arch_enable_cpu_features
 uint8_t g_use_xsave = 0;         // 1 when XSAVE/XRSTOR should be used in context switch
@@ -180,6 +181,32 @@ extern "C" void arch_fpu_restore(const void* area) {
     asm volatile("xrstor64 %0" : : "m"(*static_cast<const uint8_t*>(area)), "a"(~0u), "d"(~0u) : "memory");
   else
     asm volatile("fxrstor %0" : : "m"(*static_cast<const uint8_t*>(area)) : "memory");
+}
+
+extern "C" uint64_t arch_read_cr0() {
+  uint64_t v;
+  asm volatile("mov %%cr0, %0" : "=r"(v));
+  return v;
+}
+
+extern "C" void arch_write_cr0(uint64_t v) {
+  asm volatile("mov %0, %%cr0" :: "r"(v) : "memory");
+}
+
+extern "C" void arch_wbinvd() {
+  asm volatile("wbinvd" ::: "memory");
+}
+
+extern "C" void arch_flush_tlb() {
+  uint64_t cr3;
+  asm volatile("mov %%cr3, %0" : "=r"(cr3));
+  asm volatile("mov %0, %%cr3" :: "r"(cr3) : "memory");
+}
+
+extern "C" uint64_t arch_get_cpu_id() {
+  uint64_t id;
+  asm volatile("mov %%gs:32, %0" : "=r"(id));
+  return id;
 }
 
 extern "C" void arch_disable_interrupts() {

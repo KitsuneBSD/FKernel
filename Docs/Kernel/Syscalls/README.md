@@ -2,7 +2,7 @@
 
 ## Overview
 
-FKernel implements a Linux x86_64 ABI-compatible syscall interface with 207 registered handlers. The syscall stub (assembly) transitions from ring 3 to ring 0, saves registers, and calls the dispatcher. The dispatcher logs to DebugFS, looks up the handler in a dispatch table, and handles pending signals before returning to userspace.
+FKernel implements a Linux x86_64 ABI-compatible syscall interface with 206 registered handlers. The syscall stub (assembly) transitions from ring 3 to ring 0, saves registers, and calls the dispatcher. The dispatcher logs to DebugFS, looks up the handler in a dispatch table, and handles pending signals before returning to userspace.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ flowchart TD
     J --> K
 ```
 
-## Syscall Domains (207 handlers)
+## Syscall Domains (206 handlers)
 
 Organized into 11 domain directories under `Src/Kernel/Syscall/syscall_list/`. Each file defines at most one `sys_*` handler (file name = handler name minus the `sys_` prefix); shared support files with zero handlers are allowed (e.g. `Time/posix_timer.cpp`). Verified by `xmake check-syscalls`:
 
@@ -90,4 +90,4 @@ Every syscall entry and exit is logged to the `SyscallLogNode` (128KB ring buffe
 
 ## Current Status
 
-~80% complete. 207 syscalls registered across 11 domains. Core FS, process, memory, and time syscalls functional. Networking syscalls with TCP/UDP socket implementations. IPC syscalls integrated with capability system (SCM_RIGHTS, SCM_CREDENTIALS). KQueue syscalls (kqueue, kevent) with EVFILT_PROC/SIGNAL/TIMER. Signal delivery working with frame installation. No seccomp or ptrace yet.
+~80% complete. 206 syscalls registered across 11 domains. Core FS, process, memory, and time syscalls functional. Networking syscalls with TCP/UDP socket implementations. IPC syscalls integrated with capability system (SCM_RIGHTS, SCM_CREDENTIALS). KQueue syscalls (kqueue, kevent) with EVFILT_PROC/SIGNAL/TIMER. Signal delivery working with frame installation. No seccomp or ptrace yet.

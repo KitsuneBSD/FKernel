@@ -1,7 +1,8 @@
-#include <Kernel/Driver/Device/BlockDevice/raid_device.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Device/BlockDevice/raid_device.h>
 
 namespace fkernel {
 

@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Terminal/vga_terminal.h>
 #include <Kernel/Driver/Keyboard/keymap_manager.h>
@@ -5,8 +8,6 @@
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace terminal {

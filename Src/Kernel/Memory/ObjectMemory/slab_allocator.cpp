@@ -1,13 +1,14 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Utilities/aligner.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Memory/ObjectMemory/slab_allocator.h>
 #include <Kernel/Memory/ObjectMemory/slab.h>
 #include <Kernel/Memory/ObjectMemory/slab_cache.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
 #include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Utilities/aligner.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace {
 

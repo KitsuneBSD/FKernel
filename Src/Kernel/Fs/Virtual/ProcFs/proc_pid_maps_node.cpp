@@ -1,8 +1,9 @@
+#include <LibFK/Synchronization/spinlock.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_pid_maps_node.h>
 #include <Kernel/Memory/VirtualMemory/memory_region.h>
 #include <Kernel/Memory/VirtualMemory/Pages/page_flags.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Synchronization/spinlock.h>
 
 fk::core::Result<size_t, fk::core::Error> ProcPidMapsNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
   ensure_cached();
@@ -14,7 +15,7 @@ fk::core::Result<size_t, fk::core::Error> ProcPidMapsNode::read(uint64_t offset,
 }
 
 static void append_str(fk::containers::Vector<uint8_t>& vec, const char* s) {
-  for (; *s; ++s) vec.push_back(static_cast<uint8_t>(*s));
+  for (; *s; ++s) TRY_OR_FATAL(vec.push_back(static_cast<uint8_t>(*s)));
 }
 
 static void append_hex(fk::containers::Vector<uint8_t>& vec, uintptr_t val, int width = 0) {
@@ -33,7 +34,7 @@ static void append_hex(fk::containers::Vector<uint8_t>& vec, uintptr_t val, int 
   }
   buf[i] = '\0';
   int len = i;
-  for (int p = len; p < width; ++p) vec.push_back(static_cast<uint8_t>('0'));
+  for (int p = len; p < width; ++p) TRY_OR_FATAL(vec.push_back(static_cast<uint8_t>('0')));
   append_str(vec, buf);
 }
 
@@ -43,7 +44,7 @@ static void append_dec(fk::containers::Vector<uint8_t>& vec, unsigned long long 
   int i = 0;
   unsigned long long tmp = val;
   while (tmp) { buf[i++] = '0' + (tmp % 10); tmp /= 10; }
-  for (int j = i - 1; j >= 0; --j) vec.push_back(static_cast<uint8_t>(buf[j]));
+  for (int j = i - 1; j >= 0; --j) TRY_OR_FATAL(vec.push_back(static_cast<uint8_t>(buf[j])));
 }
 
 void ProcPidMapsNode::ensure_cached() {
@@ -59,22 +60,22 @@ void ProcPidMapsNode::ensure_cached() {
     bool executable = (region.flags & PageFlags::ExecuteDisable) == 0;
 
     append_hex(m_cached, region.start);
-    m_cached.push_back('-');
+    TRY_OR_FATAL(m_cached.push_back('-'));
     append_hex(m_cached, region.end);
-    m_cached.push_back(' ');
-    m_cached.push_back(readable   ? 'r' : '-');
-    m_cached.push_back(writable   ? 'w' : '-');
-    m_cached.push_back(executable ? 'x' : '-');
-    m_cached.push_back('p');
-    m_cached.push_back(' ');
+    TRY_OR_FATAL(m_cached.push_back(' '));
+    TRY_OR_FATAL(m_cached.push_back(readable   ? 'r' : '-'));
+    TRY_OR_FATAL(m_cached.push_back(writable ? 'w' : '-'));
+    TRY_OR_FATAL(m_cached.push_back(executable ? 'x' : '-'));
+    TRY_OR_FATAL(m_cached.push_back('p'));
+    TRY_OR_FATAL(m_cached.push_back(' '));
     append_hex(m_cached, 0, 8);
     append_str(m_cached, " 00:00 ");
     append_dec(m_cached, 0);
-    m_cached.push_back(' ');
+    TRY_OR_FATAL(m_cached.push_back(' '));
     if (region.name && region.name[0]) {
-      m_cached.push_back(' ');
+      TRY_OR_FATAL(m_cached.push_back(' '));
       append_str(m_cached, region.name);
     }
-    m_cached.push_back('\n');
+    TRY_OR_FATAL(m_cached.push_back('\n'));
   }
 }

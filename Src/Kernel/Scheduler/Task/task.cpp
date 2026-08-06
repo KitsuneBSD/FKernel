@@ -1,12 +1,13 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
+
 #include <Kernel/Fs/Vfs/Core/node.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Ipc/Capabilities/capability.h>
 #include <Kernel/Ipc/Capabilities/cspace.h>
+#include <Kernel/Memory/PhysicalMemory/physical_memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Task/task.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Memory/Allocators/heap_malloc.h>
-
 #include <Kernel/Ipc/Endpoints/global_endpoint_manager.h>
 #include <Kernel/Ipc/Notifications/notification.h>
 
@@ -145,6 +146,12 @@ void Task::destroy() {
     VirtualMemoryManager::the().free_address_space(resources.memory.cr3);
     resources.memory.cr3 = 0;
   }
+
+  // Free the KPTI shadow PML4 (single page — not a full address space)
+  if (resources.memory.shadow_cr3) {
+    PhysicalMemoryManager::the().free_page(resources.memory.shadow_cr3);
+    resources.memory.shadow_cr3 = 0;
+  }
 }
 
 void Task::set_heap_regions(uintptr_t start, uintptr_t break_addr) {
@@ -199,16 +206,16 @@ int Task::add_file_descriptor(fk::RefPtr<FileDescription> description) {
     }
   }
 
-  if (resources.files.descriptors.is_full()) {
-    fk::algorithms::kwarn("TASK", "Task %lu: FD table full!", control.identity.id.value());
+  if (static_cast<int>(resources.files.descriptors.size()) >= SOFT_OPEN_FILES_LIMIT) {
+    fk::algorithms::kwarn("TASK", "Task %lu: FD table at soft limit!", control.identity.id.value());
     if (cap_handle != fkernel::ipc::INVALID_HANDLE && resources.ipc.cspace)
       resources.ipc.cspace->revoke_fd(cap_handle);
     return -24;
   }
 
   int fd = static_cast<int>(resources.files.descriptors.size());
-  resources.files.descriptors.push_back(description);
-  resources.files.cap_handles.push_back(cap_handle);
+  TRY_OR_FATAL(resources.files.descriptors.push_back(description));
+  TRY_OR_FATAL(resources.files.cap_handles.push_back(cap_handle));
   return fd;
 }
 
@@ -243,21 +250,8 @@ int Task::dup_file_descriptor(int old_fd, bool cloexec, int min_fd) {
   }
   if (cloexec) description->set_cloexec(true);
 
-  for (int i = min_fd; i < static_cast<int>(resources.files.descriptors.capacity()); ++i) {
-    if (i >= static_cast<int>(resources.files.descriptors.size())) {
-      while (static_cast<int>(resources.files.descriptors.size()) < i) {
-        resources.files.descriptors.push_back({});
-        resources.files.cap_handles.push_back(fkernel::ipc::INVALID_HANDLE);
-      }
-      uint32_t cap_handle = fkernel::ipc::INVALID_HANDLE;
-      if (resources.ipc.cspace)
-        cap_handle = resources.ipc.cspace->install_fd(
-            description.get(), fd_flags_to_rights(description->open_flags()));
-      resources.files.descriptors.push_back(description);
-      resources.files.cap_handles.push_back(cap_handle);
-      return static_cast<int>(resources.files.descriptors.size()) - 1;
-    }
-
+  // Scan existing slots for a free one at or above min_fd.
+  for (int i = min_fd; i < static_cast<int>(resources.files.descriptors.size()); ++i) {
     if (!resources.files.descriptors[i]) {
       uint32_t cap_handle = fkernel::ipc::INVALID_HANDLE;
       if (resources.ipc.cspace)
@@ -269,17 +263,29 @@ int Task::dup_file_descriptor(int old_fd, bool cloexec, int min_fd) {
     }
   }
 
-  return -1;
+  // No free slot found — fill any gap between current size and min_fd, then append.
+  while (static_cast<int>(resources.files.descriptors.size()) < min_fd) {
+    TRY_OR_FATAL(resources.files.descriptors.push_back({}));
+    TRY_OR_FATAL(resources.files.cap_handles.push_back(fkernel::ipc::INVALID_HANDLE));
+  }
+
+  uint32_t cap_handle = fkernel::ipc::INVALID_HANDLE;
+  if (resources.ipc.cspace)
+    cap_handle = resources.ipc.cspace->install_fd(
+        description.get(), fd_flags_to_rights(description->open_flags()));
+  TRY_OR_FATAL(resources.files.descriptors.push_back(description));
+  TRY_OR_FATAL(resources.files.cap_handles.push_back(cap_handle));
+  return static_cast<int>(resources.files.descriptors.size()) - 1;
 }
 
 int Task::install_at(int newfd, fk::RefPtr<FileDescription> desc) {
   fk::synchronization::ScopedLockIRQ lock_task(lock);
-  if (newfd < 0 || newfd >= static_cast<int>(MAX_OPEN_FILES))
+  if (newfd < 0 || newfd >= SOFT_OPEN_FILES_LIMIT)
     return -1;
 
   while (static_cast<int>(resources.files.descriptors.size()) <= newfd) {
-    resources.files.descriptors.push_back({});
-    resources.files.cap_handles.push_back(fkernel::ipc::INVALID_HANDLE);
+    TRY_OR_FATAL(resources.files.descriptors.push_back({}));
+    TRY_OR_FATAL(resources.files.cap_handles.push_back(fkernel::ipc::INVALID_HANDLE));
   }
 
   uint32_t old_handle = resources.files.cap_handles[newfd];

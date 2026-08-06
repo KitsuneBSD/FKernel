@@ -90,6 +90,11 @@ unsigned long strtoul(const char *str, char **endptr, int base) {
     else if (*str >= 'A' && *str <= 'Z') digit = *str - 'A' + 10;
     else break;
     if (digit >= base) break;
+    if (result > (ULONG_MAX - (unsigned long)digit) / (unsigned long)base) {
+      errno = ERANGE;
+      if (endptr) *endptr = (char *)str;
+      return ULONG_MAX;
+    }
     result = result * (unsigned long)base + (unsigned long)digit;
     ++str;
   }
@@ -152,7 +157,35 @@ void *bsearch(const void *key, const void *base, size_t nmemb, size_t size,
 
 /* strtoll */
 long long strtoll(const char *str, char **endptr, int base) {
-  return (long long)strtol(str, endptr, base);
+  const char *original_str = str;
+  unsigned long long result = 0;
+  int sign = 1;
+  while (*str == ' ' || *str == '\t') ++str;
+  if (*str == '-') { sign = -1; ++str; }
+  else if (*str == '+') ++str;
+  if (base == 0) {
+    if (*str == '0') { ++str; base = (*str == 'x' || *str == 'X') ? (++str, 16) : 8; }
+    else base = 10;
+  } else if (base == 16 && *str == '0' && (str[1] == 'x' || str[1] == 'X')) str += 2;
+  const char *start = str;
+  unsigned long long cutoff = (sign == -1) ? (unsigned long long)LLONG_MAX + 1ULL : (unsigned long long)LLONG_MAX;
+  while (1) {
+    int digit;
+    if (*str >= '0' && *str <= '9') digit = *str - '0';
+    else if (*str >= 'a' && *str <= 'z') digit = *str - 'a' + 10;
+    else if (*str >= 'A' && *str <= 'Z') digit = *str - 'A' + 10;
+    else break;
+    if (digit >= base) break;
+    if (result > (cutoff - (unsigned long long)digit) / (unsigned long long)base) {
+      errno = ERANGE;
+      if (endptr) *endptr = (char *)str;
+      return sign == -1 ? LLONG_MIN : LLONG_MAX;
+    }
+    result = result * (unsigned long long)base + (unsigned long long)digit;
+    ++str;
+  }
+  if (endptr) *endptr = (str == start) ? (char *)original_str : (char *)str;
+  return sign == -1 ? -(long long)result : (long long)result;
 }
 
 /* strtoull */
@@ -173,6 +206,11 @@ unsigned long long strtoull(const char *str, char **endptr, int base) {
     else if (*str >= 'A' && *str <= 'Z') digit = *str - 'A' + 10;
     else break;
     if (digit >= base) break;
+    if (result > (ULLONG_MAX - (unsigned long long)digit) / (unsigned long long)base) {
+      errno = ERANGE;
+      if (endptr) *endptr = (char *)str;
+      return ULLONG_MAX;
+    }
     result = result * (unsigned long long)base + (unsigned long long)digit;
     ++str;
   }

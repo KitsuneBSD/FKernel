@@ -1,7 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Hardware/Firmware/Fadt/fadt_manager.h>
 #include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 FadtManager &FadtManager::the() {
   static FadtManager instance;
@@ -66,7 +67,7 @@ bool FadtManager::validate_ports() const {
   if (get_pm_timer_block(timer_port) && timer_port != 0) {
     uint32_t val1 = inl(timer_port);
     for (int i = 0; i < 10000; i++) {
-        asm volatile("" ::: "memory");
+        __sync_synchronize();
     }
     uint32_t val2 = inl(timer_port);
 

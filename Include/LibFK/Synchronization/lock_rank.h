@@ -19,17 +19,32 @@ enum class LockRank : uint32_t {
     Max         = 0xFFFFFFFFu,
 };
 
-// Global rank tracker (single-CPU; per-CPU slot tracking is a future TODO).
-// Lives here as an inline variable so no separate .cpp is needed.
-inline LockRank g_current_lock_rank = LockRank::None;
+// Must match or exceed the kernel's MAX_CPUS (currently 64).
+// Slot 0 serves pre-APIC paths and host-side unit tests.
+static constexpr uint32_t FK_MAX_CPUS = 64;
 
-// Returns the highest rank currently held by the calling CPU.
+// Per-CPU rank table. Indexed by cpu_lock_slot() below.
+inline LockRank g_cpu_lock_ranks[FK_MAX_CPUS] = {};
+
+// Returns the APIC-ID-based per-CPU slot (1-indexed in kernel; 0 for host tests
+// and pre-APIC kernel paths). Saturates to slot 0 on unexpected APIC ID.
+inline uint32_t cpu_lock_slot() {
+#ifdef __fkernel__
+    uint32_t ebx;
+    asm volatile("cpuid" : "=b"(ebx) : "a"(1) : "ecx", "edx");
+    uint32_t slot = (ebx >> 24) + 1;
+    return (slot < FK_MAX_CPUS) ? slot : 0;
+#else
+    return 0;
+#endif
+}
+
 inline LockRank current_cpu_lock_rank() {
-    return g_current_lock_rank;
+    return g_cpu_lock_ranks[cpu_lock_slot()];
 }
 
 inline void set_cpu_lock_rank(LockRank rank) {
-    g_current_lock_rank = rank;
+    g_cpu_lock_ranks[cpu_lock_slot()] = rank;
 }
 
 } // namespace fk::synchronization

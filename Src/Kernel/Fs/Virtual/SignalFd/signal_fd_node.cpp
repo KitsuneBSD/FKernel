@@ -1,6 +1,7 @@
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+
 #include <Kernel/Fs/Virtual/SignalFd/signal_fd_node.h>
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
-#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 namespace fkernel {
 
@@ -26,7 +27,7 @@ bool SignalFdNode::try_enqueue(int signum) {
     }
     SignalfdSiginfo info{};
     info.ssi_signo = static_cast<uint32_t>(signum);
-    m_queue.push_back(info);
+    TRY_OR_FATAL(m_queue.push_back(info));
     m_lock.unlock();
 
     m_endpoint.signal(fk::NotificationBits(1));

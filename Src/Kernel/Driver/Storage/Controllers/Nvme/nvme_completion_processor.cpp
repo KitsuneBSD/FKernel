@@ -1,6 +1,7 @@
-#include <Kernel/Driver/Storage/Controllers/Nvme/nvme_completion_processor.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Logging/log.h>
+
+#include <Kernel/Driver/Storage/Controllers/Nvme/nvme_completion_processor.h>
 
 namespace fkernel {
 

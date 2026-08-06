@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Driver/Vga/dirty_tracker.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 

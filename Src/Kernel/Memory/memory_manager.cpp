@@ -1,3 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Memory/Allocators/allocator_backend.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
@@ -6,10 +11,6 @@
 #include <Kernel/Memory/iommu.h>
 #include <Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.h>
 #include <Kernel/Boot/Core/boot_info.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/Allocators/allocator_backend.h>
-#include <LibFK/Utilities/memory.h>
 
 #ifdef __x86_64__
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
@@ -97,12 +98,16 @@ static inline void restore_interrupts(uint64_t flags) {
 void* MemoryManager::allocate(size_t size) {
     if (!m_heap_initialized) return nullptr;
 
+    uint64_t flags = save_and_disable_interrupts();
+
     if (SlabAllocator::the().is_initialized() && size > 0 && size <= 2048) {
         void* ptr = SlabAllocator::the().allocate(size);
-        if (ptr) return ptr;
+        if (ptr) {
+            restore_interrupts(flags);
+            return ptr;
+        }
     }
 
-    uint64_t flags = save_and_disable_interrupts();
     m_heap_lock.lock();
 
     // Align size to 16 bytes
@@ -155,15 +160,18 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
         return nullptr;
     }
 
+    uint64_t flags = save_and_disable_interrupts();
+
     // Slab-backed objects have no BlockHeader; route them through the slab
     // allocator so growing a LibFK Vector/String no longer trips the heap
     // magic check (M4).
     if (SlabAllocator::the().is_initialized() &&
         SlabAllocator::the().is_slab_allocation(ptr)) {
-        return SlabAllocator::the().reallocate(ptr, size);
+        void* result = SlabAllocator::the().reallocate(ptr, size);
+        restore_interrupts(flags);
+        return result;
     }
 
-    uint64_t flags = save_and_disable_interrupts();
     m_heap_lock.lock();
 
     BlockHeader* header = reinterpret_cast<BlockHeader*>(
@@ -195,11 +203,15 @@ void* MemoryManager::reallocate(void* ptr, size_t size) {
 void MemoryManager::free(void* ptr) {
     if (!ptr) return;
 
+    uint64_t flags = save_and_disable_interrupts();
+
     if (SlabAllocator::the().is_initialized()) {
-        if (SlabAllocator::the().deallocate(ptr)) return;
+        if (SlabAllocator::the().deallocate(ptr)) {
+            restore_interrupts(flags);
+            return;
+        }
     }
 
-    uint64_t flags = save_and_disable_interrupts();
     m_heap_lock.lock();
 
     BlockHeader* header = reinterpret_cast<BlockHeader*>(

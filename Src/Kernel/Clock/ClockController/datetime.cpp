@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/converter.h>
+
 #include <Kernel/Clock/ClockController/rtc.h>
 #include <Kernel/Clock/clock_interrupt.h>
-#include <LibFK/Utilities/converter.h>
 
 fk::text::String DateTime::to_string() const {
   char buffer[32];

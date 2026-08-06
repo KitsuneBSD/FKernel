@@ -64,7 +64,8 @@ public:
     void wake_task(Task* task);
     void terminate_current(int status);
     // Safe to call from exception handlers: skips copy_to_user cleanup.
-    void kill_current_from_exception(int signal);
+    // Never returns: switches away from the terminated task and halts as a fallback.
+    [[noreturn]] void kill_current_from_exception(int signal);
     void on_tick();
     void schedule();
     void switch_to_task(Task* next);

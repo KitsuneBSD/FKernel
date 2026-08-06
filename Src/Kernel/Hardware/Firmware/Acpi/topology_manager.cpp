@@ -1,6 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Hardware/Firmware/Acpi/topology_manager.h>
 #include <Kernel/Hardware/Firmware/Acpi/acpi.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel::acpi {
 
@@ -33,7 +34,7 @@ void TopologyManager::parse_srat(SRATHeader* srat) {
             case SRATEntryType::ProcessorLocalApic: {
                 auto* lapic = reinterpret_cast<SRATProcessorLocalApic*>(ptr);
                 if (lapic->flags & 1) { // Enabled
-                    m_cpu_affinities.push_back({lapic->apic_id, lapic->proximity_domain()});
+                    TRY_OR_FATAL(m_cpu_affinities.push_back({lapic->apic_id, lapic->proximity_domain()}));
                     fk::algorithms::klog("TOPOLOGY", "  CPU APIC ID %u -> Proximity Domain %u", 
                                          lapic->apic_id, lapic->proximity_domain());
                 }
@@ -42,7 +43,7 @@ void TopologyManager::parse_srat(SRATHeader* srat) {
             case SRATEntryType::MemoryAffinity: {
                 auto* mem = reinterpret_cast<SRATMemoryAffinity*>(ptr);
                 if (mem->is_enabled()) {
-                    m_nodes.push_back({mem->proximity_domain, mem->base_addr(), mem->length()});
+                    TRY_OR_FATAL(m_nodes.push_back({mem->proximity_domain, mem->base_addr(), mem->length()}));
                     fk::algorithms::klog("TOPOLOGY", "  Memory [0x%lx - 0x%lx] -> Proximity Domain %u", 
                                          mem->base_addr(), mem->base_addr() + mem->length(), mem->proximity_domain);
                 }
@@ -51,7 +52,7 @@ void TopologyManager::parse_srat(SRATHeader* srat) {
             case SRATEntryType::ProcessorLocalX2Apic: {
                 auto* x2apic = reinterpret_cast<SRATProcessorLocalX2Apic*>(ptr);
                 if (x2apic->flags & 1) {
-                    m_cpu_affinities.push_back({x2apic->x2apic_id, x2apic->proximity_domain});
+                    TRY_OR_FATAL(m_cpu_affinities.push_back({x2apic->x2apic_id, x2apic->proximity_domain}));
                     fk::algorithms::klog("TOPOLOGY", "  CPU x2APIC ID %u -> Proximity Domain %u", 
                                          x2apic->x2apic_id, x2apic->proximity_domain);
                 }

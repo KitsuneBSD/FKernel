@@ -1,7 +1,8 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Driver/Storage/Controllers/Ata/pio_strategy.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 static constexpr uint8_t ATA_REG_DATA = 0;
 static constexpr uint8_t ATA_REG_SECCOUNT = 2;
@@ -68,7 +69,7 @@ PIOStrategy::read_sectors(uint64_t start_sector, size_t count,
     outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_READ_PIO);
 
     if (!wait_status(ATA_SR_DRQ, ATA_SR_DRQ)) {
-      fk::algorithms::kerror(
+      fk::algorithms::kwarn(
           "PIO", "Error or timeout waiting for DRQ during read at LBA %lu",
           start_sector + i);
       return fk::core::Error::IOError;
@@ -100,7 +101,7 @@ PIOStrategy::write_sectors(uint64_t start_sector, size_t count,
     outb(m_io_base + ATA_REG_COMMAND, ATA_CMD_WRITE_PIO);
 
     if (!wait_status(ATA_SR_DRQ, ATA_SR_DRQ)) {
-      fk::algorithms::kerror(
+      fk::algorithms::kwarn(
           "PIO", "Error or timeout waiting for DRQ during write at LBA %lu",
           start_sector + i);
       return fk::core::Error::IOError;

@@ -1,11 +1,12 @@
-#include <Kernel/Fs/Disk/Ext4/ext4_fs.h>
-#include <Kernel/Fs/Disk/Ext4/ext4_node.h>
-#include <Kernel/Fs/Disk/Ext2/ext2_super.h>
-#include <Kernel/Fs/Disk/Ext3/ext3_super.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
+
+#include <Kernel/Fs/Disk/Ext4/ext4_fs.h>
+#include <Kernel/Fs/Disk/Ext4/ext4_node.h>
+#include <Kernel/Fs/Disk/Ext2/ext2_super.h>
+#include <Kernel/Fs/Disk/Ext3/ext3_super.h>
 
 namespace fkernel {
 
@@ -213,7 +214,7 @@ Result<void, Error> Ext4FileSystem::list_dir_inode_ext4(
                 if (static_cast<size_t>(len) >= sizeof(e.name)) len = sizeof(e.name) - 1;
                 fk::memory::copy(e.name, blk_buf + pos + sizeof(Ext2DirEntry), len);
                 e.name[len] = '\0';
-                entries.push_back(fk::types::move(e));
+                TRY(entries.push_back(fk::types::move(e)));
             }
             pos += de->rec_len;
         }

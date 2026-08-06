@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Net/Sockets/unix_socket_buffer.h>
 #include <Kernel/Memory/memory_manager.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 

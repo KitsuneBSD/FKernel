@@ -10,11 +10,9 @@ class GDTController {
 private:
   bool m_initialized = false;
 
-  static constexpr size_t MAX_CPUS = 32;
-
-  uint64_t m_gdt_per_cpu[MAX_CPUS][10];
-  TSS64    m_tss_per_cpu[MAX_CPUS];
-  GDTR     m_gdtr_per_cpu[MAX_CPUS];
+  uint64_t m_gdt_per_cpu[::MAX_CPUS][10];
+  TSS64    m_tss_per_cpu[::MAX_CPUS];
+  GDTR     m_gdtr_per_cpu[::MAX_CPUS];
 
   void setup_entries(uint64_t gdt[10]);
   void fill_tss(uint32_t cpu_index);

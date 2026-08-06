@@ -1,11 +1,12 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+
 #include <Kernel/Driver/Storage/Partitions/Gpt/gpt.h>
 #include <Kernel/Driver/Storage/Partitions/Mbr/mbr.h>
 #include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Driver/Storage/Interfaces/storage_device.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Memory/Pointers/ref_ptr.h>
 
 PartitionManager &PartitionManager::the() {
   static PartitionManager instance;

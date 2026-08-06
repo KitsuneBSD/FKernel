@@ -92,7 +92,7 @@ template <> struct DefaultHasher<void*> {
 
 template <typename Key, typename Value>
 HashMap<Key, Value>::HashMap() {
-  m_buckets.resize(16);
+  TRY_OR_FATAL(m_buckets.resize(16));
 }
 
 template <typename Key, typename Value>
@@ -107,7 +107,7 @@ size_t HashMap<Key, Value>::bucket_for(const Key &key, size_t cap) const {
 template <typename Key, typename Value>
 fk::core::Result<bool> HashMap<Key, Value>::rehash(size_t new_cap) {
   fk::containers::Vector<Entry> new_buckets;
-  new_buckets.resize(new_cap);
+  TRY(new_buckets.resize(new_cap));
   if (new_buckets.size() < new_cap) return fk::core::Error::OutOfMemory;
 
   for (size_t i = 0; i < m_buckets.size(); i++) {

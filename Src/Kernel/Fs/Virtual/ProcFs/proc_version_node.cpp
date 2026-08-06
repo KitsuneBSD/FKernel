@@ -1,5 +1,6 @@
-#include <Kernel/Fs/Virtual/ProcFs/proc_version_node.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/ProcFs/proc_version_node.h>
 
 using namespace fk::core;
 

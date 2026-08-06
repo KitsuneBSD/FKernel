@@ -1,6 +1,7 @@
+#include <LibFK/Text/string.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_filesystems_node.h>
 #include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
-#include <LibFK/Text/string.h>
 
 using namespace fk::core;
 
@@ -30,7 +31,7 @@ fk::core::Result<size_t, fk::core::Error> ProcFilesystemsNode::read(uint64_t off
   }, &out);
 
   for (size_t i = 0; i < out.length(); ++i)
-    m_cached.push_back(static_cast<uint8_t>(out[i]));
+    TRY(m_cached.push_back(static_cast<uint8_t>(out[i])));
 
   if (offset >= m_cached.size()) return static_cast<size_t>(0);
   size_t available = m_cached.size() - (size_t)offset;

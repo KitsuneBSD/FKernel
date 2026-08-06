@@ -1,9 +1,10 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Arch/x86_64/io.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
 #include <Kernel/Hardware/Cpu/cpu_block.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 extern "C" void syscall_stub();
 extern "C" uint64_t stack_top;

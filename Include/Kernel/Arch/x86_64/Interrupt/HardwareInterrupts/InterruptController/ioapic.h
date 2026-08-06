@@ -54,4 +54,5 @@ public:
    * @brief Remap IRQ to vector and LAPIC
    */
   void remap_irq(uint8_t irq, uint8_t vector, uint8_t lapic_id, uint32_t flags);
+  void set_irq_affinity(uint8_t irq, uint8_t lapic_id);
 };

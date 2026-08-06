@@ -1,6 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 
@@ -18,25 +19,25 @@ void DriverManager::initialize() {
 fk::core::Result<void, fk::core::Error>
 DriverManager::register_driver(fk::memory::OwnPtr<Driver> driver) {
   if (!driver) {
-    fk::algorithms::kerror("DRIVER_MANAGER", "register_driver: null driver pointer");
+    fk::algorithms::kwarn("DRIVER_MANAGER", "register_driver: null driver pointer");
     return fk::core::Error::InvalidParameter;
   }
 
   fk::algorithms::klog("DRIVER_MANAGER", "Registering new driver: '%s'", driver->name());
-  m_drivers.push_back(fk::types::move(driver));
+  TRY(m_drivers.push_back(fk::types::move(driver)));
   return {};
 }
 
 fk::core::Result<void, fk::core::Error> DriverManager::register_device(fk::RefPtr<Node> device) {
   if (!device) {
-    fk::algorithms::kerror("DRIVER_MANAGER", "register_device: null device pointer");
+    fk::algorithms::kwarn("DRIVER_MANAGER", "register_device: null device pointer");
     return fk::core::Error::InvalidParameter;
   }
 
   fk::algorithms::klog(
       "DRIVER_MANAGER", "Registering device: '%s' (Type: %s)", device->name().c_str(),
       device->is_block_device() ? "Block" : (device->is_character_device() ? "Char" : "Unknown"));
-  m_devices.push_back(device);
+  TRY(m_devices.push_back(device));
 
   // Automatically register with DevFs
   auto res = DevFs::the().register_device(device, device->name().c_str());

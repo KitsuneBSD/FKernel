@@ -8,7 +8,7 @@ class ChildList {
 
 public:
   fk::RefPtr<Node> find_by_name(const char* name);
-  void add(Child child) { m_entries.push_back(child); }
+  void add(Child child) { TRY_OR_FATAL(m_entries.push_back(child)); }
   const fk::containers::Vector<Child>& entries() const { return m_entries; }
   size_t size() const { return m_entries.size(); }
   bool remove_by_name(const char* name) {

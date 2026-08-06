@@ -66,3 +66,7 @@ void mouse_handler([[maybe_unused]] uint8_t vector,
 
 void apic_timer_handler([[maybe_unused]] uint8_t vector,
                         InterruptFrame *frame = nullptr);
+
+// APIC spurious interrupt: no EOI (Intel SDM §10.9). Must not panic.
+void apic_spurious_handler([[maybe_unused]] uint8_t vector,
+                           [[maybe_unused]] InterruptFrame *frame = nullptr);

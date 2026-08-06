@@ -1,10 +1,11 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+#include <LibFK/Memory/Allocators/heap_malloc.h>
+
 #include <Kernel/Fs/Disk/Ufs/ufs_fs.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_node.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_dir.h>
 #include <Kernel/Fs/Disk/Ufs/ufs_endian.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
-#include <LibFK/Memory/Allocators/heap_malloc.h>
 
 namespace fkernel {
 
@@ -282,7 +283,7 @@ UfsFileSystem::list_dir_ino(uint32_t ino, uint64_t dir_size,
                     fk::memory::copy(ent.name, dname, nlen);
                     ent.name[nlen] = '\0';
                     ent.type = (de->d_type == UFS_DT_DIR) ? 1u : 0u;
-                    entries.push_back(ent);
+                    TRY(entries.push_back(ent));
                 }
             }
             off += de->d_reclen;

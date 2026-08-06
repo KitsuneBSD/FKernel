@@ -1,6 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Boot/Core/boot_timer.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 static uint64_t g_tsc_freq_hz = 0;
 

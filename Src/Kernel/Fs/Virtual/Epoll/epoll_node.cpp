@@ -13,7 +13,7 @@ bool EpollNode::ctl_add(int fd, uint32_t events, uint64_t data) {
         m_kq = kq_res.value();
     }
 
-    m_entries.push_back({fd, events, data});
+    TRY_OR_FATAL(m_entries.push_back({fd, events, data}));
 
     struct kevent kev;
     kev.ident  = static_cast<uint64_t>(fd);

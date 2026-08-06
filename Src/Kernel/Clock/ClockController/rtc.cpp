@@ -1,7 +1,8 @@
+#include <LibFK/Utilities/converter.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Clock/ClockController/rtc.h>
 #include <Kernel/Arch/x86_64/io.h>
-#include <LibFK/Utilities/converter.h>
 
 uint64_t RTCClock::s_ticks = 0;
 

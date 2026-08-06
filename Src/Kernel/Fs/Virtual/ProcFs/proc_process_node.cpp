@@ -1,9 +1,10 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/ProcFs/proc_process_node.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Scheduler/Task/task_state.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 using namespace fk::core;
 using namespace fkernel::scheduler;
@@ -46,7 +47,7 @@ void ProcProcessNode::ensure_cached() {
   if (!t) {
     const char* msg = "(process not found)\n";
     m_cached.clear();
-    for (size_t i = 0; msg[i]; ++i) m_cached.push_back(static_cast<uint8_t>(msg[i]));
+    for (size_t i = 0; msg[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(msg[i])));
     return;
   }
 
@@ -87,5 +88,5 @@ void ProcProcessNode::ensure_cached() {
              (unsigned long long)t->control.lifecycle.cpu_affinity);
   }
   m_cached.clear();
-  for (size_t i = 0; buf[i]; ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+  for (size_t i = 0; buf[i]; ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(buf[i])));
 }

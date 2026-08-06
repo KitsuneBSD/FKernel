@@ -1,3 +1,7 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Synchronization/spinlock.h>
+#include <LibFK/Synchronization/interrupt_disabler.h>
+
 #include <Kernel/Scheduler/Core/scheduler.h>
 #include <Kernel/Scheduler/Qos/qos.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
@@ -8,10 +12,8 @@
 #include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Posix/signal_defs.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Synchronization/interrupt_disabler.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
+#include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Syscall/posix_timer.h>
 
 using namespace fk::synchronization;
@@ -84,6 +86,30 @@ void SchedulerManager::sleep_current(fk::TickCount ticks) {
     });
   }
   proc.need_resched = true;
+}
+
+[[noreturn]] void SchedulerManager::kill_current_from_exception(int signal) {
+  Task* curr = this->current();
+  if (!curr) arch_halt_loop();
+  // Minimal cleanup safe to call from exception context (no copy_to_user, no file lock walks).
+  curr->control.lifecycle.terminated = true;
+  curr->control.lifecycle.exit_status = 128 + signal;
+  fkernel::notify_proc_kqueue(curr, fkernel::NOTE_EXIT);
+  if (curr->control.identity.ppid.is_valid()) {
+    auto parent = find_task(curr->control.identity.ppid);
+    if (parent) {
+      siginfo_t si{};
+      si.si_signo = SIGCHLD;
+      si.si_code  = 2; // CLD_KILLED
+      si.si_pid   = curr->control.identity.id.value();
+      si.si_uid   = curr->control.identity.uid;
+      si.si_status = signal;
+      fkernel::ipc::SignalDelivery::send_signal(parent.get(), SIGCHLD, &si, false);
+    }
+  }
+  zombify_current();
+  schedule();
+  arch_halt_loop();
 }
 
 void SchedulerManager::reap_zombie(Task* task) {
@@ -296,17 +322,19 @@ void SchedulerManager::on_tick() {
     }
   }
 
-  for (int i = 0; i < MAX_POSIX_TIMERS; ++i) {
-    if (!s_timers[i].used || s_timers[i].expiry_ticks == 0) continue;
-    --s_timers[i].expiry_ticks;
-    if (s_timers[i].expiry_ticks == 0) {
-      Task* owner = s_timers[i].owner;
-      if (owner) {
-        fkernel::ipc::SignalDelivery::send_signal(owner, s_timers[i].signo);
+  {
+    ScopedLock t_lock(s_timer_lock);
+    for (size_t i = 0; i < s_timers.size(); ++i) {
+      if (!s_timers[i].used || s_timers[i].expiry_ticks == 0) continue;
+      --s_timers[i].expiry_ticks;
+      if (s_timers[i].expiry_ticks == 0) {
+        Task* owner = s_timers[i].owner;
+        if (owner)
+          fkernel::ipc::SignalDelivery::send_signal(owner, s_timers[i].signo);
+        s_timers[i].used = s_timers[i].interval_ticks > 0;
+        if (s_timers[i].interval_ticks > 0)
+          s_timers[i].expiry_ticks = s_timers[i].interval_ticks;
       }
-      s_timers[i].used = s_timers[i].interval_ticks > 0;
-      if (s_timers[i].interval_ticks > 0)
-        s_timers[i].expiry_ticks = s_timers[i].interval_ticks;
     }
   }
 

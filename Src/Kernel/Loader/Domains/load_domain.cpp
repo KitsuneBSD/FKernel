@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::elf_domains {
 
@@ -31,7 +32,7 @@ LoadDomain::extract_memory_regions(const fk::containers::Vector<Elf64_Phdr>& hea
 
   for (const auto& phdr : headers) {
     if (phdr.p_type == PT_LOAD) {
-      regions.push_back(calculate_memory_region(phdr, load_base));
+      TRY_OR_FATAL(regions.push_back(calculate_memory_region(phdr, load_base)));
     }
   }
 

@@ -5,7 +5,7 @@
 #include <Kernel/Driver/Network/E1000/e1000_tx_desc.h>
 #include <Kernel/Driver/Network/network_device.h>
 #include <Kernel/Hardware/Buses/Pci/pci_device.h>
-#include <Kernel/Memory/Dma/dma_buffer.h>
+#include <Kernel/Driver/Async/dma_buffer.h>
 #include <LibFK/Types/types.h>
 
 struct Task;

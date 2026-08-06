@@ -1,11 +1,12 @@
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_node.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
-#include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Generic/byte_order.h>
+
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_node.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_btree.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_unicode.h>
+#include <Kernel/Fs/Disk/HfsPlus/hfsplus_extents.h>
 
 namespace fkernel {
 
@@ -75,7 +76,7 @@ static void hfs_list_cb(void* ctx, const char* name, const CatalogRecord& rec) {
     de.name[len] = '\0';
     de.type = (rec.type == kHFSPlusFolderRecord) ? 1u
                                                   : 0u;
-    lc->entries->push_back(de);
+    TRY_OR_FATAL(lc->entries->push_back(de));
 }
 
 fk::core::Result<void, fk::core::Error>
@@ -93,7 +94,7 @@ HFSPlusNode::read_link()
 
     // Symlink target is stored in the data fork as a plain UTF-8 string
     fk::containers::Vector<uint8_t> buf;
-    buf.resize((size_t)m_size + 1);
+    TRY(buf.resize((size_t)m_size + 1));
     auto res = read(0, (size_t)m_size, buf.begin());
     if (res.is_error()) return res.error();
     buf[res.value()] = '\0';

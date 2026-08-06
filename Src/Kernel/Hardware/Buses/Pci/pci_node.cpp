@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Generic/math.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Hardware/Buses/Pci/pci_node.h>
 #include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
-#include <LibFK/Algorithms/Generic/math.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 

@@ -1,6 +1,7 @@
+#include <LibFK/Container/Sequence/vector.h>
+
 #include <Kernel/Net/Arp/arp_table.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Container/Sequence/vector.h>
 
 namespace fkernel {
 namespace net {
@@ -36,7 +37,7 @@ void ArpTable::expire_old_entries() {
     fk::containers::Vector<uint32_t> to_remove;
     m_table.for_each([&](const uint32_t& key, const ArpEntry& e) {
         if (now - e.created_at_ticks > ttl_ticks)
-            to_remove.push_back(key);
+            TRY_OR_FATAL(to_remove.push_back(key));
     });
     for (size_t i = 0; i < to_remove.size(); ++i)
         m_table.remove(to_remove[i]);

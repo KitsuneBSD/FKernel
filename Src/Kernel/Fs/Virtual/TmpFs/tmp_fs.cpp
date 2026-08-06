@@ -1,9 +1,10 @@
-#include <Kernel/Fs/Virtual/TmpFs/tmp_fs.h>
 #include <LibFK/Algorithms/Generic/container_algorithms.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/error.h>
 #include <LibFK/Memory/Allocators/new.h>
+
+#include <Kernel/Fs/Virtual/TmpFs/tmp_fs.h>
 
 fk::RefPtr<Node> ChildList::find_by_name(const char* name) {
   size_t idx = fk::algorithms::find_if(m_entries.begin(), m_entries.size(),
@@ -31,7 +32,7 @@ fk::core::Result<size_t, fk::core::Error> TmpFsNode::write(uint64_t offset, size
   uint64_t end_offset = offset + size;
 
   if (end_offset > m_data.size())
-    m_data.resize(end_offset);
+    TRY(m_data.resize(end_offset));
 
   fk::memory::copy(m_data.begin() + offset, buffer, size);
 
@@ -43,7 +44,7 @@ size_t TmpFsNode::size() const {
 }
 
 fk::core::Result<void, fk::core::Error> TmpFsNode::truncate(uint64_t new_size) {
-  m_data.resize(new_size);
+  TRY(m_data.resize(new_size));
   return {};
 }
 
@@ -106,7 +107,7 @@ TmpFsDirectoryNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
       de.type = 0; // File
     }
 
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

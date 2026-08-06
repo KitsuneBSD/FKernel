@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Arch/x86_64/arch_defs.h>
 #include <Kernel/Fs/Vfs/Core/dentry.h>
 #include <Kernel/Fs/Vfs/Core/file_description.h>
@@ -5,8 +8,6 @@
 #include <Kernel/Fs/Virtual/PipeFs/pipe_node.h>
 #include <Kernel/Posix/sys/time.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 static constexpr size_t BLOCK_SECTOR_SIZE = 512;
 

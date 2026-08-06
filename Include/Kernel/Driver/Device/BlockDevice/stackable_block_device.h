@@ -14,7 +14,7 @@ protected:
 
 public:
   void add_child(fk::RefPtr<BlockDevice> child) {
-    if (child) m_children.push_back(fk::types::move(child));
+    if (child) TRY_OR_FATAL(m_children.push_back(fk::types::move(child)));
   }
 
   size_t child_count() const { return m_children.size(); }

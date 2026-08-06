@@ -1,7 +1,8 @@
-#include <Kernel/Fs/Virtual/TimerFd/timer_fd_registry.h>
-#include <Kernel/Fs/Virtual/TimerFd/timer_fd_node.h>
 #include <LibFK/Container/Sequence/vector.h>
 #include <LibFK/Synchronization/spinlock.h>
+
+#include <Kernel/Fs/Virtual/TimerFd/timer_fd_registry.h>
+#include <Kernel/Fs/Virtual/TimerFd/timer_fd_node.h>
 
 namespace fkernel {
 namespace timer_fd_registry {
@@ -13,7 +14,7 @@ namespace {
 
 void register_timer(TimerFdNode* node) {
     fk::synchronization::ScopedLock lock(s_lock);
-    s_timers.push_back(node);
+    TRY_OR_FATAL(s_timers.push_back(node));
 }
 
 void unregister_timer(TimerFdNode* node) {

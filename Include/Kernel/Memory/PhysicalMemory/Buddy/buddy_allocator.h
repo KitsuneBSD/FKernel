@@ -27,11 +27,6 @@ private:
   size_t m_length;
 
 protected:
-  /**
-   * @brief Internal initialization routine to populate free lists.
-   */
-  void initialize();
-
   /** @brief Converts an order to a list index. */
   size_t order_to_index(size_t order) const;
 
@@ -49,11 +44,6 @@ protected:
 
 public:
   BuddyAllocator();
-
-  /**
-   * @brief Constructs an allocator with a specific memory range.
-   */
-  BuddyAllocator(uintptr_t base_address, size_t length);
 
   /**
    * @brief Stores the managed range without populating free lists.

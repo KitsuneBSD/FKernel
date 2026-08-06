@@ -1,12 +1,13 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Memory/Pointers/ref_ptr.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Driver/Storage/Controllers/Nvme/nvme_controller.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Memory/Pointers/ref_ptr.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -166,27 +167,20 @@ fk::core::Result<void, fk::core::Error> NVMeController::configure_admin_queue() 
     *reinterpret_cast<volatile uint32_t*>(m_controller_regs + NVME_AQA) = aqa;
     
     // Allocate admin queue DMA buffers (4KB each)
-    auto sq_result = dma_alloc_buffer(4096);
-    auto cq_result = dma_alloc_buffer(4096);
-    
-    if (sq_result.is_error() || cq_result.is_error()) {
-        fk::algorithms::kwarn("NVMe", "Failed to allocate admin queue memory");
-        return fk::core::Error::OutOfMemory;
-    }
-    
-    m_admin_queue.sq_buffer = sq_result.value();
-    m_admin_queue.cq_buffer = cq_result.value();
-    m_admin_queue.sq_memory = m_admin_queue.sq_buffer.vaddr;
-    m_admin_queue.cq_memory = m_admin_queue.cq_buffer.vaddr;
+    TRY(m_admin_queue.sq_buffer.allocate(4096));
+    TRY(m_admin_queue.cq_buffer.allocate(4096));
+
+    m_admin_queue.sq_memory = m_admin_queue.sq_buffer.virtual_address();
+    m_admin_queue.cq_memory = m_admin_queue.cq_buffer.virtual_address();
     m_admin_queue.sq_size = 64;
     m_admin_queue.cq_size = 64;
     m_admin_queue.sq_tail = 0;
     m_admin_queue.cq_head = 0;
     m_admin_queue.cq_phase = 1;
-    
+
     // Set admin queue base addresses (physical)
-    *reinterpret_cast<volatile uint64_t*>(m_controller_regs + NVME_ASQ) = m_admin_queue.sq_buffer.phys;
-    *reinterpret_cast<volatile uint64_t*>(m_controller_regs + NVME_ACQ) = m_admin_queue.cq_buffer.phys;
+    *reinterpret_cast<volatile uint64_t*>(m_controller_regs + NVME_ASQ) = m_admin_queue.sq_buffer.physical_address().as_uintptr();
+    *reinterpret_cast<volatile uint64_t*>(m_controller_regs + NVME_ACQ) = m_admin_queue.cq_buffer.physical_address().as_uintptr();
     
     // Setup doorbell pointers
     uint32_t doorbell_offset = 0x1000; // Base doorbell offset
@@ -202,18 +196,11 @@ fk::core::Result<void, fk::core::Error> NVMeController::create_io_queues() {
     fk::algorithms::klog("NVMe", "Creating IO queues...");
 
     // Allocate IO queue DMA buffers
-    auto sq_result = dma_alloc_buffer(4096);
-    auto cq_result = dma_alloc_buffer(4096);
-    
-    if (sq_result.is_error() || cq_result.is_error()) {
-        fk::algorithms::kwarn("NVMe", "Failed to allocate IO queue memory");
-        return fk::core::Error::OutOfMemory;
-    }
-    
-    m_io_queue.sq_buffer = sq_result.value();
-    m_io_queue.cq_buffer = cq_result.value();
-    m_io_queue.sq_memory = m_io_queue.sq_buffer.vaddr;
-    m_io_queue.cq_memory = m_io_queue.cq_buffer.vaddr;
+    TRY(m_io_queue.sq_buffer.allocate(4096));
+    TRY(m_io_queue.cq_buffer.allocate(4096));
+
+    m_io_queue.sq_memory = m_io_queue.sq_buffer.virtual_address();
+    m_io_queue.cq_memory = m_io_queue.cq_buffer.virtual_address();
     m_io_queue.sq_size = 64;
     m_io_queue.cq_size = 64;
     m_io_queue.sq_tail = 0;
@@ -225,10 +212,10 @@ fk::core::Result<void, fk::core::Error> NVMeController::create_io_queues() {
     m_io_queue.cq_head_db = reinterpret_cast<volatile uint32_t*>(m_controller_regs + doorbell_offset + (3 * m_doorbell_stride * 4));
 
     // 1. Create IO CQ (pass physical address to controller)
-    Command cmd;
-    fk::memory::set(&cmd, 0, sizeof(Command));
+    NvmeCommand cmd;
+    fk::memory::set(&cmd, 0, sizeof(NvmeCommand));
     cmd.cdw0 = NVME_CMD_CREATE_IO_CQ;
-    cmd.prp1 = m_io_queue.cq_buffer.phys;
+    cmd.prp1 = m_io_queue.cq_buffer.physical_address().as_uintptr();
     cmd.cdw10 = ((m_io_queue.cq_size - 1) << 16) | 1; // Size, Queue ID 1
     cmd.cdw11 = 1; // Physically contiguous, interrupts disabled for now
 
@@ -236,9 +223,9 @@ fk::core::Result<void, fk::core::Error> NVMeController::create_io_queues() {
     if (res.is_error()) return res.error();
 
     // 2. Create IO SQ (pass physical address to controller)
-    fk::memory::set(&cmd, 0, sizeof(Command));
+    fk::memory::set(&cmd, 0, sizeof(NvmeCommand));
     cmd.cdw0 = NVME_CMD_CREATE_IO_SQ;
-    cmd.prp1 = m_io_queue.sq_buffer.phys;
+    cmd.prp1 = m_io_queue.sq_buffer.physical_address().as_uintptr();
     cmd.cdw10 = ((m_io_queue.sq_size - 1) << 16) | 1; // Size, Queue ID 1
     cmd.cdw11 = (1 << 16) | 1; // CQ ID 1, Physically contiguous
 
@@ -249,15 +236,15 @@ fk::core::Result<void, fk::core::Error> NVMeController::create_io_queues() {
     return {};
 }
 
-fk::core::Result<void, fk::core::Error> NVMeController::submit_command(QueuePair& queue, Command& cmd) {
-    Command* sq = reinterpret_cast<Command*>(queue.sq_memory);
+fk::core::Result<void, fk::core::Error> NVMeController::submit_command(NvmeQueuePair& queue, NvmeCommand& cmd) {
+    NvmeCommand* sq = reinterpret_cast<NvmeCommand*>(queue.sq_memory);
     sq[queue.sq_tail] = cmd;
-    
+
     queue.sq_tail = (queue.sq_tail + 1) % queue.sq_size;
     *queue.sq_tail_db = queue.sq_tail;
 
     // Wait for completion (polling)
-    volatile Completion* cq = reinterpret_cast<volatile Completion*>(queue.cq_memory);
+    volatile NvmeCompletion* cq = reinterpret_cast<volatile NvmeCompletion*>(queue.cq_memory);
     int timeout = 1000000;
     while (timeout-- > 0) {
         uint16_t status = cq[queue.cq_head].status;
@@ -283,76 +270,69 @@ fk::core::Result<void, fk::core::Error> NVMeController::submit_command(QueuePair
 
 fk::core::Result<void, fk::core::Error> NVMeController::identify_controller() {
     fk::algorithms::klog("NVMe", "Controller identify");
-    auto buf_result = dma_alloc_buffer(4096);
-    if (buf_result.is_error()) return fk::core::Error::OutOfMemory;
-    DmaBuffer identify_buf = buf_result.value();
-    
-    Command cmd;
-    fk::memory::set(&cmd, 0, sizeof(Command));
+    DmaBuffer identify_buf;
+    TRY(identify_buf.allocate(4096));
+
+    NvmeCommand cmd;
+    fk::memory::set(&cmd, 0, sizeof(NvmeCommand));
     cmd.cdw0 = NVME_CMD_IDENTIFY;
-    cmd.prp1 = identify_buf.phys;
+    cmd.prp1 = identify_buf.physical_address().as_uintptr();
     cmd.cdw10 = 1; // Identify Controller
 
-    auto res = submit_command(m_admin_queue, cmd);
-    dma_free_buffer(identify_buf);
-    return res;
+    return submit_command(m_admin_queue, cmd);
 }
 
 void NVMeController::scan_namespaces() {
     // Step 1: Identify Active Namespace List (CNS=0x02)
-    auto ns_list_result = dma_alloc_buffer(4096);
-    if (ns_list_result.is_error()) {
+    DmaBuffer ns_list_buf;
+    if (ns_list_buf.allocate(4096).is_error()) {
         fk::algorithms::kwarn("NVMe", "Failed to allocate NS list buffer");
-        Namespace ns;
+        NvmeNamespace ns;
         ns.nsid = 1; ns.size_blocks = 0; ns.block_size = 512; ns.active = true;
-        m_namespaces.push_back(ns);
+        TRY_OR_FATAL(m_namespaces.push_back(ns));
         return;
     }
-    DmaBuffer ns_list_buf = ns_list_result.value();
 
-    Command cmd;
-    fk::memory::set(&cmd, 0, sizeof(Command));
+    NvmeCommand cmd;
+    fk::memory::set(&cmd, 0, sizeof(NvmeCommand));
     cmd.cdw0 = NVME_CMD_IDENTIFY;
-    cmd.prp1 = ns_list_buf.phys;
+    cmd.prp1 = ns_list_buf.physical_address().as_uintptr();
     cmd.cdw10 = 0x02; // CNS=0x02: Active NS ID list
 
     if (submit_command(m_admin_queue, cmd).is_error()) {
         fk::algorithms::kwarn("NVMe", "Active NS list failed — falling back to NSID=1");
-        dma_free_buffer(ns_list_buf);
-        Namespace ns;
+        NvmeNamespace ns;
         ns.nsid = 1; ns.size_blocks = 0; ns.block_size = 512; ns.active = true;
-        m_namespaces.push_back(ns);
+        TRY_OR_FATAL(m_namespaces.push_back(ns));
         return;
     }
 
-    auto* ns_ids = reinterpret_cast<uint32_t*>(ns_list_buf.vaddr);
+    auto* ns_ids = reinterpret_cast<uint32_t*>(ns_list_buf.virtual_address());
 
     // Step 2: Identify each namespace (CNS=0x00)
-    auto ns_data_result = dma_alloc_buffer(4096);
-    if (ns_data_result.is_error()) {
+    DmaBuffer ns_data_buf;
+    if (ns_data_buf.allocate(4096).is_error()) {
         fk::algorithms::kwarn("NVMe", "Failed to allocate NS data buffer");
-        dma_free_buffer(ns_list_buf);
-        Namespace ns;
+        NvmeNamespace ns;
         ns.nsid = 1; ns.size_blocks = 0; ns.block_size = 512; ns.active = true;
-        m_namespaces.push_back(ns);
+        TRY_OR_FATAL(m_namespaces.push_back(ns));
         return;
     }
-    DmaBuffer ns_data_buf = ns_data_result.value();
 
     for (int i = 0; i < 1024 && ns_ids[i] != 0; ++i) {
         uint32_t nsid = ns_ids[i];
-        fk::memory::set(ns_data_buf.vaddr, 0, 4096);
+        fk::memory::set(ns_data_buf.virtual_address(), 0, 4096);
 
-        Command ns_cmd;
-        fk::memory::set(&ns_cmd, 0, sizeof(Command));
+        NvmeCommand ns_cmd;
+        fk::memory::set(&ns_cmd, 0, sizeof(NvmeCommand));
         ns_cmd.cdw0 = NVME_CMD_IDENTIFY;
         ns_cmd.nsid = nsid;
-        ns_cmd.prp1 = ns_data_buf.phys;
+        ns_cmd.prp1 = ns_data_buf.physical_address().as_uintptr();
         ns_cmd.cdw10 = 0x00; // CNS=0x00: Identify Namespace
 
         if (submit_command(m_admin_queue, ns_cmd).is_error()) continue;
 
-        auto* data = reinterpret_cast<uint8_t*>(ns_data_buf.vaddr);
+        auto* data = reinterpret_cast<uint8_t*>(ns_data_buf.virtual_address());
         uint64_t nsze = *reinterpret_cast<uint64_t*>(data + 0);
         uint8_t flbas = data[26] & 0x0F;
         uint32_t lbaf = *reinterpret_cast<uint32_t*>(data + 128 + flbas * 4);
@@ -361,12 +341,12 @@ void NVMeController::scan_namespaces() {
 
         if (nsze == 0) nsze = 1024 * 1024; // fallback if identify returns 0
 
-        Namespace ns;
+        NvmeNamespace ns;
         ns.nsid = nsid;
         ns.size_blocks = nsze;
         ns.block_size = block_size;
         ns.active = true;
-        m_namespaces.push_back(ns);
+        TRY_OR_FATAL(m_namespaces.push_back(ns));
 
         fk::algorithms::klog("NVMe", "Found NS %u: %llu blocks * %u bytes",
                               nsid, (unsigned long long)nsze, block_size);
@@ -374,13 +354,11 @@ void NVMeController::scan_namespaces() {
 
     if (m_namespaces.size() == 0) {
         fk::algorithms::kwarn("NVMe", "No namespaces found — adding NSID=1 as fallback");
-        Namespace ns;
+        NvmeNamespace ns;
         ns.nsid = 1; ns.size_blocks = 1024 * 1024; ns.block_size = 512; ns.active = true;
-        m_namespaces.push_back(ns);
+        TRY_OR_FATAL(m_namespaces.push_back(ns));
     }
 
-    dma_free_buffer(ns_data_buf);
-    dma_free_buffer(ns_list_buf);
     fk::algorithms::klog("NVMe", "scan_namespaces: found %zu namespace(s)", m_namespaces.size());
 }
 
@@ -394,8 +372,8 @@ fk::core::Result<size_t, fk::core::Error>
 NVMeController::read_sectors(uint64_t start_sector, size_t count, uint8_t *buffer) {
     if (!m_initialized) return fk::core::Error::DeviceError;
     
-    Command cmd;
-    fk::memory::set(&cmd, 0, sizeof(Command));
+    NvmeCommand cmd;
+    fk::memory::set(&cmd, 0, sizeof(NvmeCommand));
     cmd.cdw0 = NVME_CMD_READ;
     cmd.nsid = 1;
     cmd.prp1 = VirtualMemoryManager::the().translate((uintptr_t)buffer);
@@ -412,8 +390,8 @@ fk::core::Result<size_t, fk::core::Error>
 NVMeController::write_sectors(uint64_t start_sector, size_t count, const uint8_t *buffer) {
     if (!m_initialized) return fk::core::Error::DeviceError;
 
-    Command cmd;
-    fk::memory::set(&cmd, 0, sizeof(Command));
+    NvmeCommand cmd;
+    fk::memory::set(&cmd, 0, sizeof(NvmeCommand));
     cmd.cdw0 = NVME_CMD_WRITE;
     cmd.nsid = 1;
     cmd.prp1 = VirtualMemoryManager::the().translate((uintptr_t)buffer);

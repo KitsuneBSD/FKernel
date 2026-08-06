@@ -16,7 +16,7 @@ public:
     virtual fk::core::Result<size_t, fk::core::Error> read(uint64_t, size_t size, uint8_t* buffer) override {
         if (!buffer || size == 0) return fk::core::Error::InvalidParameter;
         size_t n;
-        while ((n = serial::read(buffer, size)) == 0)
+        while ((n = Serial::read(buffer, size)) == 0)
             SchedulerManager::the().yield();
         return n;
     }
@@ -25,7 +25,7 @@ public:
         if (!buffer) return fk::core::Error::InvalidParameter;
         
         for (size_t i = 0; i < size; ++i) {
-            serial::write_char(static_cast<char>(buffer[i]));
+            Serial::write_char(static_cast<char>(buffer[i]));
         }
         
         return size;

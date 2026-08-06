@@ -1,8 +1,9 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Driver/Pty/pty_master.h>
 #include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Utilities/memory.h>
 
 struct winsize {
   uint16_t ws_row;

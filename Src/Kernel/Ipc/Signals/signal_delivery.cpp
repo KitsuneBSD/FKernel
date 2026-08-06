@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
 #include <Kernel/Fs/Virtual/SignalFd/signal_fd_node.h>
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
@@ -9,9 +12,6 @@
 #include <Kernel/Hardware/Cpu/cpu_block.h>
 #include <Kernel/Memory/UserAccess/user_access.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace ipc {

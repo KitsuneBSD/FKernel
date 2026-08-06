@@ -1,6 +1,7 @@
-#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/new.h>
+
+#include <Kernel/Ipc/Endpoints/ipc_log_node.h>
 
 namespace fkernel {
 
@@ -17,7 +18,7 @@ void IpcLogNode::append(const char* str, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         if (m_buffer.size() >= MAX_LOG_SIZE)
             m_buffer.clear();
-        m_buffer.push_back(static_cast<uint8_t>(str[i]));
+        TRY_OR_FATAL(m_buffer.push_back(static_cast<uint8_t>(str[i])));
     }
 }
 

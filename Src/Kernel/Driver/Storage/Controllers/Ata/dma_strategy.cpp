@@ -1,10 +1,11 @@
-#include <Kernel/Arch/x86_64/io.h>
-#include <Kernel/Driver/Storage/Controllers/Ata/dma_strategy.h>
-#include <Kernel/Memory/Dma/dma_buffer.h>
-#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
-#include <Kernel/Scheduler/Core/scheduler.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Arch/x86_64/io.h>
+#include <Kernel/Driver/Storage/Controllers/Ata/dma_strategy.h>
+#include <Kernel/Driver/Async/dma_buffer.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 
 namespace fkernel {
 
@@ -31,172 +32,154 @@ void DMAStrategy::prepare_transfer(uint64_t start_sector, uint8_t count, bool wr
 
 fk::core::Result<size_t, fk::core::Error> DMAStrategy::read_sectors(uint64_t start_sector, size_t count, uint8_t* buffer) {
     if (count == 0 || !buffer) return fk::core::Error::InvalidParameter;
-    if (count > 256) return fk::core::Error::NotImplemented;
 
     fk::synchronization::ScopedLockIRQ lock(m_transfer_lock);
 
-    if (m_prdt_buffer.vaddr == nullptr) {
-        auto r = dma_alloc_buffer(4096);
-        if (r.is_error()) return fk::core::Error::OutOfMemory;
-        m_prdt_buffer = r.value();
+    if (!m_prdt_buffer.is_valid()) {
+        TRY(m_prdt_buffer.allocate(4096));
     }
-    PRD* prdt = reinterpret_cast<PRD*>(m_prdt_buffer.vaddr);
+    PRD* prdt = reinterpret_cast<PRD*>(m_prdt_buffer.virtual_address());
 
-    size_t total_bytes = count * 512;
-    uintptr_t current_buffer_virt = reinterpret_cast<uintptr_t>(buffer);
-    size_t remaining_bytes = total_bytes;
-    int prd_idx = 0;
+    size_t total_done = 0;
+    while (count > 0) {
+        // ATA sector count register is 8-bit; 0 encodes 256.
+        size_t chunk = (count > 256) ? 256 : count;
+        size_t chunk_bytes = chunk * 512;
+        uintptr_t cur_va = reinterpret_cast<uintptr_t>(buffer);
+        size_t remaining = chunk_bytes;
+        int prd_idx = 0;
 
-    // Build PRDT by translating buffer pages to physical addresses
-    while (remaining_bytes > 0 && prd_idx < 1024) {
-        uintptr_t page_offset = current_buffer_virt % 4096;
-        uintptr_t page_base = current_buffer_virt - page_offset;
-        
-        uintptr_t phys_base = VirtualMemoryManager::the().translate(page_base);
-        if (phys_base == 0) {
-            fk::algorithms::kwarn("DMA", "read: translate failed for buffer %p", buffer);
-            return fk::core::Error::IOError;
-        }
-        
-        uintptr_t phys = phys_base + page_offset;
-
-        size_t bytes_to_page_end = 4096 - page_offset;
-        size_t chunk_size = (remaining_bytes < bytes_to_page_end) ? remaining_bytes : bytes_to_page_end;
-
-        prdt[prd_idx].phys_addr = (uint32_t)phys;
-        prdt[prd_idx].byte_count = (uint16_t)chunk_size;
-        prdt[prd_idx].reserved = 0;
-        prdt[prd_idx].last_entry = 0;
-
-        remaining_bytes -= chunk_size;
-        current_buffer_virt += chunk_size;
-        prd_idx++;
-    }
-    prdt[prd_idx - 1].last_entry = 1;
-
-    // 2. Setup Bus Master
-    outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.phys);
-    
-    // Set direction (Read from drive = 1 in Bit 3 of BM Command)
-    outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ);
-    
-    // Clear Error and Interrupt bits in Status Register
-    outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
-
-    // 3. Command Drive
-    wait_busy();
-    prepare_transfer(start_sector, (uint8_t)(count == 256 ? 0 : count), false);
-
-    // 4. Start Bus Master
-    outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ | BM_CMD_START);
-
-    // 5. Wait for completion (Polling status for now, ideally IRQ based)
-    int timeout = 10000000;
-    while (timeout-- > 0) {
-        uint8_t status = inb(m_bm_base + BM_STATUS_REG);
-        uint8_t drive_status = inb(m_io_base + ATA_REG_STATUS);
-
-        if (!(status & BM_STATUS_ACTIVE)) {
-            if (status & BM_STATUS_ERROR) {
-                fk::algorithms::kwarn("DMA", "read: bus master error");
+        while (remaining > 0 && prd_idx < 1024) {
+            uintptr_t page_off = cur_va % 4096;
+            uintptr_t phys_base = VirtualMemoryManager::the().translate(cur_va - page_off);
+            if (phys_base == 0) {
+                fk::algorithms::kwarn("DMA", "read: translate failed for buffer %p", (void*)cur_va);
                 return fk::core::Error::IOError;
             }
-            break;
+            size_t bytes_to_end = 4096 - page_off;
+            size_t entry_size = (remaining < bytes_to_end) ? remaining : bytes_to_end;
+            prdt[prd_idx].phys_addr  = (uint32_t)(phys_base + page_off);
+            prdt[prd_idx].byte_count = (uint16_t)entry_size;
+            prdt[prd_idx].reserved   = 0;
+            prdt[prd_idx].last_entry = 0;
+            remaining -= entry_size;
+            cur_va    += entry_size;
+            ++prd_idx;
         }
-        
-        if (!(drive_status & ATA_SR_BSY) && (status & BM_STATUS_INTERRUPT)) {
-            break;
+        prdt[prd_idx - 1].last_entry = 1;
+
+        outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.physical_address().as_uintptr());
+        outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ);
+        outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
+
+        wait_busy();
+        prepare_transfer(start_sector, (uint8_t)(chunk == 256 ? 0 : chunk), false);
+        outb(m_bm_base + BM_COMMAND_REG, BM_CMD_READ | BM_CMD_START);
+
+        int timeout = 10000000;
+        while (timeout-- > 0) {
+            uint8_t bm_st = inb(m_bm_base + BM_STATUS_REG);
+            uint8_t ata_st = inb(m_io_base + ATA_REG_STATUS);
+            if (!(bm_st & BM_STATUS_ACTIVE)) {
+                if (bm_st & BM_STATUS_ERROR) {
+                    fk::algorithms::kwarn("DMA", "read: bus master error");
+                    return fk::core::Error::IOError;
+                }
+                break;
+            }
+            if (!(ata_st & ATA_SR_BSY) && (bm_st & BM_STATUS_INTERRUPT)) break;
+            SchedulerManager::the().yield();
         }
-        
-        SchedulerManager::the().yield();
-    }
-    if (timeout == 0) {
-        fk::algorithms::kwarn("DMA", "read: completion timeout");
-        return fk::core::Error::DeviceError;
-    }
+        outb(m_bm_base + BM_COMMAND_REG, 0x00);
+        if (timeout == 0) {
+            fk::algorithms::kwarn("DMA", "read: completion timeout");
+            return fk::core::Error::DeviceError;
+        }
 
-    // 6. Stop Bus Master
-    outb(m_bm_base + BM_COMMAND_REG, 0x00);
-
-    return count;
+        total_done   += chunk;
+        start_sector += chunk;
+        buffer       += chunk_bytes;
+        count        -= chunk;
+    }
+    return total_done;
 }
 
 fk::core::Result<size_t, fk::core::Error> DMAStrategy::write_sectors(uint64_t start_sector, size_t count, const uint8_t* buffer) {
     if (count == 0 || !buffer) return fk::core::Error::InvalidParameter;
-    if (count > 256) return fk::core::Error::NotImplemented;
 
     fk::synchronization::ScopedLockIRQ lock(m_transfer_lock);
 
-    if (m_prdt_buffer.vaddr == nullptr) {
-        auto r = dma_alloc_buffer(4096);
-        if (r.is_error()) return fk::core::Error::OutOfMemory;
-        m_prdt_buffer = r.value();
+    if (!m_prdt_buffer.is_valid()) {
+        TRY(m_prdt_buffer.allocate(4096));
     }
-    PRD* prdt = reinterpret_cast<PRD*>(m_prdt_buffer.vaddr);
+    PRD* prdt = reinterpret_cast<PRD*>(m_prdt_buffer.virtual_address());
 
-    size_t total_bytes = count * 512;
-    uintptr_t current_buffer_virt = reinterpret_cast<uintptr_t>(buffer);
-    size_t remaining_bytes = total_bytes;
-    int prd_idx = 0;
+    size_t total_done = 0;
+    while (count > 0) {
+        size_t chunk = (count > 256) ? 256 : count;
+        size_t chunk_bytes = chunk * 512;
+        uintptr_t cur_va = reinterpret_cast<uintptr_t>(buffer);
+        size_t remaining = chunk_bytes;
+        int prd_idx = 0;
 
-    while (remaining_bytes > 0 && prd_idx < 1024) {
-        uintptr_t page_offset = current_buffer_virt % 4096;
-        uintptr_t page_base = current_buffer_virt - page_offset;
-
-        uintptr_t phys_base = VirtualMemoryManager::the().translate(page_base);
-        if (phys_base == 0) {
-            fk::algorithms::kwarn("DMA", "write: translate failed for buffer %p", buffer);
-            return fk::core::Error::IOError;
-        }
-
-        uintptr_t phys = phys_base + page_offset;
-        size_t bytes_to_page_end = 4096 - page_offset;
-        size_t chunk_size = (remaining_bytes < bytes_to_page_end) ? remaining_bytes : bytes_to_page_end;
-        prdt[prd_idx].phys_addr = (uint32_t)phys;
-        prdt[prd_idx].byte_count = (uint16_t)chunk_size;
-        prdt[prd_idx].reserved = 0;
-        prdt[prd_idx].last_entry = 0;
-        remaining_bytes -= chunk_size;
-        current_buffer_virt += chunk_size;
-        prd_idx++;
-    }
-    prdt[prd_idx - 1].last_entry = 1;
-
-    outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.phys);
-    outb(m_bm_base + BM_COMMAND_REG, 0); // Write to drive = 0 in Bit 3
-    outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
-
-    wait_busy();
-    {
-        uint8_t ata_status = inb(m_io_base + ATA_REG_STATUS);
-        if (ata_status & ATA_SR_ERR) {
-            fk::algorithms::kwarn("DMA", "write: ATA error before transfer, status=0x%02x", ata_status);
-            return fk::core::Error::IOError;
-        }
-    }
-    prepare_transfer(start_sector, (uint8_t)(count == 256 ? 0 : count), true);
-
-    outb(m_bm_base + BM_COMMAND_REG, BM_CMD_START);
-
-    int timeout = 10000000;
-    while (timeout-- > 0) {
-        uint8_t status = inb(m_bm_base + BM_STATUS_REG);
-        if (!(status & BM_STATUS_ACTIVE)) {
-            if (status & BM_STATUS_ERROR) {
-                fk::algorithms::kwarn("DMA", "write: bus master error");
+        while (remaining > 0 && prd_idx < 1024) {
+            uintptr_t page_off = cur_va % 4096;
+            uintptr_t phys_base = VirtualMemoryManager::the().translate(cur_va - page_off);
+            if (phys_base == 0) {
+                fk::algorithms::kwarn("DMA", "write: translate failed for buffer %p", (void*)cur_va);
                 return fk::core::Error::IOError;
             }
-            break;
+            size_t bytes_to_end = 4096 - page_off;
+            size_t entry_size = (remaining < bytes_to_end) ? remaining : bytes_to_end;
+            prdt[prd_idx].phys_addr  = (uint32_t)(phys_base + page_off);
+            prdt[prd_idx].byte_count = (uint16_t)entry_size;
+            prdt[prd_idx].reserved   = 0;
+            prdt[prd_idx].last_entry = 0;
+            remaining -= entry_size;
+            cur_va    += entry_size;
+            ++prd_idx;
         }
-        SchedulerManager::the().yield();
-    }
-    if (timeout == 0) {
-        fk::algorithms::kwarn("DMA", "write: completion timeout");
-        return fk::core::Error::DeviceError;
-    }
+        prdt[prd_idx - 1].last_entry = 1;
 
-    outb(m_bm_base + BM_COMMAND_REG, 0x00);
-    return count;
+        outl(m_bm_base + BM_PRDT_ADDR_REG, (uint32_t)m_prdt_buffer.physical_address().as_uintptr());
+        outb(m_bm_base + BM_COMMAND_REG, 0);
+        outb(m_bm_base + BM_STATUS_REG, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
+
+        wait_busy();
+        {
+            uint8_t ata_st = inb(m_io_base + ATA_REG_STATUS);
+            if (ata_st & ATA_SR_ERR) {
+                fk::algorithms::kwarn("DMA", "write: ATA error before transfer, status=0x%02x", ata_st);
+                return fk::core::Error::IOError;
+            }
+        }
+        prepare_transfer(start_sector, (uint8_t)(chunk == 256 ? 0 : chunk), true);
+        outb(m_bm_base + BM_COMMAND_REG, BM_CMD_START);
+
+        int timeout = 10000000;
+        while (timeout-- > 0) {
+            uint8_t bm_st = inb(m_bm_base + BM_STATUS_REG);
+            if (!(bm_st & BM_STATUS_ACTIVE)) {
+                if (bm_st & BM_STATUS_ERROR) {
+                    fk::algorithms::kwarn("DMA", "write: bus master error");
+                    return fk::core::Error::IOError;
+                }
+                break;
+            }
+            SchedulerManager::the().yield();
+        }
+        outb(m_bm_base + BM_COMMAND_REG, 0x00);
+        if (timeout == 0) {
+            fk::algorithms::kwarn("DMA", "write: completion timeout");
+            return fk::core::Error::DeviceError;
+        }
+
+        total_done   += chunk;
+        start_sector += chunk;
+        buffer       += chunk_bytes;
+        count        -= chunk;
+    }
+    return total_done;
 }
 
 } // namespace fkernel

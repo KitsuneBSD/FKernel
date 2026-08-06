@@ -1,10 +1,11 @@
-#include <Kernel/Fs/Disk/Ext2/ext2_fs.h>
-#include <Kernel/Fs/Disk/Ext2/ext2_node.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Algorithms/Generic/bitmap.h>
 #include <LibFK/Algorithms/Generic/scatter_io.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
+
+#include <Kernel/Fs/Disk/Ext2/ext2_fs.h>
+#include <Kernel/Fs/Disk/Ext2/ext2_node.h>
 
 namespace fkernel {
 
@@ -257,7 +258,45 @@ Ext2FileSystem::set_data_block(Ext2Inode& inode, uint32_t ino,
         return leaf;
     }
 
-    return Error::InvalidData; // triple indirect: very rare, not implemented for writes
+    idx -= m_ptrs_per_blk * m_ptrs_per_blk;
+
+    // Triple indirect: inode.i_block[14] → L1 → L2 → leaf
+    uint32_t sq    = m_ptrs_per_blk * m_ptrs_per_blk;
+    uint32_t l1_i  = idx / sq;
+    uint32_t l2_i  = (idx % sq) / m_ptrs_per_blk;
+    uint32_t l3_i  = idx % m_ptrs_per_blk;
+
+    uint32_t tind = TRY(ensure_indirect(this, inode.i_block[14], prefer));
+
+    uint32_t l1 = TRY(read_indirect(this, tind, l1_i));
+    if (l1 == 0) {
+        l1 = TRY(alloc_block(prefer));
+        uint8_t* z = static_cast<uint8_t*>(kmalloc(m_block_size));
+        if (!z) return Error::OutOfMemory;
+        fk::memory::set(z, 0, m_block_size);
+        auto r = write_block(l1, z); kfree(z);
+        if (r.is_error()) return r.error();
+        TRY(write_indirect(this, tind, l1_i, l1));
+    }
+
+    uint32_t l2 = TRY(read_indirect(this, l1, l2_i));
+    if (l2 == 0) {
+        l2 = TRY(alloc_block(prefer));
+        uint8_t* z = static_cast<uint8_t*>(kmalloc(m_block_size));
+        if (!z) return Error::OutOfMemory;
+        fk::memory::set(z, 0, m_block_size);
+        auto r = write_block(l2, z); kfree(z);
+        if (r.is_error()) return r.error();
+        TRY(write_indirect(this, l1, l2_i, l2));
+    }
+
+    uint32_t leaf = TRY(read_indirect(this, l2, l3_i));
+    if (alloc && leaf == 0) {
+        leaf = TRY(alloc_block(prefer));
+        TRY(write_indirect(this, l2, l3_i, leaf));
+        inode.i_blocks += m_block_size / 512;
+    }
+    return leaf;
 }
 
 // ---- Read from inode ---------------------------------------------------------
@@ -333,7 +372,7 @@ Ext2FileSystem::list_dir_inode(const Ext2Inode& dir,
                     fk::memory::copy(entry.name, dname, nlen);
                     entry.name[nlen] = '\0';
                     entry.type = (de->file_type == EXT2_FT_DIR) ? 1u : 0u;
-                    entries.push_back(entry);
+                    TRY(entries.push_back(entry));
                 }
             }
             off += de->rec_len;

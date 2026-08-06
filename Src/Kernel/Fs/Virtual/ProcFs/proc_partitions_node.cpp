@@ -1,8 +1,9 @@
-#include <Kernel/Fs/Virtual/ProcFs/proc_partitions_node.h>
-#include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Text/string.h>
+
+#include <Kernel/Fs/Virtual/ProcFs/proc_partitions_node.h>
+#include <Kernel/Driver/Storage/Partitions/partition_manager.h>
 
 using namespace fk::core;
 
@@ -29,5 +30,5 @@ void ProcPartitionsNode::ensure_cached() {
   }
 
   m_cached.clear();
-  for (size_t i = 0; i < buf.length(); ++i) m_cached.push_back(static_cast<uint8_t>(buf[i]));
+  for (size_t i = 0; i < buf.length(); ++i) TRY_OR_FATAL(m_cached.push_back(static_cast<uint8_t>(buf[i])));
 }

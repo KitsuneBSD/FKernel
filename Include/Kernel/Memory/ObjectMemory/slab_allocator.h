@@ -7,7 +7,7 @@
  * @class SlabAllocator
  * @brief Object-caching slab allocator for fixed-size kernel allocations.
  *
- * Manages multiple caches of common sizes (16–2048 bytes).  Each cache
+ * Manages multiple caches of common sizes (16–8192 bytes).  Each cache
  * grows by allocating page-sized slabs from the kernel heap, subdividing
  * them into fixed-size objects linked by an embedded free list.  Alloc/free
  * is O(1).  Fallback: passes requests above the largest cache size through

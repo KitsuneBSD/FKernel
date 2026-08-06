@@ -1,12 +1,14 @@
 -- Meta/x86_64-tools/check_one_syscall_per_file.lua
 -- Verifies AGENTS.md Secret Rule:
---   "One syscall handler per file. Each Src/Kernel/Syscall/syscall_list/
+--   "One syscall handler per file. Each Src/Kernel/Syscall/SyscallList/
 --    file defines at most one sys_* handler. File name matches the handler
 --    name minus the `sys_` prefix."
 --
 -- Files with zero handlers are allowed (shared support files, e.g.
 -- Time/posix_timer.cpp). Files with MORE THAN ONE handler definition are
--- violations.
+-- violations. Files with EXACTLY ONE handler are also checked for the
+-- name-match rule: the file basename (without .cpp) must equal the handler
+-- name minus the `sys_` prefix (e.g. sys_prlimit64 -> prlimit64.cpp).
 --
 -- Detection:
 --   A handler definition is a function named `sys_<name>` declared as
@@ -127,7 +129,7 @@ local function find_project_root()
 end
 
 local ROOT = find_project_root():gsub("/+$", "")
-local SYSCALL_DIR = ROOT .. "/Src/Kernel/Syscall/syscall_list"
+local SYSCALL_DIR = ROOT .. "/Src/Kernel/Syscall/SyscallList"
 
 local function relpath(abs)
   if abs:sub(1, #ROOT) == ROOT then
@@ -224,11 +226,24 @@ local function main()
         msg = #handlers .. " syscall handler definitions (max 1)",
         handlers = handlers,
       })
+    elseif #handlers == 1 then
+      local basename = file:match("([^/]+)%.cpp$")
+      local expected = handlers[1].name:gsub("^sys_", "")
+      if basename and basename ~= expected then
+        table.insert(violations, {
+          file = relpath(file),
+          msg = string.format(
+            "file name '%s' does not match handler '%s' (expected '%s.cpp')",
+            basename, handlers[1].name, expected),
+          handlers = handlers,
+        })
+      end
     end
   end
 
   print(string.format("\n🔍 [%s] Checking one syscall handler per file rule...\n", script_name))
-  print(string.format("   Scanned: %d files in Src/Kernel/Syscall/syscall_list/", #files))
+  print(string.format("   Scanned: %d files in Src/Kernel/Syscall/SyscallList/", #files))
+  print("   Rules:  at most 1 handler/file AND file name = handler minus `sys_`")
   print("")
 
   if #violations == 0 then
@@ -247,7 +262,7 @@ local function main()
     end
     print("")
   end
-  print("   Fix: Split handlers into separate files (file name = handler name minus `sys_`).")
+  print("   Fix: Split handlers into separate files (file name = handler name minus `sys_`); rename files whose basename does not match the single handler.")
   print(string.format("   check-one-syscall-per-file: %d files checked, %d violations", #files, #violations))
   os.exit(1)
 end

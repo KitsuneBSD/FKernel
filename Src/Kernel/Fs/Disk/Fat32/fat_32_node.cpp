@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Generic/fat_name.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Disk/Fat32/fat_32_node.h>
 #include <Kernel/Fs/Disk/Fat32/fat_32_fs.h>
 #include <Kernel/Fs/Disk/Fat32/directory_entry.h>
-#include <LibFK/Algorithms/Generic/fat_name.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 

@@ -1,11 +1,12 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/8259_pic.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/i8259_pic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/ioapic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/InterruptController/x2apic.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/timer_interrupt.h>
 #include <Kernel/Hardware/Cpu/cpu.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 void HardwareInterruptManager::select_and_configure_controller() {
   static PIC8259 pic_controller_instance;
@@ -70,7 +71,7 @@ void HardwareInterruptManager::set_memory_manager(bool is_memory_manager) {
 void HardwareInterruptManager::mask_interrupt(uint8_t irq) {
   m_unmasked_irqs &= ~(1u << irq);
   if (!m_controller) {
-    fk::algorithms::kerror("HW_INTERRUPT", "mask_interrupt: no controller available");
+    fk::algorithms::kwarn("HW_INTERRUPT", "mask_interrupt: no controller available");
     return;
   }
   m_controller->mask_interrupt(irq);
@@ -79,7 +80,7 @@ void HardwareInterruptManager::mask_interrupt(uint8_t irq) {
 void HardwareInterruptManager::unmask_interrupt(uint8_t irq) {
   m_unmasked_irqs |= (1u << irq);
   if (!m_controller) {
-    fk::algorithms::kerror("HW_INTERRUPT", "unmask_interrupt: no controller available");
+    fk::algorithms::kwarn("HW_INTERRUPT", "unmask_interrupt: no controller available");
     return;
   }
   m_controller->unmask_interrupt(irq);
@@ -87,7 +88,7 @@ void HardwareInterruptManager::unmask_interrupt(uint8_t irq) {
 
 void HardwareInterruptManager::send_eoi(uint8_t irq) {
   if (!m_controller) {
-    fk::algorithms::kerror("HW_INTERRUPT", "send_eoi: no controller available");
+    fk::algorithms::kwarn("HW_INTERRUPT", "send_eoi: no controller available");
     return;
   }
   m_controller->send_eoi(irq);
@@ -96,7 +97,7 @@ void HardwareInterruptManager::send_eoi(uint8_t irq) {
 fk::core::Result<uint8_t, fk::core::Error>
 HardwareInterruptManager::allocate_msi_vector(const PciDevice& device) {
   if (!m_controller) {
-    fk::algorithms::kerror("HW_INTERRUPT", "allocate_msi_vector: no controller available");
+    fk::algorithms::kwarn("HW_INTERRUPT", "allocate_msi_vector: no controller available");
     return fk::core::Error::NoDevice;
   }
   return m_controller->allocate_msi_vector(device);

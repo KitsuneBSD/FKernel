@@ -1,12 +1,13 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Synchronization/spinlock.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Loader/Domains/dynamic_domain.h>
 #include <Kernel/Loader/Domains/load_domain.h>
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Loader/Domains/parser_domain.h>
 #include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Arch/x86_64/Hardware/Cpu/cpu_ops.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Synchronization/spinlock.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel::elf_domains {
 
@@ -59,7 +60,7 @@ DynamicDomain::load_dependencies(const fk::containers::Vector<Elf64_Phdr>& heade
       if (s.name == name) { already_loaded = true; break; }
     }
     if (!already_loaded)
-      s_global_libraries.push_back({fk::VirtualAddress(0), fk::VirtualAddress(0), fk::VirtualAddress(0), fk::text::String(name)});
+      TRY(s_global_libraries.push_back({fk::VirtualAddress(0), fk::VirtualAddress(0), fk::VirtualAddress(0), fk::text::String(name)}));
   }
   }
 

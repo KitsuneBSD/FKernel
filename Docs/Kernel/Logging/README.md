@@ -32,7 +32,8 @@ graph TD
 
 | Function | Color | Halts | Use Case |
 |----------|-------|-------|----------|
-| `kerror(prefix, fmt, ...)` | Red | **Yes** | Unrecoverable errors (proposed: split into `kfatal()` halt + `kerror()` non-halting) |
+| `kfatal(prefix, fmt, ...)` | Red | **Yes** | Unrecoverable errors (halts CPU) |
+| `kerror(prefix, fmt, ...)` | Red | No | Errors (recoverable or unclassified) — does NOT halt |
 | `kexception(prefix, fmt, ...)` | Red | No | Exception handler output |
 | `kwarn(prefix, fmt, ...)` | Yellow | No | Warnings, degraded operation |
 | `kdebug(prefix, fmt, ...)` | White | No | Debug diagnostics |
@@ -80,7 +81,7 @@ fk::algorithms::kexception("PAGE_FAULT", "RIP=%p CR2=%p error=%u", rip, cr2, err
 
 1. **No log-level filtering** — all levels always compiled in
 2. **Panic bypasses logging** — messages never reach dmesg
-3. **`kerror()` halts on every call** — no non-halting error level; proposed split: `kfatal()` (halt) + `kerror()` (non-halting)
+3. ~~**`kerror()` halts on every call**~~ — split done: `kfatal()` halts, `kerror()` is non-halting
 4. **Inconsistent prefix naming** — mixed conventions across ~100+ call sites
 5. **Dead code** — StdoutLogNode/StderrLogNode never instantiated
 6. **`set_log_target_bits()` declared but not implemented** in `kernel_puts.h`
@@ -89,7 +90,7 @@ fk::algorithms::kexception("PAGE_FAULT", "RIP=%p CR2=%p error=%u", rip, cr2, err
 ## Future: Proposed Log Levels
 
 ```
-FATAL   — halts the system (cli;hlt) — current kerror() behavior
+FATAL   — halts the system (cli;hlt) — `kfatal()`
 ERROR   — non-halting error, requires attention
 WARN    — warning, operation degraded but continues
 INFO    — normal operational messages (init, state changes)

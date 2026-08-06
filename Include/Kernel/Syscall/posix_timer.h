@@ -1,10 +1,12 @@
 #pragma once
 
 #include <Kernel/Scheduler/Task/task.h>
+#include <LibFK/Container/Sequence/vector.h>
+#include <LibFK/Synchronization/spinlock.h>
 
-// Shared POSIX timer state used by the sys_timer_* syscalls (syscall_list/Time/)
+// Shared POSIX timer state used by the sys_timer_* syscalls (SyscallList/Time/)
 // and the scheduler tick path (Scheduler/scheduler_lifecycle.cpp).
-// The single definition lives in Src/Kernel/Syscall/syscall_list/Time/posix_timer.cpp.
+// Definitions live in Src/Kernel/Syscall/SyscallList/Time/posix_timer.cpp.
 struct PosixTimer {
   bool used{false};
   int signo{14}; // SIGALRM default
@@ -13,6 +15,5 @@ struct PosixTimer {
   Task* owner{nullptr};
 };
 
-inline constexpr int MAX_POSIX_TIMERS = 8;
-
-extern PosixTimer s_timers[MAX_POSIX_TIMERS];
+extern fk::containers::Vector<PosixTimer> s_timers;
+extern fk::synchronization::Spinlock s_timer_lock;

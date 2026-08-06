@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Core/assertions.h>
+
 #include <Kernel/Boot/Multiboot/multiboot2.h>
 #include <Kernel/Boot/Multiboot/multiboot_interpreter.h>
 #include <Kernel/Boot/Core/boot_info.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Core/assertions.h>
 
 namespace boot {
 
@@ -210,9 +211,9 @@ void BootInfo::create_iterators() {
            tag && tag->type != multiboot2::TagType::End; tag = tag->next()) {
         if (tag->type == multiboot2::TagType::Module) {
           auto mod = reinterpret_cast<multiboot2::TagModule const *>(tag);
-          m_modules.push_back({.start = mod->mod_start,
+          TRY_OR_FATAL(m_modules.push_back({.start = mod->mod_start,
                                .end = mod->mod_end,
-                               .cmdline = mod->get_cmdline()});
+                               .cmdline = mod->get_cmdline()}));
           fk::algorithms::klog("BOOT", "Found module: %s (%p - %p)",
                                mod->get_cmdline(),
                                (void *)(uintptr_t)mod->mod_start,

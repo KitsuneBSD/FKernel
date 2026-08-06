@@ -1,12 +1,12 @@
-#include <Kernel/Fs/Disk/Fat32/fat_32_fs.h>
-#include <Kernel/Fs/Disk/Fat32/bpb.h>
-#include <Kernel/Fs/Disk/Fat32/directory_entry.h>
 #include <LibFK/Algorithms/Generic/fat_name.h>
 #include <LibFK/Algorithms/Generic/string_algorithms.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Algorithms/Generic/math.h>
 
+#include <Kernel/Fs/Disk/Fat32/fat_32_fs.h>
+#include <Kernel/Fs/Disk/Fat32/bpb.h>
+#include <Kernel/Fs/Disk/Fat32/directory_entry.h>
 #include <Kernel/Fs/Disk/Fat32/fat_32_node.h>
 
 namespace fkernel {
@@ -43,7 +43,7 @@ Fat32FileSystem::list_directory_from(uint32_t first_cluster, fk::containers::Vec
                 if (has_lfn) fk::memory::copy(entry.name, lfn_buf, 256);
                 has_lfn = false;
                 entry.type = (dir[j].attr & 0x10) != 0 ? 1 : 0;
-                entries.push_back(entry);
+                TRY(entries.push_back(entry));
             }
         }
         current_cluster = get_next_cluster(current_cluster);
@@ -235,11 +235,13 @@ Fat32FileSystem::read_from_cluster_chain(uint32_t first_cluster, uint64_t offset
 
     while (bytes_read < size && current_cluster < 0x0FFFFFF8) {
         uint8_t* temp = static_cast<uint8_t*>(kmalloc(cluster_size));
-        m_device->read(cluster_to_sector(current_cluster) * 512, cluster_size, temp);
-        
+        if (!temp) return fk::core::Error::OutOfMemory;
+        if (m_device->read(cluster_to_sector(current_cluster) * 512, cluster_size, temp).is_error()) {
+            kfree(temp);
+            return fk::core::Error::IOError;
+        }
         size_t to_copy = fk::algorithms::min(size - bytes_read, (size_t)(cluster_size - cluster_offset));
         fk::memory::copy(buffer + bytes_read, temp + cluster_offset, to_copy);
-        
         kfree(temp);
         bytes_read += to_copy;
         cluster_offset = 0;

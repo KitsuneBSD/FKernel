@@ -17,6 +17,7 @@ xmake build-initrd             # Build initrd
 xmake config-initrd            # Configure initrd interactively
 xmake analyze                  # Analyze kernel runtime
 xmake check-syscalls          # Verify one syscall handler per file
+xmake check-arch-asm          # Verify asm/inline-asm stays under Arch/ dirs
 ```
 
 Build outputs: `build/FKernel.bin`, `build/FKernel-MockOS.iso`, `build/FKernel-HDA.qcow2`.
@@ -37,7 +38,7 @@ Violations are build errors. LibFK defines the boundary between LibC and Kernel.
 
 Only these two files may include LibC directly:
 - `Src/Kernel/Io/kernel_puts.cpp` — implements kprintf output routing
-- `Src/Kernel/Arch/x86_64/Panic/Panic.cpp` — panic handler (runs before logging init)
+- `Src/Kernel/Arch/x86_64/Panic/panic.cpp` — panic handler (runs before logging init)
 
 ### LibFK ↔ Kernel Boundary
 
@@ -48,6 +49,7 @@ LibFK MUST NOT include Kernel headers. Use the allocator backend pattern
 
 ```bash
 xmake check-layers    # Verify layer separation
+xmake check-arch-asm  # Verify asm/inline-asm stays under Arch/ dirs (arch_* policy)
 ```
 
 ### LibFK Equivalents for LibC
@@ -165,7 +167,7 @@ portability layer, declared in `<Kernel/Arch/<arch>/Hardware/Cpu/cpu_ops.h>`.
 | `arch_smap_begin()` / `arch_smap_end()` | STAC / CLAC |
 | `arch_triple_fault()` | LIDT + INT3 panic |
 | `detect_tsc_frequency()` | CPUID 0x15/0x16 TSC calibration |
-| `arch_cpu_idle()` _(Phase 42)_ | TODO: extract `sti; hlt` from scheduler |
+| `arch_cpu_idle()` | STI; HLT idle loop (`cpu_ops.cpp:151`) |
 
 ### Rules
 
@@ -284,7 +286,7 @@ All algorithms used across multiple domains belong in `LibFK/Algorithms/`:
 |----------|----------|----------|
 | `fk::algorithms::klog(PREFIX, fmt, ...)` | Normal operations, init | Returns |
 | `fk::algorithms::kwarn(PREFIX, fmt, ...)` | Warnings, degraded ops | Returns |
-| `fk::algorithms::kerror(PREFIX, fmt, ...)` | Unrecoverable errors | **Halts CPU** (proposed: split into `kfatal()` halt + `kerror()` non-halting) |
+| `fk::algorithms::kerror(PREFIX, fmt, ...)` | Errors (recoverable or unclassified) | Returns — does NOT halt; use `kfatal()` for unrecoverable errors |
 | `fk::algorithms::kdebug(PREFIX, fmt, ...)` | Debug diagnostics | Returns |
 | `fk::algorithms::kexception(PREFIX, fmt, ...)` | Exception handlers | Returns |
 
@@ -305,7 +307,7 @@ fk::algorithms::klog("sys_reboot", ...);          // lowercase
 ### Rules
 
 1. **Never use raw `kprintf()` in kernel code** — always use `fk::algorithms::klog/kwarn/kerror`
-2. **Never use `kerror()` for recoverable errors** — it halts; use `kwarn()` instead
+2. **Never use `kerror()` for recoverable errors without context** — it no longer halts (split `kfatal()`/`kerror()` done); use `kfatal()` only for truly unrecoverable errors
 3. **Include context in error messages** — error code, path, relevant values
 4. **Log at INFO level during subsystem init** — helps debug boot order issues
 5. **Use `kdebug()` for hot paths** — may be stripped in release builds

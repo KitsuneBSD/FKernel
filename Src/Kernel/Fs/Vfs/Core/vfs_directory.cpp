@@ -1,10 +1,10 @@
-#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
-#include <Kernel/Fs/Vfs/Core/dentry.h>
-#include <Kernel/Fs/Vfs/Core/file_description.h>
-
 #include <LibFK/Container/Associative/unordered_set.h>
 #include <LibFK/Text/string.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
+#include <Kernel/Fs/Vfs/Core/dentry.h>
+#include <Kernel/Fs/Vfs/Core/file_description.h>
 
 namespace fkernel {
 
@@ -17,7 +17,7 @@ VirtualFileSystem::readdir(const char *path, fk::containers::Vector<DirectoryEnt
   fk::containers::UnorderedSet<fk::text::String> seen;
   auto add = [&](const DirectoryEntry& entry) {
       if (seen.insert(fk::text::String(entry.name)))
-          entries.push_back(entry);
+          TRY_OR_FATAL(entries.push_back(entry));
   };
 
   auto dentry = dentry_res.value();
@@ -50,7 +50,7 @@ VirtualFileSystem::readdir(fk::RefPtr<FileDescription> description, uint8_t *buf
   fk::containers::UnorderedSet<fk::text::String> seen;
   auto add = [&](const DirectoryEntry& entry) {
       if (seen.insert(fk::text::String(entry.name)))
-          entries.push_back(entry);
+          TRY_OR_FATAL(entries.push_back(entry));
   };
 
   DirectoryEntry dot; fk::memory::copy_string(dot.name, "."); dot.type = 1; add(dot);

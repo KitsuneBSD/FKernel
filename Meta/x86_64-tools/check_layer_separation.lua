@@ -1,6 +1,27 @@
 -- Meta/x86_64-tools/check_layer_separation.lua
 -- Verifies LibC → LibFK → Kernel layer separation
--- Kernel code MUST NOT include LibC headers directly
+-- Kernel code MUST NOT include LibC headers directly.
+-- Detection covers BOTH prefixed (`#include <LibC/string.h>`) and
+-- unprefixed (`#include <string.h>`) LibC includes. Unprefixed includes
+-- resolve to the project's LibC via `Include/LibC/` on the include path, so
+-- the basename of every real LibC header is treated as forbidden in Kernel.
+
+-- Build a set of LibC header basenames (e.g. "string.h", "stdint.h")
+local function libc_header_basenames()
+  local names = {}
+  local cmd = 'find "Include/LibC" -name "*.h" -type f 2>/dev/null'
+  local handle = io.popen(cmd)
+  if handle then
+    for file in handle:lines() do
+      local base = file:match("([^/]+)$")
+      if base then names[base] = true end
+    end
+    handle:close()
+  end
+  return names
+end
+
+local LIBC_BASENAMES = libc_header_basenames()
 
 local function scan_file(filepath)
   local violations = {}
@@ -13,6 +34,17 @@ local function scan_file(filepath)
     -- Match #include <LibC/...> or #include "LibC/..."
     if line:match('#%s*include%s*[<"]LibC/') then
       table.insert(violations, { file = filepath, line = line_num, content = line })
+    else
+      -- Match unprefixed LibC include: #include <string.h> / #include "string.h"
+      local base = line:match('#%s*include%s*[<"]([%w_%.]+)[>"]')
+      if base and LIBC_BASENAMES[base] then
+        table.insert(violations, {
+          file = filepath,
+          line = line_num,
+          content = line,
+          unprefixed = true,
+        })
+      end
     end
   end
   f:close()
@@ -36,6 +68,9 @@ end
 local exceptions = {
   ["Src/Kernel/Arch/x86_64/Panic/panic.cpp"] = true,
   ["Src/Kernel/Io/kernel_puts.cpp"] = true,
+  -- POSIX ABI facade: <sys/errno.h> is the userspace-facing system header
+  -- mirroring Linux errno numbers (musl/BusyBox contract). Not kernel code.
+  ["Include/Kernel/Posix/sys/errno.h"] = true,
 }
 
 local all_violations = {}
@@ -54,9 +89,11 @@ end
 -- Scan Kernel header files
 local kernel_h = find_files("Include/Kernel", "*.h")
 for _, file in ipairs(kernel_h) do
-  local viols = scan_file(file)
-  for _, v in ipairs(viols) do
-    table.insert(all_violations, v)
+  if not exceptions[file] then
+    local viols = scan_file(file)
+    for _, v in ipairs(viols) do
+      table.insert(all_violations, v)
+    end
   end
 end
 
@@ -109,9 +146,10 @@ else
   print(string.format("\n❌ Layer separation violations found: %d\n", #all_violations))
   for _, v in ipairs(all_violations) do
     local tag = v.reverse and "REVERSE (LibFK→Kernel)" or "Kernel→LibC"
+    if v.unprefixed then tag = tag .. " (unprefixed)" end
     print(string.format("  [%s] %s:%d: %s", tag, v.file, v.line, v.content:match("^%s*(.-)%s*$")))
   end
   print(string.format("\nFix: Replace LibC includes with LibFK equivalents."))
-  print(string.format("Exceptions: panic.cpp, kernel_puts.cpp (early boot/panic context)."))
+  print(string.format("Exceptions: panic.cpp, kernel_puts.cpp, Kernel/Posix/sys/errno.h (ABI facade)."))
   os.exit(1)
 end

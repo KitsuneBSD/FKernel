@@ -1,16 +1,17 @@
-#include <Kernel/Driver/Network/E1000/e1000.h>
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
-#include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
-#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
-#include <Kernel/Memory/Dma/dma_buffer.h>
-#include <Kernel/Memory/memory_manager.h>
-#include <Kernel/Hardware/Buses/Pci/pci.h>
-#include <Kernel/Scheduler/Core/scheduler.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Core/assertions.h>
 #include <LibFK/Memory/Pointers/ref_ptr.h>
 #include <LibFK/Utilities/memory.h>
 #include <LibFK/Synchronization/interrupt_disabler.h>
+
+#include <Kernel/Driver/Network/E1000/e1000.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
+#include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
+#include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
+#include <Kernel/Driver/Async/dma_buffer.h>
+#include <Kernel/Memory/memory_manager.h>
+#include <Kernel/Hardware/Buses/Pci/pci.h>
+#include <Kernel/Scheduler/Core/scheduler.h>
 
 namespace fkernel {
 
@@ -133,27 +134,23 @@ void E1000Controller::read_mac_address() {
 }
 
 void E1000Controller::initialize_rx() {
-    auto ring_result = dma_alloc_buffer(sizeof(e1000_rx_desc) * 128);
-    if (ring_result.is_error()) {
+    if (m_rx_ring.allocate(sizeof(e1000_rx_desc) * 128).is_error()) {
         fk::algorithms::kerror("E1000", "Failed to allocate RX descriptor ring");
         return;
     }
-    m_rx_ring = ring_result.value();
-    m_rx_descs = reinterpret_cast<e1000_rx_desc*>(m_rx_ring.vaddr);
+    m_rx_descs = reinterpret_cast<e1000_rx_desc*>(m_rx_ring.virtual_address());
 
     for (int i = 0; i < 128; i++) {
-        auto buf_result = dma_alloc_buffer(2048);
-        if (buf_result.is_error()) {
+        if (m_rx_buffers[i].allocate(2048).is_error()) {
             fk::algorithms::kerror("E1000", "Failed to allocate RX buffer %d", i);
             return;
         }
-        m_rx_buffers[i] = buf_result.value();
-        m_rx_descs[i].addr = m_rx_buffers[i].phys;
+        m_rx_descs[i].addr = m_rx_buffers[i].physical_address().as_uintptr();
         m_rx_descs[i].status = 0;
     }
 
-    write_command(REG_RXADDRL, (uint32_t)m_rx_ring.phys);
-    write_command(REG_RXADDRH, (uint32_t)(m_rx_ring.phys >> 32));
+    write_command(REG_RXADDRL, (uint32_t)m_rx_ring.physical_address().as_uintptr());
+    write_command(REG_RXADDRH, (uint32_t)(m_rx_ring.physical_address().as_uintptr() >> 32));
     write_command(REG_RXLEN, 128 * sizeof(e1000_rx_desc));
     write_command(REG_RXHEAD, 0);
     write_command(REG_RXTAIL, 127);
@@ -167,27 +164,23 @@ void E1000Controller::initialize_rx() {
 }
 
 void E1000Controller::initialize_tx() {
-    auto ring_result = dma_alloc_buffer(sizeof(e1000_tx_desc) * 128);
-    if (ring_result.is_error()) {
+    if (m_tx_ring.allocate(sizeof(e1000_tx_desc) * 128).is_error()) {
         fk::algorithms::kerror("E1000", "Failed to allocate TX descriptor ring");
         return;
     }
-    m_tx_ring = ring_result.value();
-    m_tx_descs = reinterpret_cast<e1000_tx_desc*>(m_tx_ring.vaddr);
+    m_tx_descs = reinterpret_cast<e1000_tx_desc*>(m_tx_ring.virtual_address());
 
     for (int i = 0; i < 128; i++) {
-        auto buf_result = dma_alloc_buffer(2048);
-        if (buf_result.is_error()) {
+        if (m_tx_buffers[i].allocate(2048).is_error()) {
             fk::algorithms::kerror("E1000", "Failed to allocate TX buffer %d", i);
             return;
         }
-        m_tx_buffers[i] = buf_result.value();
-        m_tx_descs[i].addr = m_tx_buffers[i].phys;
+        m_tx_descs[i].addr = m_tx_buffers[i].physical_address().as_uintptr();
         m_tx_descs[i].status = 0;
     }
 
-    write_command(REG_TXADDRL, (uint32_t)m_tx_ring.phys);
-    write_command(REG_TXADDRH, (uint32_t)(m_tx_ring.phys >> 32));
+    write_command(REG_TXADDRL, (uint32_t)m_tx_ring.physical_address().as_uintptr());
+    write_command(REG_TXADDRH, (uint32_t)(m_tx_ring.physical_address().as_uintptr() >> 32));
     write_command(REG_TXLEN, 128 * sizeof(e1000_tx_desc));
     write_command(REG_TXHEAD, 0);
     write_command(REG_TXTAIL, 0);
@@ -208,7 +201,7 @@ fk::core::Result<void, fk::core::Error> E1000Controller::send_packet(const uint8
     m_tx_descs[m_tx_current].len = (uint16_t)size;
     m_tx_descs[m_tx_current].status = 0;
     m_tx_descs[m_tx_current].lower_setup = (1 << 3) | (1 << 0) | (1 << 1); // RS, EOP, IFCS
-    fk::memory::copy(m_tx_buffers[m_tx_current].vaddr, data, size);
+    fk::memory::copy(m_tx_buffers[m_tx_current].virtual_address(), data, size);
 
     uint16_t old_tx = m_tx_current;
     m_tx_current = (m_tx_current + 1) % 128;
@@ -264,7 +257,7 @@ fk::core::Result<size_t, fk::core::Error> E1000Controller::receive_packet(uint8_
 
     if (size > max_size) size = max_size;
 
-    fk::memory::copy(buffer, m_rx_buffers[m_rx_current].vaddr, size);
+    fk::memory::copy(buffer, m_rx_buffers[m_rx_current].virtual_address(), size);
 
     m_rx_descs[m_rx_current].status = 0;
     uint16_t old_rx = m_rx_current;

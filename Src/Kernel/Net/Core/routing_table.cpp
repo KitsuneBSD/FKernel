@@ -22,7 +22,7 @@ void RoutingTable::add_route(IPv4Address dest, IPv4Address mask, IPv4Address gw)
     entry.netmask = mask;
     entry.gateway = gw;
     entry.is_default = false;
-    m_routes.push_back(entry);
+    TRY_OR_FATAL(m_routes.push_back(entry));
 }
 
 fk::memory::optional<IPv4Address> RoutingTable::lookup(IPv4Address dest) const {

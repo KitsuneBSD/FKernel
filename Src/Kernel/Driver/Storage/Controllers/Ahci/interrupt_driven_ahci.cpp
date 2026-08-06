@@ -1,10 +1,13 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/tick_manager.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Driver/Storage/Controllers/Ahci/interrupt_driven_ahci.h>
 #include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <Kernel/Memory/memory_manager.h>
+#include <Kernel/Memory/VirtualMemory/virtual_memory_manager.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 
@@ -309,23 +312,66 @@ void AhciInterruptHandler::register_handler(fk::RefPtr<InterruptDrivenAhciContro
   fk::algorithms::klog("AHCI_INT", "Registered interrupt handler for IRQ %d (vector %d)", irq, vector);
 }
 
-// Async DMA operations not yet implemented — callers get DeviceError
+// base class rebase_ports() already allocated cmd_list/fis_buffer/cmd_tables per port
 fk::core::Result<void, fk::core::Error> InterruptDrivenAhciController::setup_dma_buffers() {
-    fk::algorithms::kwarn("AHCI_INT", "setup_dma_buffers: async DMA not implemented");
-    return fk::core::Error::NotImplemented;
+    return {};
 }
-void InterruptDrivenAhciController::setup_command_header(uint32_t, uint32_t, uint32_t, bool) {
-    fk::algorithms::kwarn("AHCI_INT", "setup_command_header: not implemented");
+
+void InterruptDrivenAhciController::setup_command_header(uint32_t port_index, uint32_t slot,
+                                                          uint32_t /*sector_count*/, bool is_write) {
+    if (port_index >= m_ports.size() || !m_ports[port_index].is_implemented) return;
+    auto& port = m_ports[port_index];
+    HBA_CMD_HEADER* h = reinterpret_cast<HBA_CMD_HEADER*>(port.cmd_list.virtual_address()) + slot;
+    h->cfl   = sizeof(FIS_REG_H2D) / sizeof(uint32_t);
+    h->w     = is_write ? 1 : 0;
+    h->prdtl = 1;
 }
-void InterruptDrivenAhciController::setup_fis(uint32_t, uint32_t, uint64_t, uint32_t, bool) {
-    fk::algorithms::kwarn("AHCI_INT", "setup_fis: not implemented");
+
+void InterruptDrivenAhciController::setup_fis(uint32_t port_index, uint32_t slot, uint64_t lba,
+                                               uint32_t count, bool is_write) {
+    if (port_index >= m_ports.size() || !m_ports[port_index].is_implemented) return;
+    auto& port = m_ports[port_index];
+
+    // find_pending searches active entries by slot number.
+    auto* op_ptr = m_port_queues[port_index].find_pending(slot);
+    if (!op_ptr) {
+        fk::algorithms::kwarn("AHCI_INT", "setup_fis: no op for port %u slot %u", port_index, slot);
+        return;
+    }
+    void* buf = (*op_ptr)->get_buffer();
+
+    HBA_CMD_TABLE* ct = reinterpret_cast<HBA_CMD_TABLE*>(
+        static_cast<uint8_t*>(port.cmd_tables.virtual_address()) + slot * 256);
+    fk::memory::set(ct, 0, sizeof(HBA_CMD_TABLE));
+
+    uintptr_t phys = VirtualMemoryManager::the().translate(reinterpret_cast<uintptr_t>(buf));
+    ct->prdt_entry[0].dba  = (uint32_t)phys;
+    ct->prdt_entry[0].dbau = (uint32_t)(phys >> 32);
+    ct->prdt_entry[0].dbc  = (count << 9) - 1;
+    ct->prdt_entry[0].i    = 1;
+
+    FIS_REG_H2D* fis = reinterpret_cast<FIS_REG_H2D*>(&ct->cfis);
+    fis->fis_type = 0x27; // FIS_TYPE_REG_H2D
+    fis->c        = 1;
+    fis->command  = is_write ? (uint8_t)0x35 : (uint8_t)0x25; // WRITE/READ DMA EXT
+    fis->lba0     = (uint8_t)lba;
+    fis->lba1     = (uint8_t)(lba >> 8);
+    fis->lba2     = (uint8_t)(lba >> 16);
+    fis->device   = 1 << 6; // LBA mode
+    fis->lba3     = (uint8_t)(lba >> 24);
+    fis->lba4     = (uint8_t)(lba >> 32);
+    fis->lba5     = (uint8_t)(lba >> 40);
+    fis->countl   = (uint8_t)count;
+    fis->counth   = (uint8_t)(count >> 8);
 }
-void InterruptDrivenAhciController::start_command(uint32_t, uint32_t) {
-    fk::algorithms::kwarn("AHCI_INT", "start_command: not implemented");
+
+void InterruptDrivenAhciController::start_command(uint32_t port_index, uint32_t slot) {
+    if (port_index >= m_ports.size() || !m_ports[port_index].is_implemented) return;
+    m_ports[port_index].regs->ci |= (1u << slot);
 }
-DmaBuffer& InterruptDrivenAhciController::get_dma_buffer(uint32_t) {
-    fk::algorithms::kwarn("AHCI_INT", "get_dma_buffer: returning static dummy");
-    static DmaBuffer dummy; return dummy;
+
+DmaBuffer& InterruptDrivenAhciController::get_dma_buffer(uint32_t port_index) {
+    return m_port_buffers[port_index < 32 ? port_index : 0];
 }
 
 } // namespace fkernel

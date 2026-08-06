@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Virtual/SysFs/sys_block_dev_dir_node.h>
 #include <Kernel/Fs/Virtual/SysFs/sys_attr_node.h>
-#include <LibFK/Utilities/memory.h>
 
 static void u64_to_str(char* buf, size_t len, uint64_t val) {
   if (val == 0) { buf[0] = '0'; buf[1] = '\0'; return; }
@@ -29,7 +30,7 @@ fk::core::Result<void, fk::core::Error> SysBlockDevDirNode::list_dir(fk::contain
     DirectoryEntry de;
     fk::memory::copy_n(de.name, n, sizeof(de.name));
     de.type = 0;
-    entries.push_back(de);
+    TRY(entries.push_back(de));
   }
   return {};
 }

@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Driver/Storage/Controllers/Nvme/interrupt_driven_nvme.h>
 #include <Kernel/Driver/Storage/Controllers/Nvme/nvme_command_builder.h>
 #include <Kernel/Driver/Storage/Controllers/Nvme/nvme_completion_processor.h>
@@ -8,7 +10,6 @@
 #include <Kernel/Hardware/Buses/Pci/pci.h>
 #include <Kernel/Memory/memory_manager.h>
 #include <Kernel/Memory/PhysicalMemory/Buddy/buddy_order.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 
@@ -124,20 +125,45 @@ InterruptDrivenNvmeController::create_read_operation(uint16_t command_id, uint64
 
 fk::core::Result<void, fk::core::Error>
 InterruptDrivenNvmeController::submit_read_command(NvmeAsyncOperation* operation) {
-  uint64_t prp1 = MemoryManager::the().translate(reinterpret_cast<uintptr_t>(operation->buffer()));
+  uintptr_t buf_va = reinterpret_cast<uintptr_t>(operation->buffer());
+  uint64_t prp1 = MemoryManager::the().translate(buf_va);
   uint32_t transfer_size = operation->block_count() * m_state.configuration().block_size();
+
+  uint64_t prp2 = 0;
+
   if (transfer_size > 4096) {
-    fk::algorithms::kerror("NVME_INT", "Large xfer not supported");
-    return fk::core::Error::NotImplemented;
+    uint32_t pages_needed = (transfer_size + 4095) / 4096;
+
+    if (pages_needed == 2) {
+      // Two-page transfer: PRP2 = physical address of second page.
+      prp2 = MemoryManager::the().translate(buf_va + 4096);
+    } else {
+      // Multi-page transfer: build a PRP list for pages 2..N.
+      // PRP list fits in one 4KiB page → handles up to 512 additional pages (~2MiB).
+      auto list_result = allocate_dma_memory(4096);
+      if (list_result.is_error()) {
+        fk::algorithms::kerror("NVME_INT", "PRP list alloc failed for %u-page xfer", pages_needed);
+        return fk::core::Error::OutOfMemory;
+      }
+      uintptr_t list_phys = list_result.value();
+      auto* prp_list = reinterpret_cast<uint64_t*>(list_phys);
+      for (uint32_t i = 1; i < pages_needed; ++i)
+        prp_list[i - 1] = MemoryManager::the().translate(buf_va + i * 4096);
+      prp2 = list_phys;
+      operation->set_prp_list(list_phys);
+    }
   }
 
   NvmeCommand cmd = NvmeCommandBuilder::build_read(operation->start_lba(), operation->block_count(),
-                                                   prp1, 0, m_state.configuration().namespace_id());
+                                                   prp1, prp2, m_state.configuration().namespace_id());
   cmd.cdw0 |= (operation->command_id() & 0xFFFF) << 16;
 
   auto submit_result = submit_io_command(cmd);
-  if (submit_result.is_error())
+  if (submit_result.is_error()) {
+    if (operation->prp_list_phys())
+      free_dma_memory(operation->prp_list_phys(), 4096);
     return submit_result.error();
+  }
 
   return {};
 }
@@ -149,6 +175,8 @@ InterruptDrivenNvmeController::read_blocks(uint64_t start_lba, size_t count, uin
     return async_op_res.error();
   auto* async_op = async_op_res.value();
   IoCompletionStatus status = async_op->wait_for_completion(5000);
+  if (async_op->prp_list_phys())
+    free_dma_memory(async_op->prp_list_phys(), 4096);
   return translate_completion_status(status, count);
 }
 

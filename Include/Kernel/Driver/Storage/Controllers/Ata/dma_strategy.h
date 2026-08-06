@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Kernel/Driver/Storage/Controllers/Ata/ata_transfer_strategy.h>
-#include <Kernel/Memory/Dma/dma_buffer.h>
+#include <Kernel/Driver/Async/dma_buffer.h>
 #include <LibFK/Synchronization/spinlock.h>
 #include <LibFK/Types/types.h>
 

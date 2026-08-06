@@ -5,11 +5,10 @@
 // fprintf/vfprintf check if the FILE* is stdout/stderr and use the same path;
 // all other FILE* are unsupported in the freestanding kernel context.
 
-static char g_printf_buf[2048];
-
 int vprintf(const char *fmt, va_list args) {
-    int n = vsnprintf(g_printf_buf, sizeof(g_printf_buf), fmt, args);
-    libc_puts(g_printf_buf);
+    char buf[2048];
+    int n = vsnprintf(buf, sizeof(buf), fmt, args);
+    libc_puts(buf);
     return n;
 }
 

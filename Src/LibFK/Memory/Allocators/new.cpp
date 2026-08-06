@@ -4,13 +4,28 @@
  */
 
 #include <LibC/stddef.h>
+#include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/heap_malloc.h>
 
 /// @brief Allocates memory for a single object.
-void *operator new(size_t size) { return heap_malloc(size); }
+void *operator new(size_t size) {
+  void *ptr = heap_malloc(size);
+  if (!ptr) {
+    fk::algorithms::kfatal("HEAP", "operator new OOM: size=%zu", size);
+    __builtin_unreachable();
+  }
+  return ptr;
+}
 
 /// @brief Allocates memory for an array of objects.
-void *operator new[](size_t size) { return heap_malloc(size); }
+void *operator new[](size_t size) {
+  void *ptr = heap_malloc(size);
+  if (!ptr) {
+    fk::algorithms::kfatal("HEAP", "operator new[] OOM: size=%zu", size);
+    __builtin_unreachable();
+  }
+  return ptr;
+}
 
 /// @brief Frees memory for a single object.
 void operator delete(void *ptr) noexcept { heap_free(ptr); }

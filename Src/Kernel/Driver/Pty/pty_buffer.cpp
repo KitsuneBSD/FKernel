@@ -1,5 +1,6 @@
-#include <Kernel/Driver/Pty/pty_buffer.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Driver/Pty/pty_buffer.h>
 
 namespace fkernel {
 
@@ -18,7 +19,7 @@ size_t PtyBuffer::write(const uint8_t* src, size_t len) {
   size_t space = CAPACITY - m_data.size();
   size_t n = len < space ? len : space;
   for (size_t i = 0; i < n; ++i)
-    m_data.push_back(src[i]);
+    TRY_OR_FATAL(m_data.push_back(src[i]));
   if (n > 0) m_notification.signal(fk::NotificationBits(1));
   return n;
 }

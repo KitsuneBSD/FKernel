@@ -1,9 +1,9 @@
-#include <Kernel/Fs/Disk/RamDisk/ram_disk.h>
-
 #include <LibFK/Algorithms/Generic/container_algorithms.h>
 #include <LibFK/Algorithms/Logging/log.h>
 #include <LibFK/Memory/Allocators/new.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Disk/RamDisk/ram_disk.h>
 
 namespace fkernel {
 
@@ -73,7 +73,7 @@ void RamDiskNode::parse_tar() {
 
         file_node->set_name(name_ptr);
         file_node->set_parent(fk::RefPtr<Node>(this));
-        m_files.push_back({final_filename, file_node});
+        TRY_OR_FATAL(m_files.push_back({final_filename, file_node}));
         fk::algorithms::klog("RAMDISK", "Loaded file: %s (%zu bytes) as '%s'", final_filename,
                              file_size, name_ptr);
         files_loaded++;
@@ -90,7 +90,7 @@ void RamDiskNode::parse_tar() {
         fk::memory::copy_n(temp, final_filename, sizeof(temp) - 1);
         temp[sizeof(temp) - 1] = '\0';
       }
-      m_directories.push_back(temp);
+      TRY_OR_FATAL(m_directories.push_back(temp));
       fk::algorithms::klog("RAMDISK", "Found explicit directory: %s", temp);
     } else if (header->typeflag[0] == '2') {
       // Symbolic link
@@ -110,7 +110,7 @@ void RamDiskNode::parse_tar() {
 
         symlink_node->set_name(name_ptr);
         symlink_node->set_parent(fk::RefPtr<Node>(this));
-        m_files.push_back({final_filename, symlink_node});
+        TRY_OR_FATAL(m_files.push_back({final_filename, symlink_node}));
         fk::algorithms::klog("RAMDISK", "Loaded symlink: %s -> %s as '%s'", final_filename,
                              link_target, name_ptr);
         files_loaded++;
@@ -176,9 +176,9 @@ fk::core::Result<fk::RefPtr<Node>, fk::core::Error> RamDiskNode::lookup(const ch
 
     // Copy m_files and m_directories to the new directory node so it can find its own children
     for (auto& f : m_files)
-      dir_node->m_files.push_back(f);
+      TRY(dir_node->m_files.push_back(f));
     for (auto& d : m_directories)
-      dir_node->m_directories.push_back(d);
+      TRY(dir_node->m_directories.push_back(d));
 
     dir_node->m_prefix = dir_prefix;
     dir_node->set_parent(fk::RefPtr<Node>(this));
@@ -239,7 +239,7 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
       } else {
         de.type = entry.node->is_symlink() ? 2 : 0; // DT_LNK : DT_REG
       }
-      entries.push_back(de);
+      TRY(entries.push_back(de));
     }
   }
 
@@ -272,7 +272,7 @@ RamDiskNode::list_dir(fk::containers::Vector<DirectoryEntry>& entries) {
       fk::memory::set(&de, 0, sizeof(de));
       fk::memory::copy_n(de.name, component, sizeof(de.name) - 1);
       de.type = 1; // DT_DIR
-      entries.push_back(de);
+      TRY(entries.push_back(de));
     }
   }
 

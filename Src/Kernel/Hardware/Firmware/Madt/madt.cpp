@@ -1,3 +1,6 @@
+#include <LibFK/Core/assertions.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Hardware/Firmware/Acpi/acpi.h>
 #include <Kernel/Hardware/Firmware/Madt/madt.h>
 #include <Kernel/Hardware/Firmware/Madt/madt_entries.h>
@@ -5,8 +8,6 @@
 #include <Kernel/Hardware/Firmware/Madt/madt_ioapic.h>
 #include <Kernel/Hardware/Firmware/Madt/madt_interrupt_source_override.h>
 #include <Kernel/Hardware/Firmware/Madt/madt_lapic_override.h>
-#include <LibFK/Core/assertions.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 void ACPIManager::initialize_madt() {
   m_madt = (Madt *)find_table("APIC");

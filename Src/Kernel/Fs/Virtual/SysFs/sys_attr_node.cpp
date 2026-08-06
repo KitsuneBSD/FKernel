@@ -1,5 +1,6 @@
-#include <Kernel/Fs/Virtual/SysFs/sys_attr_node.h>
 #include <LibFK/Utilities/memory.h>
+
+#include <Kernel/Fs/Virtual/SysFs/sys_attr_node.h>
 
 fk::core::Result<size_t, fk::core::Error> SysAttrNode::read(uint64_t offset, size_t size, uint8_t* buffer) {
   // Value with a trailing newline

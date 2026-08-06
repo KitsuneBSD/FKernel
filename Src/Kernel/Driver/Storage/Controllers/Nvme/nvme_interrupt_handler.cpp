@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_types.h>
 #include <Kernel/Driver/Storage/Controllers/Nvme/interrupt_driven_nvme.h>
 #include <Kernel/Driver/Storage/Controllers/Nvme/nvme_interrupt_handler.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel {
 

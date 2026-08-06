@@ -1,10 +1,11 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Vfs/Core/dentry.h>
 #include <Kernel/Fs/Vfs/Events/kqueue.h>
 #include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Net/Sockets/unix_socket.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
@@ -180,7 +181,7 @@ void UnixSocket::send_fds(fk::containers::Vector<fk::RefPtr<FileDescription>>& f
 void UnixSocket::recv_fds(fk::containers::Vector<fk::RefPtr<FileDescription>>& out) {
   fk::synchronization::ScopedLockIRQ lock(m_lock);
   for (size_t i = 0; i < m_pending_fd_count; ++i)
-    out.push_back(fk::types::move(m_pending_fds[i]));
+    TRY_OR_FATAL(out.push_back(fk::types::move(m_pending_fds[i])));
   m_pending_fd_count = 0;
 }
 

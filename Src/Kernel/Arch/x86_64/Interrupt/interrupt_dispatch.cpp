@@ -1,3 +1,5 @@
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Arch/x86_64/Interrupt/Handler/handlers.h>
 #include <Kernel/Arch/x86_64/Interrupt/Handler/interrupt_frame.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
@@ -6,7 +8,48 @@
 #include <Kernel/Arch/x86_64/Syscall/syscall_arch.h>
 #include <Kernel/Ipc/Signals/signal_delivery.h>
 #include <Kernel/Scheduler/Core/scheduler.h>
-#include <LibFK/Algorithms/Logging/log.h>
+
+static_assert(sizeof(InterruptFrame) == 22 * sizeof(uint64_t),
+              "InterruptFrame layout changed — update PtRegs bridge copy");
+static_assert(sizeof(PtRegs) == 16 * sizeof(uint64_t),
+              "PtRegs layout changed — update InterruptFrame bridge copy");
+static_assert(__builtin_offsetof(InterruptFrame, rip)    == 17 * sizeof(uint64_t));
+static_assert(__builtin_offsetof(InterruptFrame, rflags) == 19 * sizeof(uint64_t));
+static_assert(__builtin_offsetof(InterruptFrame, rsp)    == 20 * sizeof(uint64_t));
+static_assert(__builtin_offsetof(PtRegs, rip)    == 13 * sizeof(uint64_t));
+static_assert(__builtin_offsetof(PtRegs, rflags) == 14 * sizeof(uint64_t));
+static_assert(__builtin_offsetof(PtRegs, rsp)    == 15 * sizeof(uint64_t));
+
+// TSC latency stats (sprint Item 1): max handler cycles per interrupt vector.
+// Not locked — a lost update on a concurrent per-CPU update is acceptable for a max tracker.
+// g_tsc_max_syscall is defined in syscall.cpp (extern here for the periodic dump).
+extern uint64_t g_tsc_max_syscall;
+static uint64_t g_tsc_max_irq[256] = {};
+static uint64_t g_tsc_last_dump_ticks = 0;
+static constexpr uint64_t TSC_DUMP_INTERVAL_MS = 5000;
+
+static inline uint64_t irq_tsc_now() {
+    uint32_t lo, hi;
+    asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+    return (static_cast<uint64_t>(hi) << 32) | lo;
+}
+
+static void tsc_latency_dump(uint64_t now_ticks) {
+    g_tsc_last_dump_ticks = now_ticks;
+    bool any = false;
+    for (size_t v = 0; v < 256; ++v) {
+        if (!g_tsc_max_irq[v]) continue;
+        if (!any) { fk::algorithms::klog("TSC", "Max handler latencies (5s window):"); any = true; }
+        fk::algorithms::klog("TSC", "  [%s] vec %3zu: %lu cy",
+            v < 32 ? "EXC" : "IRQ", v, g_tsc_max_irq[v]);
+        g_tsc_max_irq[v] = 0;
+    }
+    if (g_tsc_max_syscall) {
+        if (!any) fk::algorithms::klog("TSC", "Max handler latencies (5s window):");
+        fk::algorithms::klog("TSC", "  [SYS] syscall:     %lu cy", g_tsc_max_syscall);
+        g_tsc_max_syscall = 0;
+    }
+}
 
 namespace {
 
@@ -33,6 +76,9 @@ void evaluate_irq_storms() {
   }
   if (now_ticks - g_storm_last_ticks < STORM_WINDOW_MS) return;
   g_storm_last_ticks = now_ticks;
+
+  if (now_ticks - g_tsc_last_dump_ticks >= TSC_DUMP_INTERVAL_MS)
+    tsc_latency_dump(now_ticks);
 
   for (size_t v = 0; v < STORM_SLOTS; ++v) {
     if (g_storm_counts[v] >= STORM_MAX_PER_WINDOW) {
@@ -66,11 +112,15 @@ extern "C" void interrupt_dispatch(uint8_t vector,
   ++g_storm_counts[vector];
   evaluate_irq_storms();
 
+  uint64_t tsc_start = irq_tsc_now();
   auto handler = InterruptController::the().get_interrupt(vector);
-  if (handler) {
+  if (handler)
     handler(vector, frame);
-  } else
+  else
     default_handler(vector, frame);
+  uint64_t tsc_elapsed = irq_tsc_now() - tsc_start;
+  if (tsc_elapsed > g_tsc_max_irq[vector])
+    g_tsc_max_irq[vector] = tsc_elapsed;
 
   if (SchedulerManager::the().is_initialized() &&
       SchedulerManager::the().is_need_resched()) {

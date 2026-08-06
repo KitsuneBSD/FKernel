@@ -3,7 +3,7 @@
 namespace fkernel {
 
 void DentryNodeStack::push(fk::RefPtr<Node> node) {
-  m_nodes.push_back(node);
+  TRY_OR_FATAL(m_nodes.push_back(node));
 }
 
 void DentryNodeStack::pop() {

@@ -1,9 +1,10 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Driver/Terminal/terminal_manager.h>
 #include <Kernel/Driver/Terminal/vga_terminal.h>
 #include <Kernel/Driver/Device/driver_manager.h>
 #include <Kernel/Fs/Virtual/DevFs/dev_fs.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 namespace terminal {
@@ -38,7 +39,7 @@ TerminalManager::create_terminal(TerminalType type, const char *name_hint) {
     auto* term_ptr = terminal.get();
     fkernel::DriverManager::the().register_device(fk::RefPtr<Node>(term_ptr));
 
-    m_vga_terminals.push_back(fk::types::move(terminal));
+    TRY(m_vga_terminals.push_back(fk::types::move(terminal)));
     fk::algorithms::klog("TERMINAL_MANAGER",
                          "Created VGA terminal tty%d on-demand", tty_index);
     return id;

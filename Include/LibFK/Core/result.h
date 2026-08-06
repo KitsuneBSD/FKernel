@@ -99,3 +99,16 @@ private:
       return _result.error();                                                  \
     _result.value();                                                           \
   })
+
+// For callers whose return type cannot carry an Error (void/bool/int/etc.):
+// halt on failure instead of swallowing it. Matches operator new's OOM policy
+// (kfatal + unreachable) — the caller is not expected to survive allocation
+// failure.
+#define TRY_OR_FATAL(expression)                                               \
+  do {                                                                         \
+    auto _result = (expression);                                               \
+    if (_result.is_error()) {                                                  \
+      fk::algorithms::kfatal("OOM", "allocation failure (TRY_OR_FATAL)");      \
+      __builtin_unreachable();                                                 \
+    }                                                                          \
+  } while (0)

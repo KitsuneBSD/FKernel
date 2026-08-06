@@ -1,8 +1,9 @@
+#include <LibFK/Algorithms/Logging/log.h>
+#include <LibFK/Types/Ipc/notification_bits.h>
+
 #include <Kernel/Ipc/Notifications/irq_binding.h>
 #include <Kernel/Arch/x86_64/Interrupt/interrupt_controller.h>
 #include <Kernel/Arch/x86_64/Interrupt/HardwareInterrupts/hardware_interrupt_manager.h>
-#include <LibFK/Algorithms/Logging/log.h>
-#include <LibFK/Types/Ipc/notification_bits.h>
 
 namespace fkernel {
 namespace ipc {

@@ -48,8 +48,8 @@ The LibC layer (`libc_puts`) cannot depend on Kernel headers. The hook pattern (
 
 | Level | Function | Behavior | When to Use |
 |-------|----------|----------|-------------|
-| FATAL | `kerror()` | Halts CPU | Unrecoverable: page table corruption, triple fault |
-| ERROR | `kerror()` → future `kfatal()` | Halts CPU | Should be non-halting after refactor |
+| FATAL | `kfatal()` | Halts CPU | Unrecoverable: page table corruption, triple fault |
+| ERROR | `kerror()` | Returns | Recoverable or unclassified errors (split `kfatal`/`kerror` done) |
 | EXCEPTION | `kexception()` | Returns | Exception handler output (does not halt) |
 | WARN | `kwarn()` | Returns | Degraded but continues: sector size mismatch, timeout |
 | INFO | `klog()` | Returns | State changes: mount, init, connection |
@@ -105,7 +105,7 @@ The `syslog()` syscall (nr 103) provides Linux-compatible `dmesg` access:
 1. ~~No runtime log-level filtering~~ **Implemented** — compile-time `FKERNEL_LOG_LEVEL` + runtime `get_log_level()` check
 2. No compile-time log stripping in release builds
 3. Panic output bypasses the logging system
-4. `kerror()` halts on every call — no non-halting error level; proposed split: `kfatal()` (halt) + `kerror()` (non-halting)
+4. ~~`kerror()` halts on every call~~ — split done: `kfatal()` halts, `kerror()` is non-halting
 5. 512-byte message truncation is silent
 
 ## Future: Proposed Log Levels

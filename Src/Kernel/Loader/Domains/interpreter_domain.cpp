@@ -1,3 +1,6 @@
+#include <LibFK/Algorithms/Crypto/chacha20.h>
+#include <LibFK/Algorithms/Logging/log.h>
+
 #include <Kernel/Loader/Domains/interpreter_domain.h>
 #include <Kernel/Loader/Domains/dynamic_domain.h>
 #include <Kernel/Loader/Domains/parser_domain.h>
@@ -5,8 +8,6 @@
 #include <Kernel/Loader/Domains/memory_domain.h>
 #include <Kernel/Fs/Vfs/Core/virtual_filesystem.h>
 #include <Kernel/Fs/Vfs/Core/dentry.h>
-#include <LibFK/Algorithms/Crypto/chacha20.h>
-#include <LibFK/Algorithms/Logging/log.h>
 
 namespace fkernel::elf_domains {
 

@@ -1,6 +1,7 @@
+#include <LibFK/Utilities/memory.h>
+
 #include <Kernel/Fs/Disk/Fat12/fat_12_node.h>
 #include <Kernel/Fs/Disk/Fat12/fat_12_fs.h>
-#include <LibFK/Utilities/memory.h>
 
 namespace fkernel {
 
