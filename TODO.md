@@ -266,18 +266,19 @@ Extrair dependências x86_64 para interfaces genéricas (AArch64/RISC-V no futur
 
 `Src/Kernel/Arch/x86_64/Memory/IntelIOMMU/vtd.cpp` — todas as 3 funções retornam `NotImplemented`. Sem tradução DMA real. (~2 semanas para implementação mínima)
 
-### 12. 8 locais com `NotImplemented` no kernel
+### 12. NotImplemented no kernel — 6 → restam 5 reais
 
-Recontado 2026-08-04: **8 ocorrências em 4 arquivos** (era 12/7 em 2026-08-03 — mlock + UDP `connect`/`listen` foram implementados). Lista exata sempre re-derivável: `rg "NotImplemented" Src/Kernel`.
+Recontado 2026-08-06: **5 stubs reais em 3 arquivos** + 1 ioctl catch-all correto + 1 syscall desconhecida (correto). Lista exata: `rg "NotImplemented" Src/Kernel`.
 
 | Arquivo | Ocorrências | O quê |
 |---------|-------------|-------|
 | `Arch/x86_64/Memory/IntelIOMMU/vtd.cpp` | 3 | IOMMU VT-d (tradução DMA) |
-| `Driver/Terminal/terminal_manager.cpp` | 2 | Criação de terminais Serial e PTY |
-| `Driver/Terminal/terminal_factory.cpp` | 2 | Factory de terminais Serial/PTY |
+| `Driver/Terminal/terminal_manager.cpp` | 1 | Criação de PTY |
+| `Driver/Terminal/terminal_factory.cpp` | 1 | Factory PTY |
+| `Driver/Terminal/serial_terminal.cpp` | 1 | ioctl desconhecido (correto — não é stub) |
 | `Syscall/syscall.cpp` | 1 | Syscall desconhecida (correto — não é stub) |
 
-Cada um precisa ser implementado ou documentado como "não vai fazer".
+~~Serial Terminal~~ ✅ implementado (2026-08-06): `SerialTerminal` wraps COM1 driver. PTY requer master/slave pairs (future). IOMMU requer implementação de 2 semanas.
 
 ### 13. Phase 46 — Compressed Swap (ZRam/ZSwap)
 
